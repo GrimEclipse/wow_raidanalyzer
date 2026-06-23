@@ -30,4 +30,4 @@ python analyze.py --version 12.0 --raid march_on_queldanas --boss midnight_falls
 - `WCLMechanicMiner/`：用于在游戏内从地下城手册采集机制素材的轻量 WoW 插件。
 - `docs/`：插件配置化和后续自动生成方案说明。
 
-`legacy/` 是本地备份目录，默认不上传到仓库。
+`legacy/` 保留原始单 boss 版本源码；其中生成出的 `wcl_hardcore_api.json` 不上传到仓库。
