@@ -1,0 +1,43 @@
+{
+  "versions": [
+    {
+      "version": "12.0",
+      "raids": [
+        {
+          "key": "dream_rift",
+          "name": "梦境裂隙",
+          "bosses": [
+            { "key": "chimaerus", "name": "奇美鲁斯，未梦之神" }
+          ]
+        },
+        {
+          "key": "void_spire",
+          "name": "虚影尖塔",
+          "bosses": [
+            { "key": "imperator_averzian", "name": "元首阿福扎恩" },
+            { "key": "vorasius", "name": "弗拉希乌斯" },
+            { "key": "fallen_king_salhadaar", "name": "陨落之王萨哈达尔" },
+            { "key": "vaelgor_ezzorak", "name": "威厄高尔和艾佐拉克" },
+            { "key": "lightblinded_vanguard", "name": "光盲先锋军" },
+            { "key": "crown_of_the_cosmos", "name": "宇宙之冕" }
+          ]
+        },
+        {
+          "key": "march_on_queldanas",
+          "name": "进军奎尔丹纳斯",
+          "bosses": [
+            { "key": "beloren", "name": "贝洛朗，奥的子嗣" },
+            { "key": "midnight_falls", "name": "至暗之夜降临" }
+          ]
+        },
+        {
+          "key": "sporefall",
+          "name": "暮孢陨坠",
+          "bosses": [
+            { "key": "rotmire", "name": "腐沼" }
+          ]
+        }
+      ]
+    }
+  ]
+}

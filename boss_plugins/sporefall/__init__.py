@@ -1,0 +1,2 @@
+"""Sporefall boss plugins."""
+

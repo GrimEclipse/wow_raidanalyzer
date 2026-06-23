@@ -1,0 +1,2 @@
+"""Void Spire boss plugins."""
+

@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.log
+
+.env
+.env.*
+!.env.example
+
+# Local generated WCL output and private report snapshots.
+wcl_hardcore_api.json
+
+# Local generated WCL output and private report snapshots inside legacy backups.
+legacy/**/wcl_hardcore_api.json
+
+# Codex workspace metadata.
+.agents/
+.codex/
+
+# WoW client/runtime folders if copied near the project.
+WTF/
+Cache/
