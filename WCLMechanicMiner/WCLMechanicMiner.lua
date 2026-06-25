@@ -31,15 +31,15 @@ end
 
 local function getTierInfo(index)
     if EJ_GetTierInfo then
-        local id, name = EJ_GetTierInfo(index)
-        return id, name
+        return EJ_GetTierInfo(index)
     end
 end
 
-local function selectTier(tierID)
+local function selectTier(tierIndex)
     if EJ_SelectTier then
-        EJ_SelectTier(tierID)
+        return safeCall(EJ_SelectTier, tierIndex)
     end
+    return false
 end
 
 local function getNumTiers()
@@ -254,7 +254,7 @@ function Miner:Reset()
     WCLMechanicMinerDB = {
         meta = {
             addon = ADDON_NAME or "WCLMechanicMiner",
-            version = "0.1.0",
+            version = "0.1.1",
             locale = DEFAULT_LOCALE,
             generatedAt = now(),
         },
@@ -275,10 +275,15 @@ function Miner:Dump(options)
     printf("开始抓取地下城手册。tiers=%s mode=%s", tostring(tierCount), currentTierOnly and "current" or "all")
 
     for tierIndex = 1, tierCount do
-        local tierID, tierName = getTierInfo(tierIndex)
-        if tierID and (not requestedTier or requestedTier == tierID) then
+        local tierName = getTierInfo(tierIndex)
+        local tierID = tierIndex
+        if tierName and (not requestedTier or requestedTier == tierIndex) then
             if not currentTierOnly or tierIndex == tierCount then
-                selectTier(tierID)
+                local selected, selectError = selectTier(tierIndex)
+                if not selected then
+                    printf("无法选择版本层级 %s：%s", tostring(tierIndex), tostring(selectError or "EJ_SelectTier unavailable"))
+                    return
+                end
 
                 local tier = {
                     tierID = tierID,

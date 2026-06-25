@@ -2,7 +2,7 @@
 ## Title: WCL Mechanic Miner
 ## Notes: Dumps Encounter Journal boss abilities for WCL mechanic configuration.
 ## Author: Codex
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: WCLMechanicMinerDB
 
 WCLMechanicMiner.lua

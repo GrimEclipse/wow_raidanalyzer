@@ -19,6 +19,20 @@ WCLMechanicMiner.lua
 
 如果版本号不匹配，可以在角色选择界面勾选“加载过期插件”。
 
+## 同步开发版本
+
+项目目录中的插件是 Git 源版本。修改后在项目根目录执行：
+
+```powershell
+.\sync_wow_addon.ps1
+```
+
+默认会同步到：
+
+```text
+D:\World of Warcraft\_retail_\Interface\AddOns\WCLMechanicMiner
+```
+
 ## 命令
 
 ```text
@@ -132,4 +146,3 @@ WCLMechanicMinerDB = {
 - spellID 范围扫描
 - combat log 验证
 - SavedVariables 转 Python plugin 配置
-
