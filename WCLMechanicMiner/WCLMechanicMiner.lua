@@ -67,9 +67,9 @@ local function selectEncounter(encounterID)
     end
 end
 
-local function getEncounterInfoByIndex(index)
+local function getEncounterInfoByIndex(index, instanceID)
     if EJ_GetEncounterInfoByIndex then
-        return EJ_GetEncounterInfoByIndex(index)
+        return EJ_GetEncounterInfoByIndex(index, instanceID)
     end
 end
 
@@ -86,36 +86,45 @@ local function getCreatureInfo(index, encounterID)
 end
 
 local function getSectionInfo(sectionID)
-    if not sectionID or not EJ_GetSectionInfo then
+    if not sectionID then
         return nil
     end
 
-    local title, description, headerType, abilityIcon, creatureDisplayID, uiModelSceneID,
-          siblingSectionID, firstChildSectionID, filteredByDifficulty, link, startsOpen,
-          flag1, flag2, flag3, flag4, spellID, iconFlags, difficultyMask = EJ_GetSectionInfo(sectionID)
+    if C_EncounterJournal and C_EncounterJournal.GetSectionInfo then
+        local ok, info = safeCall(C_EncounterJournal.GetSectionInfo, sectionID)
+        if not ok or type(info) ~= "table" then
+            return nil
+        end
 
-    if not title and not description and not firstChildSectionID and not siblingSectionID then
-        return nil
+        local flags = {}
+        if C_EncounterJournal.GetSectionIconFlags then
+            local flagsOK, sectionFlags = safeCall(C_EncounterJournal.GetSectionIconFlags, sectionID)
+            if flagsOK and type(sectionFlags) == "table" then
+                flags = sectionFlags
+            end
+        end
+
+        return {
+            sectionID = sectionID,
+            title = trimText(info.title),
+            description = trimText(info.description),
+            headerType = info.headerType,
+            abilityIcon = info.abilityIcon,
+            creatureDisplayID = info.creatureDisplayID,
+            uiModelSceneID = info.uiModelSceneID,
+            siblingSectionID = info.siblingSectionID,
+            firstChildSectionID = info.firstChildSectionID,
+            filteredByDifficulty = info.filteredByDifficulty and true or false,
+            link = info.link,
+            startsOpen = info.startsOpen and true or false,
+            flags = flags,
+            spellID = info.spellID,
+            iconFlags = info.iconFlags,
+            difficultyMask = info.difficultyMask,
+        }
     end
 
-    return {
-        sectionID = sectionID,
-        title = trimText(title),
-        description = trimText(description),
-        headerType = headerType,
-        abilityIcon = abilityIcon,
-        creatureDisplayID = creatureDisplayID,
-        uiModelSceneID = uiModelSceneID,
-        siblingSectionID = siblingSectionID,
-        firstChildSectionID = firstChildSectionID,
-        filteredByDifficulty = filteredByDifficulty and true or false,
-        link = link,
-        startsOpen = startsOpen and true or false,
-        flags = { flag1, flag2, flag3, flag4 },
-        spellID = spellID,
-        iconFlags = iconFlags,
-        difficultyMask = difficultyMask,
-    }
+    return nil
 end
 
 local function addSpellIndex(db, section, instance, encounter)
@@ -183,11 +192,12 @@ end
 local function collectCreatures(encounterID)
     local creatures = {}
     for i = 1, 20 do
-        local name, description, displayInfo, iconImage = getCreatureInfo(i, encounterID)
-        if not name then
+        local creatureID, name, description, displayInfo, iconImage = getCreatureInfo(i, encounterID)
+        if not creatureID then
             break
         end
         table.insert(creatures, {
+            creatureID = creatureID,
             name = trimText(name),
             description = trimText(description),
             displayInfo = displayInfo,
@@ -198,7 +208,8 @@ local function collectCreatures(encounterID)
 end
 
 local function collectEncounter(db, instance, encounterIndex)
-    local name, description, encounterID, rootSectionID, link = getEncounterInfoByIndex(encounterIndex)
+    local name, description, encounterID, rootSectionID, link =
+        getEncounterInfoByIndex(encounterIndex, instance.instanceID)
     if not encounterID then
         return nil
     end
@@ -219,25 +230,39 @@ local function collectEncounter(db, instance, encounterIndex)
     return encounter
 end
 
-local function collectInstance(db, tier, instanceID, name, description, bgImage, buttonImage, loreImage, dungeonAreaMapID, link)
+local function collectInstance(db, tier, instanceID, name, description, bgImage, buttonImage1,
+                              loreImage, buttonImage2, dungeonAreaMapID, link,
+                              shouldDisplayDifficulty, mapID)
     local instance = {
         instanceID = instanceID,
         name = trimText(name),
         description = trimText(description),
         bgImage = bgImage,
-        buttonImage = buttonImage,
+        buttonImage = buttonImage1,
+        buttonImage2 = buttonImage2,
         loreImage = loreImage,
         dungeonAreaMapID = dungeonAreaMapID,
         link = link,
+        shouldDisplayDifficulty = shouldDisplayDifficulty and true or false,
+        mapID = mapID,
         encounters = {},
     }
 
     selectInstance(instanceID)
 
-    local infoName, infoDescription, _, _, _, _, _, mapID = getInstanceInfo(instanceID)
+    local infoName, infoDescription, infoBgImage, infoButtonImage1, infoLoreImage,
+          infoButtonImage2, infoDungeonAreaMapID, infoLink, infoShouldDisplayDifficulty,
+          infoMapID = getInstanceInfo(instanceID)
     if infoName then instance.name = trimText(infoName) end
     if infoDescription then instance.description = trimText(infoDescription) end
-    if mapID then instance.mapID = mapID end
+    if infoBgImage then instance.bgImage = infoBgImage end
+    if infoButtonImage1 then instance.buttonImage = infoButtonImage1 end
+    if infoLoreImage then instance.loreImage = infoLoreImage end
+    if infoButtonImage2 then instance.buttonImage2 = infoButtonImage2 end
+    if infoDungeonAreaMapID then instance.dungeonAreaMapID = infoDungeonAreaMapID end
+    if infoLink then instance.link = infoLink end
+    instance.shouldDisplayDifficulty = infoShouldDisplayDifficulty and true or false
+    if infoMapID then instance.mapID = infoMapID end
 
     for encounterIndex = 1, 50 do
         local encounter = collectEncounter(db, instance, encounterIndex)
@@ -254,7 +279,7 @@ function Miner:Reset()
     WCLMechanicMinerDB = {
         meta = {
             addon = ADDON_NAME or "WCLMechanicMiner",
-            version = "0.1.1",
+            version = "0.1.2",
             locale = DEFAULT_LOCALE,
             generatedAt = now(),
         },
@@ -295,14 +320,31 @@ function Miner:Dump(options)
                 printf("抓取版本层级：%s / %s", tostring(tierID), tier.name ~= "" and tier.name or ("tier " .. tierIndex))
 
                 for instanceIndex = 1, 100 do
-                    local instanceID, name, description, bgImage, buttonImage, loreImage, dungeonAreaMapID, link = getInstanceByIndex(instanceIndex, true)
+                    local instanceID, name, description, bgImage, buttonImage1, loreImage,
+                          buttonImage2, dungeonAreaMapID, link, shouldDisplayDifficulty,
+                          mapID = getInstanceByIndex(instanceIndex, true)
                     if not instanceID then
                         break
                     end
 
-                    local instance = collectInstance(db, tier, instanceID, name, description, bgImage, buttonImage, loreImage, dungeonAreaMapID, link)
+                    local instance = collectInstance(
+                        db, tier, instanceID, name, description, bgImage, buttonImage1,
+                        loreImage, buttonImage2, dungeonAreaMapID, link,
+                        shouldDisplayDifficulty, mapID
+                    )
                     table.insert(tier.raids, instance)
-                    printf("  raid %s: %s, boss=%d", tostring(instanceID), instance.name, #instance.encounters)
+
+                    local instanceSectionCount = 0
+                    for _, encounter in ipairs(instance.encounters) do
+                        instanceSectionCount = instanceSectionCount + #encounter.sections
+                    end
+                    printf(
+                        "  raid %s: %s, boss=%d section=%d",
+                        tostring(instanceID),
+                        instance.name,
+                        #instance.encounters,
+                        instanceSectionCount
+                    )
                 end
 
                 table.insert(db.tiers, tier)
