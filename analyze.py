@@ -1,8 +1,6 @@
 import argparse
 from pathlib import Path
 
-from analyzer_core.runner import analyze_report
-
 
 def main():
     parser = argparse.ArgumentParser(description="WCL boss wipe analyzer")
@@ -13,6 +11,12 @@ def main():
     parser.add_argument("--output", default=str(Path(__file__).resolve().with_name("wcl_hardcore_api.json")),
                         help="输出 JSON 路径")
     args = parser.parse_args()
+
+    print(
+        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} report={args.report}",
+        flush=True,
+    )
+    from analyzer_core.runner import analyze_report
 
     analyze_report(
         version=args.version,

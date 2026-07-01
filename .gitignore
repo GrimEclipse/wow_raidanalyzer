@@ -9,6 +9,10 @@ __pycache__/
 # Local generated WCL output and private report snapshots.
 wcl_hardcore_api.json
 
+# Local DB2 exports and generated mining outputs.
+db2_exports/
+generated/
+
 # Local generated WCL output and private report snapshots inside legacy backups.
 legacy/**/wcl_hardcore_api.json
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>至暗之夜降临 - 鲁拉开荒复盘</title>
+    <title>WCL 开荒复盘</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -20,7 +20,7 @@
 <div id="app" class="max-w-7xl mx-auto p-6">
     <header class="mb-6 border-b border-gray-800 pb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h1 class="text-3xl font-bold text-amber-400 tracking-wide">至暗之夜降临复盘面板</h1>
+            <h1 class="text-3xl font-bold text-amber-400 tracking-wide">{{ pageTitle }}</h1>
             <p class="text-gray-400 mt-2 text-sm">
                 已分析日志：
                 <span class="text-white font-semibold">{{ meta?.analyzedReports?.length || 0 }}</span>
@@ -35,7 +35,7 @@
             <button @click="currentTab='avoidable'" :class="tabClass('avoidable','blue')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 可躲避伤害
             </button>
-            <button @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
+            <button v-if="showInterruptTab" @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 漏断统计
             </button>
         </div>
@@ -86,7 +86,7 @@
             <div v-for="group in groupedWipes" :key="group.phase" class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
                 <div @click="togglePanel(group.phase)" class="p-4 cursor-pointer flex justify-between items-center" :class="phaseHeaderClass(group.phase)">
                     <div>
-                        <h2 class="font-bold text-lg text-white">{{ group.phase }} 灭团</h2>
+                        <h2 class="font-bold text-lg text-white">{{ groupTitle(group) }}</h2>
                         <p class="text-xs text-gray-300 mt-1">共 {{ group.count }} 次记录</p>
                     </div>
                     <span class="text-xl text-gray-300">{{ activePanels.includes(group.phase) ? '−' : '+' }}</span>
@@ -125,7 +125,64 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div v-if="fight.trialRecords && fight.trialRecords.length" class="mb-4 bg-gray-950 rounded border border-amber-900/70 overflow-hidden">
+                                        <div class="px-3 py-2 text-xs font-bold text-amber-200 border-b border-amber-900/70">明细数据</div>
+                                        <div class="max-h-44 overflow-y-auto no-scrollbar p-2 space-y-3">
+                                            <section v-for="record in fight.trialRecords" :key="record.type + record.title" class="text-xs border-l border-amber-800 pl-2">
+                                                <div class="flex justify-between gap-3">
+                                                    <span class="text-amber-100 font-semibold">{{ record.title }}</span>
+                                                    <span class="text-gray-500">{{ record.summary }}</span>
+                                                </div>
+                                                <div v-if="record.rows && record.rows.length" class="mt-1 space-y-1">
+                                                    <div v-for="row in record.rows.slice(0, 8)" :key="trialRowKey(record, row)" class="text-gray-300">
+                                                        <template v-if="record.type === 'split_deserters'">
+                                                            <span class="text-blue-300 font-semibold">{{ row.name }}</span>
+                                                            <span> 未吃分摊 {{ row.missCount }} 次</span>
+                                                            <span v-if="row.events && row.events.length" class="text-gray-500">
+                                                                （{{ row.events.slice(0, 4).map(e => e.time).join(' / ') }}）
+                                                            </span>
+                                                        </template>
+                                                        <template v-else-if="record.type === 'tank_swap'">
+                                                            <div v-if="row.events && row.events.length" class="space-y-0.5">
+                                                                <div v-for="event in row.events" :key="event.time + event.source + event.target + event.ability" class="text-gray-400">
+                                                                    <span class="font-mono text-gray-500">{{ event.time }}</span>
+                                                                    <span class="text-gray-300 ml-1">{{ event.text }}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div v-if="row.deathLines && row.deathLines.length" class="space-y-0.5">
+                                                                <div v-for="line in row.deathLines" :key="line.time + line.player + line.ability" class="text-red-300 font-semibold">
+                                                                    <span class="font-mono text-gray-500">{{ line.time }}</span>
+                                                                    {{ line.text }}
+                                                                </div>
+                                                            </div>
+                                                            <div v-else class="text-red-300 font-semibold">
+                                                                <span class="font-mono text-gray-500">{{ row.time }}</span>
+                                                                {{ row.deathLine || `${row.player} 死于 ${row.deathAbility}` }}
+                                                            </div>
+                                                        </template>
+                                                        <template v-else-if="record.type === 'split_issue'">
+                                                            <span class="font-mono text-gray-500">{{ row.time }}</span>
+                                                            <span class="text-blue-300 font-semibold"> {{ row.player }}</span>
+                                                            <span> 死于 {{ row.ability }}</span>
+                                                        </template>
+                                                        <template v-else-if="record.type === 'combat_res'">
+                                                            <span class="font-mono text-gray-500">{{ row.time }}</span>
+                                                            <span class="text-gray-300 ml-1">{{ row.text }}</span>
+                                                        </template>
+                                                        <template v-else-if="row.text">
+                                                            <span v-if="row.time" class="font-mono text-gray-500">{{ row.time }}</span>
+                                                            <span class="text-gray-300 ml-1">{{ row.text }}</span>
+                                                        </template>
+                                                        <template v-else>
+                                                            {{ JSON.stringify(row) }}
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        </div>
+                                    </div>
                                     <div class="h-36 overflow-y-auto no-scrollbar bg-gray-950/60 rounded border border-gray-800 p-2 space-y-1">
+                                        <div v-if="!fight.deathTimeline || !fight.deathTimeline.length" class="text-xs text-gray-500 py-8 text-center">本场没有死亡记录。</div>
                                         <div v-for="event in fight.deathTimeline" :key="event.time + event.player + event.ability" class="grid grid-cols-[44px_1fr_120px] gap-2 text-xs py-1 border-l border-gray-700 pl-2">
                                             <span class="text-gray-500 font-mono">{{ event.time }}</span>
                                             <span class="text-blue-300 font-semibold truncate">{{ event.player }}</span>
@@ -221,7 +278,7 @@
         </section>
 
         <!-- 漏断统计 -->
-        <section v-show="currentTab === 'interrupt'" class="max-w-3xl mx-auto bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+        <section v-if="showInterruptTab" v-show="currentTab === 'interrupt'" class="max-w-3xl mx-auto bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
             <table class="w-full text-sm">
                 <thead class="bg-gray-950 text-gray-400 text-xs">
                 <tr>
@@ -336,6 +393,7 @@ createApp({
             return this.activeAvoidableRows[0].totalDamage || 1;
         },
         interruptBoard() {
+            if (!this.showInterruptTab) return [];
             const tally = {};
             this.rawWipeAnalysis.forEach(fight => {
                 const text = fight.investigation || '';
@@ -349,6 +407,9 @@ createApp({
             return Object.entries(tally)
                 .map(([name, count]) => ({ name, count }))
                 .sort((a, b) => b.count - a.count);
+        },
+        showInterruptTab() {
+            return this.meta?.features?.interrupts !== false;
         },
         activeVersion() {
             return this.catalog.versions.find(item => item.version === this.selectedVersion) || this.catalog.versions[0] || { raids: [] };
@@ -369,6 +430,10 @@ createApp({
             const raid = this.activeRaid?.name || '';
             const boss = this.activeBoss?.name || '';
             return [this.selectedVersion, raid, boss].filter(Boolean).join(' / ');
+        },
+        pageTitle() {
+            const boss = this.meta?.bossName || this.activeBoss?.name || 'WCL';
+            return `${boss}复盘面板`;
         },
         analyzeCommand() {
             const report = this.reportInput || '<日志ID>';
@@ -462,7 +527,7 @@ createApp({
             return `${minutes}:${seconds}`;
         },
         phaseRank(phase) {
-            return { P4: 5, P3: 4, 'P2转P3': 3, P2: 2, P1: 1 }[phase] || 0;
+            return { '已击杀': 6, P4: 5, P3: 4, 'P2转P3': 3, P2: 2, '单阶段': 2, P1: 1 }[phase] || 0;
         },
         getWipeElapsedMs(fight) {
             if (fight.wipeElapsedMs !== undefined && fight.wipeElapsedMs !== null && Number.isFinite(Number(fight.wipeElapsedMs))) return Number(fight.wipeElapsedMs);
@@ -555,6 +620,9 @@ createApp({
             if (!this.avoidableTabs.some(tab => tab.key === this.avoidableTab)) {
                 this.avoidableTab = 'total';
             }
+            if (!this.showInterruptTab && this.currentTab === 'interrupt') {
+                this.currentTab = 'wipe';
+            }
 
             this.activePanels = this.groupedWipes.length ? [this.groupedWipes[0].phase] : [];
             this.activeDetailPanels = this.groupedWipes.length && this.groupedWipes[0].reasons.length ? [this.groupedWipes[0].reasons[0].key] : [];
@@ -582,15 +650,25 @@ createApp({
         },
         phaseHeaderClass(phase) {
             const classes = {
+                '已击杀': 'bg-emerald-950/80',
                 P4: 'bg-red-950/90',
                 P3: 'bg-fuchsia-950/80',
                 'P2转P3': 'bg-amber-950/80',
+                '单阶段': 'bg-blue-950/80',
                 P2: 'bg-blue-950/80',
                 P1: 'bg-gray-900'
             };
             return classes[phase] || 'bg-gray-900';
         },
+        groupTitle(group) {
+            if (group.phase === '已击杀') return '已击杀记录';
+            return `${group.phase} 灭团`;
+        },
+        trialRowKey(record, row) {
+            return `${record.type}-${row.name || row.player || ''}-${row.missCount || row.time || ''}`;
+        },
         wipeHeaderClass(reason) {
+            if (reason.includes('已击杀')) return 'bg-emerald-950/80';
             if (reason.includes('漏断')) return 'bg-red-950/80';
             if (reason.includes('水晶') || reason.includes('宇宙') || reason.includes('圣光')) return 'bg-purple-950/80';
             if (reason.includes('星辰裂片') || reason.includes('天堂与地狱')) return 'bg-pink-950/80';

@@ -18,6 +18,12 @@ PLUGIN_CONFIG = {
             "trigger": {"death_spell_ids": [123456]},
             "link": {"type": "damage-taken", "before_ms": 15_000, "after_ms": 2_000},
         },
+        {
+            "key": "replay_position_review",
+            "reason": "示例站位复盘",
+            "trigger": {"death_spell_ids": [654321]},
+            "link": {"type": "replay", "position_ms": 330_000},
+        },
     ],
     "interrupts": {
         "enabled": False,
@@ -47,4 +53,3 @@ PLUGIN_CONFIG = {
 
 def analyze(report_ids: str, output_path=None, catalog_entry=None):
     return placeholder_analyze(report_ids, output_path, catalog_entry)
-

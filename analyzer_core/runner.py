@@ -1,5 +1,6 @@
 from importlib import import_module
 from pathlib import Path
+from typing import Optional, Union
 
 from analyzer_core.catalog import find_boss
 
@@ -11,8 +12,9 @@ def load_plugin(entry):
     return module
 
 
-def analyze_report(version: str, raid_key: str, boss_key: str, report_ids: str, output_path: str | Path | None = None):
+def analyze_report(version: str, raid_key: str, boss_key: str, report_ids: str, output_path: Optional[Union[str, Path]] = None):
     entry = find_boss(version, raid_key, boss_key)
+    print(f"[analyze] loading plugin: {entry.plugin}", flush=True)
     plugin = load_plugin(entry)
+    print("[analyze] plugin loaded, starting WCL analysis", flush=True)
     return plugin.analyze(report_ids=report_ids, output_path=output_path, catalog_entry=entry)
-

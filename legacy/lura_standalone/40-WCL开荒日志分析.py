@@ -8,6 +8,33 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+def load_env_file():
+    search_dirs = [Path.cwd(), Path(__file__).resolve().parent]
+    search_dirs.extend(Path(__file__).resolve().parents)
+    seen = set()
+    for directory in search_dirs:
+        if directory in seen:
+            continue
+        seen.add(directory)
+        env_path = directory / ".env"
+        if not env_path.exists():
+            continue
+        for raw_line in env_path.read_text(encoding="utf-8-sig").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+        return env_path
+    return None
+
+
+load_env_file()
+
 # ================= 1. 全局配置 =================
 CLIENT_ID = os.getenv("WCL_CLIENT_ID", "")
 CLIENT_SECRET = os.getenv("WCL_CLIENT_SECRET", "")
@@ -16,6 +43,7 @@ REPORT_IDS_INPUT = os.getenv("WCL_REPORT_IDS", "")
 TARGET_BOSS_KEYWORDS = ["midnight falls", "l'ura", "至暗之夜降临", "鲁拉"]
 PROXY_URL = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
+WCL_BASE_URL = os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com").rstrip("/")
 
 TERMINAL_MATRIX_ID = 1286276
 SKY_GLAIVE_ID = 1254076
@@ -67,6 +95,7 @@ PLAYER_ALIASES = {
 P1_END_MS = 231_000
 P2_END_MS = 330_000
 P2_TO_P3_END_MS = 342_000
+P2_TO_P3_SPREAD_REPLAY_MS = 330_000
 P3_FALLBACK_START_MS = 360_000
 P4_SIGNAL_AFTER_MS = 330_000
 P4_NO_DEATH_MS = 510_000
@@ -90,16 +119,21 @@ def progress_bar(current, total, width=18):
 # ================= 2. WCL API =================
 def get_token():
     if not CLIENT_ID or not CLIENT_SECRET:
-        raise RuntimeError("请先设置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET 环境变量。")
-    url = "https://cn.warcraftlogs.com/oauth/token"
+        raise RuntimeError("请先在项目 .env 或系统环境变量中设置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET。")
+    url = f"{WCL_BASE_URL}/oauth/token"
     res = requests.post(url, data={"grant_type": "client_credentials"}, auth=(CLIENT_ID, CLIENT_SECRET),
                         proxies=PROXIES, verify=False, timeout=30)
+    if res.status_code == 401:
+        raise RuntimeError(
+            f"WCL 鉴权失败：当前 WCL_CLIENT_ID / WCL_CLIENT_SECRET 无效，或不是 {WCL_BASE_URL} 对应的客户端凭据。"
+            "注意 WCL_CLIENT_ID 需要填写 API Clients 页面里的 Client ID，不是 WCL 用户名或主页名。"
+        )
     res.raise_for_status()
     return res.json()["access_token"]
 
 
 def graphql(token, query, variables):
-    url = "https://cn.warcraftlogs.com/api/v2/client"
+    url = f"{WCL_BASE_URL}/api/v2/client"
     headers = {"Authorization": f"Bearer {token}"}
     res = requests.post(url, json={"query": query, "variables": variables}, headers=headers, proxies=PROXIES,
                         verify=False, timeout=90)
@@ -278,11 +312,11 @@ def format_time(ms): return str(timedelta(seconds=max(0, int(ms)) // 1000))[2:7]
 
 
 def deep_link(r_id, f_id, v_type, ev_time, pb=15_000,
-              pa=2_000): return f"https://cn.warcraftlogs.com/reports/{r_id}#fight={f_id}&type={v_type}&start={ev_time - pb}&end={ev_time + pa}"
+              pa=2_000): return f"{WCL_BASE_URL}/reports/{r_id}#fight={f_id}&type={v_type}&start={ev_time - pb}&end={ev_time + pa}"
 
 
 def replay_link(r_id, f_id, position_ms):
-    return f"https://cn.warcraftlogs.com/reports/{r_id}#fight={f_id}&view=replay&position={max(0, int(position_ms))}"
+    return f"{WCL_BASE_URL}/reports/{r_id}?fight={f_id}&view=replay&position={max(0, int(position_ms))}"
 
 
 def base_phase_from_elapsed_ms(ms):
@@ -462,13 +496,21 @@ def analyze_fight(report_id, fight, raw, global_avoidable):
     p4_signal_death = find_p4_signal_death(deaths, fight)
     wipe_elapsed_ms = fight["endTime"] - fight["startTime"]
     wipe_phase = infer_wipe_phase(wipe_elapsed_ms, deaths, fight)
+    actual_phase = wipe_phase
+    is_kill = bool(fight.get("kill"))
+    if is_kill:
+        wipe_phase = "已击杀"
     first_mechanic_id = first_mechanic_death.get("killingAbilityGameID") if first_mechanic_death else None
     wipe_reason, investigation, wcl_link = "大面积 AoE 减员崩盘", "", ""
     p4_stellar_shards = analyze_p4_stellar_shards(
         p4_stellar_debuffs, deaths, actor_map, fight["startTime"]
-    ) if wipe_phase == "P4" else []
+    ) if actual_phase == "P4" else []
 
-    if p4_signal_death:
+    if is_kill:
+        wipe_reason = "已击杀"
+        investigation = f"Boss 已击杀，本场不归类为灭团。战斗结束于 {format_time(wipe_elapsed_ms)}，下方保留本场死亡记录供复盘。"
+        wcl_link = replay_link(report_id, fight["id"], max(0, wipe_elapsed_ms - 3_000))
+    elif p4_signal_death:
         signal_time = fight_elapsed(p4_signal_death, fight)
         wipe_reason = "P4阶段减员"
         investigation = f"P4阶段发生减员，已定位到首次 P4 独有死亡前 3 秒回放。死亡发生在本场 {format_time(signal_time)}。"
@@ -480,7 +522,7 @@ def analyze_fight(report_id, fight, raw, global_avoidable):
                              MATRIX_ACCIDENT_WINDOW_MS, 2_000)
     elif first_mechanic_id == 1254256:
         wipe_reason, investigation = "纳鲁的挽歌（漏接鲁拉之泪）", "触发前后请通过链接检查人员分散位置。"
-        wcl_link = deep_link(report_id, fight["id"], "damage-taken", first_mechanic_death["timestamp"])
+        wcl_link = replay_link(report_id, fight["id"], P2_TO_P3_SPREAD_REPLAY_MS)
     elif first_mechanic_id == 1251789:
         wipe_reason, investigation = "宇宙裂隙（没转掉）", "午夜水晶读条未被及时处理，优先复盘转火和目标分配。"
         wcl_link = deep_link(report_id, fight["id"], "damage-done", first_mechanic_death["timestamp"])
@@ -494,7 +536,7 @@ def analyze_fight(report_id, fight, raw, global_avoidable):
         phase = "P1 不谐" if fight_elapsed(first_mechanic_death, fight) < P1_END_MS else "P3 点名碰牌不谐"
         wipe_reason, investigation = f"不谐（{phase}）", f"死亡发生在本场 {format_time(fight_elapsed(first_mechanic_death, fight))}，判定为{phase}。"
 
-    if wipe_phase == "P4" and not p4_signal_death:
+    if not is_kill and wipe_phase == "P4" and not p4_signal_death:
         wipe_reason = "P4阶段减员" if deaths else "P4阶段记录"
         investigation = "P4阶段发生减员。请结合死亡时间线查看具体死亡原因。" if deaths else "战斗超过 8:30 且无死亡记录，判定进入 P4。"
         wcl_link = replay_link(report_id, fight["id"], P4_NO_DEATH_MS - 3_000)
@@ -512,7 +554,8 @@ def analyze_fight(report_id, fight, raw, global_avoidable):
         "fightName": fight.get("name"), "fightStart": fight["startTime"], "fightEnd": fight["endTime"],
         "startClock": start_clock, "startDateTime": start_datetime,
         "duration": format_time(fight["endTime"] - fight["startTime"]),
-        "wipePhase": wipe_phase, "wipeElapsedMs": wipe_elapsed_ms,
+        "fightStatus": "kill" if is_kill else "wipe", "isKill": is_kill, "kill": is_kill,
+        "fightPhase": actual_phase, "wipePhase": wipe_phase, "wipeElapsedMs": wipe_elapsed_ms,
         "wipeReason": wipe_reason, "investigation": investigation, "wclDeepLink": wcl_link,
         "deathTimeline": timeline,
         "p4StellarShardHits": p4_stellar_shards,
@@ -545,9 +588,10 @@ def build_aggregated_json():
                  "spellLabels": {str(key): value for key, value in SPELLS.items()},
                  "phaseConfig": {
                      "p1EndMs": P1_END_MS,
-                     "p2EndMs": P2_END_MS,
-                     "p2ToP3EndMs": P2_TO_P3_END_MS,
-                     "p4SignalAfterMs": P4_SIGNAL_AFTER_MS,
+                    "p2EndMs": P2_END_MS,
+                    "p2ToP3EndMs": P2_TO_P3_END_MS,
+                    "p2ToP3SpreadReplayMs": P2_TO_P3_SPREAD_REPLAY_MS,
+                    "p4SignalAfterMs": P4_SIGNAL_AFTER_MS,
                      "p4NoDeathMs": P4_NO_DEATH_MS,
                      "p4UniqueDeathIds": sorted(P4_UNIQUE_DEATH_IDS),
                      "stellarShardDamageIds": sorted(STELLAR_SHARD_IDS),

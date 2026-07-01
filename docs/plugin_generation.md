@@ -24,6 +24,7 @@ boss_plugins/
 - 基础信息：版本、副本、boss key、boss 中英文名、WCL boss 名关键词
 - 阶段规则：按时间、按 cast、按死亡技能、按 debuff/cast 信号进入阶段
 - 灭团规则：死亡技能、阶段限定、优先级、WCL 链接类型
+- 回放定位点：固定机制时间点、相对事件偏移、WCL replay position，用于检查站位和分散
 - 打断规则：是否启用、固定轮次/左右场/目标分配、名单
 - debuff 归因：debuff id、faded/apply 事件、匹配死亡/伤害 id、匹配窗口
 - 可躲避榜：技能 id、展示名、是否统计死亡
@@ -61,6 +62,16 @@ PLUGIN_CONFIG = {
             "trigger": {"death_spell_ids": [1286276]},
             "analyzer": "interrupt_rotation",
             "link": {"type": "interrupts", "before_ms": 25000, "after_ms": 2000}
+        },
+        {
+            "key": "p2_to_p3_spread",
+            "reason": "纳鲁的挽歌（漏接鲁拉之泪）",
+            "trigger": {"death_spell_ids": [1254256]},
+            "link": {
+                "type": "replay",
+                "position_ms": 330000,
+                "description": "定位到黑暗熔毁分散收尾点，检查人员分散位置"
+            }
         }
     ],
     "debuff_attribution": [
@@ -90,4 +101,3 @@ def analyze(report_ids: str, output_path=None, catalog_entry=None):
 2. 写一个 `boss_plugins/configurable.py`，支持 `death_spell_reason`、`interrupt_rotation`、`debuff_fade_death`、`avoidable_board` 四种通用分析器。
 3. 用奇美鲁斯做第一个纯配置 boss，验证不写特殊 Python 也能跑。
 4. 当某个 boss 有特殊机制时，只在单 boss 文件里补一个小 hook，不改 core。
-
