@@ -57,7 +57,7 @@ PROXY_URL = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 CN_TZ = timezone(timedelta(hours=8))
 ENABLE_DISPEL_ANALYSIS = os.getenv("LIGHTBLINDED_VANGUARD_DISPELS", "").strip().lower() in {"1", "true", "yes", "on"}
-DISPEL_LOGIC_TEXT = "统计逻辑：死亡前 last3hits 疑似包含复仇者之盾；死亡前未被可躲避技能命中；阵亡人数 < 5 且治疗阵亡人数 < 2；回看获得复仇者之盾 debuff 后 8 秒内治疗是否施放还魂术、群体驱散或治疗专精单驱。"
+DISPEL_LOGIC_TEXT = "统计逻辑：死亡前 last3hits 疑似包含复仇者之盾；死亡前未被可躲避技能命中；阵亡人数 < 5 且治疗阵亡人数 < 2；排除战斗结束前 15 秒、软狂暴阶段和坦克已无法战复后的拉脱段；回看死亡前 8 秒内是否存在复仇者之盾实际驱散事件，并统计治疗是否完成驱散。"
 
 
 SPELLS = {
@@ -133,7 +133,7 @@ SHIELD_DETAIL_DEBUFF_IDS = {1255739}
 COMBAT_RES_IDS = {20484, 61999, 20707, 391054}
 AVENGER_SHIELD_CAST_ID = 1246497
 AVENGER_SHIELD_DAMAGE_ID = 1246502
-AVENGER_SHIELD_DEBUFF_ID = 1246487
+AVENGER_SHIELD_DEBUFF_ID = 1246502
 AVENGER_SHIELD_IDS = {AVENGER_SHIELD_CAST_ID, AVENGER_SHIELD_DAMAGE_ID, AVENGER_SHIELD_DEBUFF_ID}
 DISPEL_CHECK_CAST_IDS = set(HEALER_DISPEL_SPELLS) | set(COMBAT_RES_SPELLS)
 SOFT_ENRAGE_BUFF_ID = 1256133
@@ -306,6 +306,10 @@ def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_ti
 
 def ability_id(event):
     return event.get("abilityGameID") or event.get("killingAbilityGameID") or event.get("extraAbilityGameID")
+
+
+def extra_ability_id(event):
+    return event.get("extraAbilityGameID")
 
 
 def ability_name(event):
@@ -541,25 +545,17 @@ def casts_in_window(casts, source_id, start_ts, end_ts):
     ]
 
 
-def target_dispels_in_window(casts, target_id, start_ts, end_ts):
-    raid_wide_ids = {32375, 115310}
+def avenger_shield_dispels_in_window(dispels, start_ts, end_ts, target_id=None, source_id=None):
     return [
-        event for event in casts
+        event for event in dispels
         if start_ts <= event.get("timestamp", 0) <= end_ts
-        and (
-            event.get("targetID") == target_id
-            or ability_id(event) in raid_wide_ids
-        )
+        and extra_ability_id(event) == AVENGER_SHIELD_DEBUFF_ID
+        and (target_id is None or event.get("targetID") == target_id)
+        and (source_id is None or event.get("sourceID") == source_id)
     ]
 
 
 def soft_enrage_start_timestamp(fight, soft_enrage_buffs):
-    zealous = [
-        event for event in soft_enrage_buffs
-        if ability_id(event) == ZEALOUS_SPIRIT_ID and event_is_apply(event)
-    ]
-    if zealous:
-        return min(event.get("timestamp", 0) for event in zealous)
     if fight["endTime"] - fight["startTime"] > SOFT_ENRAGE_MS:
         return fight["startTime"] + SOFT_ENRAGE_MS
     return None
@@ -615,7 +611,7 @@ def soft_enrage_evidence(fight, actor_map, soft_enrage_buffs):
     }
 
 
-def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_events, shield_debuffs, dispel_casts, res_events, combatant_info, actor_map, fight, soft_enrage_start=None):
+def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_events, shield_debuffs, dispel_casts, dispel_events, res_events, combatant_info, actor_map, fight, soft_enrage_start=None, suppress_after_timestamp=None):
     healer_ids = infer_healer_player_ids(combatant_info, dispel_casts)
     if not healer_ids:
         return []
@@ -624,6 +620,10 @@ def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_event
     for death in deaths:
         death_ts = death.get("timestamp", 0)
         if soft_enrage_start and death_ts >= soft_enrage_start:
+            continue
+        if suppress_after_timestamp and death_ts >= suppress_after_timestamp:
+            continue
+        if fight["endTime"] - death_ts < 15_000:
             continue
         if death.get("killingAbilityGameID") in SPLIT_RELATED_DEATH_IDS | TANK_SIGNAL_DEATH_IDS | {BLINDING_LIGHT_ID}:
             continue
@@ -642,9 +642,9 @@ def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_event
         if not shield_hit:
             continue
         debuff_start = shield_debuff_start_for_death(death, shield_debuffs, shield_hit)
-        start_ts = debuff_start.get("timestamp", shield_hit.get("timestamp", death_ts))
-        end_ts = min(death_ts, start_ts + 8_000)
-        successful_target_dispels = target_dispels_in_window(dispel_casts, death.get("targetID"), start_ts, end_ts)
+        start_ts = max(fight["startTime"], death_ts - 8_000)
+        end_ts = death_ts
+        successful_target_dispels = avenger_shield_dispels_in_window(dispel_events, start_ts, end_ts, target_id=death.get("targetID"))
         if successful_target_dispels:
             continue
         healer_rows = []
@@ -658,7 +658,12 @@ def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_event
                     "text": f"{healer_name}（已阵亡）",
                 })
                 continue
-            used = casts_in_window(dispel_casts, healer_id, start_ts, end_ts)
+            used = avenger_shield_dispels_in_window(dispel_events, start_ts, end_ts, source_id=healer_id)
+            if not used:
+                used = [
+                    event for event in casts_in_window(dispel_casts, healer_id, start_ts, end_ts)
+                    if ability_id(event) in HEALER_DISPEL_SPELLS
+                ]
             if used:
                 used_any = True
                 spells = "、".join(dict.fromkeys(ability_name(event) for event in used))
@@ -839,6 +844,20 @@ def combat_res_for_tank_deaths(tank_deaths, res_rows):
     ]
 
 
+def tank_unrecoverable_timestamp(tank_deaths, res_rows):
+    if not tank_deaths:
+        return None
+    ordered = sorted(tank_deaths, key=lambda item: item.get("timestamp", 0))
+    first_tank_death = ordered[0]
+    tank_rescues = combat_res_for_tank_deaths(ordered, res_rows)
+    unique_tank_death_ids = {death.get("targetID") for death in ordered}
+    if len(unique_tank_death_ids) >= 2 and len(tank_rescues) < len(ordered):
+        return first_tank_death.get("timestamp", 0)
+    if combat_res_before_timestamp(first_tank_death.get("timestamp", 0), res_rows) and not combat_res_after_death(first_tank_death, res_rows):
+        return first_tank_death.get("timestamp", 0)
+    return None
+
+
 def unique_names(names):
     seen = set()
     result = []
@@ -979,6 +998,7 @@ def analyze_fight(
     shield_damage_events,
     shield_debuffs,
     dispel_casts,
+    dispel_events,
     combatant_info,
     soft_enrage_buffs,
 ):
@@ -995,47 +1015,38 @@ def analyze_fight(
     tank_players = [actor(actor_map, player_id) for player_id in sorted(tank_player_ids, key=lambda item: actor(actor_map, item))]
     res_rows = format_combat_res_events(res_events, actor_map, fight)
     soft_enrage = soft_enrage_evidence(fight, actor_map, soft_enrage_buffs)
-    dispel_rows = analyze_dispel_failures(
-        deaths,
-        avoidable_damage_events,
-        shield_damage_events,
-        shield_debuffs,
-        dispel_casts,
-        res_events,
-        combatant_info,
-        actor_map,
-        fight,
-        soft_enrage.get("startTimestamp"),
-    )
-    for row in dispel_rows:
-        row["reportID"] = report_id
-        row["fightID"] = fight["id"]
-        row["fightName"] = fight.get("name")
-        row["wclDispelsLink"] = dispels_link(report_id, fight["id"])
+    dispel_rows = []
     tank_deaths = [
         death for death in deaths
         if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS and death.get("targetID") in tank_player_ids
     ]
+    tank_unrecoverable_at = tank_unrecoverable_timestamp(tank_deaths, res_rows)
     blind_light_deaths = [death for death in deaths if death.get("killingAbilityGameID") == BLINDING_LIGHT_ID]
     reason_key = preliminary["key"]
-    if not fight.get("kill") and soft_enrage.get("triggered"):
-        reason_key = "soft_enrage"
     if reason_key in {"tank_swap", "tank_swap_with_split", "avoidable_into_tank"} and not tank_deaths:
         reason_key = "split_reset" if split_death_clusters else ("reset_after_deaths" if is_likely_reset(deaths) else "aoe_collapse")
-    if reason_key != "soft_enrage" and tank_deaths:
+    if tank_deaths:
         first_tank_death = min(tank_deaths, key=lambda item: item.get("timestamp", 0))
         deaths_before_tank = deaths_before(deaths, first_tank_death.get("timestamp", 0))
         tank_res_after = combat_res_after_death(first_tank_death, res_rows)
         tank_rescues = combat_res_for_tank_deaths(tank_deaths, res_rows)
         unique_tank_death_ids = {death.get("targetID") for death in tank_deaths}
-        if len(unique_tank_death_ids) >= 2 and len(tank_rescues) < len(tank_deaths):
-            reason_key = "tank_no_bres"
-        elif len(deaths_before_tank) > 4:
+        if len(deaths_before_tank) > 4:
             reason_key = "aoe_before_tank"
+        elif len(unique_tank_death_ids) >= 2 and len(tank_rescues) < len(tank_deaths):
+            reason_key = "tank_no_bres"
         elif len(deaths) > 4 and tank_res_after:
             reason_key = "aoe_after_tank_res"
         elif len(deaths) > 4 and not tank_res_after and combat_res_before_timestamp(first_tank_death.get("timestamp", 0), res_rows):
             reason_key = "tank_no_bres"
+    if not fight.get("kill") and soft_enrage.get("triggered"):
+        soft_start = soft_enrage.get("startTimestamp") or fight["startTime"] + SOFT_ENRAGE_MS
+        deaths_before_soft = deaths_before(deaths, soft_start)
+        hard_reasons = {"tank_swap", "tank_swap_with_split", "avoidable_into_tank", "tank_no_bres", "aoe_after_tank_res", "aoe_before_tank"}
+        if len(deaths_before_soft) > 4 and reason_key not in hard_reasons:
+            reason_key = "aoe_collapse"
+        elif reason_key not in hard_reasons:
+            reason_key = "soft_enrage"
 
     deserters = split_deserters(deaths, split_damage_clusters, actor_map, actor_type, fight) if reason_key in split_keys else []
     tank_evidence = tank_death_evidence(deaths, detail_damage_events, debuffs, actor_map, fight, tank_player_ids) if reason_key in tank_keys else []
@@ -1113,7 +1124,7 @@ def analyze_fight(
         elif reason_key == "soft_enrage":
             wipe_reason = "防骑层数过高 / 软狂暴灭团"
             stack_text = f"，贝莱梅最高记录到 {soft_enrage['stack']} 层" if soft_enrage.get("stack") else ""
-            zealous_text = f"，Zealous Spirit 出现在 {soft_enrage['zealousTime']}" if soft_enrage.get("zealousTime") else ""
+            zealous_text = ""
             investigation = f"战斗超过 6:35 后进入贝莱梅软狂暴检查窗口{zealous_text}{stack_text}。此阶段飞盾伤害已进入高压/软狂暴逻辑，不再归因为治疗驱散，倾向防骑层数过高、惩戒过早死亡导致软狂暴灭团。"
             wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
 
@@ -1136,11 +1147,33 @@ def analyze_fight(
         prior_deaths = len(deaths_before(deaths, start_ts))
         stack_at_start = soft_enrage.get("stackAtStart") or soft_enrage.get("stack") or 0
         stack_text = f"防骑此时已叠加 {stack_at_start} 层报应" if stack_at_start else "防骑层数未能从日志中稳定读取"
-        zealous_text = f"Zealous Spirit 出现在 {soft_enrage['zealousTime']}。" if soft_enrage.get("zealousTime") else ""
+        zealous_text = ""
         max_stack_text = f"本场最高记录到 {soft_enrage['stack']} 层。" if soft_enrage.get("stack") and soft_enrage.get("stack") != stack_at_start else ""
         wipe_reason = "防骑层数过高 / 软狂暴灭团"
         investigation = f"战斗超过 6:35 后进入贝莱梅软狂暴检查窗口。群体飞盾前，{stack_text}。在此前已经减员 {prior_deaths} 名玩家。{zealous_text}{max_stack_text}此阶段飞盾不再归因为治疗驱散，倾向防骑层数过高、惩戒过早死亡导致软狂暴灭团。"
         wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
+
+    dispel_suppressed_reasons = {"tank_swap", "tank_swap_with_split", "avoidable_into_tank", "tank_no_bres"}
+    if not is_kill and reason_key not in dispel_suppressed_reasons:
+        dispel_rows = analyze_dispel_failures(
+            deaths,
+            avoidable_damage_events,
+            shield_damage_events,
+            shield_debuffs,
+            dispel_casts,
+            dispel_events,
+            res_events,
+            combatant_info,
+            actor_map,
+            fight,
+            soft_enrage.get("startTimestamp"),
+            tank_unrecoverable_at,
+        )
+        for row in dispel_rows:
+            row["reportID"] = report_id
+            row["fightID"] = fight["id"]
+            row["fightName"] = fight.get("name")
+            row["wclDispelsLink"] = dispels_link(report_id, fight["id"])
 
     death_timeline = [
         {
@@ -1271,6 +1304,8 @@ def needs_dispel_check(fight, deaths):
     for death in deaths:
         if death.get("timestamp", 0) >= soft_start:
             continue
+        if fight["endTime"] - death.get("timestamp", 0) < 15_000:
+            continue
         if death.get("killingAbilityGameID") in AVOIDABLE_DAMAGE_IDS:
             continue
         if death.get("killingAbilityGameID") in SPLIT_RELATED_DEATH_IDS | TANK_SIGNAL_DEATH_IDS | {BLINDING_LIGHT_ID}:
@@ -1329,6 +1364,7 @@ def fetch_fight_payload(token, report_id, fight):
     shield_damage_events = []
     shield_debuffs = []
     dispel_casts = []
+    dispel_events = []
     combatant_info = []
     soft_enrage_buffs = []
     if not fight.get("kill") and fight["endTime"] - fight["startTime"] > SOFT_ENRAGE_MS:
@@ -1368,10 +1404,16 @@ def fetch_fight_payload(token, report_id, fight):
             DISPEL_CHECK_CAST_IDS,
             "读取治疗驱散 / 战复线索",
         )
+        progress("读取实际驱散事件", 2)
+        dispel_events = [
+            event for event in fetch_events_all(token, report_id, "Dispels", fight)
+            if extra_ability_id(event) == AVENGER_SHIELD_DEBUFF_ID
+        ]
+        progress(f"复仇者之盾实际驱散：{len(dispel_events)} 条", 3)
         if not res_events:
             res_events = [event for event in dispel_casts if ability_id(event) in COMBAT_RES_IDS]
         combatant_info = fetch_combatant_info(token, report_id, fight)
-    return deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary, shield_damage_events, shield_debuffs, dispel_casts, combatant_info, soft_enrage_buffs
+    return deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary, shield_damage_events, shield_debuffs, dispel_casts, dispel_events, combatant_info, soft_enrage_buffs
 
 
 def summarize_dispel_analysis(fights):
@@ -1464,6 +1506,7 @@ def build_aggregated_json(report_ids):
                 shield_damage_events,
                 shield_debuffs,
                 dispel_casts,
+                dispel_events,
                 combatant_info,
                 soft_enrage_buffs,
             ) = fetch_fight_payload(token, report_id, fight)
@@ -1481,6 +1524,7 @@ def build_aggregated_json(report_ids):
                 shield_damage_events,
                 shield_debuffs,
                 dispel_casts,
+                dispel_events,
                 combatant_info,
                 soft_enrage_buffs,
             )
