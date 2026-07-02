@@ -10,7 +10,7 @@ except ModuleNotFoundError as exc:
     raise RuntimeError("缺少 requests 依赖，请先在当前 Python 环境执行：python -m pip install -r requirements.txt") from exc
 import urllib3
 
-from boss_plugins.common import write_json_result
+from boss_plugins.common import COMBAT_RES_SPELLS, HEALER_DISPEL_SPELLS, HEALER_SPEC_IDS, write_json_result
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -56,6 +56,8 @@ WCL_BASE_URL = os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com").rstrip(
 PROXY_URL = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 CN_TZ = timezone(timedelta(hours=8))
+ENABLE_DISPEL_ANALYSIS = os.getenv("LIGHTBLINDED_VANGUARD_DISPELS", "").strip().lower() in {"1", "true", "yes", "on"}
+DISPEL_LOGIC_TEXT = "统计逻辑：死亡前 last3hits 疑似包含复仇者之盾；死亡前未被可躲避技能命中；阵亡人数 < 5 且治疗阵亡人数 < 2；回看获得复仇者之盾 debuff 后 8 秒内治疗是否施放还魂术、群体驱散或治疗专精单驱。"
 
 
 SPELLS = {
@@ -83,10 +85,21 @@ SPELLS = {
     1246736: "惩戒审判易伤",
     1246487: "复仇者之盾预兆",
     1255739: "灼热光辉",
+    1256133: "狂热层数",
+    1272423: "Zealous Spirit",
     20484: "复生",
     61999: "盟友复生",
     20707: "灵魂石",
     391054: "代祷",
+    4987: "清洁术",
+    115450: "清创生血",
+    88423: "自然之愈",
+    360823: "自然平衡",
+    527: "纯净术",
+    77130: "净化灵魂",
+    32375: "群体驱散",
+    115310: "还魂术",
+    89808: "烧灼魔法",
 }
 
 EXECUTION_SENTENCE_DAMAGE_ID = 1249024
@@ -98,6 +111,7 @@ RET_JUDGMENT_VULN_ID = 1246736
 TANK_STRIKE_IDS = {1251859, 1251812}
 TANK_VULN_IDS = {PROT_JUDGMENT_VULN_ID, RET_JUDGMENT_VULN_ID}
 MYTHIC_RAID_SIZE = 20
+SOFT_ENRAGE_MS = 395_000
 
 AVOIDABLE_SPELLS = {
     "holyHammer": {"label": "神圣之锤", "ids": {1249047}},
@@ -117,6 +131,13 @@ SPLIT_DETAIL_DEBUFF_IDS = {1248994, EXECUTION_SENTENCE_DAMAGE_ID}
 SHIELD_DETAIL_DAMAGE_IDS = {BLINDING_LIGHT_ID}
 SHIELD_DETAIL_DEBUFF_IDS = {1255739}
 COMBAT_RES_IDS = {20484, 61999, 20707, 391054}
+AVENGER_SHIELD_CAST_ID = 1246497
+AVENGER_SHIELD_DAMAGE_ID = 1246502
+AVENGER_SHIELD_DEBUFF_ID = 1246487
+AVENGER_SHIELD_IDS = {AVENGER_SHIELD_CAST_ID, AVENGER_SHIELD_DAMAGE_ID, AVENGER_SHIELD_DEBUFF_ID}
+DISPEL_CHECK_CAST_IDS = set(HEALER_DISPEL_SPELLS) | set(COMBAT_RES_SPELLS)
+SOFT_ENRAGE_BUFF_ID = 1256133
+ZEALOUS_SPIRIT_ID = 1272423
 
 ACTOR_NAME_OVERRIDES = {
     "General Amias Bellamy": "阿米尔斯·贝莱梅将军",
@@ -227,14 +248,24 @@ def fetch_actor_maps(token, report_id):
     return actor_map, actor_type
 
 
-def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None):
+def fetch_combatant_info(token, report_id, fight):
+    try:
+        return fetch_events_all(token, report_id, "CombatantInfo", fight)
+    except Exception as error:
+        progress(f"CombatantInfo 读取失败，治疗识别将使用回退逻辑：{error}", 2)
+        return []
+
+
+def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None, hostility_type=None):
     ability_arg = f", $abilityID: Float" if ability_id is not None else ""
     ability_filter = ", abilityID: $abilityID" if ability_id is not None else ""
+    hostility_arg = ", $hostilityType: HostilityType" if hostility_type else ""
+    hostility_filter = ", hostilityType: $hostilityType" if hostility_type else ""
     query = f"""
-    query($code: String!, $dataType: EventDataType!, $startTime: Float!, $endTime: Float!, $fightIDs: [Int]{ability_arg}) {{
+    query($code: String!, $dataType: EventDataType!, $startTime: Float!, $endTime: Float!, $fightIDs: [Int]{ability_arg}{hostility_arg}) {{
       reportData {{
         report(code: $code) {{
-          events(dataType: $dataType, startTime: $startTime, endTime: $endTime, fightIDs: $fightIDs, limit: 10000{ability_filter}) {{
+          events(dataType: $dataType, startTime: $startTime, endTime: $endTime, fightIDs: $fightIDs, limit: 10000{ability_filter}{hostility_filter}) {{
             data
             nextPageTimestamp
           }}
@@ -251,15 +282,20 @@ def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_ti
     }
     if ability_id is not None:
         variables["abilityID"] = float(ability_id)
-    return graphql(token, query, variables)["events"]
+    if hostility_type:
+        variables["hostilityType"] = hostility_type
+    return graphql(token, query, variables).get("events")
 
 
-def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None):
+def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None, hostility_type=None):
     rows = []
     current_start = start_time if start_time is not None else fight["startTime"]
     final_end = end_time if end_time is not None else fight["endTime"]
     while current_start < final_end:
-        page = fetch_event_page(token, report_id, data_type, fight, current_start, final_end, ability_id)
+        page = fetch_event_page(token, report_id, data_type, fight, current_start, final_end, ability_id, hostility_type)
+        if not page:
+            progress(f"{data_type} 查询返回空页，按 0 条处理：fight={fight['id']} ability={ability_id or 'ALL'}", 3)
+            break
         rows.extend(page.get("data") or [])
         next_page = page.get("nextPageTimestamp")
         if not next_page or next_page <= current_start:
@@ -301,6 +337,39 @@ def format_time(ms):
     return str(timedelta(seconds=max(0, int(ms)) // 1000))[2:7]
 
 
+def event_source_id(event):
+    return event.get("sourceID") or event.get("targetID")
+
+
+def event_target_id(event):
+    return event.get("targetID")
+
+
+def combatant_spec_id(event):
+    for key in ("specID", "specId", "spec", "specializationID", "specializationId"):
+        value = event.get(key)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+    return None
+
+
+def infer_healer_player_ids(combatant_info, casts):
+    healer_ids = set()
+    for event in combatant_info:
+        spec_id = combatant_spec_id(event)
+        source_id = event_source_id(event)
+        if source_id and spec_id in HEALER_SPEC_IDS:
+            healer_ids.add(source_id)
+    if healer_ids:
+        return healer_ids
+    for event in casts:
+        if ability_id(event) in DISPEL_CHECK_CAST_IDS and event.get("sourceID"):
+            healer_ids.add(event.get("sourceID"))
+    return healer_ids
+
+
 def get_local_datetime(absolute_ms):
     return datetime.fromtimestamp(absolute_ms / 1000.0, CN_TZ)
 
@@ -310,6 +379,18 @@ def deep_link(report_id, fight_id, view_type, event_time, before_ms=15_000, afte
         f"{WCL_BASE_URL}/reports/{report_id}#fight={fight_id}&type={view_type}"
         f"&start={event_time - before_ms}&end={event_time + after_ms}"
     )
+
+
+def fight_type_link(report_id, fight_id, view_type):
+    return f"{WCL_BASE_URL}/reports/{report_id}?fight={fight_id}&type={view_type}"
+
+
+def deaths_link(report_id, fight_id):
+    return fight_type_link(report_id, fight_id, "deaths")
+
+
+def dispels_link(report_id, fight_id):
+    return fight_type_link(report_id, fight_id, "dispels")
 
 
 def replay_link(report_id, fight_id, position_ms):
@@ -401,6 +482,214 @@ def recent_events_for_player(events, player_id, timestamp, before_ms=12_000):
     ]
 
 
+def event_is_apply(event):
+    return str(event.get("type", "")).lower() in {"applybuff", "applydebuff", "refreshbuff", "refreshdebuff"}
+
+
+def healer_is_alive(healer_id, timestamp, deaths, res_events):
+    last_death = max(
+        (death.get("timestamp", 0) for death in deaths if death.get("targetID") == healer_id and death.get("timestamp", 0) <= timestamp),
+        default=None,
+    )
+    if last_death is None:
+        return True
+    return any(
+        event.get("targetID") == healer_id and last_death < event.get("timestamp", 0) <= timestamp
+        for event in res_events
+    )
+
+
+def healer_deaths_before(deaths, healer_ids, timestamp):
+    return {
+        death.get("targetID")
+        for death in deaths
+        if death.get("targetID") in healer_ids and death.get("timestamp", 0) <= timestamp
+    }
+
+
+def recent_shield_damage_for_death(death, shield_damage_events):
+    timestamp = death.get("timestamp", 0)
+    target_id = death.get("targetID")
+    candidates = [
+        event for event in shield_damage_events
+        if event.get("targetID") == target_id and 0 <= timestamp - event.get("timestamp", 0) <= 8_500
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda event: event.get("timestamp", 0))
+
+
+def shield_debuff_start_for_death(death, shield_debuffs, fallback_event):
+    target_id = death.get("targetID")
+    death_ts = death.get("timestamp", 0)
+    candidates = [
+        event for event in shield_debuffs
+        if event.get("targetID") == target_id
+        and event_is_apply(event)
+        and 0 <= death_ts - event.get("timestamp", 0) <= 12_000
+    ]
+    if candidates:
+        return max(candidates, key=lambda event: event.get("timestamp", 0))
+    return fallback_event
+
+
+def casts_in_window(casts, source_id, start_ts, end_ts):
+    return [
+        event for event in casts
+        if event.get("sourceID") == source_id
+        and start_ts <= event.get("timestamp", 0) <= end_ts
+    ]
+
+
+def target_dispels_in_window(casts, target_id, start_ts, end_ts):
+    raid_wide_ids = {32375, 115310}
+    return [
+        event for event in casts
+        if start_ts <= event.get("timestamp", 0) <= end_ts
+        and (
+            event.get("targetID") == target_id
+            or ability_id(event) in raid_wide_ids
+        )
+    ]
+
+
+def soft_enrage_start_timestamp(fight, soft_enrage_buffs):
+    zealous = [
+        event for event in soft_enrage_buffs
+        if ability_id(event) == ZEALOUS_SPIRIT_ID and event_is_apply(event)
+    ]
+    if zealous:
+        return min(event.get("timestamp", 0) for event in zealous)
+    if fight["endTime"] - fight["startTime"] > SOFT_ENRAGE_MS:
+        return fight["startTime"] + SOFT_ENRAGE_MS
+    return None
+
+
+def max_soft_enrage_stack(soft_enrage_buffs):
+    stack_events = [event for event in soft_enrage_buffs if ability_id(event) == SOFT_ENRAGE_BUFF_ID]
+    if not stack_events:
+        return 0, None
+    def event_stack(event):
+        return int(event.get("stack") or event.get("stacks") or 0)
+    best = max(stack_events, key=lambda event: (event_stack(event), event.get("timestamp", 0)))
+    return event_stack(best), best
+
+
+def soft_enrage_stack_at_timestamp(soft_enrage_buffs, timestamp):
+    stack_events = [
+        event for event in soft_enrage_buffs
+        if ability_id(event) == SOFT_ENRAGE_BUFF_ID and event.get("timestamp", 0) <= timestamp
+    ]
+    if not stack_events:
+        stack_events = [
+            event for event in soft_enrage_buffs
+            if ability_id(event) == SOFT_ENRAGE_BUFF_ID and 0 <= event.get("timestamp", 0) - timestamp <= 3_000
+        ]
+    if not stack_events:
+        return 0, None
+    def event_stack(event):
+        return int(event.get("stack") or event.get("stacks") or 0)
+    best = max(stack_events, key=lambda event: event.get("timestamp", 0))
+    return event_stack(best), best
+
+
+def soft_enrage_evidence(fight, actor_map, soft_enrage_buffs):
+    start_ts = soft_enrage_start_timestamp(fight, soft_enrage_buffs)
+    stack, stack_event = max_soft_enrage_stack(soft_enrage_buffs)
+    stack_at_start, stack_at_start_event = soft_enrage_stack_at_timestamp(soft_enrage_buffs, start_ts) if start_ts else (0, None)
+    zealous_events = [
+        event for event in soft_enrage_buffs
+        if ability_id(event) == ZEALOUS_SPIRIT_ID and event_is_apply(event)
+    ]
+    first_zealous = min(zealous_events, key=lambda event: event.get("timestamp", 0), default=None)
+    return {
+        "triggered": bool(start_ts),
+        "startTime": format_time(start_ts - fight["startTime"]) if start_ts else None,
+        "startTimestamp": start_ts,
+        "stack": stack,
+        "stackTime": format_time(fight_elapsed(stack_event, fight)) if stack_event else None,
+        "stackTarget": actor(actor_map, stack_event.get("targetID")) if stack_event else None,
+        "stackAtStart": stack_at_start,
+        "stackAtStartTime": format_time(fight_elapsed(stack_at_start_event, fight)) if stack_at_start_event else None,
+        "zealousTime": format_time(fight_elapsed(first_zealous, fight)) if first_zealous else None,
+    }
+
+
+def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_events, shield_debuffs, dispel_casts, res_events, combatant_info, actor_map, fight, soft_enrage_start=None):
+    healer_ids = infer_healer_player_ids(combatant_info, dispel_casts)
+    if not healer_ids:
+        return []
+    avoidable_death_ids = {death.get("targetID") for death in deaths if death.get("killingAbilityGameID") in AVOIDABLE_DAMAGE_IDS}
+    rows = []
+    for death in deaths:
+        death_ts = death.get("timestamp", 0)
+        if soft_enrage_start and death_ts >= soft_enrage_start:
+            continue
+        if death.get("killingAbilityGameID") in SPLIT_RELATED_DEATH_IDS | TANK_SIGNAL_DEATH_IDS | {BLINDING_LIGHT_ID}:
+            continue
+        if len(deaths_before(deaths, death_ts)) >= 5:
+            continue
+        if len(healer_deaths_before(deaths, healer_ids, death_ts)) >= 2:
+            continue
+        if death.get("targetID") in avoidable_death_ids or death.get("killingAbilityGameID") in AVOIDABLE_DAMAGE_IDS:
+            continue
+        if any(
+            event.get("targetID") == death.get("targetID") and 0 <= death_ts - event.get("timestamp", 0) <= 8_000
+            for event in avoidable_damage_events
+        ):
+            continue
+        shield_hit = recent_shield_damage_for_death(death, shield_damage_events)
+        if not shield_hit:
+            continue
+        debuff_start = shield_debuff_start_for_death(death, shield_debuffs, shield_hit)
+        start_ts = debuff_start.get("timestamp", shield_hit.get("timestamp", death_ts))
+        end_ts = min(death_ts, start_ts + 8_000)
+        successful_target_dispels = target_dispels_in_window(dispel_casts, death.get("targetID"), start_ts, end_ts)
+        if successful_target_dispels:
+            continue
+        healer_rows = []
+        used_any = False
+        for healer_id in sorted(healer_ids, key=lambda item: actor(actor_map, item)):
+            healer_name = actor(actor_map, healer_id)
+            if not healer_is_alive(healer_id, end_ts, deaths, res_events):
+                healer_rows.append({
+                    "name": healer_name,
+                    "status": "dead",
+                    "text": f"{healer_name}（已阵亡）",
+                })
+                continue
+            used = casts_in_window(dispel_casts, healer_id, start_ts, end_ts)
+            if used:
+                used_any = True
+                spells = "、".join(dict.fromkeys(ability_name(event) for event in used))
+                healer_rows.append({
+                    "name": healer_name,
+                    "status": "used",
+                    "spellName": spells,
+                    "text": f"{healer_name}（已使用 {spells}）",
+                })
+            else:
+                healer_rows.append({
+                    "name": healer_name,
+                    "status": "missing",
+                    "text": f"{healer_name}（未使用）",
+                })
+        if not any(row["status"] == "missing" for row in healer_rows):
+            continue
+        rows.append({
+            "time": format_time(fight_elapsed(death, fight)),
+            "player": actor(actor_map, death.get("targetID")),
+            "ability": SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID"))),
+            "shieldTime": format_time(fight_elapsed(shield_hit, fight)),
+            "windowStart": format_time(start_ts - fight["startTime"]),
+            "windowEnd": format_time(end_ts - fight["startTime"]),
+            "usedAny": used_any,
+            "healers": healer_rows,
+            "text": f"{actor(actor_map, death.get('targetID'))} 死亡前 last3hits 疑似包含复仇者之盾，检查 {format_time(start_ts - fight['startTime'])}-{format_time(end_ts - fight['startTime'])} 治疗驱散窗口",
+        })
+    return rows
+
+
 def infer_tank_player_ids(damage_events):
     scores = defaultdict(lambda: {"hitCount": 0, "totalDamage": 0, "firstHit": 10**18})
     for event in damage_events:
@@ -442,10 +731,22 @@ def tank_death_evidence(deaths, damage_events, debuffs, actor_map, fight, tank_p
     for death in candidate_deaths:
         related += recent_events_for_player(tank_related_debuffs, death.get("targetID"), death.get("timestamp", 0), before_ms=25_000)
     related = sorted(related, key=lambda item: item.get("timestamp", 0))
+    damaging_related = [
+        event for event in related
+        if event_amount(event) > 0
+    ]
     events = []
     seen = set()
     for event in related:
         aid = ability_id(event)
+        if event_amount(event) == 0 and any(
+            ability_id(other) == aid
+            and other.get("sourceID") == event.get("sourceID")
+            and other.get("targetID") == event.get("targetID")
+            and abs(other.get("timestamp", 0) - event.get("timestamp", 0)) <= 1_500
+            for other in damaging_related
+        ):
+            continue
         key = (event.get("timestamp", 0) // 1000, event.get("sourceID"), event.get("targetID"), aid, event_amount(event))
         if key in seen:
             continue
@@ -475,7 +776,7 @@ def tank_death_evidence(deaths, damage_events, debuffs, actor_map, fight, tank_p
         })
     return [{
         "time": format_time(first_death_ts - fight["startTime"]),
-        "player": "、".join(line["player"] for line in death_lines),
+        "player": "、".join(unique_names(line["player"] for line in death_lines)),
         "deathAbility": "、".join(line["ability"] for line in death_lines),
         "deathLine": "；".join(line["text"] for line in death_lines),
         "deathLines": death_lines,
@@ -526,6 +827,27 @@ def combat_res_after_death(tank_death, res_rows):
 
 def combat_res_before_timestamp(timestamp, res_rows):
     return [row for row in res_rows if row.get("timestamp", 0) < timestamp]
+
+
+def combat_res_for_tank_deaths(tank_deaths, res_rows):
+    tank_ids = {death.get("targetID") for death in tank_deaths}
+    first_death = min((death.get("timestamp", 0) for death in tank_deaths), default=0)
+    last_death = max((death.get("timestamp", 0) for death in tank_deaths), default=0)
+    return [
+        row for row in res_rows
+        if row.get("targetID") in tank_ids and first_death <= row.get("timestamp", 0) <= last_death
+    ]
+
+
+def unique_names(names):
+    seen = set()
+    result = []
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        result.append(name)
+    return result
 
 
 def split_death_clusters_from_deaths(deaths):
@@ -643,7 +965,23 @@ def split_deserters(deaths, damage_clusters, actor_map, actor_type, fight):
     return sorted(rows_by_player.values(), key=lambda item: item["missCount"], reverse=True)
 
 
-def analyze_fight(report_id, fight, actor_map, actor_type, deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary):
+def analyze_fight(
+    report_id,
+    fight,
+    actor_map,
+    actor_type,
+    deaths,
+    avoidable_damage_events,
+    detail_damage_events,
+    debuffs,
+    res_events,
+    preliminary,
+    shield_damage_events,
+    shield_debuffs,
+    dispel_casts,
+    combatant_info,
+    soft_enrage_buffs,
+):
     absolute_ms = fight["reportStartTime"] + fight["startTime"]
     local_start = get_local_datetime(absolute_ms)
     duration_ms = fight["endTime"] - fight["startTime"]
@@ -656,19 +994,43 @@ def analyze_fight(report_id, fight, actor_map, actor_type, deaths, avoidable_dam
     tank_player_ids = infer_tank_player_ids(detail_damage_events)
     tank_players = [actor(actor_map, player_id) for player_id in sorted(tank_player_ids, key=lambda item: actor(actor_map, item))]
     res_rows = format_combat_res_events(res_events, actor_map, fight)
+    soft_enrage = soft_enrage_evidence(fight, actor_map, soft_enrage_buffs)
+    dispel_rows = analyze_dispel_failures(
+        deaths,
+        avoidable_damage_events,
+        shield_damage_events,
+        shield_debuffs,
+        dispel_casts,
+        res_events,
+        combatant_info,
+        actor_map,
+        fight,
+        soft_enrage.get("startTimestamp"),
+    )
+    for row in dispel_rows:
+        row["reportID"] = report_id
+        row["fightID"] = fight["id"]
+        row["fightName"] = fight.get("name")
+        row["wclDispelsLink"] = dispels_link(report_id, fight["id"])
     tank_deaths = [
         death for death in deaths
         if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS and death.get("targetID") in tank_player_ids
     ]
     blind_light_deaths = [death for death in deaths if death.get("killingAbilityGameID") == BLINDING_LIGHT_ID]
     reason_key = preliminary["key"]
+    if not fight.get("kill") and soft_enrage.get("triggered"):
+        reason_key = "soft_enrage"
     if reason_key in {"tank_swap", "tank_swap_with_split", "avoidable_into_tank"} and not tank_deaths:
         reason_key = "split_reset" if split_death_clusters else ("reset_after_deaths" if is_likely_reset(deaths) else "aoe_collapse")
-    if tank_deaths:
+    if reason_key != "soft_enrage" and tank_deaths:
         first_tank_death = min(tank_deaths, key=lambda item: item.get("timestamp", 0))
         deaths_before_tank = deaths_before(deaths, first_tank_death.get("timestamp", 0))
         tank_res_after = combat_res_after_death(first_tank_death, res_rows)
-        if len(deaths_before_tank) > 4:
+        tank_rescues = combat_res_for_tank_deaths(tank_deaths, res_rows)
+        unique_tank_death_ids = {death.get("targetID") for death in tank_deaths}
+        if len(unique_tank_death_ids) >= 2 and len(tank_rescues) < len(tank_deaths):
+            reason_key = "tank_no_bres"
+        elif len(deaths_before_tank) > 4:
             reason_key = "aoe_before_tank"
         elif len(deaths) > 4 and tank_res_after:
             reason_key = "aoe_after_tank_res"
@@ -687,39 +1049,39 @@ def analyze_fight(report_id, fight, actor_map, actor_type, deaths, avoidable_dam
         wipe_phase = "已击杀"
         wipe_reason = "已击杀"
         investigation = f"Boss 已击杀，本场不归类为灭团。战斗结束于 {format_time(duration_ms)}，下方保留死亡和明细数据。"
-        wcl_link = replay_link(report_id, fight["id"], max(0, duration_ms - 3_000))
+        wcl_link = deaths_link(report_id, fight["id"])
     else:
         wipe_phase = "单阶段"
         if reason_key == "reset_no_deaths":
             wipe_reason = "团队拉脱 / 无死亡记录"
             investigation = "本场没有死亡事件，通常是团队主动拉脱或重开。"
-            wcl_link = replay_link(report_id, fight["id"], max(0, duration_ms - 3_000))
+            wcl_link = deaths_link(report_id, fight["id"])
         elif reason_key == "tank_swap":
             wipe_reason = "换嘲失误 / 倒T"
             names = "、".join(row["player"] for row in tank_evidence) if tank_evidence else "、".join(actor(actor_map, death.get("targetID")) for death in deaths[:2])
             investigation = f"【{names}】死亡前存在审判、正义盾击或最终审判记录，优先复盘换嘲与坦克承伤。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 3_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "tank_swap_with_split":
             split_cluster = split_death_clusters[0] if split_death_clusters else None
             split_text = split_issue_summary(split_cluster, fight)
             names = "、".join(row["player"] for row in tank_evidence) if tank_evidence else "、".join(actor(actor_map, death.get("targetID")) for death in deaths if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS)
             wipe_reason = "换嘲失误 / 倒T"
             investigation = f"最终归因指向坦克承伤或换嘲问题，【{names}】死亡前存在审判、正义盾击或最终审判记录；同时 {split_text}，分摊也存在问题。"
-            wcl_link = split_replay_link(report_id, fight, split_cluster) or (deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 3_000) if deaths else "")
+            wcl_link = split_replay_link(report_id, fight, split_cluster) or (deaths_link(report_id, fight["id"]) if deaths else "")
         elif reason_key == "avoidable_into_tank":
             avoidable_deaths = [death for death in deaths if death.get("killingAbilityGameID") in AVOIDABLE_DAMAGE_IDS]
             names = "、".join(actor(actor_map, death.get("targetID")) for death in avoidable_deaths[:3])
             tank_names = "、".join(row["player"] for row in tank_evidence) if tank_evidence else "、".join(actor(actor_map, death.get("targetID")) for death in deaths if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS)
             wipe_reason = "前置可躲避减员后倒T / 团队拉脱"
             investigation = f"前置有玩家【{names}】死于可躲避技能，随后【{tank_names}】出现坦克相关死亡；本场未死满，倾向减员后团队拉脱。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", avoidable_deaths[0]["timestamp"] if avoidable_deaths else deaths[0]["timestamp"], 12_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "tank_no_bres":
             first_tank_death = min(tank_deaths, key=lambda item: item.get("timestamp", 0)) if tank_deaths else None
             used_before = combat_res_before_timestamp(first_tank_death.get("timestamp", 0), res_rows) if first_tank_death else []
             tank_names = "、".join(actor(actor_map, death.get("targetID")) for death in tank_deaths)
             wipe_reason = "倒T / 战复资源已用"
             investigation = f"【{tank_names}】发生坦克相关死亡，且倒T前已使用 {len(used_before)} 次战复，后续未看到对坦克的战复记录，倾向战复资源不足导致倒T无法补救。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", first_tank_death["timestamp"], 20_000, 5_000) if first_tank_death else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if first_tank_death else ""
         elif reason_key in {"split_collapse", "split_reset"} and split_death_clusters:
             cluster = split_death_clusters[0]
             wipe_reason = "分摊出现问题 / 团队拉脱" if reason_key == "split_reset" else "分摊出现问题阵亡"
@@ -729,25 +1091,56 @@ def analyze_fight(report_id, fight, actor_map, actor_type, deaths, avoidable_dam
         elif reason_key == "shield_failed" and blind_light_deaths:
             wipe_reason = "圣洁护盾没转掉"
             investigation = "当前 pull 减员少于 4 人时出现盲目之光死亡，判定圣洁护盾未及时处理。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-done", blind_light_deaths[0]["timestamp"], 15_000, 2_000)
+            wcl_link = deaths_link(report_id, fight["id"])
         elif reason_key == "reset_after_deaths":
             wipe_reason = "减员后团队拉脱"
             investigation = f"本场死亡总人数 {len(deaths)}，未达到全团阵亡规模，倾向团队在减员后主动拉脱或重开。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 12_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "aoe_after_tank_res":
             tank_names = "、".join(actor(actor_map, death.get("targetID")) for death in tank_deaths)
             investigation = f"本场发生过坦克死亡（{tank_names}），但之后有战复记录，最终死亡总人数 {len(deaths)}，归因为团队减员过多 / AoE 崩溃。"
             wipe_reason = "团队减员过多 / AoE 崩溃"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "aoe_before_tank":
             tank_names = "、".join(actor(actor_map, death.get("targetID")) for death in tank_deaths)
             wipe_reason = "团队减员过多 / AoE 崩溃"
             investigation = f"倒T前团队已死亡超过 4 人，后续 {tank_names} 的坦克相关死亡更像崩溃结果；最终归因为团队减员过多 / AoE 崩溃。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "aoe_collapse":
             wipe_reason = "团队减员过多 / AoE 崩溃"
             investigation = f"本场死亡总人数 {len(deaths)}，因团队减员过多 / AoE 崩溃灭团。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
+        elif reason_key == "soft_enrage":
+            wipe_reason = "防骑层数过高 / 软狂暴灭团"
+            stack_text = f"，贝莱梅最高记录到 {soft_enrage['stack']} 层" if soft_enrage.get("stack") else ""
+            zealous_text = f"，Zealous Spirit 出现在 {soft_enrage['zealousTime']}" if soft_enrage.get("zealousTime") else ""
+            investigation = f"战斗超过 6:35 后进入贝莱梅软狂暴检查窗口{zealous_text}{stack_text}。此阶段飞盾伤害已进入高压/软狂暴逻辑，不再归因为治疗驱散，倾向防骑层数过高、惩戒过早死亡导致软狂暴灭团。"
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
+
+    if not is_kill and reason_key == "tank_no_bres":
+        tank_names = "、".join(unique_names(actor(actor_map, death.get("targetID")) for death in tank_deaths))
+        tank_rescues = combat_res_for_tank_deaths(tank_deaths, res_rows)
+        wipe_reason = "倒T / 倒T重置"
+        if tank_rescues:
+            investigation = f"【{tank_names}】连续发生坦克死亡，本场只记录到 {len(tank_rescues)} 次坦克战复，无法补足双坦数量，归因为倒T / 倒T重置。"
+        else:
+            investigation = f"【{tank_names}】发生坦克死亡，后续没有能抢救坦克的战复记录，归因为倒T / 倒T重置。"
+        wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
+    elif not is_kill and reason_key == "aoe_before_tank":
+        tank_names = "、".join(unique_names(actor(actor_map, death.get("targetID")) for death in tank_deaths))
+        wipe_reason = "团队减员过多 / AoE 崩溃"
+        investigation = f"战斗发生了倒T（{tank_names}），但倒T前已经阵亡超过 4 人，归因为团队减员过多。"
+        wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
+    elif not is_kill and reason_key == "soft_enrage":
+        start_ts = soft_enrage.get("startTimestamp") or fight["startTime"] + SOFT_ENRAGE_MS
+        prior_deaths = len(deaths_before(deaths, start_ts))
+        stack_at_start = soft_enrage.get("stackAtStart") or soft_enrage.get("stack") or 0
+        stack_text = f"防骑此时已叠加 {stack_at_start} 层报应" if stack_at_start else "防骑层数未能从日志中稳定读取"
+        zealous_text = f"Zealous Spirit 出现在 {soft_enrage['zealousTime']}。" if soft_enrage.get("zealousTime") else ""
+        max_stack_text = f"本场最高记录到 {soft_enrage['stack']} 层。" if soft_enrage.get("stack") and soft_enrage.get("stack") != stack_at_start else ""
+        wipe_reason = "防骑层数过高 / 软狂暴灭团"
+        investigation = f"战斗超过 6:35 后进入贝莱梅软狂暴检查窗口。群体飞盾前，{stack_text}。在此前已经减员 {prior_deaths} 名玩家。{zealous_text}{max_stack_text}此阶段飞盾不再归因为治疗驱散，倾向防骑层数过高、惩戒过早死亡导致软狂暴灭团。"
+        wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
 
     death_timeline = [
         {
@@ -796,7 +1189,6 @@ def analyze_fight(report_id, fight, actor_map, actor_type, deaths, avoidable_dam
             "summary": f"本场记录到 {len(res_rows)} 次战复施放",
             "rows": res_rows,
         })
-
     return {
         "reportID": report_id,
         "fightID": fight["id"],
@@ -832,18 +1224,20 @@ def analyze_fight(report_id, fight, actor_map, actor_type, deaths, avoidable_dam
             "tankEvidence": tank_evidence,
             "tankPlayers": tank_players,
             "combatResurrections": res_rows,
+            "dispelIssues": dispel_rows,
+            "softEnrage": soft_enrage,
         },
     }
 
 
-def fetch_spell_events(token, report_id, fight, data_type, spell_ids, label):
+def fetch_spell_events(token, report_id, fight, data_type, spell_ids, label, hostility_type=None):
     rows = []
     spell_ids = sorted(spell_ids)
     if not spell_ids:
         return rows
     for index, spell_id in enumerate(spell_ids, start=1):
         progress(f"{label} {index}/{len(spell_ids)}：{SPELLS.get(spell_id, spell_id)} ({spell_id})", 2)
-        spell_rows = fetch_events_all(token, report_id, data_type, fight, ability_id=spell_id)
+        spell_rows = fetch_events_all(token, report_id, data_type, fight, ability_id=spell_id, hostility_type=hostility_type)
         rows.extend(spell_rows)
         if spell_rows:
             progress(f"{SPELLS.get(spell_id, spell_id)}：{len(spell_rows)} 条", 2)
@@ -870,6 +1264,20 @@ def detail_spell_ids_for_reason(reason_key, deaths):
         damage_ids |= TANK_DETAIL_DAMAGE_IDS
         debuff_ids |= TANK_DETAIL_DEBUFF_IDS
     return damage_ids, debuff_ids
+
+
+def needs_dispel_check(fight, deaths):
+    soft_start = fight["startTime"] + SOFT_ENRAGE_MS
+    for death in deaths:
+        if death.get("timestamp", 0) >= soft_start:
+            continue
+        if death.get("killingAbilityGameID") in AVOIDABLE_DAMAGE_IDS:
+            continue
+        if death.get("killingAbilityGameID") in SPLIT_RELATED_DEATH_IDS | TANK_SIGNAL_DEATH_IDS | {BLINDING_LIGHT_ID}:
+            continue
+        if len(deaths_before(deaths, death.get("timestamp", 0))) < 5:
+            return True
+    return False
 
 
 def fetch_fight_payload(token, report_id, fight):
@@ -918,7 +1326,90 @@ def fetch_fight_payload(token, report_id, fight):
             COMBAT_RES_IDS,
             "读取战复记录",
         )
-    return deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary
+    shield_damage_events = []
+    shield_debuffs = []
+    dispel_casts = []
+    combatant_info = []
+    soft_enrage_buffs = []
+    if not fight.get("kill") and fight["endTime"] - fight["startTime"] > SOFT_ENRAGE_MS:
+        progress("读取 6:35 后软狂暴层数线索", 2)
+        soft_enrage_buffs = fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "Buffs",
+            {SOFT_ENRAGE_BUFF_ID, ZEALOUS_SPIRIT_ID},
+            "读取贝莱梅软狂暴 Buff",
+            hostility_type="Enemies",
+        )
+    if ENABLE_DISPEL_ANALYSIS and needs_dispel_check(fight, deaths):
+        progress("按死亡 last3hits 补充读取飞盾 / 驱散线索", 2)
+        shield_damage_events = fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "DamageTaken",
+            {AVENGER_SHIELD_DAMAGE_ID},
+            "读取复仇者之盾伤害线索",
+        )
+        shield_debuffs = fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "Debuffs",
+            {AVENGER_SHIELD_DEBUFF_ID},
+            "读取复仇者之盾 Debuff 线索",
+        )
+        dispel_casts = fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "Casts",
+            DISPEL_CHECK_CAST_IDS,
+            "读取治疗驱散 / 战复线索",
+        )
+        if not res_events:
+            res_events = [event for event in dispel_casts if ability_id(event) in COMBAT_RES_IDS]
+        combatant_info = fetch_combatant_info(token, report_id, fight)
+    return deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary, shield_damage_events, shield_debuffs, dispel_casts, combatant_info, soft_enrage_buffs
+
+
+def summarize_dispel_analysis(fights):
+    summary = {}
+    fight_rows = []
+    for fight in fights:
+        rows = fight.get("lightblindedVanguard", {}).get("dispelIssues", [])
+        if not rows:
+            continue
+        fight_rows.append({
+            "reportID": fight.get("reportID"),
+            "fightID": fight.get("fightID"),
+            "startDateTime": fight.get("startDateTime"),
+            "duration": fight.get("duration"),
+            "wclDispelsLink": dispels_link(fight.get("reportID"), fight.get("fightID")),
+            "issueCount": len(rows),
+            "rows": rows,
+        })
+        for row in rows:
+            for healer in row.get("healers", []):
+                name = healer.get("name")
+                if not name:
+                    continue
+                bucket = summary.setdefault(name, {"name": name, "missing": 0, "dead": 0, "used": 0, "total": 0})
+                status = healer.get("status")
+                if status == "missing":
+                    bucket["missing"] += 1
+                elif status == "dead":
+                    bucket["dead"] += 1
+                elif status == "used":
+                    bucket["used"] += 1
+                bucket["total"] += 1
+    return {
+        "enabled": ENABLE_DISPEL_ANALYSIS,
+        "logic": DISPEL_LOGIC_TEXT,
+        "summary": sorted(summary.values(), key=lambda item: (item["missing"], item["dead"], item["total"]), reverse=True),
+        "fights": sorted(fight_rows, key=lambda item: (item.get("reportID") or "", item.get("fightID") or 0)),
+    }
 
 
 def build_aggregated_json(report_ids):
@@ -942,7 +1433,9 @@ def build_aggregated_json(report_ids):
             "bossName": "光盲先锋军",
             "features": {
                 "interrupts": False,
+                "dispels": ENABLE_DISPEL_ANALYSIS,
             },
+            "dispelAnalysisEnabled": ENABLE_DISPEL_ANALYSIS,
             "avoidableSpells": {key: value["label"] for key, value in AVOIDABLE_SPELLS.items()},
             "spellLabels": {str(key): value for key, value in SPELLS.items()},
             "trialRecordTypes": {
@@ -950,7 +1443,7 @@ def build_aggregated_json(report_ids):
                 "tank_swap": "倒T / 换嘲证据",
             },
         },
-        "data": {"page1_wipeAnalysis": [], "page2_avoidableBoard": {}},
+        "data": {"page1_wipeAnalysis": [], "page2_avoidableBoard": {}, "page3_dispelAnalysis": {"enabled": ENABLE_DISPEL_ANALYSIS, "logic": DISPEL_LOGIC_TEXT, "summary": [], "fights": []}},
     }
 
     global_avoidable = {key: {} for key in AVOIDABLE_SPELLS}
@@ -961,7 +1454,19 @@ def build_aggregated_json(report_ids):
         progress(f"匹配到 {len(fights)} 场光盲先锋军战斗", 1)
         for index, fight in enumerate(fights, start=1):
             progress(f"分析 Fight {fight['id']} ({index}/{len(fights)})", 1)
-            deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary = fetch_fight_payload(token, report_id, fight)
+            (
+                deaths,
+                avoidable_damage_events,
+                detail_damage_events,
+                debuffs,
+                res_events,
+                preliminary,
+                shield_damage_events,
+                shield_debuffs,
+                dispel_casts,
+                combatant_info,
+                soft_enrage_buffs,
+            ) = fetch_fight_payload(token, report_id, fight)
             fight_result = analyze_fight(
                 report_id,
                 fight,
@@ -973,10 +1478,16 @@ def build_aggregated_json(report_ids):
                 debuffs,
                 res_events,
                 preliminary,
+                shield_damage_events,
+                shield_debuffs,
+                dispel_casts,
+                combatant_info,
+                soft_enrage_buffs,
             )
             merge_avoidable(global_avoidable, fight_result["avoidableSummary"])
             final_output["data"]["page1_wipeAnalysis"].append(fight_result)
 
+    final_output["data"]["page3_dispelAnalysis"] = summarize_dispel_analysis(final_output["data"]["page1_wipeAnalysis"])
     final_output["data"]["page2_avoidableBoard"] = {
         key: sorted(rows.values(), key=lambda item: item["totalDamage"], reverse=True)
         for key, rows in global_avoidable.items()

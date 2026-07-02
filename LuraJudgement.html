@@ -21,11 +21,15 @@
     <header class="mb-6 border-b border-gray-800 pb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <h1 class="text-3xl font-bold text-amber-400 tracking-wide">{{ pageTitle }}</h1>
-            <p class="text-gray-400 mt-2 text-sm">
+            <p v-if="dataLoaded" class="text-gray-400 mt-2 text-sm">
                 已分析日志：
                 <span class="text-white font-semibold">{{ meta?.analyzedReports?.length || 0 }}</span>
                 份
                 <span v-if="activeBossLabel" class="ml-2 text-gray-500">/ {{ activeBossLabel }}</span>
+            </p>
+            <p v-else class="text-gray-400 mt-2 text-sm">
+                在线分析功能敬请期待，请先使用
+                <span class="text-blue-300 font-semibold"> &gt;&gt; JSON 导入窗口 &lt;&lt; </span>
             </p>
         </div>
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
@@ -38,39 +42,17 @@
             <button v-if="showInterruptTab" @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 漏断统计
             </button>
+            <button v-if="showDispelTab" @click="currentTab='dispel'" :class="tabClass('dispel','emerald')" class="px-5 py-2 text-sm rounded border font-bold transition">
+                驱散统计
+            </button>
         </div>
     </header>
 
     <section v-if="!dataLoaded" class="flex justify-center py-28 fade-in">
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 max-w-3xl w-full shadow-xl">
-            <h2 class="text-2xl font-bold mb-3">读取复盘数据</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5 text-sm">
-                <label class="block">
-                    <span class="text-xs text-gray-500">版本</span>
-                    <select v-model="selectedVersion" class="mt-1 w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-200">
-                        <option v-for="version in catalog.versions" :key="version.version" :value="version.version">{{ version.version }}</option>
-                    </select>
-                </label>
-                <label class="block">
-                    <span class="text-xs text-gray-500">副本</span>
-                    <select v-model="selectedRaid" class="mt-1 w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-200">
-                        <option v-for="raid in activeRaids" :key="raid.key" :value="raid.key">{{ raid.name }}</option>
-                    </select>
-                </label>
-                <label class="block">
-                    <span class="text-xs text-gray-500">Boss</span>
-                    <select v-model="selectedBoss" class="mt-1 w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-200">
-                        <option v-for="boss in activeBosses" :key="boss.key" :value="boss.key">{{ boss.name }}</option>
-                    </select>
-                </label>
-                <label class="block">
-                    <span class="text-xs text-gray-500">WCL 日志 ID</span>
-                    <input v-model.trim="reportInput" placeholder="例如 your_report_id" class="mt-1 w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-gray-200 placeholder:text-gray-600">
-                </label>
-            </div>
-            <div class="bg-gray-950 border border-gray-800 rounded p-3 text-xs text-gray-400 mb-5">
-                当前阶段还没有接服务器。请先用统一入口生成 JSON：
-                <span class="block mt-1 text-gray-300 font-mono break-all">{{ analyzeCommand }}</span>
+            <h2 class="text-2xl font-bold mb-3">JSON 导入窗口</h2>
+            <div class="bg-gray-950 border border-gray-800 rounded p-4 text-sm text-gray-400 mb-5 leading-6">
+                在线分析功能敬请期待。当前页面不会在前端选择 Boss 或直接请求 WCL，请先在本地生成复盘 JSON 后导入查看。
             </div>
             <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
                 选择 JSON 文件
@@ -133,6 +115,7 @@
                                                     <span class="text-amber-100 font-semibold">{{ record.title }}</span>
                                                     <span class="text-gray-500">{{ record.summary }}</span>
                                                 </div>
+                                                <div v-if="record.logic" class="mt-1 text-[11px] leading-relaxed text-gray-500">{{ record.logic }}</div>
                                                 <div v-if="record.rows && record.rows.length" class="mt-1 space-y-1">
                                                     <div v-for="row in record.rows.slice(0, 8)" :key="trialRowKey(record, row)" class="text-gray-300">
                                                         <template v-if="record.type === 'split_deserters'">
@@ -168,6 +151,22 @@
                                                         <template v-else-if="record.type === 'combat_res'">
                                                             <span class="font-mono text-gray-500">{{ row.time }}</span>
                                                             <span class="text-gray-300 ml-1">{{ row.text }}</span>
+                                                        </template>
+                                                        <template v-else-if="record.type === 'dispel_issue'">
+                                                            <div class="space-y-1">
+                                                                <div>
+                                                                    <span class="font-mono text-gray-500">{{ row.time }}</span>
+                                                                    <span class="text-blue-300 font-semibold ml-1">{{ row.player }}</span>
+                                                                    <span class="text-gray-300"> 死亡前疑似复仇者之盾未及时驱散</span>
+                                                                    <span class="text-gray-500">（{{ row.windowStart }}-{{ row.windowEnd }}）</span>
+                                                                </div>
+                                                                <div class="flex flex-wrap gap-1">
+                                                                    <span v-for="healer in row.healers" :key="row.time + healer.name" class="px-2 py-0.5 rounded border"
+                                                                          :class="healer.status === 'missing' ? 'bg-red-950/70 border-red-800 text-red-200' : (healer.status === 'dead' ? 'bg-gray-900 border-gray-700 text-gray-500' : 'bg-emerald-950/60 border-emerald-800 text-emerald-200')">
+                                                                        {{ healer.text }}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </template>
                                                         <template v-else-if="row.text">
                                                             <span v-if="row.time" class="font-mono text-gray-500">{{ row.time }}</span>
@@ -299,6 +298,64 @@
                 </tbody>
             </table>
         </section>
+
+        <section v-if="showDispelTab" v-show="currentTab === 'dispel'" class="space-y-5">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-800">
+                    <h2 class="font-bold text-white">驱散问题统计</h2>
+                    <p class="mt-1 text-xs text-gray-500">{{ dispelAnalysis.logic }}</p>
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-950 text-gray-400 text-xs">
+                    <tr>
+                        <th class="py-2 px-4 text-left">治疗玩家</th>
+                        <th class="py-2 px-4 text-center">未使用驱散</th>
+                        <th class="py-2 px-4 text-center">已阵亡</th>
+                        <th class="py-2 px-4 text-center">已使用</th>
+                        <th class="py-2 px-4 text-center">合计</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr v-for="row in dispelSummary" :key="row.name" class="border-t border-gray-800 hover:bg-gray-800 transition">
+                        <td class="py-2 px-4 text-blue-300 font-bold">{{ row.name }}</td>
+                        <td class="py-2 px-4 text-center text-red-300 font-mono font-bold">{{ row.missing }}</td>
+                        <td class="py-2 px-4 text-center text-gray-400 font-mono">{{ row.dead }}</td>
+                        <td class="py-2 px-4 text-center text-emerald-300 font-mono">{{ row.used }}</td>
+                        <td class="py-2 px-4 text-center text-amber-300 font-mono">{{ row.total }}</td>
+                    </tr>
+                    <tr v-if="dispelSummary.length === 0">
+                        <td colspan="5" class="py-8 text-center text-gray-500">暂无驱散失误记录。</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div v-for="fight in dispelFights" :key="fight.reportID + '-' + fight.fightID" class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                <div class="px-4 py-3 border-b border-gray-800 flex justify-between gap-3">
+                    <div>
+                        <div class="text-sm font-bold text-white">{{ fight.reportID?.slice(0, 8) }} / Fight {{ fight.fightID }}</div>
+                        <div class="text-xs text-gray-500 mt-1">{{ fight.startDateTime || '-' }} · {{ fight.duration || '-' }} · {{ fight.issueCount }} 条记录</div>
+                    </div>
+                    <a v-if="fight.wclDispelsLink" :href="fight.wclDispelsLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200 whitespace-nowrap">查看 Dispels</a>
+                </div>
+                <div class="p-4 space-y-3">
+                    <div v-for="row in fight.rows" :key="row.time + row.player" class="bg-gray-950 border border-gray-800 rounded p-3 text-xs">
+                        <div class="mb-2">
+                            <span class="font-mono text-gray-500">{{ row.time }}</span>
+                            <span class="text-blue-300 font-bold ml-1">{{ row.player }}</span>
+                            <span class="text-gray-300"> 死亡前疑似复仇者之盾未及时驱散</span>
+                            <span class="text-gray-500">（{{ row.windowStart }}-{{ row.windowEnd }}）</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1">
+                            <span v-for="healer in row.healers" :key="row.time + healer.name" class="px-2 py-0.5 rounded border"
+                                  :class="healer.status === 'missing' ? 'bg-red-950/70 border-red-800 text-red-200' : (healer.status === 'dead' ? 'bg-gray-900 border-gray-700 text-gray-500' : 'bg-emerald-950/60 border-emerald-800 text-emerald-200')">
+                                {{ healer.text }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 </div>
 
@@ -314,6 +371,7 @@ createApp({
             meta: {},
             rawWipeAnalysis: [],
             avoidableBoard: {},
+            dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
             errorMsg: '',
             activePanels: [],
@@ -411,6 +469,15 @@ createApp({
         showInterruptTab() {
             return this.meta?.features?.interrupts !== false;
         },
+        showDispelTab() {
+            return this.meta?.features?.dispels === true && this.dispelAnalysis.enabled !== false;
+        },
+        dispelSummary() {
+            return this.dispelAnalysis.summary || [];
+        },
+        dispelFights() {
+            return this.dispelAnalysis.fights || [];
+        },
         activeVersion() {
             return this.catalog.versions.find(item => item.version === this.selectedVersion) || this.catalog.versions[0] || { raids: [] };
         },
@@ -427,17 +494,16 @@ createApp({
             return this.activeBosses.find(item => item.key === this.selectedBoss) || this.activeBosses[0] || {};
         },
         activeBossLabel() {
-            const raid = this.activeRaid?.name || '';
-            const boss = this.activeBoss?.name || '';
-            return [this.selectedVersion, raid, boss].filter(Boolean).join(' / ');
+            if (!this.dataLoaded) return '';
+            const version = this.meta?.version || this.selectedVersion;
+            const raid = this.meta?.raidName || this.activeRaid?.name || '';
+            const boss = this.meta?.bossName || this.activeBoss?.name || '';
+            return [version, raid, boss].filter(Boolean).join(' / ');
         },
         pageTitle() {
+            if (!this.dataLoaded) return 'WCL 开荒复盘面板';
             const boss = this.meta?.bossName || this.activeBoss?.name || 'WCL';
             return `${boss}复盘面板`;
-        },
-        analyzeCommand() {
-            const report = this.reportInput || '<日志ID>';
-            return `python analyze.py --version ${this.selectedVersion} --raid ${this.selectedRaid} --boss ${this.selectedBoss} --report ${report}`;
         }
     },
     mounted() {
@@ -588,6 +654,7 @@ createApp({
 
             this.glaiveBoard = result.data.page2_glaiveBoard || [];
             this.avoidableBoard = { ...(result.data.page2_avoidableBoard || {}) };
+            this.dispelAnalysis = result.data.page3_dispelAnalysis || { enabled: false, logic: '', summary: [], fights: [] };
             if (!this.avoidableBoard.skyGlaive && this.glaiveBoard.length) this.avoidableBoard.skyGlaive = this.glaiveBoard;
 
             const playerMap = {};
@@ -623,6 +690,9 @@ createApp({
             if (!this.showInterruptTab && this.currentTab === 'interrupt') {
                 this.currentTab = 'wipe';
             }
+            if (!this.showDispelTab && this.currentTab === 'dispel') {
+                this.currentTab = 'wipe';
+            }
 
             this.activePanels = this.groupedWipes.length ? [this.groupedWipes[0].phase] : [];
             this.activeDetailPanels = this.groupedWipes.length && this.groupedWipes[0].reasons.length ? [this.groupedWipes[0].reasons[0].key] : [];
@@ -644,7 +714,8 @@ createApp({
             const activeMap = {
                 red: 'bg-red-900/80 text-red-100 border-red-500',
                 blue: 'bg-blue-900/80 text-blue-100 border-blue-500',
-                purple: 'bg-purple-900/80 text-purple-100 border-purple-500'
+                purple: 'bg-purple-900/80 text-purple-100 border-purple-500',
+                emerald: 'bg-emerald-900/80 text-emerald-100 border-emerald-500'
             };
             return active ? activeMap[color] : 'bg-gray-900 text-gray-400 border-gray-700 hover:bg-gray-800';
         },

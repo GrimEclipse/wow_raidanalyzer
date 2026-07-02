@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 
 
@@ -10,10 +11,13 @@ def main():
     parser.add_argument("--boss", default="midnight_falls", help="boss key")
     parser.add_argument("--output", default=str(Path(__file__).resolve().with_name("wcl_hardcore_api.json")),
                         help="输出 JSON 路径")
+    parser.add_argument("--include-dispels", action="store_true", help="读取额外驱散数据；当前主要用于光盲先锋军复仇者之盾减员分析")
     args = parser.parse_args()
+    if args.include_dispels:
+        os.environ["LIGHTBLINDED_VANGUARD_DISPELS"] = "1"
 
     print(
-        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} report={args.report}",
+        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} report={args.report} include_dispels={args.include_dispels}",
         flush=True,
     )
     from analyzer_core.runner import analyze_report
