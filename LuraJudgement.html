@@ -182,10 +182,15 @@
                                     </div>
                                     <div class="h-36 overflow-y-auto no-scrollbar bg-gray-950/60 rounded border border-gray-800 p-2 space-y-1">
                                         <div v-if="!fight.deathTimeline || !fight.deathTimeline.length" class="text-xs text-gray-500 py-8 text-center">本场没有死亡记录。</div>
-                                        <div v-for="event in fight.deathTimeline" :key="event.time + event.player + event.ability" class="grid grid-cols-[44px_1fr_120px] gap-2 text-xs py-1 border-l border-gray-700 pl-2">
+                                        <div v-for="event in fight.deathTimeline" :key="event.time + event.player + event.ability + (event.kind || '')" class="grid gap-2 text-xs py-1 border-l border-gray-700 pl-2" :class="event.kind === 'tank_evidence' ? 'grid-cols-[44px_1fr]' : 'grid-cols-[44px_1fr_120px]'">
                                             <span class="text-gray-500 font-mono">{{ event.time }}</span>
-                                            <span class="text-blue-300 font-semibold truncate">{{ event.player }}</span>
-                                            <span class="text-red-300 truncate text-right">{{ event.ability }}</span>
+                                            <template v-if="event.kind === 'tank_evidence'">
+                                                <span class="text-gray-300 leading-relaxed">{{ event.text }}</span>
+                                            </template>
+                                            <template v-else>
+                                                <span class="text-blue-300 font-semibold truncate">{{ event.player }}</span>
+                                                <span class="text-red-300 truncate text-right">{{ event.ability }}</span>
+                                            </template>
                                         </div>
                                     </div>
                                 </div>
@@ -200,9 +205,28 @@
         <section v-show="currentTab === 'avoidable'" class="space-y-5">
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
                 <div class="flex flex-wrap gap-2 mb-4">
-                    <button v-for="tab in avoidableTabs" :key="tab.key" @click="avoidableTab=tab.key" :class="avoidableTab === tab.key ? 'bg-blue-600 text-white border-blue-400' : 'bg-gray-950 text-gray-400 border-gray-700 hover:bg-gray-800'" class="px-4 py-2 rounded border text-sm font-bold transition">
-                        {{ tab.label }}
-                    </button>
+                        <button v-for="tab in avoidableTabs" :key="tab.key" @click="avoidableTab=tab.key" :class="avoidableTab === tab.key ? 'bg-blue-600 text-white border-blue-400' : 'bg-gray-950 text-gray-400 border-gray-700 hover:bg-gray-800'" class="px-4 py-2 rounded border text-sm font-bold transition">
+                            {{ tab.label }}
+                        </button>
+                </div>
+
+                <div v-if="avoidableFirstDeathBoard.length" class="bg-gray-900 border border-gray-800 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-bold text-red-200">团队崩溃前置可躲避死亡排行</h3>
+                        <span class="text-xs text-gray-500">仅统计最终归因为团队减员过多 / AoE 崩溃的战斗</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
+                        <div v-for="(row, index) in avoidableFirstDeathBoard.slice(0, 12)" :key="'afd-' + row.name" class="bg-gray-950 border border-gray-800 rounded px-3 py-2 text-xs">
+                            <div class="flex justify-between gap-2">
+                                <span class="text-gray-500 font-mono">#{{ index + 1 }}</span>
+                                <span class="text-gray-300">{{ roleIcons(row.roles || row.role) }}</span>
+                                <span class="text-blue-300 font-bold truncate flex-1">{{ row.name }}</span>
+                                <span class="text-amber-300">😋</span>
+                                <span class="text-red-300 font-mono">{{ row.count }}</span>
+                            </div>
+                            <div class="mt-1 text-gray-500 truncate">{{ row.spellSummary }}</div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
@@ -212,21 +236,25 @@
                             <tr>
                                 <th class="py-2 px-3 text-center w-16">排名</th>
                                 <th class="py-2 px-3 text-left">玩家</th>
-                                <th class="py-2 px-3 text-right">承受伤害</th>
-                                <th class="py-2 px-3 text-center">次数</th>
-                                <th class="py-2 px-3 text-center">直接死亡</th>
+                                <th class="py-2 px-3 text-center">职责</th>
+                                <th class="py-2 px-3 text-right cursor-pointer select-none" @click="setAvoidableSort('totalDamage')">承受伤害 <span class="text-gray-600">{{ sortIcon('totalDamage') }}</span></th>
+                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('hitCount')">次数 <span class="text-gray-600">{{ sortIcon('hitCount') }}</span></th>
+                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('deathCount')">直接死亡 <span class="text-gray-600">{{ sortIcon('deathCount') }}</span></th>
                             </tr>
                             </thead>
                             <tbody>
-                            <tr v-for="(player, index) in activeAvoidableRows" :key="player.name" class="border-b border-gray-800/50 hover:bg-gray-800/70">
+                            <tr v-for="(player, index) in activeAvoidableTableRows" :key="player.name" class="border-b border-gray-800/50 hover:bg-gray-800/70">
                                 <td class="py-2 px-3 text-center text-gray-500 font-bold">{{ index + 1 }}</td>
                                 <td class="py-2 px-3 text-blue-300 font-bold">{{ player.name }}</td>
+                                <td class="py-2 px-3 text-center text-gray-300">{{ roleIcons(player.roles || player.role) }}</td>
                                 <td class="py-2 px-3 text-right font-mono">{{ number(player.totalDamage) }}</td>
                                 <td class="py-2 px-3 text-center text-amber-300 font-mono">{{ player.hitCount }}</td>
-                                <td class="py-2 px-3 text-center font-mono" :class="player.deathCount > 0 ? 'text-red-400 font-bold' : 'text-green-500'">{{ player.deathCount || 0 }}</td>
+                                <td class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
+                                    {{ player.deathCount || 0 }}<span v-if="player.deathCompensationCount" class="text-amber-300">({{ avoidableDeathTotal(player) }})</span>
+                                </td>
                             </tr>
                             <tr v-if="activeAvoidableRows.length === 0">
-                                <td colspan="5" class="py-10 text-center text-gray-500">暂无该技能承伤记录，若有数据请补充后端 Spell ID。</td>
+                                <td colspan="6" class="py-10 text-center text-gray-500">暂无该技能承伤记录，若有数据请补充后端 Spell ID。</td>
                             </tr>
                             </tbody>
                         </table>
@@ -368,9 +396,12 @@ createApp({
             dataLoaded: false,
             currentTab: 'wipe',
             avoidableTab: 'total',
+            avoidableSortKey: 'totalDamage',
+            avoidableSortDir: 'desc',
             meta: {},
             rawWipeAnalysis: [],
             avoidableBoard: {},
+            avoidableFirstDeathBoard: [],
             dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
             errorMsg: '',
@@ -430,6 +461,22 @@ createApp({
         },
         activeAvoidableRows() {
             return this.avoidableBoard[this.avoidableTab] || [];
+        },
+        activeAvoidableTableRows() {
+            const rows = [...this.activeAvoidableRows];
+            const key = this.avoidableSortKey;
+            const direction = this.avoidableSortDir === 'asc' ? 1 : -1;
+            return rows.sort((a, b) => {
+                const valueA = a[key] || 0;
+                const valueB = b[key] || 0;
+                const primary = (valueA - valueB) * direction;
+                if (primary) return primary;
+                if (key === 'deathCount') {
+                    const compensationTie = ((a.deathCompensationCount || 0) - (b.deathCompensationCount || 0)) * direction;
+                    if (compensationTie) return compensationTie;
+                }
+                return (b.totalDamage || 0) - (a.totalDamage || 0);
+            });
         },
         avoidableBreakdownTabs() {
             return this.avoidableTabs.filter(tab => tab.key !== 'total');
@@ -622,6 +669,27 @@ createApp({
         avoidableColor(index) {
             return this.avoidablePalette[index % this.avoidablePalette.length];
         },
+        avoidableDeathTotal(player) {
+            return (player.deathCount || 0) + (player.deathCompensationCount || 0);
+        },
+        roleIcons(value) {
+            const roles = Array.isArray(value) ? value : [value];
+            const icons = { tank: '🛡', healer: '✚', dps: '🗡' };
+            const unique = [...new Set(roles.filter(Boolean))];
+            return unique.length ? unique.map(role => icons[role] || '?').join(' ') : '?';
+        },
+        setAvoidableSort(key) {
+            if (this.avoidableSortKey === key) {
+                this.avoidableSortDir = this.avoidableSortDir === 'desc' ? 'asc' : 'desc';
+            } else {
+                this.avoidableSortKey = key;
+                this.avoidableSortDir = 'desc';
+            }
+        },
+        sortIcon(key) {
+            if (this.avoidableSortKey !== key) return '↕';
+            return this.avoidableSortDir === 'desc' ? '▼' : '▲';
+        },
         makeReplayLink(fight, positionMs) {
             if (!fight.reportID || !fight.fightID) return fight.wclDeepLink || '';
             return `https://cn.warcraftlogs.com/reports/${fight.reportID}#fight=${fight.fightID}&view=replay&position=${Math.max(0, Math.floor(positionMs))}`;
@@ -654,6 +722,7 @@ createApp({
 
             this.glaiveBoard = result.data.page2_glaiveBoard || [];
             this.avoidableBoard = { ...(result.data.page2_avoidableBoard || {}) };
+            this.avoidableFirstDeathBoard = result.data.page2_avoidableFirstDeathBoard || [];
             this.dispelAnalysis = result.data.page3_dispelAnalysis || { enabled: false, logic: '', summary: [], fights: [] };
             if (!this.avoidableBoard.skyGlaive && this.glaiveBoard.length) this.avoidableBoard.skyGlaive = this.glaiveBoard;
 
@@ -664,15 +733,19 @@ createApp({
 
             skillKeys.forEach(key => {
                 (this.avoidableBoard[key] || []).forEach(p => {
+                    const roles = Array.isArray(p.roles) ? p.roles : (p.role ? [p.role] : []);
                     if (!playerMap[p.name]) {
                         playerMap[p.name] = {
-                            name: p.name, totalDamage: 0, hitCount: 0, deathCount: 0,
+                            name: p.name, role: roles[0] || 'unknown', roles: [...roles], totalDamage: 0, hitCount: 0, deathCount: 0, deathCompensationCount: 0,
                             breakdown: {}
                         };
                     }
+                    playerMap[p.name].roles = [...new Set([...(playerMap[p.name].roles || []), ...roles])];
+                    playerMap[p.name].role = playerMap[p.name].roles[0] || playerMap[p.name].role || 'unknown';
                     playerMap[p.name].totalDamage += p.totalDamage || 0;
                     playerMap[p.name].hitCount += p.hitCount || 0;
                     playerMap[p.name].deathCount += p.deathCount || 0;
+                    playerMap[p.name].deathCompensationCount += p.deathCompensationCount || 0;
                     playerMap[p.name].breakdown[key] = (playerMap[p.name].breakdown[key] || 0) + (p.totalDamage || 0);
                 });
             });

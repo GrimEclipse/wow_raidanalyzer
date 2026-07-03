@@ -57,6 +57,7 @@ PROXY_URL = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 CN_TZ = timezone(timedelta(hours=8))
 ENABLE_DISPEL_ANALYSIS = os.getenv("LIGHTBLINDED_VANGUARD_DISPELS", "").strip().lower() in {"1", "true", "yes", "on"}
+ENABLE_AOE_AVOIDABLE_FIRST_DEATHS = os.getenv("LIGHTBLINDED_VANGUARD_AOE_AVOIDABLE_FIRST_DEATHS", "1").strip().lower() not in {"0", "false", "no", "off"}
 DISPEL_LOGIC_TEXT = "统计逻辑：死亡前 last3hits 疑似包含复仇者之盾；死亡前未被可躲避技能命中；阵亡人数 < 5 且治疗阵亡人数 < 2；排除战斗结束前 15 秒、软狂暴阶段和坦克已无法战复后的拉脱段；回看死亡前 8 秒内是否存在复仇者之盾实际驱散事件，并统计治疗是否完成驱散。"
 
 
@@ -72,7 +73,7 @@ SPELLS = {
     1251857: "审判",
     1251859: "正义盾击",
     1246726: "审判",
-    1251812: "最终审判",
+    1251812: "惩戒裁决",
     1249047: "神圣之锤",
     1276982: "神圣奉献",
     1246765: "神圣风暴",
@@ -100,6 +101,7 @@ SPELLS = {
     32375: "群体驱散",
     115310: "还魂术",
     89808: "烧灼魔法",
+    211319: "代偿",
 }
 
 EXECUTION_SENTENCE_DAMAGE_ID = 1249024
@@ -112,6 +114,9 @@ TANK_STRIKE_IDS = {1251859, 1251812}
 TANK_VULN_IDS = {PROT_JUDGMENT_VULN_ID, RET_JUDGMENT_VULN_ID}
 MYTHIC_RAID_SIZE = 20
 SOFT_ENRAGE_MS = 395_000
+TANK_SPEC_IDS = {250, 581, 104, 268, 66, 73}
+HOLY_PRIEST_SPEC_ID = 257
+AVOIDABLE_CHEAT_DEATH_IDS = {211319}
 
 AVOIDABLE_SPELLS = {
     "holyHammer": {"label": "神圣之锤", "ids": {1249047}},
@@ -123,6 +128,8 @@ AVOIDABLE_DAMAGE_IDS = {spell_id for config in AVOIDABLE_SPELLS.values() for spe
 TANK_DEATH_IDS = {1251857, 1251859, 1246726, 1251812}
 TANK_SIGNAL_DEATH_IDS = TANK_DEATH_IDS
 TANK_DETAIL_DAMAGE_IDS = {1251857, 1251859, 1246726, 1251812}
+TANK_DETAIL_CAST_IDS = {1251857, 1251859, 1246736, 1251812}
+TANK_CAST_DAMAGE_MATCH_IDS = {1246736: 1246726}
 TANK_DETAIL_DEBUFF_IDS = TANK_VULN_IDS
 SPLIT_DEATH_IDS = {EXECUTION_SENTENCE_DAMAGE_ID, EXECUTED_DAMAGE_ID}
 SPLIT_RELATED_DEATH_IDS = SPLIT_DEATH_IDS | {1249047}
@@ -328,6 +335,24 @@ def event_amount(event):
     return int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
 
 
+def is_environment_actor_name(name):
+    return name in {"Environment", "环境", "未知(None)", "未知(0)"}
+
+
+def is_environment_actor(actor_map, actor_id):
+    return actor_id in {None, 0} or is_environment_actor_name(actor(actor_map, actor_id))
+
+
+def event_key(event):
+    return (
+        event.get("timestamp", 0),
+        event.get("sourceID"),
+        event.get("targetID"),
+        ability_id(event),
+        event_amount(event),
+    )
+
+
 def actor(actor_map, actor_id):
     name = actor_map.get(actor_id, f"未知({actor_id})")
     return ACTOR_NAME_OVERRIDES.get(name, name)
@@ -374,6 +399,35 @@ def infer_healer_player_ids(combatant_info, casts):
     return healer_ids
 
 
+def build_player_roles(combatant_info, tank_player_ids=None):
+    roles = {}
+    for event in combatant_info:
+        source_id = event_source_id(event)
+        spec_id = combatant_spec_id(event)
+        if not source_id:
+            continue
+        if spec_id in TANK_SPEC_IDS:
+            roles[source_id] = "tank"
+        elif spec_id in HEALER_SPEC_IDS:
+            roles[source_id] = "healer"
+        else:
+            roles.setdefault(source_id, "dps")
+    for player_id in tank_player_ids or set():
+        if player_id and player_id not in roles:
+            roles[player_id] = "tank"
+    return roles
+
+
+def build_player_specs(combatant_info):
+    specs = {}
+    for event in combatant_info:
+        source_id = event_source_id(event)
+        spec_id = combatant_spec_id(event)
+        if source_id and spec_id:
+            specs[source_id] = spec_id
+    return specs
+
+
 def get_local_datetime(absolute_ms):
     return datetime.fromtimestamp(absolute_ms / 1000.0, CN_TZ)
 
@@ -416,46 +470,77 @@ def deaths_before(deaths, timestamp):
     return [death for death in deaths if death.get("timestamp", 0) <= timestamp]
 
 
-def build_avoidable_rows(actor_map, damage_events, deaths):
+def compensation_for_damage_event(damage_event, compensation_events):
+    target_id = damage_event.get("targetID")
+    timestamp = damage_event.get("timestamp", 0)
+    candidates = [
+        event for event in compensation_events
+        if event.get("targetID") == target_id
+        and event_is_apply(event)
+        and -250 <= event.get("timestamp", 0) - timestamp <= 2_500
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda event: abs(event.get("timestamp", 0) - timestamp))
+
+
+def empty_avoidable_row(name, spell_key, spell_name, role="unknown"):
+    roles = [] if role in {None, "", "unknown"} else [role]
+    return {
+        "name": name,
+        "role": role,
+        "roles": roles,
+        "spellKey": spell_key,
+        "spellName": spell_name,
+        "totalDamage": 0,
+        "hitCount": 0,
+        "deathCount": 0,
+        "deathCompensationCount": 0,
+    }
+
+
+def sort_avoidable_rows(rows):
+    return sorted(rows, key=lambda item: item.get("totalDamage", 0), reverse=True)
+
+
+def merge_roles(existing_roles, new_roles):
+    order = {"tank": 0, "healer": 1, "dps": 2, "unknown": 3}
+    roles = {role for role in (existing_roles or []) + (new_roles or []) if role and role != "unknown"}
+    return sorted(roles, key=lambda role: order.get(role, 99))
+
+
+def build_avoidable_rows(actor_map, damage_events, deaths, player_roles=None, player_specs=None, compensation_events=None):
+    player_roles = player_roles or {}
+    player_specs = player_specs or {}
+    compensation_events = compensation_events or []
     local = {key: {} for key in AVOIDABLE_SPELLS}
+    seen_compensations = set()
     for event in damage_events:
         aid = ability_id(event)
-        target = actor(actor_map, event.get("targetID"))
+        target_id = event.get("targetID")
+        target = actor(actor_map, target_id)
         for key, config in AVOIDABLE_SPELLS.items():
             if aid not in config["ids"]:
                 continue
-            row = local[key].setdefault(
-                target,
-                {
-                    "name": target,
-                    "spellKey": key,
-                    "spellName": config["label"],
-                    "totalDamage": 0,
-                    "hitCount": 0,
-                    "deathCount": 0,
-                },
-            )
+            row = local[key].setdefault(target, empty_avoidable_row(target, key, config["label"], player_roles.get(target_id, "unknown")))
             row["totalDamage"] += event_amount(event)
             row["hitCount"] += 1
+            compensation = compensation_for_damage_event(event, compensation_events) if player_specs.get(target_id) == HOLY_PRIEST_SPEC_ID else None
+            if compensation:
+                compensation_key = (key, target_id, ability_id(compensation), compensation.get("timestamp", 0))
+                if compensation_key not in seen_compensations:
+                    seen_compensations.add(compensation_key)
+                    row["deathCompensationCount"] += 1
     for death in deaths:
         death_id = death.get("killingAbilityGameID")
-        target = actor(actor_map, death.get("targetID"))
+        target_id = death.get("targetID")
+        target = actor(actor_map, target_id)
         for key, config in AVOIDABLE_SPELLS.items():
             if death_id not in config["ids"]:
                 continue
-            row = local[key].setdefault(
-                target,
-                {
-                    "name": target,
-                    "spellKey": key,
-                    "spellName": config["label"],
-                    "totalDamage": 0,
-                    "hitCount": 0,
-                    "deathCount": 0,
-                },
-            )
+            row = local[key].setdefault(target, empty_avoidable_row(target, key, config["label"], player_roles.get(target_id, "unknown")))
             row["deathCount"] += 1
-    return {key: sorted(rows.values(), key=lambda item: item["totalDamage"], reverse=True) for key, rows in local.items()}
+    return {key: sort_avoidable_rows(rows.values()) for key, rows in local.items()}
 
 
 def merge_avoidable(global_board, local_board):
@@ -469,14 +554,20 @@ def merge_avoidable(global_board, local_board):
                     "name": target,
                     "spellKey": key,
                     "spellName": row["spellName"],
+                    "role": row.get("role", "unknown"),
+                    "roles": row.get("roles") or ([] if row.get("role") in {None, "", "unknown"} else [row.get("role")]),
                     "totalDamage": 0,
                     "hitCount": 0,
                     "deathCount": 0,
+                    "deathCompensationCount": 0,
                 },
             )
+            merged["roles"] = merge_roles(merged.get("roles"), row.get("roles") or ([] if row.get("role") in {None, "", "unknown"} else [row.get("role")]))
+            merged["role"] = merged["roles"][0] if merged["roles"] else (row.get("role") or merged.get("role") or "unknown")
             merged["totalDamage"] += row.get("totalDamage", 0)
             merged["hitCount"] += row.get("hitCount", 0)
             merged["deathCount"] += row.get("deathCount", 0)
+            merged["deathCompensationCount"] += row.get("deathCompensationCount", 0)
 
 
 def recent_events_for_player(events, player_id, timestamp, before_ms=12_000):
@@ -651,13 +742,6 @@ def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_event
         used_any = False
         for healer_id in sorted(healer_ids, key=lambda item: actor(actor_map, item)):
             healer_name = actor(actor_map, healer_id)
-            if not healer_is_alive(healer_id, end_ts, deaths, res_events):
-                healer_rows.append({
-                    "name": healer_name,
-                    "status": "dead",
-                    "text": f"{healer_name}（已阵亡）",
-                })
-                continue
             used = avenger_shield_dispels_in_window(dispel_events, start_ts, end_ts, source_id=healer_id)
             if not used:
                 used = [
@@ -672,6 +756,12 @@ def analyze_dispel_failures(deaths, avoidable_damage_events, shield_damage_event
                     "status": "used",
                     "spellName": spells,
                     "text": f"{healer_name}（已使用 {spells}）",
+                })
+            elif not healer_is_alive(healer_id, end_ts, deaths, res_events):
+                healer_rows.append({
+                    "name": healer_name,
+                    "status": "dead",
+                    "text": f"{healer_name}（已阵亡）",
                 })
             else:
                 healer_rows.append({
@@ -717,7 +807,7 @@ def infer_tank_player_ids(damage_events):
     return {player_id for player_id, _ in ranked[:2]}
 
 
-def tank_death_evidence(deaths, damage_events, debuffs, actor_map, fight, tank_player_ids):
+def tank_death_evidence(deaths, damage_events, cast_events, actor_map, fight, tank_player_ids):
     candidate_deaths = [
         death for death in deaths
         if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS
@@ -725,56 +815,94 @@ def tank_death_evidence(deaths, damage_events, debuffs, actor_map, fight, tank_p
     ]
     if not candidate_deaths:
         return []
-    tank_related_damage = [event for event in damage_events if ability_id(event) in TANK_DEATH_IDS | TANK_VULN_IDS]
-    tank_related_debuffs = [event for event in debuffs if ability_id(event) in TANK_VULN_IDS]
+    tank_related_damage = [event for event in damage_events if ability_id(event) in TANK_DEATH_IDS]
+    tank_related_casts = [event for event in cast_events if ability_id(event) in TANK_DETAIL_CAST_IDS]
     first_death_ts = min(death.get("timestamp", 0) for death in candidate_deaths)
     last_death_ts = max(death.get("timestamp", 0) for death in candidate_deaths)
-    related = [
+    related_casts = [
+        event for event in tank_related_casts
+        if first_death_ts - 25_000 <= event.get("timestamp", 0) <= last_death_ts + 500
+    ]
+    related_damage = [
         event for event in tank_related_damage
         if first_death_ts - 25_000 <= event.get("timestamp", 0) <= last_death_ts + 500
     ]
-    for death in candidate_deaths:
-        related += recent_events_for_player(tank_related_debuffs, death.get("targetID"), death.get("timestamp", 0), before_ms=25_000)
-    related = sorted(related, key=lambda item: item.get("timestamp", 0))
-    damaging_related = [
-        event for event in related
-        if event_amount(event) > 0
-    ]
+    related_casts = sorted(related_casts, key=lambda item: item.get("timestamp", 0))
+    related_damage = sorted(related_damage, key=lambda item: item.get("timestamp", 0))
     events = []
     seen = set()
-    for event in related:
+    matched_damage_keys = set()
+
+    def nearest_damage_for_cast(cast_event):
+        aid = ability_id(cast_event)
+        damage_aid = TANK_CAST_DAMAGE_MATCH_IDS.get(aid, aid)
+        source_id = cast_event.get("sourceID")
+        target_id = cast_event.get("targetID")
+        target_is_environment = is_environment_actor(actor_map, target_id)
+        candidates = []
+        for damage in related_damage:
+            if ability_id(damage) != damage_aid:
+                continue
+            if source_id is not None and damage.get("sourceID") != source_id:
+                continue
+            if target_id is not None and not target_is_environment and damage.get("targetID") != target_id:
+                continue
+            if abs(damage.get("timestamp", 0) - cast_event.get("timestamp", 0)) <= 2_000:
+                candidates.append(damage)
+        if not candidates:
+            return None
+        return min(candidates, key=lambda damage: abs(damage.get("timestamp", 0) - cast_event.get("timestamp", 0)))
+
+    def append_tank_event(event, matched_damage=None):
         aid = ability_id(event)
-        if event_amount(event) == 0 and any(
-            ability_id(other) == aid
-            and other.get("sourceID") == event.get("sourceID")
-            and other.get("targetID") == event.get("targetID")
-            and abs(other.get("timestamp", 0) - event.get("timestamp", 0)) <= 1_500
-            for other in damaging_related
-        ):
-            continue
-        key = (event.get("timestamp", 0) // 1000, event.get("sourceID"), event.get("targetID"), aid, event_amount(event))
+        source_id = event.get("sourceID") if event.get("sourceID") is not None else (matched_damage or {}).get("sourceID")
+        target_id = event.get("targetID")
+        if is_environment_actor(actor_map, target_id):
+            target_id = (matched_damage or {}).get("targetID")
+        if is_environment_actor(actor_map, target_id):
+            return
+        timestamp = event.get("timestamp", 0)
+        if matched_damage and (not target_id or abs(matched_damage.get("timestamp", 0) - timestamp) <= 500):
+            timestamp = matched_damage.get("timestamp", timestamp)
+        key = (timestamp // 1000, source_id, target_id, aid)
         if key in seen:
-            continue
+            return
         seen.add(key)
-        source = actor(actor_map, event.get("sourceID"))
-        target = actor(actor_map, event.get("targetID"))
+        source = actor(actor_map, source_id)
+        target = actor(actor_map, target_id)
         ability = tank_ability_name(event)
-        amount = event_amount(event)
-        amount_text = f"（{amount:,}）" if amount else ""
+        amount = event_amount(matched_damage) if matched_damage else 0
+        amount_text = f"（{amount:,}）" if aid in TANK_STRIKE_IDS and amount else ""
+        if matched_damage:
+            matched_damage_keys.add(event_key(matched_damage))
         events.append({
-            "time": format_time(fight_elapsed(event, fight)),
+            "time": format_time(timestamp - fight["startTime"]),
+            "absoluteTime": timestamp,
             "source": source,
             "target": target,
+            "sourceID": source_id,
+            "targetID": target_id,
             "ability": ability,
             "abilityID": aid,
             "amount": amount,
-            "text": f"{source} 对 {target} 释放了{ability}{amount_text}",
+            "kind": "tank_evidence",
+            "text": f"{source} 对 {target} 使用了{ability}{amount_text}",
         })
+
+    for event in related_casts:
+        append_tank_event(event, nearest_damage_for_cast(event))
+    for damage in related_damage:
+        if event_key(damage) in matched_damage_keys:
+            continue
+        append_tank_event(damage, damage)
+
+    events = sorted(events, key=lambda item: item.get("absoluteTime", 0))[-12:]
     death_lines = []
     for death in sorted(candidate_deaths, key=lambda item: item.get("timestamp", 0)):
         death_ability = SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID")))
         death_lines.append({
             "time": format_time(fight_elapsed(death, fight)),
+            "absoluteTime": death.get("timestamp", 0),
             "player": actor(actor_map, death.get("targetID")),
             "ability": death_ability,
             "text": f"{actor(actor_map, death.get('targetID'))} 死于 {death_ability}",
@@ -786,7 +914,7 @@ def tank_death_evidence(deaths, damage_events, debuffs, actor_map, fight, tank_p
         "deathLine": "；".join(line["text"] for line in death_lines),
         "deathLines": death_lines,
         "deathCount": len(death_lines),
-        "events": events[-12:],
+        "events": events,
     }]
 
 
@@ -867,6 +995,53 @@ def unique_names(names):
         seen.add(name)
         result.append(name)
     return result
+
+
+def role_text(role):
+    return {"tank": "坦克", "healer": "治疗", "dps": "伤害输出"}.get(role or "unknown", "未知")
+
+
+def early_death_offender_rows(deaths, actor_map, player_roles, fight, limit=4):
+    rows = []
+    for death in sorted(deaths, key=lambda item: item.get("timestamp", 0))[:limit]:
+        role = player_roles.get(death.get("targetID"), "unknown")
+        ability = SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID")))
+        player = actor(actor_map, death.get("targetID"))
+        rows.append({
+            "time": format_time(fight_elapsed(death, fight)),
+            "player": player,
+            "role": role,
+            "roleText": role_text(role),
+            "ability": ability,
+            "abilityID": death.get("killingAbilityGameID"),
+            "text": f"{player} 死于 {ability}",
+        })
+    return rows
+
+
+def avoidable_first_death_rows(deaths, actor_map, player_roles, fight, limit=4):
+    rows = []
+    for death in sorted(deaths, key=lambda item: item.get("timestamp", 0)):
+        ability_id_value = death.get("killingAbilityGameID")
+        if ability_id_value not in AVOIDABLE_DAMAGE_IDS:
+            continue
+        role = player_roles.get(death.get("targetID"), "unknown")
+        ability = SPELLS.get(ability_id_value, str(ability_id_value))
+        player = actor(actor_map, death.get("targetID"))
+        rows.append({
+            "time": format_time(fight_elapsed(death, fight)),
+            "timestamp": death.get("timestamp", 0),
+            "player": player,
+            "role": role,
+            "roles": [] if role in {None, "", "unknown"} else [role],
+            "roleText": role_text(role),
+            "ability": ability,
+            "abilityID": ability_id_value,
+            "text": f"{player} 死于 {ability}",
+        })
+        if len(rows) >= limit:
+            break
+    return rows
 
 
 def split_death_clusters_from_deaths(deaths):
@@ -992,6 +1167,7 @@ def analyze_fight(
     deaths,
     avoidable_damage_events,
     detail_damage_events,
+    detail_cast_events,
     debuffs,
     res_events,
     preliminary,
@@ -1000,18 +1176,27 @@ def analyze_fight(
     dispel_casts,
     dispel_events,
     combatant_info,
+    compensation_events,
     soft_enrage_buffs,
 ):
     absolute_ms = fight["reportStartTime"] + fight["startTime"]
     local_start = get_local_datetime(absolute_ms)
     duration_ms = fight["endTime"] - fight["startTime"]
 
-    local_avoidable = build_avoidable_rows(actor_map, avoidable_damage_events, deaths)
     execution_damage = [event for event in detail_damage_events if ability_id(event) in SPLIT_DEATH_IDS]
     split_death_clusters, split_damage_clusters = split_clusters(deaths, execution_damage)
     split_keys = {"split_collapse", "split_reset", "tank_swap_with_split"}
     tank_keys = {"tank_swap", "tank_swap_with_split", "avoidable_into_tank", "tank_no_bres", "aoe_after_tank_res", "aoe_before_tank"}
+    player_specs = build_player_specs(combatant_info)
     tank_player_ids = infer_tank_player_ids(detail_damage_events)
+    tank_player_ids |= {
+        death.get("targetID") for death in deaths
+        if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS
+        and death.get("targetID")
+        and (not player_specs.get(death.get("targetID")) or player_specs.get(death.get("targetID")) in TANK_SPEC_IDS)
+    }
+    player_roles = build_player_roles(combatant_info, tank_player_ids)
+    local_avoidable = build_avoidable_rows(actor_map, avoidable_damage_events, deaths, player_roles, player_specs, compensation_events)
     tank_players = [actor(actor_map, player_id) for player_id in sorted(tank_player_ids, key=lambda item: actor(actor_map, item))]
     res_rows = format_combat_res_events(res_events, actor_map, fight)
     soft_enrage = soft_enrage_evidence(fight, actor_map, soft_enrage_buffs)
@@ -1049,7 +1234,7 @@ def analyze_fight(
             reason_key = "soft_enrage"
 
     deserters = split_deserters(deaths, split_damage_clusters, actor_map, actor_type, fight) if reason_key in split_keys else []
-    tank_evidence = tank_death_evidence(deaths, detail_damage_events, debuffs, actor_map, fight, tank_player_ids) if reason_key in tank_keys else []
+    tank_evidence = tank_death_evidence(deaths, detail_damage_events, detail_cast_events, actor_map, fight, tank_player_ids) if reason_key in tank_keys else []
 
     is_kill = bool(fight.get("kill"))
     wipe_reason = "团队减员过多 / AoE 崩溃"
@@ -1070,14 +1255,14 @@ def analyze_fight(
         elif reason_key == "tank_swap":
             wipe_reason = "换嘲失误 / 倒T"
             names = "、".join(row["player"] for row in tank_evidence) if tank_evidence else "、".join(actor(actor_map, death.get("targetID")) for death in deaths[:2])
-            investigation = f"【{names}】死亡前存在审判、正义盾击或最终审判记录，优先复盘换嘲与坦克承伤。"
+            investigation = f"【{names}】死亡前存在审判、正义盾击或惩戒裁决记录，优先复盘换嘲与坦克承伤。"
             wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "tank_swap_with_split":
             split_cluster = split_death_clusters[0] if split_death_clusters else None
             split_text = split_issue_summary(split_cluster, fight)
             names = "、".join(row["player"] for row in tank_evidence) if tank_evidence else "、".join(actor(actor_map, death.get("targetID")) for death in deaths if death.get("killingAbilityGameID") in TANK_SIGNAL_DEATH_IDS)
             wipe_reason = "换嘲失误 / 倒T"
-            investigation = f"最终归因指向坦克承伤或换嘲问题，【{names}】死亡前存在审判、正义盾击或最终审判记录；同时 {split_text}，分摊也存在问题。"
+            investigation = f"最终归因指向坦克承伤或换嘲问题，【{names}】死亡前存在审判、正义盾击或惩戒裁决记录；同时 {split_text}，分摊也存在问题。"
             wcl_link = split_replay_link(report_id, fight, split_cluster) or (deaths_link(report_id, fight["id"]) if deaths else "")
         elif reason_key == "avoidable_into_tank":
             avoidable_deaths = [death for death in deaths if death.get("killingAbilityGameID") in AVOIDABLE_DAMAGE_IDS]
@@ -1180,11 +1365,34 @@ def analyze_fight(
             "time": format_time(fight_elapsed(death, fight)),
             "absoluteTime": death.get("timestamp"),
             "player": actor(actor_map, death.get("targetID")),
+            "role": player_roles.get(death.get("targetID"), "unknown"),
+            "roleText": role_text(player_roles.get(death.get("targetID"), "unknown")),
             "abilityID": death.get("killingAbilityGameID"),
             "ability": SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID"))),
+            "kind": "death",
         }
         for death in deaths
     ]
+    for row in tank_evidence:
+        for event in row.get("events", []):
+            death_timeline.append({
+                "time": event.get("time"),
+                "absoluteTime": event.get("absoluteTime"),
+                "player": event.get("target"),
+                "role": player_roles.get(event.get("targetID"), "tank"),
+                "roleText": "坦克",
+                "abilityID": event.get("abilityID"),
+                "ability": event.get("ability"),
+                "kind": "tank_evidence",
+                "source": event.get("source"),
+                "target": event.get("target"),
+                "amount": event.get("amount"),
+                "text": event.get("text"),
+            })
+    death_timeline = sorted(
+        death_timeline,
+        key=lambda item: (item.get("absoluteTime") or 0, 0 if item.get("kind") == "tank_evidence" else 1),
+    )
 
     trial_records = []
     if split_death_clusters and reason_key in split_keys:
@@ -1212,7 +1420,7 @@ def analyze_fight(
         trial_records.append({
             "type": "tank_swap",
             "title": "倒T / 换嘲证据",
-            "summary": f"{sum(row.get('deathCount', 1) for row in tank_evidence)} 名死亡玩家存在审判、正义盾击或最终审判记录",
+            "summary": f"{sum(row.get('deathCount', 1) for row in tank_evidence)} 名死亡玩家存在审判、正义盾击或惩戒裁决记录",
             "rows": tank_evidence,
         })
     if res_rows:
@@ -1222,6 +1430,9 @@ def analyze_fight(
             "summary": f"本场记录到 {len(res_rows)} 次战复施放",
             "rows": res_rows,
         })
+    avoidable_first_deaths = []
+    if ENABLE_AOE_AVOIDABLE_FIRST_DEATHS and reason_key in {"aoe_collapse", "aoe_after_tank_res", "aoe_before_tank"}:
+        avoidable_first_deaths = avoidable_first_death_rows(deaths, actor_map, player_roles, fight)
     return {
         "reportID": report_id,
         "fightID": fight["id"],
@@ -1258,6 +1469,7 @@ def analyze_fight(
             "tankPlayers": tank_players,
             "combatResurrections": res_rows,
             "dispelIssues": dispel_rows,
+            "avoidableFirstDeaths": avoidable_first_deaths,
             "softEnrage": soft_enrage,
         },
     }
@@ -1280,13 +1492,15 @@ def fetch_spell_events(token, report_id, fight, data_type, spell_ids, label, hos
 def detail_spell_ids_for_reason(reason_key, deaths):
     damage_ids = set()
     debuff_ids = set()
+    cast_ids = set()
     has_tank_death_signal = bool(death_ability_ids(deaths) & TANK_SIGNAL_DEATH_IDS)
     if reason_key in {"tank_swap", "avoidable_into_tank"}:
         damage_ids |= TANK_DETAIL_DAMAGE_IDS
-        debuff_ids |= TANK_DETAIL_DEBUFF_IDS
+        cast_ids |= TANK_DETAIL_CAST_IDS
     elif reason_key == "tank_swap_with_split":
         damage_ids |= TANK_DETAIL_DAMAGE_IDS | SPLIT_DETAIL_DAMAGE_IDS
-        debuff_ids |= TANK_DETAIL_DEBUFF_IDS | SPLIT_DETAIL_DEBUFF_IDS
+        debuff_ids |= SPLIT_DETAIL_DEBUFF_IDS
+        cast_ids |= TANK_DETAIL_CAST_IDS
     elif reason_key in {"split_collapse", "split_reset"}:
         damage_ids |= SPLIT_DETAIL_DAMAGE_IDS
         debuff_ids |= SPLIT_DETAIL_DEBUFF_IDS
@@ -1295,8 +1509,8 @@ def detail_spell_ids_for_reason(reason_key, deaths):
         debuff_ids |= SHIELD_DETAIL_DEBUFF_IDS
     elif reason_key in {"aoe_collapse", "reset_after_deaths"} and has_tank_death_signal:
         damage_ids |= TANK_DETAIL_DAMAGE_IDS
-        debuff_ids |= TANK_DETAIL_DEBUFF_IDS
-    return damage_ids, debuff_ids
+        cast_ids |= TANK_DETAIL_CAST_IDS
+    return damage_ids, debuff_ids, cast_ids
 
 
 def needs_dispel_check(fight, deaths):
@@ -1332,8 +1546,8 @@ def fetch_fight_payload(token, report_id, fight):
         "读取可躲避伤害",
     )
 
-    detail_damage_ids, detail_debuff_ids = detail_spell_ids_for_reason(preliminary["key"], deaths)
-    if detail_damage_ids or detail_debuff_ids:
+    detail_damage_ids, detail_debuff_ids, detail_cast_ids = detail_spell_ids_for_reason(preliminary["key"], deaths)
+    if detail_damage_ids or detail_debuff_ids or detail_cast_ids:
         progress("按归因补充读取线索事件", 2)
     detail_damage_events = fetch_spell_events(
         token,
@@ -1351,6 +1565,15 @@ def fetch_fight_payload(token, report_id, fight):
         detail_debuff_ids,
         "读取归因光环线索",
     )
+    detail_cast_events = fetch_spell_events(
+        token,
+        report_id,
+        fight,
+        "Casts",
+        detail_cast_ids,
+        "读取归因施放线索",
+        hostility_type="Enemies",
+    )
     res_events = []
     if death_ability_ids(deaths) & TANK_SIGNAL_DEATH_IDS:
         res_events = fetch_spell_events(
@@ -1366,7 +1589,17 @@ def fetch_fight_payload(token, report_id, fight):
     dispel_casts = []
     dispel_events = []
     combatant_info = []
+    compensation_events = []
     soft_enrage_buffs = []
+    if avoidable_damage_events:
+        compensation_events = fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "Debuffs",
+            AVOIDABLE_CHEAT_DEATH_IDS,
+            "读取代偿 / 免死触发线索",
+        )
     if not fight.get("kill") and fight["endTime"] - fight["startTime"] > SOFT_ENRAGE_MS:
         progress("读取 6:35 后软狂暴层数线索", 2)
         soft_enrage_buffs = fetch_spell_events(
@@ -1412,8 +1645,8 @@ def fetch_fight_payload(token, report_id, fight):
         progress(f"复仇者之盾实际驱散：{len(dispel_events)} 条", 3)
         if not res_events:
             res_events = [event for event in dispel_casts if ability_id(event) in COMBAT_RES_IDS]
-        combatant_info = fetch_combatant_info(token, report_id, fight)
-    return deaths, avoidable_damage_events, detail_damage_events, debuffs, res_events, preliminary, shield_damage_events, shield_debuffs, dispel_casts, dispel_events, combatant_info, soft_enrage_buffs
+    combatant_info = fetch_combatant_info(token, report_id, fight)
+    return deaths, avoidable_damage_events, detail_damage_events, detail_cast_events, debuffs, res_events, preliminary, shield_damage_events, shield_debuffs, dispel_casts, dispel_events, combatant_info, compensation_events, soft_enrage_buffs
 
 
 def summarize_dispel_analysis(fights):
@@ -1454,6 +1687,41 @@ def summarize_dispel_analysis(fights):
     }
 
 
+def summarize_avoidable_first_deaths(fights):
+    summary = {}
+    for fight in fights:
+        for row in fight.get("lightblindedVanguard", {}).get("avoidableFirstDeaths", []):
+            name = row.get("player")
+            if not name:
+                continue
+            bucket = summary.setdefault(name, {
+                "name": name,
+                "roles": [],
+                "count": 0,
+                "spells": {},
+                "events": [],
+            })
+            bucket["roles"] = merge_roles(bucket.get("roles"), row.get("roles") or ([] if row.get("role") in {None, "", "unknown"} else [row.get("role")]))
+            bucket["role"] = bucket["roles"][0] if bucket["roles"] else (row.get("role") or "unknown")
+            bucket["count"] += 1
+            spell_name = row.get("ability") or str(row.get("abilityID") or "")
+            if spell_name:
+                bucket["spells"][spell_name] = bucket["spells"].get(spell_name, 0) + 1
+            bucket["events"].append({
+                "reportID": fight.get("reportID"),
+                "fightID": fight.get("fightID"),
+                "time": row.get("time"),
+                "ability": row.get("ability"),
+                "wclLink": fight.get("wclDeepLink"),
+            })
+    rows = []
+    for bucket in summary.values():
+        spells = sorted(bucket["spells"].items(), key=lambda item: item[1], reverse=True)
+        bucket["spellSummary"] = " / ".join(f"{name}×{count}" for name, count in spells[:3])
+        rows.append(bucket)
+    return sorted(rows, key=lambda item: (item.get("count", 0), len(item.get("events", []))), reverse=True)
+
+
 def build_aggregated_json(report_ids):
     progress(f"WCL 基础地址：{WCL_BASE_URL}", 1)
     progress(f"WCL 代理：{PROXY_URL or '未启用'}", 1)
@@ -1476,6 +1744,8 @@ def build_aggregated_json(report_ids):
             "features": {
                 "interrupts": False,
                 "dispels": ENABLE_DISPEL_ANALYSIS,
+                "aoeOffenders": False,
+                "aoeAvoidableFirstDeaths": ENABLE_AOE_AVOIDABLE_FIRST_DEATHS,
             },
             "dispelAnalysisEnabled": ENABLE_DISPEL_ANALYSIS,
             "avoidableSpells": {key: value["label"] for key, value in AVOIDABLE_SPELLS.items()},
@@ -1485,7 +1755,7 @@ def build_aggregated_json(report_ids):
                 "tank_swap": "倒T / 换嘲证据",
             },
         },
-        "data": {"page1_wipeAnalysis": [], "page2_avoidableBoard": {}, "page3_dispelAnalysis": {"enabled": ENABLE_DISPEL_ANALYSIS, "logic": DISPEL_LOGIC_TEXT, "summary": [], "fights": []}},
+        "data": {"page1_wipeAnalysis": [], "page2_avoidableBoard": {}, "page2_avoidableFirstDeathBoard": [], "page3_dispelAnalysis": {"enabled": ENABLE_DISPEL_ANALYSIS, "logic": DISPEL_LOGIC_TEXT, "summary": [], "fights": []}},
     }
 
     global_avoidable = {key: {} for key in AVOIDABLE_SPELLS}
@@ -1500,6 +1770,7 @@ def build_aggregated_json(report_ids):
                 deaths,
                 avoidable_damage_events,
                 detail_damage_events,
+                detail_cast_events,
                 debuffs,
                 res_events,
                 preliminary,
@@ -1508,6 +1779,7 @@ def build_aggregated_json(report_ids):
                 dispel_casts,
                 dispel_events,
                 combatant_info,
+                compensation_events,
                 soft_enrage_buffs,
             ) = fetch_fight_payload(token, report_id, fight)
             fight_result = analyze_fight(
@@ -1518,6 +1790,7 @@ def build_aggregated_json(report_ids):
                 deaths,
                 avoidable_damage_events,
                 detail_damage_events,
+                detail_cast_events,
                 debuffs,
                 res_events,
                 preliminary,
@@ -1526,6 +1799,7 @@ def build_aggregated_json(report_ids):
                 dispel_casts,
                 dispel_events,
                 combatant_info,
+                compensation_events,
                 soft_enrage_buffs,
             )
             merge_avoidable(global_avoidable, fight_result["avoidableSummary"])
@@ -1533,9 +1807,10 @@ def build_aggregated_json(report_ids):
 
     final_output["data"]["page3_dispelAnalysis"] = summarize_dispel_analysis(final_output["data"]["page1_wipeAnalysis"])
     final_output["data"]["page2_avoidableBoard"] = {
-        key: sorted(rows.values(), key=lambda item: item["totalDamage"], reverse=True)
+        key: sort_avoidable_rows(rows.values())
         for key, rows in global_avoidable.items()
     }
+    final_output["data"]["page2_avoidableFirstDeathBoard"] = summarize_avoidable_first_deaths(final_output["data"]["page1_wipeAnalysis"])
     return final_output
 
 
