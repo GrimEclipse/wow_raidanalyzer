@@ -1,8 +1,0 @@
-## Interface: 120000
-## Title: WCL Mechanic Miner
-## Notes: Dumps Encounter Journal boss abilities for WCL mechanic configuration.
-## Author: Codex
-## Version: 0.1.2
-## SavedVariables: WCLMechanicMinerDB
-
-WCLMechanicMiner.lua

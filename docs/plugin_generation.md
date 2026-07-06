@@ -97,7 +97,7 @@ def analyze(report_ids: str, output_path=None, catalog_entry=None):
 
 ## 建议的演进路线
 
-1. 先保留鲁拉 legacy 插件，作为已验证基准。
+1. 先保留至暗之夜降临的现有插件入口，作为已验证基准。
 2. 写一个 `boss_plugins/configurable.py`，支持 `death_spell_reason`、`interrupt_rotation`、`debuff_fade_death`、`avoidable_board` 四种通用分析器。
 3. 用奇美鲁斯做第一个纯配置 boss，验证不写特殊 Python 也能跑。
 4. 当某个 boss 有特殊机制时，只在单 boss 文件里补一个小 hook，不改 core。

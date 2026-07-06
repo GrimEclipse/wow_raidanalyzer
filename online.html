@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WCL 在线分析</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-950 text-gray-100">
+<main class="mx-auto max-w-6xl px-6 py-8">
+    <header class="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <div class="text-xs font-semibold uppercase tracking-wide text-blue-300">Online Analyzer</div>
+            <h1 class="mt-2 text-3xl font-bold text-white">WCL 在线分析</h1>
+            <p class="mt-2 text-sm text-gray-400">选择版本、副本和 Boss，后台生成 JSON 后自动进入复盘面板。</p>
+        </div>
+        <nav class="flex gap-3 text-sm">
+            <a href="/" class="rounded border border-gray-700 px-4 py-2 text-gray-200 hover:border-gray-500">入口</a>
+            <a href="/report" class="rounded border border-gray-700 px-4 py-2 text-gray-200 hover:border-gray-500">JSON 导入</a>
+        </nav>
+    </header>
+
+    <section class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <form id="analyzeForm" class="space-y-5 rounded border border-gray-800 bg-gray-900 p-5">
+            <div class="grid gap-4 md:grid-cols-2">
+                <label class="block">
+                    <span class="text-xs font-bold text-gray-400">版本号</span>
+                    <select id="versionSelect" class="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"></select>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-bold text-gray-400">团队副本</span>
+                    <select id="raidSelect" class="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"></select>
+                </label>
+                <label class="block md:col-span-2">
+                    <span class="text-xs font-bold text-gray-400">Boss</span>
+                    <select id="bossSelect" class="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"></select>
+                </label>
+                <label class="block md:col-span-2">
+                    <span class="text-xs font-bold text-gray-400">WCL Report ID</span>
+                    <textarea id="reportIds" rows="3" class="mt-2 w-full resize-y rounded border border-gray-700 bg-gray-950 px-3 py-2 font-mono text-sm text-white focus:border-blue-500 focus:outline-none" placeholder="多个 report id 可用逗号、空格或换行分隔"></textarea>
+                </label>
+            </div>
+
+            <section id="configSection" class="hidden rounded border border-gray-800 bg-gray-950 p-4">
+                <h2 class="text-sm font-bold text-amber-200">Boss 专属配置</h2>
+                <div id="configFields" class="mt-4 space-y-4"></div>
+            </section>
+
+            <div id="unsupportedNotice" class="hidden rounded border border-gray-800 bg-gray-950 p-4 text-sm text-gray-400"></div>
+            <div id="serverNotice" class="hidden rounded border border-amber-700 bg-amber-950/30 p-4 text-sm text-amber-100"></div>
+
+            <div class="flex flex-wrap items-center gap-3 border-t border-gray-800 pt-5">
+                <button id="submitButton" type="submit" class="rounded bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400">
+                    开始分析
+                </button>
+                <a id="resultLink" href="#" class="hidden rounded border border-emerald-700 px-5 py-2 text-sm font-bold text-emerald-200 hover:border-emerald-500">查看结果</a>
+                <span id="formMessage" class="text-sm text-gray-400"></span>
+            </div>
+        </form>
+
+        <aside class="rounded border border-gray-800 bg-gray-900 p-5">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-sm font-bold text-gray-200">任务进度</h2>
+                <span id="statusBadge" class="rounded border border-gray-700 px-2 py-1 text-xs text-gray-400">空闲</span>
+            </div>
+            <div class="mt-5 h-3 overflow-hidden rounded bg-gray-800">
+                <div id="progressBar" class="h-full w-0 bg-blue-500 transition-all duration-300"></div>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-xs text-gray-400">
+                <span id="progressMessage">等待提交任务</span>
+                <span id="progressPercent">0%</span>
+            </div>
+            <div class="mt-6 rounded border border-gray-800 bg-gray-950 p-4">
+                <div class="text-xs font-bold text-gray-500">当前选择</div>
+                <div id="selectionSummary" class="mt-2 text-sm leading-6 text-gray-300">-</div>
+            </div>
+        </aside>
+    </section>
+</main>
+
+<script>
+const state = {
+    catalog: { versions: [] },
+    apiAvailable: false,
+    eventSource: null,
+    selectedVersion: '',
+    selectedRaid: '',
+    selectedBoss: ''
+};
+
+const el = {
+    version: document.getElementById('versionSelect'),
+    raid: document.getElementById('raidSelect'),
+    boss: document.getElementById('bossSelect'),
+    reportIds: document.getElementById('reportIds'),
+    form: document.getElementById('analyzeForm'),
+    configSection: document.getElementById('configSection'),
+    configFields: document.getElementById('configFields'),
+    unsupportedNotice: document.getElementById('unsupportedNotice'),
+    serverNotice: document.getElementById('serverNotice'),
+    submit: document.getElementById('submitButton'),
+    resultLink: document.getElementById('resultLink'),
+    formMessage: document.getElementById('formMessage'),
+    statusBadge: document.getElementById('statusBadge'),
+    progressBar: document.getElementById('progressBar'),
+    progressMessage: document.getElementById('progressMessage'),
+    progressPercent: document.getElementById('progressPercent'),
+    selectionSummary: document.getElementById('selectionSummary')
+};
+
+function activeVersion() {
+    return state.catalog.versions.find(item => item.version === state.selectedVersion) || state.catalog.versions[0] || { raids: [] };
+}
+
+function activeRaid() {
+    return (activeVersion().raids || []).find(item => item.key === state.selectedRaid) || (activeVersion().raids || [])[0] || { bosses: [] };
+}
+
+function activeBoss() {
+    return (activeRaid().bosses || []).find(item => item.key === state.selectedBoss) || (activeRaid().bosses || [])[0] || {};
+}
+
+function fillSelect(select, items, getValue, getLabel, selectedValue, disabledCheck) {
+    select.innerHTML = '';
+    items.forEach(item => {
+        const option = document.createElement('option');
+        option.value = getValue(item);
+        option.textContent = getLabel(item);
+        if (disabledCheck?.(item)) option.disabled = true;
+        if (option.value === selectedValue) option.selected = true;
+        select.appendChild(option);
+    });
+}
+
+function renderSelectors() {
+    fillSelect(el.version, state.catalog.versions, item => item.version, item => item.version, state.selectedVersion);
+    if (!state.catalog.versions.some(item => item.version === state.selectedVersion)) {
+        state.selectedVersion = state.catalog.versions[0]?.version || '';
+    }
+
+    const raids = activeVersion().raids || [];
+    fillSelect(el.raid, raids, item => item.key, item => item.name, state.selectedRaid);
+    if (!raids.some(item => item.key === state.selectedRaid)) {
+        state.selectedRaid = raids[0]?.key || '';
+    }
+
+    const bosses = activeRaid().bosses || [];
+    fillSelect(
+        el.boss,
+        bosses,
+        item => item.key,
+        item => item.supported ? item.name : `${item.name}（暂未支持）`,
+        state.selectedBoss,
+        item => !item.supported
+    );
+    if (!bosses.some(item => item.key === state.selectedBoss && item.supported)) {
+        state.selectedBoss = bosses.find(item => item.supported)?.key || bosses[0]?.key || '';
+    }
+    el.boss.value = state.selectedBoss;
+    renderConfig();
+    renderState();
+}
+
+function renderConfig() {
+    const schema = activeBoss().configSchema || [];
+    el.configFields.innerHTML = '';
+    el.configSection.classList.toggle('hidden', schema.length === 0);
+
+    schema.forEach(field => {
+        if (field.type !== 'interruptGroups') return;
+        const wrapper = document.createElement('div');
+        wrapper.dataset.configKey = field.key;
+        wrapper.innerHTML = `
+            <div class="text-sm font-semibold text-gray-200">${field.label}</div>
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+                ${field.groups.map(group => `
+                    <label class="block rounded border border-gray-800 bg-gray-900 p-3">
+                        <span class="text-xs font-bold text-gray-400">${group.label}</span>
+                        <input data-group="${group.key}" class="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none" placeholder="x x x">
+                    </label>
+                `).join('')}
+            </div>
+        `;
+        el.configFields.appendChild(wrapper);
+    });
+}
+
+function renderState() {
+    const boss = activeBoss();
+    const raid = activeRaid();
+    const version = activeVersion();
+    const supported = Boolean(boss.supported);
+    el.unsupportedNotice.classList.toggle('hidden', supported);
+    el.unsupportedNotice.textContent = supported ? '' : (boss.disabledReason || '该 Boss 暂未接入在线分析。');
+    el.serverNotice.classList.toggle('hidden', state.apiAvailable);
+    el.serverNotice.textContent = state.apiAvailable ? '' : '当前像是直接打开静态页面；在线分析需要先运行 python server.py。';
+    el.submit.disabled = !supported || !state.apiAvailable;
+    el.selectionSummary.textContent = [version.version, raid.name, boss.name].filter(Boolean).join(' / ') || '-';
+}
+
+function collectOptions() {
+    const options = {};
+    document.querySelectorAll('[data-config-key]').forEach(section => {
+        const key = section.dataset.configKey;
+        options[key] = {};
+        section.querySelectorAll('input[data-group]').forEach(input => {
+            options[key][input.dataset.group] = input.value.split(/[\s,，、]+/).map(item => item.trim()).filter(Boolean);
+        });
+    });
+    return options;
+}
+
+function setProgress(event) {
+    const percent = Math.max(0, Math.min(100, Number(event.percent || 0)));
+    el.statusBadge.textContent = event.status || 'running';
+    el.progressBar.style.width = `${percent}%`;
+    el.progressMessage.textContent = event.message || '处理中';
+    el.progressPercent.textContent = `${percent}%`;
+}
+
+async function loadCatalog() {
+    try {
+        const response = await fetch('/api/catalog');
+        if (!response.ok) throw new Error('api unavailable');
+        state.catalog = await response.json();
+        state.apiAvailable = true;
+    } catch (apiError) {
+        const response = await fetch('./boss_catalog.json');
+        state.catalog = await response.json();
+        state.apiAvailable = false;
+    }
+    state.selectedVersion = state.catalog.versions[0]?.version || '';
+    state.selectedRaid = activeVersion().raids?.[0]?.key || '';
+    state.selectedBoss = activeRaid().bosses?.find(item => item.supported)?.key || activeRaid().bosses?.[0]?.key || '';
+    renderSelectors();
+}
+
+async function submitAnalyze(event) {
+    event.preventDefault();
+    el.formMessage.textContent = '';
+    el.resultLink.classList.add('hidden');
+    const reportIds = el.reportIds.value.trim();
+    if (!reportIds) {
+        el.formMessage.textContent = '请填写 WCL report id。';
+        return;
+    }
+
+    el.submit.disabled = true;
+    setProgress({ status: 'queued', percent: 1, message: '提交任务' });
+    try {
+        const response = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                version: state.selectedVersion,
+                raid: state.selectedRaid,
+                boss: state.selectedBoss,
+                reportIds,
+                options: collectOptions()
+            })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || '任务提交失败');
+        watchJob(payload.eventsUrl, payload.resultUrl);
+    } catch (error) {
+        el.formMessage.textContent = error.message;
+        el.submit.disabled = false;
+    }
+}
+
+function watchJob(eventsUrl, resultUrl) {
+    if (state.eventSource) state.eventSource.close();
+    state.eventSource = new EventSource(eventsUrl);
+    state.eventSource.onmessage = event => {
+        const data = JSON.parse(event.data);
+        setProgress(data);
+        if (data.type === 'done') {
+            state.eventSource.close();
+            const reportUrl = `/report?version=${encodeURIComponent(state.selectedVersion)}&raid=${encodeURIComponent(state.selectedRaid)}&boss=${encodeURIComponent(state.selectedBoss)}&json=${encodeURIComponent(data.resultUrl || resultUrl)}`;
+            el.resultLink.href = reportUrl;
+            el.resultLink.classList.remove('hidden');
+            el.submit.disabled = false;
+            window.location.href = reportUrl;
+        }
+        if (data.type === 'error') {
+            state.eventSource.close();
+            el.formMessage.textContent = data.message || '分析失败';
+            el.submit.disabled = false;
+        }
+    };
+    state.eventSource.onerror = () => {
+        el.formMessage.textContent = '进度连接中断，任务可能仍在后台运行。';
+    };
+}
+
+el.version.addEventListener('change', () => {
+    state.selectedVersion = el.version.value;
+    state.selectedRaid = '';
+    state.selectedBoss = '';
+    renderSelectors();
+});
+el.raid.addEventListener('change', () => {
+    state.selectedRaid = el.raid.value;
+    state.selectedBoss = '';
+    renderSelectors();
+});
+el.boss.addEventListener('change', () => {
+    state.selectedBoss = el.boss.value;
+    renderSelectors();
+});
+el.form.addEventListener('submit', submitAnalyze);
+
+loadCatalog();
+</script>
+</body>
+</html>

@@ -10,6 +10,7 @@ except ModuleNotFoundError as exc:
     raise RuntimeError("缺少 requests 依赖，请先在当前 Python 环境执行：python -m pip install -r requirements.txt") from exc
 import urllib3
 
+from analyzer_core.progress import emit_progress
 from boss_plugins.common import COMBAT_RES_SPELLS, HEALER_DISPEL_SPELLS, HEALER_SPEC_IDS, write_json_result
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -156,6 +157,7 @@ ACTOR_NAME_OVERRIDES = {
 def progress(message, indent=0):
     prefix = "  " * indent
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {prefix}{message}", flush=True)
+    emit_progress(message, detail=indent > 0)
 
 
 def get_token():
@@ -1814,6 +1816,6 @@ def build_aggregated_json(report_ids):
     return final_output
 
 
-def analyze(report_ids: str, output_path=None, catalog_entry=None):
+def analyze(report_ids: str, output_path=None, catalog_entry=None, options=None):
     result = build_aggregated_json(report_ids)
     return write_json_result(result, output_path)

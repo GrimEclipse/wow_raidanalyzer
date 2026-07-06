@@ -1,25 +1,22 @@
-import importlib.util
-from pathlib import Path
-
+from analyzer_core.progress import emit_progress
 from boss_plugins.common import write_json_result
+from boss_plugins.march_on_queldanas import midnight_falls_core
 
 
-ANALYZER_SCRIPT = Path(__file__).resolve().parents[2] / "40-WCL开荒日志分析.py"
+def analyze(report_ids: str, output_path=None, catalog_entry=None, options=None):
+    midnight_falls_core.REPORT_IDS_INPUT = report_ids
+    midnight_falls_core.ONLINE_ANALYSIS_OPTIONS = options or {}
+    if not hasattr(midnight_falls_core, "_BASE_PROGRESS"):
+        midnight_falls_core._BASE_PROGRESS = midnight_falls_core.progress
+    original_progress = midnight_falls_core._BASE_PROGRESS
 
+    def wrapped_progress(message, indent=0):
+        original_progress(message, indent)
+        emit_progress(message, detail=indent > 0)
 
-def load_analyzer_module():
-    spec = importlib.util.spec_from_file_location("midnight_falls_analyzer", ANALYZER_SCRIPT)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"无法加载鲁拉分析脚本：{ANALYZER_SCRIPT}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    midnight_falls_core.progress = wrapped_progress
 
-
-def analyze(report_ids: str, output_path=None, catalog_entry=None):
-    module = load_analyzer_module()
-    module.REPORT_IDS_INPUT = report_ids
-    result = module.build_aggregated_json()
+    result = midnight_falls_core.build_aggregated_json()
 
     if catalog_entry:
         result.setdefault("meta", {}).update({
@@ -31,5 +28,5 @@ def analyze(report_ids: str, output_path=None, catalog_entry=None):
         })
 
     output = write_json_result(result, output_path)
-    module.progress(f"插件输出完成：{output}")
+    midnight_falls_core.progress(f"插件输出完成：{output}")
     return result

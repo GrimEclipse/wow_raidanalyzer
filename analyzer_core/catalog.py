@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Iterable
+from dataclasses import dataclass, field
+from typing import Iterable, List
 
 
 @dataclass(frozen=True)
@@ -10,9 +10,12 @@ class BossEntry:
     boss_key: str
     boss_name: str
     plugin: str
+    supported: bool = False
+    disabled_reason: str = "暂未接入在线分析"
+    config_schema: List[dict] = field(default_factory=list)
 
 
-VERSION_12 = "12.0"
+VERSIONS = ("12.0", "12.1")
 
 RAIDS = {
     "dream_rift": "梦境裂隙",
@@ -22,31 +25,59 @@ RAIDS = {
 }
 
 
-CATALOG = [
-    BossEntry(VERSION_12, "dream_rift", RAIDS["dream_rift"], "chimaerus", "奇美鲁斯，未梦之神",
-              "boss_plugins.dream_rift.chimaerus"),
-
-    BossEntry(VERSION_12, "void_spire", RAIDS["void_spire"], "imperator_averzian", "元首阿福扎恩",
-              "boss_plugins.void_spire.imperator_averzian"),
-    BossEntry(VERSION_12, "void_spire", RAIDS["void_spire"], "vorasius", "弗拉希乌斯",
-              "boss_plugins.void_spire.vorasius"),
-    BossEntry(VERSION_12, "void_spire", RAIDS["void_spire"], "fallen_king_salhadaar", "陨落之王萨哈达尔",
-              "boss_plugins.void_spire.fallen_king_salhadaar"),
-    BossEntry(VERSION_12, "void_spire", RAIDS["void_spire"], "vaelgor_ezzorak", "威厄高尔和艾佐拉克",
-              "boss_plugins.void_spire.vaelgor_ezzorak"),
-    BossEntry(VERSION_12, "void_spire", RAIDS["void_spire"], "lightblinded_vanguard", "光盲先锋军",
-              "boss_plugins.void_spire.lightblinded_vanguard"),
-    BossEntry(VERSION_12, "void_spire", RAIDS["void_spire"], "crown_of_the_cosmos", "宇宙之冕",
-              "boss_plugins.void_spire.crown_of_the_cosmos"),
-
-    BossEntry(VERSION_12, "march_on_queldanas", RAIDS["march_on_queldanas"], "beloren", "贝洛朗，奥的子嗣",
-              "boss_plugins.march_on_queldanas.beloren"),
-    BossEntry(VERSION_12, "march_on_queldanas", RAIDS["march_on_queldanas"], "midnight_falls", "至暗之夜降临",
-              "boss_plugins.march_on_queldanas.midnight_falls"),
-
-    BossEntry(VERSION_12, "sporefall", RAIDS["sporefall"], "rotmire", "腐沼",
-              "boss_plugins.sporefall.rotmire"),
+MIDNIGHT_FALLS_CONFIG = [
+    {
+        "key": "terminalMatrixInterruptGroups",
+        "type": "interruptGroups",
+        "label": "终结矩阵打断分配预设（请保证 id 完全一致）",
+        "groups": [
+            {"key": "group1", "label": "第一组", "slots": 3},
+            {"key": "group2", "label": "第二组", "slots": 3},
+            {"key": "group3", "label": "第三组", "slots": 3},
+            {"key": "group4", "label": "第四组", "slots": 3},
+        ],
+    }
 ]
+
+
+BOSS_DEFINITIONS = [
+    ("dream_rift", "chimaerus", "奇美鲁斯，未梦之神", "boss_plugins.dream_rift.chimaerus", False, []),
+
+    ("void_spire", "imperator_averzian", "元首阿福扎恩", "boss_plugins.void_spire.imperator_averzian", False, []),
+    ("void_spire", "vorasius", "弗拉希乌斯", "boss_plugins.void_spire.vorasius", False, []),
+    ("void_spire", "fallen_king_salhadaar", "陨落之王萨哈达尔", "boss_plugins.void_spire.fallen_king_salhadaar", False, []),
+    ("void_spire", "vaelgor_ezzorak", "威厄高尔和艾佐拉克", "boss_plugins.void_spire.vaelgor_ezzorak", False, []),
+    ("void_spire", "lightblinded_vanguard", "光盲先锋军", "boss_plugins.void_spire.lightblinded_vanguard", True, []),
+    ("void_spire", "crown_of_the_cosmos", "宇宙之冕", "boss_plugins.void_spire.crown_of_the_cosmos", True, []),
+
+    ("march_on_queldanas", "beloren", "贝洛朗，奥的子嗣", "boss_plugins.march_on_queldanas.beloren", False, []),
+    ("march_on_queldanas", "midnight_falls", "至暗之夜降临", "boss_plugins.march_on_queldanas.midnight_falls", True, MIDNIGHT_FALLS_CONFIG),
+
+    ("sporefall", "rotmire", "腐沼", "boss_plugins.sporefall.rotmire", False, []),
+]
+
+
+def build_catalog() -> List[BossEntry]:
+    entries = []
+    for version in VERSIONS:
+        for raid_key, boss_key, boss_name, plugin, supported, config_schema in BOSS_DEFINITIONS:
+            entries.append(
+                BossEntry(
+                    version=version,
+                    raid_key=raid_key,
+                    raid_name=RAIDS[raid_key],
+                    boss_key=boss_key,
+                    boss_name=boss_name,
+                    plugin=plugin,
+                    supported=supported,
+                    disabled_reason="" if supported else "暂未接入在线分析",
+                    config_schema=config_schema,
+                )
+            )
+    return entries
+
+
+CATALOG = build_catalog()
 
 
 def iter_versions() -> Iterable[str]:
@@ -76,10 +107,15 @@ def to_frontend_catalog() -> dict:
                 "key": raid_key,
                 "name": raid_entries[0].raid_name,
                 "bosses": [
-                    {"key": entry.boss_key, "name": entry.boss_name}
+                    {
+                        "key": entry.boss_key,
+                        "name": entry.boss_name,
+                        "supported": entry.supported,
+                        "disabledReason": entry.disabled_reason,
+                        "configSchema": entry.config_schema,
+                    }
                     for entry in raid_entries
                 ],
             })
         versions.append({"version": version, "raids": raids})
     return {"versions": versions}
-

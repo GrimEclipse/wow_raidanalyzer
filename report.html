@@ -28,8 +28,9 @@
                 <span v-if="activeBossLabel" class="ml-2 text-gray-500">/ {{ activeBossLabel }}</span>
             </p>
             <p v-else class="text-gray-400 mt-2 text-sm">
-                在线分析功能敬请期待，请先使用
+                读取默认报告 JSON，或使用
                 <span class="text-blue-300 font-semibold"> &gt;&gt; JSON 导入窗口 &lt;&lt; </span>
+                手动载入结果。
             </p>
         </div>
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
@@ -37,7 +38,7 @@
                 灭团复盘
             </button>
             <button @click="currentTab='avoidable'" :class="tabClass('avoidable','blue')" class="px-5 py-2 text-sm rounded border font-bold transition">
-                可躲避伤害
+                {{ avoidablePanelLabel }}
             </button>
             <button v-if="showInterruptTab" @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 漏断统计
@@ -52,7 +53,7 @@
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 max-w-3xl w-full shadow-xl">
             <h2 class="text-2xl font-bold mb-3">JSON 导入窗口</h2>
             <div class="bg-gray-950 border border-gray-800 rounded p-4 text-sm text-gray-400 mb-5 leading-6">
-                在线分析功能敬请期待。当前页面不会在前端选择 Boss 或直接请求 WCL，请先在本地生成复盘 JSON 后导入查看。
+                当前页面负责展示复盘 JSON。你可以读取默认 wcl_hardcore_api.json，也可以手动导入在线分析或命令行生成的结果。
             </div>
             <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
                 选择 JSON 文件
@@ -405,19 +406,20 @@ createApp({
             dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
             errorMsg: '',
+            jsonSource: './wcl_hardcore_api.json',
             activePanels: [],
             activeDetailPanels: [],
             reportInput: '',
             selectedVersion: '12.0',
-            selectedRaid: 'void_spire_dream_rift_queldanas',
-            selectedBoss: 'lura',
+            selectedRaid: 'march_on_queldanas',
+            selectedBoss: 'midnight_falls',
             catalog: {
                 versions: [{
                     version: '12.0',
                     raids: [{
-                        key: 'void_spire_dream_rift_queldanas',
-                        name: '虚影尖塔 / 梦境裂隙 / 进军奎尔丹纳斯',
-                        bosses: [{ key: 'lura', name: '鲁拉（至暗之夜降临）' }]
+                        key: 'march_on_queldanas',
+                        name: '进军奎尔丹纳斯',
+                        bosses: [{ key: 'midnight_falls', name: '至暗之夜降临' }]
                     }]
                 }]
             },
@@ -483,6 +485,9 @@ createApp({
         },
         activeAvoidableLabel() {
             return (this.avoidableTabs.find(tab => tab.key === this.avoidableTab) || {}).label || '';
+        },
+        avoidablePanelLabel() {
+            return this.meta?.features?.avoidableLabel || '可躲避伤害';
         },
         activeAvoidableTotal() {
             return this.activeAvoidableRows.reduce((sum, row) => sum + (row.totalDamage || 0), 0);
@@ -554,6 +559,7 @@ createApp({
         }
     },
     mounted() {
+        this.applyRouteParams();
         this.loadCatalog();
         this.autoLoadJson();
     },
@@ -566,6 +572,13 @@ createApp({
         }
     },
     methods: {
+        applyRouteParams() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('version')) this.selectedVersion = params.get('version');
+            if (params.get('raid')) this.selectedRaid = params.get('raid');
+            if (params.get('boss')) this.selectedBoss = params.get('boss');
+            if (params.get('json')) this.jsonSource = params.get('json');
+        },
         async loadCatalog() {
             try {
                 const response = await fetch('./boss_catalog.json');
@@ -592,7 +605,7 @@ createApp({
         },
         async autoLoadJson() {
             try {
-                const response = await fetch('./wcl_hardcore_api.json');
+                const response = await fetch(this.jsonSource);
                 if (!response.ok) return;
                 this.bindData(await response.json());
             } catch (e) {
@@ -728,37 +741,42 @@ createApp({
 
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
+            const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
             const skillKeys = Object.keys(this.avoidableBoard)
                 .filter(key => key !== 'total' && Array.isArray(this.avoidableBoard[key]));
 
-            skillKeys.forEach(key => {
-                (this.avoidableBoard[key] || []).forEach(p => {
-                    const roles = Array.isArray(p.roles) ? p.roles : (p.role ? [p.role] : []);
-                    if (!playerMap[p.name]) {
-                        playerMap[p.name] = {
-                            name: p.name, role: roles[0] || 'unknown', roles: [...roles], totalDamage: 0, hitCount: 0, deathCount: 0, deathCompensationCount: 0,
-                            breakdown: {}
-                        };
-                    }
-                    playerMap[p.name].roles = [...new Set([...(playerMap[p.name].roles || []), ...roles])];
-                    playerMap[p.name].role = playerMap[p.name].roles[0] || playerMap[p.name].role || 'unknown';
-                    playerMap[p.name].totalDamage += p.totalDamage || 0;
-                    playerMap[p.name].hitCount += p.hitCount || 0;
-                    playerMap[p.name].deathCount += p.deathCount || 0;
-                    playerMap[p.name].deathCompensationCount += p.deathCompensationCount || 0;
-                    playerMap[p.name].breakdown[key] = (playerMap[p.name].breakdown[key] || 0) + (p.totalDamage || 0);
+            if (showAvoidableTotal) {
+                skillKeys.forEach(key => {
+                    (this.avoidableBoard[key] || []).forEach(p => {
+                        const roles = Array.isArray(p.roles) ? p.roles : (p.role ? [p.role] : []);
+                        if (!playerMap[p.name]) {
+                            playerMap[p.name] = {
+                                name: p.name, role: roles[0] || 'unknown', roles: [...roles], totalDamage: 0, hitCount: 0, deathCount: 0, deathCompensationCount: 0,
+                                breakdown: {}
+                            };
+                        }
+                        playerMap[p.name].roles = [...new Set([...(playerMap[p.name].roles || []), ...roles])];
+                        playerMap[p.name].role = playerMap[p.name].roles[0] || playerMap[p.name].role || 'unknown';
+                        playerMap[p.name].totalDamage += p.totalDamage || 0;
+                        playerMap[p.name].hitCount += p.hitCount || 0;
+                        playerMap[p.name].deathCount += p.deathCount || 0;
+                        playerMap[p.name].deathCompensationCount += p.deathCompensationCount || 0;
+                        playerMap[p.name].breakdown[key] = (playerMap[p.name].breakdown[key] || 0) + (p.totalDamage || 0);
+                    });
                 });
-            });
-            this.avoidableBoard.total = Object.values(playerMap).sort((a, b) => b.totalDamage - a.totalDamage);
+                this.avoidableBoard.total = Object.values(playerMap).sort((a, b) => b.totalDamage - a.totalDamage);
+            } else {
+                delete this.avoidableBoard.total;
+            }
             this.avoidableTabs = [
-                { key: 'total', label: '全项合计' },
+                ...(showAvoidableTotal ? [{ key: 'total', label: '全项合计' }] : []),
                 ...skillKeys.map(key => ({
                     key,
                     label: spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key
                 }))
             ];
             if (!this.avoidableTabs.some(tab => tab.key === this.avoidableTab)) {
-                this.avoidableTab = 'total';
+                this.avoidableTab = this.avoidableTabs[0]?.key || 'total';
             }
             if (!this.showInterruptTab && this.currentTab === 'interrupt') {
                 this.currentTab = 'wipe';
