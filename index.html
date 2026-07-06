@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WCL 开荒复盘入口</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gray-950 text-gray-100">
+<main class="mx-auto max-w-6xl px-6 py-10">
+    <header class="mb-8 border-b border-gray-800 pb-5">
+        <h1 class="text-3xl font-bold text-amber-300">WCL 开荒复盘入口</h1>
+        <p class="mt-2 text-sm text-gray-400">首页只负责选择复盘资源；具体 Boss 页面承载各自的展示逻辑和 JSON。</p>
+    </header>
+
+    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <a class="block rounded border border-gray-800 bg-gray-900 p-5 hover:border-blue-500 hover:bg-gray-900/80"
+           href="LuraJudgement.html">
+            <div class="text-xs font-semibold uppercase tracking-wide text-blue-300">通用</div>
+            <h2 class="mt-2 text-xl font-bold">JSON 导入 / 自动读取</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-400">保留当前通用复盘面板，用于读取默认 wcl_hardcore_api.json 或手动导入。</p>
+        </a>
+
+        <a class="block rounded border border-gray-800 bg-gray-900 p-5 hover:border-purple-500 hover:bg-gray-900/80"
+           href="LuraJudgement.html?version=12.0&raid=void_spire&boss=lightblinded_vanguard">
+            <div class="text-xs font-semibold uppercase tracking-wide text-purple-300">虚影尖塔 / M5</div>
+            <h2 class="mt-2 text-xl font-bold">光盲先锋军</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-400">进入 M5 复盘资源。后续可以拆到独立 HTML / JS / JSON。</p>
+        </a>
+
+        <a class="block rounded border border-gray-800 bg-gray-900 p-5 hover:border-amber-500 hover:bg-gray-900/80"
+           href="LuraJudgement.html?version=12.0&raid=void_spire&boss=crown_of_the_cosmos">
+            <div class="text-xs font-semibold uppercase tracking-wide text-amber-300">虚影尖塔 / M6</div>
+            <h2 class="mt-2 text-xl font-bold">宇宙之冕</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-400">进入 M6 复盘资源。M6 的阶段归因和机制明细可以在这里继续独立扩展。</p>
+        </a>
+    </section>
+</main>
+</body>
+</html>

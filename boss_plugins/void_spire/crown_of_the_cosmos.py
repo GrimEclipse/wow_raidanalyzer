@@ -81,6 +81,7 @@ SPELLS = {
     1239095: "重力坍缩",
     1238882: "噬灭宇宙",
     1239672: "凝结形态",
+    1239111: "终末守护",
     1243743: "干扰震荡",
     1243753: "暴食深渊",
     1243981: "银锋弹幕射击",
@@ -110,6 +111,9 @@ P1_EXPECTED_TOLERANCE_MS = 2_000
 P1_RAGE_LIMIT_MS = 165_000
 P2_EARLY_RADIATION_MS = 140_000
 P15_DURATION_MS = 38_000
+P25_FALLBACK_DURATION_MS = 18_000
+P3_PORTAL_LEAD_MS = 16_000
+P3_LINE_FALLBACK_LEAD_MS = 55_000
 MYTHIC_RAID_SIZE = 20
 
 PULL_DEATH_IDS = {1255378, 1235631, 1235553, 1243981, 1233649, 1233826, 1260027, 1242553}
@@ -121,6 +125,7 @@ P3_TANK_IDS = {1, 1246461, 1233787, 1233789}
 AOE_DEATH_IDS = {1243743, 1260000, 1260771, 1233826, 1255739, 1234570, 1261289, 1260019}
 P3_LINE_DEATH_ID = 1239095
 COSMIC_DEVOUR_ID = 1238882
+TERMINAL_GUARD_DEBUFF_ID = 1239111
 P15_AVOIDABLE_IDS = {1235631, 1246001, 1243981, 1235553}
 DIMENSIONAL_SLASH_IDS = {1260838, 1260839}
 ENRAGE_IDS = {27680, 26662, 1239672}
@@ -134,6 +139,7 @@ COLLAPSING_VOID_ID = 1255378
 GRAVITY_COLLAPSE_DEBUFF_ID = 1255453
 COSMIC_RADIATION_BUFF_ID = 1260766
 COSMIC_RADIATION_DAMAGE_ID = 1260771
+COSMIC_BARRIER_ID = 1261289
 PORTAL_CAST_ID = 1261339
 SILVER_HAVOC_CAST_ID = 1234546
 
@@ -380,28 +386,115 @@ def phase_markers(casts, buffs, debuffs, fight):
     p2_start = min((event.get("timestamp", 0) for event in scatter_removes), default=None)
     if not p2_start and p15_start:
         p2_start = p15_start + P15_DURATION_MS
+    if not p15_start and p2_start:
+        p15_start = max(fight["startTime"], p2_start - P15_DURATION_MS)
 
     radiation_applies = [event for event in buffs if ability_id(event) == COSMIC_RADIATION_BUFF_ID and event_is_apply(event)]
     radiation_removes = [event for event in buffs if ability_id(event) == COSMIC_RADIATION_BUFF_ID and event_is_remove(event)]
     p3_transition = min((event.get("timestamp", 0) for event in radiation_applies), default=None)
     p3_start = min((event.get("timestamp", 0) for event in radiation_removes), default=None)
 
+    barrier_applies = [event for event in buffs if ability_id(event) == COSMIC_BARRIER_ID and event_is_apply(event)]
+    barrier_removes = [event for event in buffs if ability_id(event) == COSMIC_BARRIER_ID and event_is_remove(event)]
+    p25_start = min((event.get("timestamp", 0) for event in barrier_applies), default=None) or p3_transition
+    p25_end = min((event.get("timestamp", 0) for event in barrier_removes), default=None) or p3_start
+    if p25_start and not p3_transition:
+        p3_transition = p25_start
+    if p25_end and not p3_start:
+        p3_start = p25_end
+
+    portal_casts = [event for event in casts if ability_id(event) == PORTAL_CAST_ID]
+    first_portal = min((event.get("timestamp", 0) for event in portal_casts), default=None)
+    if not p3_start and first_portal:
+        p3_start = max(fight["startTime"], first_portal - P3_PORTAL_LEAD_MS)
+    if p3_start and not p25_end:
+        p25_end = p3_start
+    if p3_start and not p25_start and p2_start:
+        p25_start = max(p2_start, p3_start - P25_FALLBACK_DURATION_MS)
+    if p25_start and not p3_transition:
+        p3_transition = p25_start
+
+    terminal_guard_applies = [
+        event for event in debuffs
+        if ability_id(event) == TERMINAL_GUARD_DEBUFF_ID
+        and str(event.get("type", "")).lower() == "applydebuff"
+    ]
+    first_terminal_guard = min((event.get("timestamp", 0) for event in terminal_guard_applies), default=None)
+    if not p3_start and first_terminal_guard:
+        p3_start = first_terminal_guard
+    if p3_start and not p25_end:
+        p25_end = p3_start
+    if p3_start and not p25_start and p2_start:
+        p25_start = max(p2_start, p3_start - P25_FALLBACK_DURATION_MS)
+    if p25_start and not p3_transition:
+        p3_transition = p25_start
+
     return {
         "p15Start": p15_start,
         "p2Start": p2_start,
         "p3Transition": p3_transition,
+        "p25Start": p25_start,
+        "p25End": p25_end,
         "p3Start": p3_start,
         "silverHavocCasts": silver_havoc_casts,
         "radiationApplies": radiation_applies,
         "radiationRemoves": radiation_removes,
+        "barrierApplies": barrier_applies,
+        "barrierRemoves": barrier_removes,
+        "portalCasts": portal_casts,
+        "terminalGuardApplies": terminal_guard_applies,
     }
+
+
+def infer_phase_markers_from_deaths(markers, deaths, fight):
+    if markers.get("p3Start"):
+        return markers
+
+    slash_deaths = sorted(
+        (death for death in deaths if death.get("killingAbilityGameID") in DIMENSIONAL_SLASH_IDS),
+        key=lambda item: item.get("timestamp", 0),
+    )
+    gravity_cluster = first_gravity_collapse_cluster(deaths)
+    p3_signal_deaths = sorted(
+        (
+            death for death in deaths
+            if death.get("killingAbilityGameID") in {P3_LINE_DEATH_ID, COSMIC_DEVOUR_ID, COSMIC_RADIATION_DAMAGE_ID}
+        ),
+        key=lambda item: item.get("timestamp", 0),
+    )
+
+    p3_start = None
+    if slash_deaths:
+        p25_start = max(fight["startTime"], slash_deaths[0].get("timestamp", 0) - 1_000)
+        p3_start = slash_deaths[-1].get("timestamp", 0) + 7_000
+        markers["p25Start"] = markers.get("p25Start") or p25_start
+        markers["p3Transition"] = markers.get("p3Transition") or markers["p25Start"]
+    elif gravity_cluster:
+        p3_start = gravity_cluster["start"] - P3_LINE_FALLBACK_LEAD_MS
+        if markers.get("p2Start"):
+            p3_start = max(markers["p2Start"], p3_start)
+    elif p3_signal_deaths:
+        p3_start = p3_signal_deaths[0].get("timestamp", 0) - P3_LINE_FALLBACK_LEAD_MS
+        if markers.get("p2Start"):
+            p3_start = max(markers["p2Start"], p3_start)
+
+    if p3_start:
+        markers["p3Start"] = min(max(fight["startTime"], p3_start), fight["endTime"])
+        markers["p25End"] = markers.get("p25End") or markers["p3Start"]
+        if not markers.get("p25Start") and markers.get("p2Start"):
+            markers["p25Start"] = max(markers["p2Start"], markers["p3Start"] - P25_FALLBACK_DURATION_MS)
+        if markers.get("p25Start") and not markers.get("p3Transition"):
+            markers["p3Transition"] = markers["p25Start"]
+    return markers
 
 
 def phase_at(timestamp, markers, fight):
     if markers.get("p3Start") and timestamp >= markers["p3Start"]:
         return "P3"
+    if markers.get("p25Start") and timestamp >= markers["p25Start"]:
+        return "P2.5"
     if markers.get("p3Transition") and timestamp >= markers["p3Transition"]:
-        return "P2转P3"
+        return "P2.5"
     if markers.get("p2Start") and timestamp >= markers["p2Start"]:
         return "P2"
     if markers.get("p15Start") and timestamp >= markers["p15Start"]:
@@ -422,6 +515,38 @@ def primary_wipe_phase(deaths, markers, fight):
     return phase_at(deaths[0].get("timestamp", fight["endTime"]), markers, fight)
 
 
+def phase_window(markers, fight, phase):
+    windows = {
+        "P1": (fight["startTime"], markers.get("p15Start") or fight["endTime"]),
+        "P1.5": (markers.get("p15Start"), markers.get("p2Start")),
+        "P2": (markers.get("p2Start"), markers.get("p25Start") or markers.get("p3Transition")),
+        "P2.5": (markers.get("p25Start") or markers.get("p3Transition"), markers.get("p25End") or markers.get("p3Start")),
+        "P3": (markers.get("p3Start"), fight["endTime"]),
+    }
+    return windows.get(phase, (None, None))
+
+
+def phase_timeline(markers, fight):
+    rows = []
+    for phase in ["P1", "P1.5", "P2", "P2.5", "P3"]:
+        start, end = phase_window(markers, fight, phase)
+        if start is None:
+            continue
+        if end is None:
+            end = fight["endTime"]
+        if end < start:
+            end = start
+        rows.append({
+            "phase": phase,
+            "start": format_time(start - fight["startTime"]),
+            "end": format_time(end - fight["startTime"]),
+            "startMs": int(start - fight["startTime"]),
+            "endMs": int(end - fight["startTime"]),
+            "durationMs": int(max(0, end - start)),
+        })
+    return rows
+
+
 def death_ability_ids(deaths):
     return {death.get("killingAbilityGameID") for death in deaths if death.get("killingAbilityGameID")}
 
@@ -434,6 +559,54 @@ def bridge_deaths(deaths):
     return [death for death in deaths if is_bridge_death(death)]
 
 
+def bridge_death_count(deaths):
+    return len(bridge_deaths(deaths))
+
+
+def is_mass_abandon(deaths, bridge_rows):
+    if not deaths or not bridge_rows:
+        return False
+    return len(bridge_rows) >= min(12, max(6, int(len(deaths) * 0.6)))
+
+
+def is_bridge_cluster_significant(cluster):
+    return bool(cluster and len(cluster.get("events", [])) >= 3)
+
+
+def first_bridge_cluster(deaths):
+    bridge_rows = bridge_deaths(deaths)
+    clusters = cluster_events(bridge_rows, window_ms=5_000)
+    return clusters[0] if clusters else None
+
+
+def has_prior_real_death(deaths, timestamp):
+    return any(
+        not is_bridge_death(death) and death.get("timestamp", 0) < timestamp
+        for death in deaths
+    )
+
+
+def prior_real_death_count(deaths, timestamp):
+    return sum(
+        1 for death in deaths
+        if not is_bridge_death(death) and death.get("timestamp", 0) < timestamp
+    )
+
+
+def is_abandon_after_losses(deaths, bridge_cluster):
+    if not bridge_cluster:
+        return False
+    return len(bridge_cluster.get("events", [])) >= 2 and prior_real_death_count(deaths, bridge_cluster["start"]) >= 5
+
+
+def first_gravity_collapse_cluster(deaths):
+    gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == P3_LINE_DEATH_ID]
+    for cluster in cluster_events(gravity_deaths, window_ms=1_500):
+        if len(cluster["events"]) > 2:
+            return cluster
+    return None
+
+
 def classify_fight(fight, deaths, markers, buffs):
     phase = primary_wipe_phase(deaths, markers, fight)
     death_ids = death_ability_ids(deaths)
@@ -442,16 +615,23 @@ def classify_fight(fight, deaths, markers, buffs):
     pull_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in PULL_DEATH_IDS]
     shadow_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in SHADOW_AOE_IDS]
     tank_deaths = [death for death in phase_deaths[:3] if death.get("killingAbilityGameID") in TANK_DEATH_IDS]
+    phase_bridge_deaths = bridge_deaths(phase_deaths)
+    bridge_cluster = first_bridge_cluster(deaths)
+    bridge_cluster_phase = phase_at(bridge_cluster["start"], markers, fight) if bridge_cluster else phase
     enrage_events = [event for event in buffs if ability_id(event) in ENRAGE_IDS and event_is_apply(event)]
     rage_events = [event for event in buffs if ability_id(event) == RAGE_STACK_ID and event_is_apply(event)]
     gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == P3_LINE_DEATH_ID]
 
     if fight.get("kill"):
         return {"key": "kill", "phase": "已击杀", "label": "已击杀"}
-    if len(bridge_deaths(deaths[:6])) >= 2:
-        return {"key": "bridge_mistake", "phase": "过场", "label": "过桥 / 坠落失误"}
+    if first_gravity_collapse_cluster(deaths):
+        return {"key": "p3_line_aoe", "phase": "P3", "label": "P3 拉线 AoE 崩溃"}
+    if COSMIC_DEVOUR_ID in death_ids:
+        return {"key": "p3_boss_enrage", "phase": "P3", "label": "奥蕾莉亚狂暴"}
 
     if phase == "P1":
+        if is_mass_abandon(deaths, bridge_deaths(deaths)):
+            return {"key": "phase_abandon", "phase": "P1", "label": "P1 放弃 / 非预期引怪"}
         if rage_events and duration < P1_RAGE_LIMIT_MS:
             return {"key": "p1_add_rage", "phase": "P1", "label": "P1 大怪狂暴"}
         if tank_deaths:
@@ -459,30 +639,42 @@ def classify_fight(fight, deaths, markers, buffs):
         return {"key": "p1_team_collapse", "phase": "P1", "label": "P1 团队减员过多"}
 
     if phase == "P1.5":
+        if is_mass_abandon(deaths, phase_bridge_deaths):
+            return {"key": "phase_abandon", "phase": "P1.5", "label": "P1.5 放弃"}
         if len(pull_deaths) >= 2:
             return {"key": "p15_pull_deaths", "phase": "P1.5", "label": "P1.5 过多玩家死于拉弓 / 跑位"}
         return {"key": "p15_team_collapse", "phase": "P1.5", "label": "P1.5 减员过多"}
 
-    if phase in {"P2", "P2转P3"}:
+    if phase in {"P2", "P2.5"}:
+        if bridge_cluster_phase in {"P2", "P2.5", "P3"} and is_abandon_after_losses(deaths, bridge_cluster):
+            return {"key": "phase_abandon", "phase": bridge_cluster_phase, "label": f"{bridge_cluster_phase} 放弃"}
+        if phase == "P2.5" and phase_bridge_deaths:
+            if is_mass_abandon(deaths, phase_bridge_deaths):
+                return {"key": "phase_abandon", "phase": "P2.5", "label": "P2.5 放弃"}
+            return {"key": "p25_knockback", "phase": "P2.5", "label": "P2.5 转阶段击飞"}
+        if is_bridge_cluster_significant(bridge_cluster) and phase == "P2" and phase_at(bridge_cluster["start"], markers, fight) == "P2":
+            if is_mass_abandon(deaths, bridge_cluster["events"]) or has_prior_real_death(deaths, bridge_cluster["start"]):
+                return {"key": "phase_abandon", "phase": "P2", "label": "P2 放弃"}
+            return {"key": "phase_bridge_mistake", "phase": "P2", "label": "P2 过桥 / 坠落失误"}
         if len(pull_deaths) >= 2:
-            return {"key": "p2_pull_deaths", "phase": "P2", "label": "P2 过多玩家死于拉弓"}
+            return {"key": "p2_pull_deaths", "phase": phase, "label": f"{phase} 过多玩家死于拉弓"}
         if shadow_deaths:
-            return {"key": "p2_shadow_aoe", "phase": "P2", "label": "银色幻影过多团血崩溃"}
+            return {"key": "p2_shadow_aoe", "phase": phase, "label": "银色幻影过多团血崩溃"}
         if tank_deaths:
-            return {"key": "tank_death", "phase": "P2", "label": "P2 倒坦"}
-        return {"key": "p2_aoe_collapse", "phase": "P2", "label": "P2 常规 AoE 团血崩溃"}
+            return {"key": "tank_death", "phase": phase, "label": f"{phase} 倒坦"}
+        return {"key": "p2_aoe_collapse", "phase": phase, "label": f"{phase} 常规 AoE 团血崩溃"}
 
     if phase == "P3":
+        if bridge_cluster_phase == "P3" and is_abandon_after_losses(deaths, bridge_cluster):
+            return {"key": "phase_abandon", "phase": "P3", "label": "P3 放弃"}
+        if is_bridge_cluster_significant(bridge_cluster) and phase_at(bridge_cluster["start"], markers, fight) == "P3":
+            if is_mass_abandon(deaths, bridge_cluster["events"]) or has_prior_real_death(deaths, bridge_cluster["start"]):
+                return {"key": "phase_abandon", "phase": "P3", "label": "P3 放弃"}
+            return {"key": "phase_bridge_mistake", "phase": "P3", "label": "P3 过桥 / 坠落失误"}
         if len(pull_deaths) >= 2:
             return {"key": "p3_pull_deaths", "phase": "P3", "label": "P3 过多玩家死于拉弓"}
         if enrage_events:
             return {"key": "p3_add_enrage", "phase": "P3", "label": "P3 大怪狂暴"}
-        if len(gravity_deaths) > 2:
-            first_gravity = min(gravity_deaths, key=lambda item: item.get("timestamp", 0))
-            if len(deaths_before(deaths, first_gravity.get("timestamp", 0))) <= 2:
-                return {"key": "p3_line_aoe", "phase": "P3", "label": "P3 拉线 AoE 崩溃"}
-        if COSMIC_RADIATION_DAMAGE_ID in death_ids or COSMIC_DEVOUR_ID in death_ids:
-            return {"key": "p3_boss_enrage", "phase": "P3", "label": "奥蕾莉亚狂暴"}
         return {"key": "p3_aoe_collapse", "phase": "P3", "label": "P3 常规 AoE 崩溃"}
 
     return {"key": "unknown", "phase": phase, "label": "未知归因"}
@@ -495,33 +687,37 @@ def detail_spell_plan(classification, deaths):
     buff_ids = set()
     cast_ids = set()
 
-    if key != "kill":
-        debuff_ids |= {CORRUPTION_ID, SILVER_ARROW_MARK_ID}
-        buff_ids |= SHADOW_BINDING_IDS
-        damage_ids.add(1233649)
-
-    if classification["phase"] == "P1" or key in {"p1_add_rage", "p1_team_collapse", "tank_death"}:
-        debuff_ids |= {CORRUPTION_ID, SILVER_ARROW_MARK_ID}
+    if classification["phase"] == "P1" or key in {"p1_add_rage", "p1_team_collapse"}:
+        debuff_ids |= {CORRUPTION_ID, SILVER_ARROW_MARK_ID, VOID_GRASP_ID}
         buff_ids |= SHADOW_BINDING_IDS | {RAGE_STACK_ID}
         damage_ids |= {1233649, 1255378, 1281707}
 
     if key in {"p15_pull_deaths", "p15_team_collapse"}:
         damage_ids |= P15_AVOIDABLE_IDS | {1234570, 1255378}
 
-    if classification["phase"] == "P2" or key.startswith("p2"):
+    if classification["phase"] in {"P2", "P2.5"} or key.startswith("p2"):
         debuff_ids |= {VOID_GRASP_ID, RANGER_MARK_ID}
         damage_ids |= {COLLAPSING_VOID_ID}
-        buff_ids |= {COSMIC_RADIATION_BUFF_ID}
+        buff_ids |= {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID}
 
     if classification["phase"] == "P3" or key.startswith("p3"):
-        debuff_ids |= {VOID_GRASP_ID, GRAVITY_COLLAPSE_DEBUFF_ID}
-        damage_ids |= {COLLAPSING_VOID_ID, P3_LINE_DEATH_ID, COSMIC_RADIATION_DAMAGE_ID}
+        debuff_ids |= {VOID_GRASP_ID, GRAVITY_COLLAPSE_DEBUFF_ID, TERMINAL_GUARD_DEBUFF_ID, RANGER_MARK_ID}
+        damage_ids |= {COLLAPSING_VOID_ID, P3_LINE_DEATH_ID, COSMIC_RADIATION_DAMAGE_ID, COSMIC_DEVOUR_ID}
         buff_ids |= ENRAGE_IDS | {COSMIC_RADIATION_BUFF_ID}
         cast_ids |= {PORTAL_CAST_ID}
 
     if any(death.get("killingAbilityGameID") == 1233649 for death in deaths):
         debuff_ids.add(SILVER_ARROW_MARK_ID)
         damage_ids.add(1233649)
+
+    if any(death.get("killingAbilityGameID") == COLLAPSING_VOID_ID for death in deaths):
+        debuff_ids.add(VOID_GRASP_ID)
+        damage_ids.add(COLLAPSING_VOID_ID)
+
+    if any(death.get("killingAbilityGameID") == P3_LINE_DEATH_ID for death in deaths):
+        debuff_ids.add(GRAVITY_COLLAPSE_DEBUFF_ID)
+        debuff_ids.add(TERMINAL_GUARD_DEBUFF_ID)
+        damage_ids.add(P3_LINE_DEATH_ID)
 
     if any(death.get("killingAbilityGameID") in TANK_DEATH_IDS for death in deaths[:3]):
         damage_ids |= P1_TANK_IDS | P2_TANK_IDS | P3_TANK_IDS
@@ -778,19 +974,192 @@ def analyze_p2_energy(markers, fight, debuffs):
     return rows
 
 
+def analyze_ranger_mark_groups(markers, fight, debuffs, phase_name):
+    phase_start, phase_end = phase_window(markers, fight, phase_name)
+    if phase_start is None:
+        return []
+    if phase_end is None:
+        phase_end = fight["endTime"]
+    fades = [
+        event for event in debuffs
+        if ability_id(event) == RANGER_MARK_ID
+        and event_is_remove(event)
+        and phase_start <= event.get("timestamp", 0) <= phase_end
+    ]
+    rows = []
+    for index, cluster in enumerate(cluster_events(fades, window_ms=2_500), start=1):
+        players = []
+        seen = set()
+        for event in cluster["events"]:
+            target_id = event.get("targetID")
+            if target_id in seen:
+                continue
+            seen.add(target_id)
+            players.append(target_id)
+        rows.append({
+            "time": format_time(cluster["start"] - fight["startTime"]),
+            "group": index,
+            "count": len(players),
+            "targetIDs": players,
+            "text": f"{phase_name} 第 {index} 组游侠队长印记消失 {len(players)} 人",
+        })
+    return rows
+
+
+def render_ranger_mark_groups(rows, actor_map, phase_name):
+    rendered = []
+    for row in rows:
+        names = [actor(actor_map, target_id) for target_id in row.get("targetIDs", [])]
+        rendered.append({
+            **row,
+            "players": names,
+            "text": f"{row['time']} {phase_name} 第 {row['group']} 组游侠队长印记消失 {row['count']} 人：{('、'.join(names) if names else '未识别')}",
+        })
+    return rendered
+
+
+def unique_event_targets(events, actor_map):
+    seen = set()
+    rows = []
+    for event in events:
+        target_id = event.get("targetID")
+        if target_id in seen:
+            continue
+        seen.add(target_id)
+        rows.append({
+            "targetID": target_id,
+            "player": actor(actor_map, target_id),
+            "timestamp": event.get("timestamp", 0),
+        })
+    return rows
+
+
+def gravity_round_at(timestamp, debuffs, fight, actor_map):
+    guard_applies = [
+        event for event in debuffs
+        if ability_id(event) == TERMINAL_GUARD_DEBUFF_ID
+        and str(event.get("type", "")).lower() == "applydebuff"
+        and -45_000 <= event.get("timestamp", 0) - timestamp <= 2_000
+    ]
+    guard_clusters = cluster_events(guard_applies, window_ms=4_000)
+    guard_cluster = max(
+        (
+            cluster for cluster in guard_clusters
+            if 0 <= timestamp - cluster["start"] <= 15_000
+        ),
+        key=lambda item: item["start"],
+        default=None,
+    )
+    if guard_cluster:
+        round_targets = unique_event_targets(guard_cluster["events"], actor_map)
+    else:
+        round_targets = []
+
+    collapse_applies = [
+        event for event in debuffs
+        if ability_id(event) == GRAVITY_COLLAPSE_DEBUFF_ID
+        and event_is_apply(event)
+        and -20_000 <= event.get("timestamp", 0) - timestamp <= 8_000
+    ]
+    if not round_targets:
+        apply_clusters = cluster_events(collapse_applies, window_ms=4_000)
+        containing_clusters = [
+            cluster for cluster in apply_clusters
+            if cluster["start"] - 1_000 <= timestamp <= cluster["end"] + 1_000
+        ]
+        round_cluster = max(containing_clusters, key=lambda item: item["end"], default=None)
+        if not round_cluster:
+            prior_clusters = [cluster for cluster in apply_clusters if cluster["start"] <= timestamp]
+            round_cluster = max(prior_clusters, key=lambda item: item["end"], default=None)
+        if round_cluster:
+            round_targets = unique_event_targets(round_cluster["events"], actor_map)
+
+    target_ids = {row["targetID"] for row in round_targets}
+    collapse_apply_triggers = [
+        event for event in collapse_applies
+        if abs(event.get("timestamp", 0) - timestamp) <= 1_000
+    ]
+    if target_ids:
+        matching_apply_triggers = [event for event in collapse_apply_triggers if event.get("targetID") in target_ids]
+        if matching_apply_triggers:
+            collapse_apply_triggers = matching_apply_triggers
+
+    guard_removes = [
+        event for event in debuffs
+        if ability_id(event) == TERMINAL_GUARD_DEBUFF_ID
+        and event_is_remove(event)
+        and abs(event.get("timestamp", 0) - timestamp) <= 1_500
+    ]
+    if target_ids:
+        matching_guard_removes = [event for event in guard_removes if event.get("targetID") in target_ids]
+        if matching_guard_removes:
+            guard_removes = matching_guard_removes
+
+    trigger = None
+    if collapse_apply_triggers:
+        trigger_candidates = sorted(collapse_apply_triggers, key=lambda item: item.get("timestamp", 0))
+        trigger = trigger_candidates[-1]
+        if len(trigger_candidates) >= 2:
+            latest_gap = timestamp - trigger.get("timestamp", 0)
+            previous_gap = timestamp - trigger_candidates[-2].get("timestamp", 0)
+            if 0 <= latest_gap <= 120 and previous_gap <= 800:
+                trigger = trigger_candidates[-2]
+
+    removes = [
+        event for event in debuffs
+        if ability_id(event) == GRAVITY_COLLAPSE_DEBUFF_ID
+        and event_is_remove(event)
+        and abs(event.get("timestamp", 0) - timestamp) <= 2_500
+    ]
+    if target_ids:
+        matching_removes = [event for event in removes if event.get("targetID") in target_ids]
+        if matching_removes:
+            removes = matching_removes
+    if not trigger:
+        trigger = min(removes, key=lambda item: abs(item.get("timestamp", 0) - timestamp), default=None)
+    if not trigger and guard_removes:
+        trigger = min(guard_removes, key=lambda item: abs(item.get("timestamp", 0) - timestamp), default=None)
+    if not trigger:
+        trigger = max(
+            (
+                event for event in debuffs
+                if ability_id(event) == GRAVITY_COLLAPSE_DEBUFF_ID
+                and event_is_remove(event)
+                and 0 <= timestamp - event.get("timestamp", 0) <= 8_000
+            ),
+            key=lambda item: item.get("timestamp", 0),
+            default=None,
+        )
+    return {
+        "targets": round_targets,
+        "trigger": {
+            "targetID": trigger.get("targetID"),
+            "player": actor(actor_map, trigger.get("targetID")),
+            "timestamp": trigger.get("timestamp", 0),
+            "time": format_time(fight_elapsed(trigger, fight)),
+        } if trigger else None,
+    }
+
+
 def analyze_gravity_attribution(fight, actor_map, deaths, debuffs):
     gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == P3_LINE_DEATH_ID]
     rows = []
     for cluster in cluster_events(gravity_deaths, window_ms=1_500):
         if len(cluster["events"]) <= 2:
             continue
-        source = attribute_debuff_fade(cluster["events"][0], debuffs, fight, actor_map, GRAVITY_COLLAPSE_DEBUFF_ID, window_ms=2_000)
+        round_info = gravity_round_at(cluster["start"], debuffs, fight, actor_map)
+        trigger = round_info["trigger"]
+        target_names = [row["player"] for row in round_info["targets"]]
+        trigger_name = trigger["player"] if trigger else "未知拉线"
+        target_text = "、".join(target_names) if target_names else "未识别"
         rows.append({
             "time": format_time(cluster["start"] - fight["startTime"]),
-            "source": source["player"] if source else "未知拉线",
+            "source": trigger_name,
             "deathCount": len(cluster["events"]),
+            "markPlayers": target_names,
+            "trigger": trigger,
             "players": [actor(actor_map, death.get("targetID")) for death in cluster["events"]],
-            "text": f"{format_time(cluster['start'] - fight['startTime'])} 重力坍缩造成 {len(cluster['events'])} 人死亡，疑似由 {source['player'] if source else '未知拉线'} 触发",
+            "text": f"{format_time(cluster['start'] - fight['startTime'])} 重力坍缩造成 {len(cluster['events'])} 人死亡，本轮点名为 {target_text}，团血崩于{trigger_name}的那次拉线。",
         })
     return rows
 
@@ -848,9 +1217,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     death_timeline = []
     silver_marks = [event for event in detail_debuffs if ability_id(event) == SILVER_ARROW_MARK_ID and event_is_apply(event)]
     for death in deaths:
+        death_phase = phase_at(death.get("timestamp", 0), markers, fight)
         ability = SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID")))
-        if death.get("killingAbilityGameID") is None:
-            ability = "过桥 / 坠落失误"
+        if death.get("killingAbilityGameID") in {None, 3}:
+            if death_phase == "P2.5":
+                ability = "转阶段击飞"
+            elif reason_key == "phase_abandon" or death_phase in {"P1", "P1.5"}:
+                ability = "放弃 / 坠落"
+            else:
+                ability = "过桥 / 坠落失误"
         if death.get("killingAbilityGameID") == 1233649:
             marked = any(
                 event.get("targetID") == death.get("targetID") and 0 <= death.get("timestamp", 0) - event.get("timestamp", 0) <= 10_000
@@ -864,6 +1239,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "player": actor(actor_map, death.get("targetID")),
             "abilityID": death.get("killingAbilityGameID"),
             "ability": ability,
+            "phase": death_phase,
         })
 
     is_kill = bool(fight.get("kill"))
@@ -873,12 +1249,17 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         shadow_misses = []
         energy_misses = []
         gravity_rows = []
+        p3_ranger_mark_rows = []
     else:
-        p1_arrow_rows, p1_arrow_issues = analyze_p1_arrows(fight, actor_map, detail_buffs, detail_debuffs, detail_damage)
+        if phase == "P1":
+            p1_arrow_rows, p1_arrow_issues = analyze_p1_arrows(fight, actor_map, detail_buffs, detail_debuffs, detail_damage)
+        else:
+            p1_arrow_rows, p1_arrow_issues = [], []
         collapsing_rows, collapsing_deaths = analyze_collapsing_void(fight, actor_map, actor_type, deaths, detail_damage, detail_debuffs)
         shadow_misses = analyze_p2_shadow_misses(fight, actor_map, detail_damage, detail_debuffs, markers)
         energy_misses = analyze_p2_energy(markers, fight, detail_debuffs)
         gravity_rows = analyze_gravity_attribution(fight, actor_map, deaths, detail_debuffs)
+        p3_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P3"), actor_map, "P3")
 
     wipe_reason = classification["label"]
     wcl_link = ""
@@ -912,6 +1293,21 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         elif reason_key == "p2_shadow_aoe":
             investigation = "死亡记录命中银色幻影相关 AoE，判定为银色幻影过多导致团血崩溃。"
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
+        elif reason_key == "phase_abandon":
+            bridge_rows = bridge_deaths(deaths)
+            names = "、".join(actor(actor_map, death.get("targetID")) for death in bridge_rows[:8])
+            investigation = f"{phase} 出现大量坠落/无明确伤害死亡，判定为团队选择放弃或非预期引怪后快速重开。相关玩家：【{names}】。"
+            wcl_link = replay_link(report_id, fight["id"], fight_elapsed(bridge_rows[0], fight) - 5_000) if bridge_rows else ""
+        elif reason_key == "phase_bridge_mistake":
+            bridge_rows = bridge_deaths([death for death in deaths if phase_at(death.get("timestamp", 0), markers, fight) == phase])
+            names = "、".join(actor(actor_map, death.get("targetID")) for death in bridge_rows[:8])
+            investigation = f"{phase} 阶段发生过台子/坠落失误，相关玩家：【{names}】。"
+            wcl_link = replay_link(report_id, fight["id"], fight_elapsed(bridge_rows[0], fight) - 5_000) if bridge_rows else ""
+        elif reason_key == "p25_knockback":
+            bridge_rows = bridge_deaths([death for death in deaths if phase_at(death.get("timestamp", 0), markers, fight) == "P2.5"])
+            names = "、".join(actor(actor_map, death.get("targetID")) for death in bridge_rows[:8])
+            investigation = f"P2.5 宇宙屏障持续期间发生坠落，归因为转阶段击飞。相关玩家：【{names}】。"
+            wcl_link = replay_link(report_id, fight["id"], fight_elapsed(bridge_rows[0], fight) - 5_000) if bridge_rows else ""
         elif reason_key == "p3_add_enrage":
             portal_cast = min((event for event in detail_casts if ability_id(event) == PORTAL_CAST_ID), key=lambda item: item.get("timestamp", 0), default=None)
             investigation = "P3 发现大怪或裂隙幻影获得狂暴，判定为大怪狂暴。"
@@ -920,13 +1316,9 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             investigation = gravity_rows[0]["text"] if gravity_rows else "P3 低减员状态下重力坍缩造成多人同秒死亡，判定为拉线 AoE 崩溃。"
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 15_000, 5_000) if deaths else ""
         elif reason_key == "p3_boss_enrage":
-            investigation = "玩家陆续死于宇宙辐射，判定为奥蕾莉亚狂暴；请同步检查 P2 是否提前结束。"
+            ranger_text = f" P3 银锋弹射检查：{'; '.join(row['text'] for row in p3_ranger_mark_rows[:4])}。" if p3_ranger_mark_rows else " P3 未识别到游侠队长印记消失记录。"
+            investigation = f"玩家陆续死于噬灭宇宙，判定为奥蕾莉亚狂暴；请同步检查 P2 是否提前结束。{ranger_text}"
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
-        elif reason_key == "bridge_mistake":
-            bridge_rows = bridge_deaths(deaths[:8])
-            names = "、".join(actor(actor_map, death.get("targetID")) for death in bridge_rows[:6])
-            investigation = f"最早死亡中有 {len(bridge_rows)} 人属于坠落或无明确伤害记录，优先归因为过桥 / 过场失误。相关玩家：【{names}】。"
-            wcl_link = replay_link(report_id, fight["id"], fight_elapsed(bridge_rows[0], fight) - 5_000) if bridge_rows else ""
         elif reason_key == "tank_death":
             investigation = "最早 3 个死亡中出现坦克相关死亡，判定为倒坦。"
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
@@ -935,7 +1327,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
 
     trial_records = []
-    if not is_kill and (p1_arrow_rows or p1_arrow_issues):
+    if not is_kill and phase == "P1" and (p1_arrow_rows or p1_arrow_issues):
         trial_records.append({
             "type": "p1_arrows",
             "title": "P1 银锋箭 / 腐化精华",
@@ -969,6 +1361,13 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "title": "P3 重力坍缩归因",
             "summary": f"{len(gravity_rows)} 次多人死亡",
             "rows": gravity_rows,
+        })
+    if reason_key == "p3_boss_enrage" and p3_ranger_mark_rows:
+        trial_records.append({
+            "type": "p3_ranger_marks",
+            "title": "P3 银锋弹射检查",
+            "summary": f"{len(p3_ranger_mark_rows)} 组",
+            "rows": p3_ranger_mark_rows,
         })
 
     local_board = {
@@ -1021,8 +1420,9 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "phaseMarkers": {
                 key: (format_time(value - fight["startTime"]) if isinstance(value, int) else None)
                 for key, value in markers.items()
-                if key in {"p15Start", "p2Start", "p3Transition", "p3Start"}
+                if key in {"p15Start", "p2Start", "p3Transition", "p25Start", "p25End", "p3Start"}
             },
+            "phaseTimeline": phase_timeline(markers, fight),
             "classificationKey": reason_key,
             "p1ArrowRows": p1_arrow_rows,
             "p1ArrowIssues": p1_arrow_issues,
@@ -1030,6 +1430,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "missedShadows": shadow_misses,
             "missedEnergy": energy_misses,
             "gravityRows": gravity_rows,
+            "p3RangerMarkRows": p3_ranger_mark_rows,
         },
     }
 
@@ -1040,9 +1441,10 @@ def fetch_fight_payload(token, report_id, fight):
     progress(f"死亡事件：{len(deaths)} 条", 2)
 
     casts = fetch_spell_events(token, report_id, fight, "Casts", {SILVER_HAVOC_CAST_ID, PORTAL_CAST_ID}, "读取阶段读条")
-    buffs = fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, RAGE_STACK_ID} | ENRAGE_IDS, "读取阶段/狂暴 Buff")
-    debuffs = fetch_spell_events(token, report_id, fight, "Debuffs", {1234570}, "读取阶段 Debuff")
+    buffs = fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID, RAGE_STACK_ID} | ENRAGE_IDS, "读取阶段/狂暴 Buff")
+    debuffs = fetch_spell_events(token, report_id, fight, "Debuffs", {1234570, TERMINAL_GUARD_DEBUFF_ID}, "读取阶段 Debuff")
     markers = phase_markers(casts, buffs, debuffs, fight)
+    markers = infer_phase_markers_from_deaths(markers, deaths, fight)
     classification = classify_fight(fight, deaths, markers, buffs)
     progress(f"死亡归因初判：{classification['phase']} / {classification['label']}", 2)
 

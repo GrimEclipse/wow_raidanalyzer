@@ -405,6 +405,7 @@ createApp({
             dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
             errorMsg: '',
+            jsonSource: './wcl_hardcore_api.json',
             activePanels: [],
             activeDetailPanels: [],
             reportInput: '',
@@ -554,6 +555,7 @@ createApp({
         }
     },
     mounted() {
+        this.applyRouteParams();
         this.loadCatalog();
         this.autoLoadJson();
     },
@@ -566,6 +568,13 @@ createApp({
         }
     },
     methods: {
+        applyRouteParams() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('version')) this.selectedVersion = params.get('version');
+            if (params.get('raid')) this.selectedRaid = params.get('raid');
+            if (params.get('boss')) this.selectedBoss = params.get('boss');
+            if (params.get('json')) this.jsonSource = params.get('json');
+        },
         async loadCatalog() {
             try {
                 const response = await fetch('./boss_catalog.json');
@@ -592,7 +601,7 @@ createApp({
         },
         async autoLoadJson() {
             try {
-                const response = await fetch('./wcl_hardcore_api.json');
+                const response = await fetch(this.jsonSource);
                 if (!response.ok) return;
                 this.bindData(await response.json());
             } catch (e) {
