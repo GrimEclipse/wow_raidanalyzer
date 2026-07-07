@@ -202,7 +202,7 @@
                                             </template>
                                             <template v-else>
                                                 <span class="text-blue-300 font-semibold truncate">{{ event.player }}</span>
-                                                <span class="text-red-300 truncate text-right">{{ event.ability }}</span>
+                                                <span class="text-red-300 truncate text-right">{{ event.ability }}<span v-if="event.amount" class="text-gray-500 ml-1">{{ number(event.amount) }}</span></span>
                                             </template>
                                         </div>
                                     </div>
@@ -260,7 +260,7 @@
                                 <td class="py-2 px-3 text-center text-gray-500 font-bold">{{ index + 1 }}</td>
                                 <td class="py-2 px-3 text-blue-300 font-bold">{{ player.name }}</td>
                                 <td class="py-2 px-3 text-center text-gray-300">{{ roleIcons(player.roles || player.role) }}</td>
-                                <td class="py-2 px-3 text-right font-mono">{{ number(player.totalDamage) }}</td>
+                                <td class="py-2 px-3 text-right font-mono">{{ player.damageText || number(player.totalDamage) }}</td>
                                 <td class="py-2 px-3 text-center text-amber-300 font-mono">{{ player.hitCount }}</td>
                                 <td class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
                                     {{ player.deathCount || 0 }}<span v-if="player.deathCompensationCount" class="text-amber-300">({{ avoidableDeathTotal(player) }})</span>
@@ -297,7 +297,7 @@
                                 <div v-for="player in activeAvoidableRows.slice(0, 10)" :key="'bar-' + player.name">
                                     <div class="flex justify-between text-xs mb-1">
                                         <span class="text-gray-300 truncate font-semibold">{{ player.name }}</span>
-                                        <span class="text-gray-400 font-mono">{{ number(player.totalDamage) }}</span>
+                                        <span class="text-gray-400 font-mono">{{ player.damageText || number(player.totalDamage) }}</span>
                                     </div>
                                     <div class="h-2.5 bg-gray-800/80 rounded overflow-hidden flex w-full">
                                         <div class="flex h-full transition-all duration-500 ease-out" :style="{ width: percent(player.totalDamage, activeAvoidableMax) + '%' }">
@@ -420,18 +420,18 @@
                              :style="voidCenterStyle()"></div>
                         <template v-for="drop in activeVoidMapDrops()" :key="voidDropKey(drop)">
                             <template v-if="drop.hasPosition && drop.x !== null && drop.y !== null">
-                                <a v-if="drop.positionMs !== undefined"
+                                <a v-if="drop.positionMs !== undefined && drop._showCircle !== false"
                                    :href="makeReplayLink(voidRepulsionDialog.fight, drop.positionMs)"
                                    target="_blank"
                                    class="absolute rounded-full border transition hover:brightness-125"
                                    :class="voidDropCircleClass(drop)"
                                    :style="voidDropCircleStyle(drop)"
                                    :title="voidDropTitle(drop)"></a>
-                                <div v-else class="absolute rounded-full border"
+                                <div v-else-if="drop._showCircle !== false" class="absolute rounded-full border"
                                      :class="voidDropCircleClass(drop)"
                                      :style="voidDropCircleStyle(drop)"
                                      :title="voidDropTitle(drop)"></div>
-                                <div class="absolute -translate-x-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-black/75 border text-[10px] leading-none whitespace-nowrap pointer-events-none"
+                                <div v-if="drop._showLabel !== false" class="absolute -translate-x-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-black/75 border text-[10px] leading-none whitespace-nowrap pointer-events-none"
                                      :class="voidDropLabelClass(drop)"
                                      :style="voidDropMarkerStyle(drop)">
                                     {{ drop.player }}
@@ -440,8 +440,8 @@
                         </template>
                     </div>
                     <div class="text-xs text-gray-400 leading-5">
-                        紫色圆形为 20 码虚空残渣覆盖范围；蓝点为奥蕾莉亚初始中心
-                        {{ voidArenaConfig.centerX }}, {{ voidArenaConfig.centerY }}。切换阶段会只显示该阶段的水。
+                        紫色圆形为 15 码虚空残渣覆盖范围；蓝点为奥蕾莉亚初始中心。
+                        {{ voidCoordinateHint() }}切换到单次放水时，上一轮残留水会保留但隐藏名字，当前轮只显示落点。
                     </div>
                 </div>
                 <aside class="space-y-3">
@@ -484,7 +484,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="drop in activeVoidMapDrops()" :key="voidDropKey(drop) + '-row'" class="border-t border-gray-800">
+                                <tr v-for="drop in activeVoidTableDrops()" :key="voidDropKey(drop) + '-row'" class="border-t border-gray-800">
                                     <td class="py-2 px-3 font-mono text-gray-400">
                                         <a v-if="drop.positionMs !== undefined" :href="makeReplayLink(voidRepulsionDialog.fight, drop.positionMs)" target="_blank" class="text-sky-300 hover:text-sky-200">{{ drop.time }}</a>
                                         <span v-else>{{ drop.time || '-' }}</span>
@@ -561,7 +561,7 @@ createApp({
                 centerPixelX: 436.5,
                 centerPixelY: 397,
                 pixelsPerYard: 4.6,
-                waterRadiusYards: 20,
+                waterRadiusYards: 15,
                 yAxis: -1
             }
         };
@@ -786,7 +786,7 @@ createApp({
             return `${minutes}:${seconds}`;
         },
         phaseRank(phase) {
-            return { '已击杀': 6, P4: 5, P3: 4, 'P2转P3': 3, P2: 2, '单阶段': 2, P1: 1 }[phase] || 0;
+            return { '已击杀': 7, P4: 6, P3: 5, 'P2转P3': 4, 'P2.5': 4, P2: 3, 'P1.5': 2, '单阶段': 2, P1: 1 }[phase] || 0;
         },
         getWipeElapsedMs(fight) {
             if (fight.wipeElapsedMs !== undefined && fight.wipeElapsedMs !== null && Number.isFinite(Number(fight.wipeElapsedMs))) return Number(fight.wipeElapsedMs);
@@ -925,6 +925,18 @@ createApp({
         activeVoidMapDrops() {
             if (!this.voidRepulsionDialog) return [];
             if (this.voidRepulsionDialog.selectedRoundKey === 'all') return this.voidRecordsForPhase();
+            const groups = this.voidRoundGroups();
+            const groupIndex = groups.findIndex(item => item.key === this.voidRepulsionDialog.selectedRoundKey);
+            if (groupIndex < 0) return this.voidRecordsForPhase();
+            const previous = groups.slice(0, groupIndex).flatMap(group =>
+                group.drops.map(drop => ({ ...drop, _pastWater: true, _showLabel: false, _showCircle: true }))
+            );
+            const current = groups[groupIndex].drops.map(drop => ({ ...drop, _pendingDrop: true, _showCircle: false, _showLabel: true }));
+            return [...previous, ...current];
+        },
+        activeVoidTableDrops() {
+            if (!this.voidRepulsionDialog) return [];
+            if (this.voidRepulsionDialog.selectedRoundKey === 'all') return this.voidRecordsForPhase();
             const group = this.voidRoundGroups().find(item => item.key === this.voidRepulsionDialog.selectedRoundKey);
             return group ? group.drops : this.voidRecordsForPhase();
         },
@@ -933,6 +945,14 @@ createApp({
             if (phase === 'P2') return index === 0 ? 2 : (index === 1 ? 3 : 4);
             if (phase === 'P3') return 1;
             return '-';
+        },
+        voidCoordinateHint() {
+            const drop = this.voidRecords(this.voidRepulsionDialog?.fight || {})
+                .find(item => item.hasPosition);
+            if (drop && drop.originX !== undefined && drop.originX !== null) {
+                return '坐标以奥蕾莉亚起始点为 (0, 0)。';
+            }
+            return '当前数据使用 WCL 原始坐标。';
         },
         voidRoundLabel(group, index) {
             const number = group.castIndex || index + 1;
@@ -949,6 +969,7 @@ createApp({
                 : 'bg-emerald-950/50 border-emerald-800 text-emerald-200';
         },
         voidDropCircleClass(drop) {
+            if (drop._pastWater) return 'bg-purple-600/20 border-purple-300/60 shadow-[0_0_12px_rgba(168,85,247,0.25)]';
             return this.isVoidOutlier(drop)
                 ? 'bg-red-600/35 border-red-300 shadow-[0_0_22px_rgba(248,113,113,0.45)]'
                 : 'bg-purple-600/30 border-purple-300 shadow-[0_0_18px_rgba(168,85,247,0.4)]';
@@ -1033,6 +1054,19 @@ createApp({
                 fight.detailReason = fight.wipeReason || '未知原因';
                 return fight;
             });
+            const firstVoidDrop = this.rawWipeAnalysis
+                .flatMap(fight => fight?.crownOfTheCosmos?.voidRepulsionRecords || [])
+                .find(drop => drop.hasPosition);
+            if (firstVoidDrop) {
+                if (firstVoidDrop.originX !== undefined && firstVoidDrop.originX !== null) {
+                    this.voidArenaConfig.centerX = 0;
+                    this.voidArenaConfig.centerY = 0;
+                } else {
+                    this.voidArenaConfig.centerX = -363.85;
+                    this.voidArenaConfig.centerY = 4788.22;
+                }
+                this.voidArenaConfig.waterRadiusYards = Number(firstVoidDrop.waterRadiusYards || 15);
+            }
 
             this.glaiveBoard = result.data.page2_glaiveBoard || [];
             this.avoidableBoard = { ...(result.data.page2_avoidableBoard || {}) };
@@ -1117,8 +1151,10 @@ createApp({
                 P4: 'bg-red-950/90',
                 P3: 'bg-fuchsia-950/80',
                 'P2转P3': 'bg-amber-950/80',
+                'P2.5': 'bg-amber-950/80',
                 '单阶段': 'bg-blue-950/80',
                 P2: 'bg-blue-950/80',
+                'P1.5': 'bg-purple-950/80',
                 P1: 'bg-gray-900'
             };
             return classes[phase] || 'bg-gray-900';

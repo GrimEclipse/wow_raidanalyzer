@@ -1,0 +1,2759 @@
+{
+  "reportID": "PAMtmJz8rNywYVQT",
+  "fightIDs": [
+    27,
+    28,
+    29,
+    30
+  ],
+  "phantomActorIDsInReport": [
+    369
+  ],
+  "sourceChecks": [
+    {
+      "reportID": "PAMtmJz8rNywYVQT",
+      "fightID": 30,
+      "phantomActorIDs": [
+        369
+      ],
+      "phantomActorNames": {
+        "369": "Silver Simulacrum"
+      },
+      "damageDoneCountsBySource": {
+        "369": 1260
+      },
+      "phaseSpellProbe": {
+        "Buffs": {
+          "1261289": 0,
+          "1260766": 2
+        },
+        "Debuffs": {
+          "1261289": 0,
+          "1260766": 0
+        },
+        "Casts": {
+          "1261289": 0,
+          "1260766": 1
+        },
+        "DamageDone": {
+          "1261289": 1247,
+          "1260766": 0
+        },
+        "DamageTaken": {
+          "1261289": 0,
+          "1260766": 0
+        }
+      }
+    },
+    {
+      "reportID": "AGkdfNWKtR28xMTB",
+      "fightID": 24,
+      "phantomActorIDs": [
+        100
+      ],
+      "phantomActorNames": {
+        "100": "Silver Simulacrum"
+      },
+      "damageDoneCountsBySource": {
+        "100": 1115
+      },
+      "phaseSpellProbe": {
+        "Buffs": {
+          "1261289": 0,
+          "1260766": 2
+        },
+        "Debuffs": {
+          "1261289": 0,
+          "1260766": 0
+        },
+        "Casts": {
+          "1261289": 0,
+          "1260766": 1
+        },
+        "DamageDone": {
+          "1261289": 1709,
+          "1260766": 0
+        },
+        "DamageTaken": {
+          "1261289": 0,
+          "1260766": 0
+        }
+      }
+    }
+  ],
+  "fights": [
+    {
+      "fightID": 27,
+      "kill": false,
+      "duration": "04:58.243",
+      "counts": {
+        "deaths": 22,
+        "casts": 5830,
+        "debuffs": 589,
+        "enemyDebuffs": 94,
+        "buffs": 0,
+        "damage": 630,
+        "resources": 6959,
+        "enemyResources": 6,
+        "phantomDamage": 837
+      },
+      "phase": {
+        "p15Start": "02:14.788",
+        "silverHavocEventTime": null,
+        "p2Start": "02:52.788",
+        "scatterFadeFirst": "02:24.605",
+        "scatterFadeLast": "02:52.788",
+        "barrierApply": null,
+        "barrierRemove": null,
+        "radiationApply": null,
+        "radiationRemove": null,
+        "p2DurationUntilBarrier": "02:05.455",
+        "p2LastedFull140s": false
+      },
+      "p1": {
+        "voidRepulsion": [
+          {
+            "time": "00:18.986",
+            "player": "八妖灵九琦舞",
+            "targetID": 41,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.987",
+            "player": "Leviackerman",
+            "targetID": 28,
+            "position": {
+              "hasPosition": true,
+              "x": -32674.71,
+              "y": 479944.15,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -277,
+              "afterDeltaMs": 843,
+              "jump": 456.44
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.988",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -31282.57,
+              "y": 480291.81,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1584,
+              "afterDeltaMs": 430,
+              "jump": 149.01
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.989",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -31471.61,
+              "y": 479680.88,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -859,
+              "afterDeltaMs": 1125,
+              "jump": 405.49
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.991",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": true,
+              "x": -35493.0,
+              "y": 479926.0,
+              "source": "resources_after",
+              "deltaMs": 899
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.991",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -34766.72,
+              "y": 477380.95,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -625,
+              "afterDeltaMs": 1436,
+              "jump": 981.47
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.991",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -32474.95,
+              "y": 475674.05,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1021,
+              "afterDeltaMs": 1721,
+              "jump": 72.24
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.483",
+            "player": "Leviackerman",
+            "targetID": 28,
+            "position": {
+              "hasPosition": true,
+              "x": -39259.59,
+              "y": 475517.53,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -3612,
+              "afterDeltaMs": 268,
+              "jump": 2050.6
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.483",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.484",
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -37276.69,
+              "y": 476708.72,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -471,
+              "afterDeltaMs": 53,
+              "jump": 473.97
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.585",
+            "player": "八妖灵九琦舞",
+            "targetID": 41,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.586",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -41237.11,
+              "y": 480407.57,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1117,
+              "afterDeltaMs": 577,
+              "jump": 1152.05
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.586",
+            "player": "Leviackerman",
+            "targetID": 28,
+            "position": {
+              "hasPosition": true,
+              "x": -41189.89,
+              "y": 479246.19,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -453,
+              "afterDeltaMs": 1981,
+              "jump": 597.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.587",
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -38893.22,
+              "y": 478644.24,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -934,
+              "afterDeltaMs": 2974,
+              "jump": 845.97
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "silverArrows": [
+          {
+            "markTime": "00:19.955",
+            "expectedHitTime": "00:25.955",
+            "markedPlayers": [
+              "飞天小喷菇",
+              "染小九"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "染小九",
+              "Breezeluck",
+              "Polonaise",
+              "Leviackerman",
+              "飞天小喷菇",
+              "爱音"
+            ]
+          },
+          {
+            "markTime": "00:37.462",
+            "expectedHitTime": "00:43.462",
+            "markedPlayers": [
+              "叶问",
+              "小楚唯"
+            ],
+            "bossHitTime": "00:43.475",
+            "bossHitTarget": "殆米阿尔",
+            "corruptionBeforeHit": 12,
+            "playerDamageTargets": [
+              "叶问",
+              "小楚唯"
+            ]
+          },
+          {
+            "markTime": "00:56.619",
+            "expectedHitTime": "01:02.619",
+            "markedPlayers": [
+              "Leviackerman",
+              "小树暖暖"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "小树暖暖",
+              "Leviackerman"
+            ]
+          },
+          {
+            "markTime": "01:15.810",
+            "expectedHitTime": "01:21.810",
+            "markedPlayers": [
+              "残夜将歇",
+              "Breezeluck"
+            ],
+            "bossHitTime": "01:21.826",
+            "bossHitTarget": "殁里乌姆",
+            "corruptionBeforeHit": 16,
+            "playerDamageTargets": [
+              "残夜将歇",
+              "Loveating",
+              "Breezeluck",
+              "Loveating"
+            ]
+          },
+          {
+            "markTime": "01:33.306",
+            "expectedHitTime": "01:39.306",
+            "markedPlayers": [
+              "Leviackerman",
+              "飞天小喷菇"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "Leviackerman",
+              "飞天小喷菇"
+            ]
+          },
+          {
+            "markTime": "01:59.560",
+            "expectedHitTime": "02:05.560",
+            "markedPlayers": [
+              "三坑不二",
+              "八妖灵九琦舞"
+            ],
+            "bossHitTime": "02:05.546",
+            "bossHitTarget": "龌勒卢斯",
+            "corruptionBeforeHit": 20,
+            "playerDamageTargets": [
+              "三坑不二",
+              "八妖灵九琦舞"
+            ]
+          }
+        ]
+      },
+      "p15": {
+        "deaths": [
+          {
+            "time": "02:30.653",
+            "player": "Polonaise",
+            "abilityID": 1243981
+          }
+        ]
+      },
+      "p2": {
+        "rangerMarks": [
+          {
+            "index": 1,
+            "markStart": "03:19.046",
+            "markedPlayers": [
+              "Oogi",
+              "Leviackerman",
+              "叮咚好烦",
+              "Superhunter"
+            ],
+            "fadeTimes": [
+              "03:25.047",
+              "03:25.366",
+              "03:27.065",
+              "03:27.346"
+            ],
+            "ricochetHits": 10,
+            "bossEnergyDrainCount": 2,
+            "bossEnergyDrains": [
+              {
+                "time": "03:25.604",
+                "resourceChange": -5,
+                "resourceAfter": 31
+              },
+              {
+                "time": "03:27.621",
+                "resourceChange": -5,
+                "resourceAfter": 28
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 2,
+            "markStart": "03:44.051",
+            "markedPlayers": [
+              "Oogi",
+              "Jokermeow",
+              "残夜将歇"
+            ],
+            "fadeTimes": [
+              "03:50.058",
+              "03:52.066",
+              "03:52.374"
+            ],
+            "ricochetHits": 13,
+            "bossEnergyDrainCount": 2,
+            "bossEnergyDrains": [
+              {
+                "time": "03:50.618",
+                "resourceChange": -5,
+                "resourceAfter": 44
+              },
+              {
+                "time": "03:52.627",
+                "resourceChange": -5,
+                "resourceAfter": 41
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 3,
+            "markStart": "04:11.083",
+            "markedPlayers": [
+              "叶问",
+              "Jokermeow",
+              "毛绒微醺爬爬"
+            ],
+            "fadeTimes": [
+              "04:17.385",
+              "04:19.090",
+              "04:19.395"
+            ],
+            "ricochetHits": 8,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "04:19.642",
+                "resourceChange": -5,
+                "resourceAfter": 60
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 4,
+            "markStart": "04:36.088",
+            "markedPlayers": [
+              "茶喵不吃糖",
+              "叮咚好烦",
+              "Oogi"
+            ],
+            "fadeTimes": [
+              "04:42.083",
+              "04:44.087",
+              "04:44.382"
+            ],
+            "ricochetHits": 12,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "04:42.082",
+                "resourceChange": -5,
+                "resourceAfter": 76
+              }
+            ],
+            "success": true
+          }
+        ],
+        "voidRepulsion": [
+          {
+            "time": "03:20.083",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:20.084",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -33461.0,
+              "y": 479272.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -661,
+              "afterDeltaMs": 821,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:20.084",
+            "player": "染小九",
+            "targetID": 19,
+            "position": {
+              "hasPosition": true,
+              "x": -35673.16,
+              "y": 482887.21,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1394,
+              "afterDeltaMs": 573,
+              "jump": 1254.19
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:20.085",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:45.081",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -36173.6,
+              "y": 484399.31,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2297,
+              "afterDeltaMs": 816,
+              "jump": 214.19
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:45.081",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:45.081",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -34850.69,
+              "y": 485223.69,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1134,
+              "afterDeltaMs": 1333,
+              "jump": 210.24
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:45.082",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:12.094",
+            "player": "茶喵不吃糖",
+            "targetID": 1,
+            "position": {
+              "hasPosition": true,
+              "x": -37711.0,
+              "y": 484750.0,
+              "source": "resources_before",
+              "deltaMs": -353
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:12.095",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -38338.84,
+              "y": 482472.76,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2323,
+              "afterDeltaMs": 202,
+              "jump": 827.61
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:12.095",
+            "player": "染小九",
+            "targetID": 19,
+            "position": {
+              "hasPosition": true,
+              "x": -38209.4,
+              "y": 484141.8,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -506,
+              "afterDeltaMs": 2053,
+              "jump": 1187.34
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:37.072",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:37.073",
+            "player": "残夜将歇",
+            "targetID": 29,
+            "position": {
+              "hasPosition": true,
+              "x": -40266.16,
+              "y": 481120.32,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2074,
+              "afterDeltaMs": 806,
+              "jump": 403.54
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:37.073",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "phantomActorIDs": [
+          369
+        ],
+        "phantomSegments": [
+          {
+            "firstDamage": "03:29.943",
+            "lastDamage": "03:40.741",
+            "tickCount": 10,
+            "possibleEliminator": "Oogi",
+            "voidGraspFadeTime": "03:39.808"
+          },
+          {
+            "firstDamage": "03:54.623",
+            "lastDamage": "04:06.639",
+            "tickCount": 7,
+            "possibleEliminator": "飞天小喷菇",
+            "voidGraspFadeTime": "04:06.867"
+          },
+          {
+            "firstDamage": "04:22.152",
+            "lastDamage": "04:57.686",
+            "tickCount": 25,
+            "possibleEliminator": null,
+            "voidGraspFadeTime": null
+          }
+        ]
+      },
+      "p3": {
+        "portalCastTime": null,
+        "portalCastTimes": [],
+        "portalPlayerPositions": []
+      }
+    },
+    {
+      "fightID": 28,
+      "kill": false,
+      "duration": "00:26.591",
+      "counts": {
+        "deaths": 19,
+        "casts": 21,
+        "debuffs": 15,
+        "enemyDebuffs": 0,
+        "buffs": 0,
+        "damage": 11,
+        "resources": 7,
+        "enemyResources": 0,
+        "phantomDamage": 0
+      },
+      "phase": {
+        "p15Start": null,
+        "silverHavocEventTime": null,
+        "p2Start": null,
+        "scatterFadeFirst": null,
+        "scatterFadeLast": null,
+        "barrierApply": null,
+        "barrierRemove": null,
+        "radiationApply": null,
+        "radiationRemove": null,
+        "p2DurationUntilBarrier": null,
+        "p2LastedFull140s": false
+      },
+      "p1": {
+        "voidRepulsion": [
+          {
+            "time": "00:18.984",
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.985",
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.985",
+            "player": "茶喵不吃糖",
+            "targetID": 1,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "silverArrows": [
+          {
+            "markTime": "00:19.970",
+            "expectedHitTime": "00:25.970",
+            "markedPlayers": [
+              "茶喵不吃糖",
+              "Oogi"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "Oogi",
+              "毛绒微醺爬爬"
+            ]
+          }
+        ]
+      },
+      "p15": {
+        "deaths": []
+      },
+      "p2": {
+        "rangerMarks": [],
+        "voidRepulsion": [
+          {
+            "time": "00:18.984",
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.985",
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.985",
+            "player": "茶喵不吃糖",
+            "targetID": 1,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "phantomActorIDs": [
+          369
+        ],
+        "phantomSegments": []
+      },
+      "p3": {
+        "portalCastTime": null,
+        "portalCastTimes": [],
+        "portalPlayerPositions": []
+      }
+    },
+    {
+      "fightID": 29,
+      "kill": false,
+      "duration": "06:35.106",
+      "counts": {
+        "deaths": 22,
+        "casts": 8692,
+        "debuffs": 645,
+        "enemyDebuffs": 93,
+        "buffs": 3,
+        "damage": 807,
+        "resources": 11086,
+        "enemyResources": 9,
+        "phantomDamage": 1220
+      },
+      "phase": {
+        "p15Start": "02:14.653",
+        "silverHavocEventTime": null,
+        "p2Start": "02:52.653",
+        "scatterFadeFirst": "02:24.452",
+        "scatterFadeLast": "02:52.653",
+        "barrierApply": null,
+        "barrierRemove": null,
+        "radiationApply": "05:11.438",
+        "radiationRemove": "05:26.287",
+        "p2DurationUntilBarrier": "02:18.785",
+        "p2LastedFull140s": false
+      },
+      "p1": {
+        "voidRepulsion": [
+          {
+            "time": "00:18.969",
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": true,
+              "x": -31569.86,
+              "y": 480247.14,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1002,
+              "afterDeltaMs": 105,
+              "jump": 128.56
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.970",
+            "player": "八妖灵九琦舞",
+            "targetID": 41,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.970",
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -30668.19,
+              "y": 479045.58,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -649,
+              "afterDeltaMs": 403,
+              "jump": 531.5
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.979",
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": true,
+              "x": -36457.0,
+              "y": 478145.0,
+              "source": "resources_before",
+              "deltaMs": -6807
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.980",
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -33222.0,
+              "y": 474874.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1,
+              "afterDeltaMs": 51,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.980",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -34900.89,
+              "y": 476423.57,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1683,
+              "afterDeltaMs": 2476,
+              "jump": 1018.06
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.980",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -33543.46,
+              "y": 474200.68,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -699,
+              "afterDeltaMs": 879,
+              "jump": 156.11
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.508",
+            "player": "Superhunter",
+            "targetID": 82,
+            "position": {
+              "hasPosition": true,
+              "x": -36180.17,
+              "y": 482147.37,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1867,
+              "afterDeltaMs": 1373,
+              "jump": 2362.6
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.508",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -41236.62,
+              "y": 480896.8,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1231,
+              "afterDeltaMs": 659,
+              "jump": 71.2
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.511",
+            "player": "茶喵不吃糖",
+            "targetID": 1,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.511",
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": true,
+              "x": -34052.91,
+              "y": 483025.86,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -5085,
+              "afterDeltaMs": 281,
+              "jump": 4646.34
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.584",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": true,
+              "x": -39182.0,
+              "y": 482341.0,
+              "source": "resources_after",
+              "deltaMs": 9797
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.584",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -39351.92,
+              "y": 482139.26,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1594,
+              "afterDeltaMs": 251,
+              "jump": 1206.31
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.585",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -40581.97,
+              "y": 482546.07,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1525,
+              "afterDeltaMs": 348,
+              "jump": 76.69
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.585",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -37043.06,
+              "y": 484169.13,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -61,
+              "afterDeltaMs": 2363,
+              "jump": 89.19
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "silverArrows": [
+          {
+            "markTime": "00:19.970",
+            "expectedHitTime": "00:25.970",
+            "markedPlayers": [
+              "八妖灵九琦舞",
+              "小楚唯"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "小楚唯",
+              "八妖灵九琦舞"
+            ]
+          },
+          {
+            "markTime": "00:37.487",
+            "expectedHitTime": "00:43.487",
+            "markedPlayers": [
+              "三坑不二",
+              "茶喵不吃糖"
+            ],
+            "bossHitTime": "00:43.495",
+            "bossHitTarget": "殆米阿尔",
+            "corruptionBeforeHit": 10,
+            "playerDamageTargets": [
+              "茶喵不吃糖",
+              "三坑不二"
+            ]
+          },
+          {
+            "markTime": "00:56.633",
+            "expectedHitTime": "01:02.633",
+            "markedPlayers": [
+              "叶问",
+              "残夜将歇"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "八妖灵九琦舞",
+              "Oogi",
+              "叶问",
+              "残夜将歇"
+            ]
+          },
+          {
+            "markTime": "01:15.807",
+            "expectedHitTime": "01:21.807",
+            "markedPlayers": [
+              "Polonaise",
+              "Oogi"
+            ],
+            "bossHitTime": "01:21.818",
+            "bossHitTarget": "殁里乌姆",
+            "corruptionBeforeHit": 19,
+            "playerDamageTargets": [
+              "Oogi",
+              "Polonaise"
+            ]
+          },
+          {
+            "markTime": "01:33.288",
+            "expectedHitTime": "01:39.288",
+            "markedPlayers": [
+              "三坑不二",
+              "八妖灵九琦舞"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "八妖灵九琦舞",
+              "三坑不二"
+            ]
+          },
+          {
+            "markTime": "01:59.605",
+            "expectedHitTime": "02:05.605",
+            "markedPlayers": [
+              "花落冬阳",
+              "叮咚好烦"
+            ],
+            "bossHitTime": "02:05.605",
+            "bossHitTarget": "龌勒卢斯",
+            "corruptionBeforeHit": 19,
+            "playerDamageTargets": [
+              "叮咚好烦",
+              "花落冬阳"
+            ]
+          }
+        ]
+      },
+      "p15": {
+        "deaths": [
+          {
+            "time": "02:46.482",
+            "player": "八妖灵九琦舞",
+            "abilityID": null
+          }
+        ]
+      },
+      "p2": {
+        "rangerMarks": [
+          {
+            "index": 1,
+            "markStart": "03:18.863",
+            "markedPlayers": [
+              "小楚唯",
+              "毛绒微醺爬爬",
+              "Loveating",
+              "叮咚好烦"
+            ],
+            "fadeTimes": [
+              "03:24.895",
+              "03:25.168",
+              "03:26.891",
+              "03:27.191"
+            ],
+            "ricochetHits": 18,
+            "bossEnergyDrainCount": 2,
+            "bossEnergyDrains": [
+              {
+                "time": "03:24.895",
+                "resourceChange": -5,
+                "resourceAfter": 31
+              },
+              {
+                "time": "03:27.442",
+                "resourceChange": -5,
+                "resourceAfter": 28
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 2,
+            "markStart": "03:43.859",
+            "markedPlayers": [
+              "Loveating",
+              "小楚唯",
+              "Superhunter",
+              "Jokermeow"
+            ],
+            "fadeTimes": [
+              "03:49.868",
+              "03:50.170",
+              "03:51.869",
+              "03:52.175"
+            ],
+            "ricochetHits": 6,
+            "bossEnergyDrainCount": 2,
+            "bossEnergyDrains": [
+              {
+                "time": "03:50.412",
+                "resourceChange": -5,
+                "resourceAfter": 44
+              },
+              {
+                "time": "03:52.417",
+                "resourceChange": -5,
+                "resourceAfter": 41
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 3,
+            "markStart": "04:10.908",
+            "markedPlayers": [
+              "残夜将歇",
+              "小楚唯",
+              "Jokermeow",
+              "毛绒微醺爬爬"
+            ],
+            "fadeTimes": [
+              "04:16.920",
+              "04:17.210",
+              "04:18.928",
+              "04:19.224"
+            ],
+            "ricochetHits": 6,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "04:17.457",
+                "resourceChange": -5,
+                "resourceAfter": 58
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 4,
+            "markStart": "04:35.937",
+            "markedPlayers": [
+              "Loveating",
+              "Oogi",
+              "茶喵不吃糖",
+              "毛绒微醺爬爬"
+            ],
+            "fadeTimes": [
+              "04:41.931",
+              "04:42.232",
+              "04:43.926",
+              "04:44.225"
+            ],
+            "ricochetHits": 8,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "04:42.498",
+                "resourceChange": -5,
+                "resourceAfter": 76
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 5,
+            "markStart": "05:02.913",
+            "markedPlayers": [
+              "叮咚好烦",
+              "三坑不二",
+              "Loveating",
+              "Jokermeow"
+            ],
+            "fadeTimes": [
+              "05:08.927",
+              "05:09.225",
+              "05:10.929"
+            ],
+            "ricochetHits": 14,
+            "bossEnergyDrainCount": 2,
+            "bossEnergyDrains": [
+              {
+                "time": "05:08.927",
+                "resourceChange": -5,
+                "resourceAfter": 96
+              },
+              {
+                "time": "05:11.491",
+                "resourceChange": -5,
+                "resourceAfter": 92
+              }
+            ],
+            "success": true
+          }
+        ],
+        "voidRepulsion": [
+          {
+            "time": "03:19.864",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -33696.0,
+              "y": 479564.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -591,
+              "afterDeltaMs": 413,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:19.865",
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -33206.06,
+              "y": 480391.12,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -395,
+              "afterDeltaMs": 3745,
+              "jump": 2319.36
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:19.865",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -33700.0,
+              "y": 482513.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -102,
+              "afterDeltaMs": 258,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:44.854",
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -34836.0,
+              "y": 485022.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -923,
+              "afterDeltaMs": 388,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:44.855",
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": true,
+              "x": -34891.61,
+              "y": 483590.64,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1865,
+              "afterDeltaMs": 755,
+              "jump": 106.04
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:44.856",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -35584.16,
+              "y": 483263.44,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1708,
+              "afterDeltaMs": 1707,
+              "jump": 1198.86
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:11.921",
+            "player": "Superhunter",
+            "targetID": 82,
+            "position": {
+              "hasPosition": true,
+              "x": -36873.38,
+              "y": 484730.52,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2013,
+              "afterDeltaMs": 249,
+              "jump": 741.06
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:11.922",
+            "player": "Breezeluck",
+            "targetID": 16,
+            "position": {
+              "hasPosition": true,
+              "x": -36884.59,
+              "y": 483433.53,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1350,
+              "afterDeltaMs": 2439,
+              "jump": 1827.42
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:11.922",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -37442.87,
+              "y": 485146.05,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1,
+              "afterDeltaMs": 101,
+              "jump": 97.87
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:36.926",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:36.926",
+            "player": "残夜将歇",
+            "targetID": 29,
+            "position": {
+              "hasPosition": true,
+              "x": -39673.61,
+              "y": 481606.65,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -517,
+              "afterDeltaMs": 1028,
+              "jump": 474.11
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:36.926",
+            "player": "三坑不二",
+            "targetID": 42,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:36.927",
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": true,
+              "x": -39765.94,
+              "y": 482786.94,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -5397,
+              "afterDeltaMs": 4426,
+              "jump": 1406.37
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:03.938",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -41879.13,
+              "y": 478713.34,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -923,
+              "afterDeltaMs": 6805,
+              "jump": 4159.67
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:03.939",
+            "player": "Breezeluck",
+            "targetID": 16,
+            "position": {
+              "hasPosition": true,
+              "x": -41044.78,
+              "y": 477871.78,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1240,
+              "afterDeltaMs": 859,
+              "jump": 45.19
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:03.939",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:03.940",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": true,
+              "x": -42142.0,
+              "y": 478783.0,
+              "source": "resources_after",
+              "deltaMs": 1995
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "phantomActorIDs": [
+          369
+        ],
+        "phantomSegments": [
+          {
+            "firstDamage": "03:30.497",
+            "lastDamage": "04:08.384",
+            "tickCount": 20,
+            "possibleEliminator": "残夜将歇",
+            "voidGraspFadeTime": "04:08.667"
+          },
+          {
+            "firstDamage": "04:21.482",
+            "lastDamage": "04:33.519",
+            "tickCount": 7,
+            "possibleEliminator": "染小九",
+            "voidGraspFadeTime": "04:33.672"
+          },
+          {
+            "firstDamage": "04:46.603",
+            "lastDamage": "04:58.613",
+            "tickCount": 7,
+            "possibleEliminator": "Loveating",
+            "voidGraspFadeTime": "04:58.676"
+          }
+        ]
+      },
+      "p3": {
+        "portalCastTime": "05:42.291",
+        "portalCastTimes": [
+          "05:42.291"
+        ],
+        "portalPlayerPositions": [
+          {
+            "player": "茶喵不吃糖",
+            "targetID": 1,
+            "position": {
+              "hasPosition": true,
+              "x": -38434.0,
+              "y": 481608.0,
+              "source": "resources_before",
+              "deltaMs": -4693
+            }
+          },
+          {
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": true,
+              "x": -38814.36,
+              "y": 478552.69,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -713,
+              "afterDeltaMs": 4847,
+              "jump": 3148.85
+            }
+          },
+          {
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -39298.41,
+              "y": 480207.63,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2718,
+              "afterDeltaMs": 1243,
+              "jump": 3046.55
+            }
+          },
+          {
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": true,
+              "x": -39158.0,
+              "y": 478714.0,
+              "source": "resources_before",
+              "deltaMs": -3900
+            }
+          },
+          {
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -37918.0,
+              "y": 480834.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -3,
+              "afterDeltaMs": 35,
+              "jump": 0.0
+            }
+          },
+          {
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -37928.6,
+              "y": 480316.19,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -6874,
+              "afterDeltaMs": 2198,
+              "jump": 2690.9
+            }
+          },
+          {
+            "player": "Breezeluck",
+            "targetID": 16,
+            "position": {
+              "hasPosition": true,
+              "x": -38964.0,
+              "y": 478629.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -154,
+              "afterDeltaMs": 40,
+              "jump": 0.0
+            }
+          },
+          {
+            "player": "染小九",
+            "targetID": 19,
+            "position": {
+              "hasPosition": true,
+              "x": -39362.7,
+              "y": 478736.08,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -617,
+              "afterDeltaMs": 679,
+              "jump": 620.08
+            }
+          },
+          {
+            "player": "Jokermeow",
+            "targetID": 25,
+            "position": {
+              "hasPosition": true,
+              "x": -36779.8,
+              "y": 479998.36,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -634,
+              "afterDeltaMs": 2144,
+              "jump": 767.97
+            }
+          },
+          {
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -38770.0,
+              "y": 478722.0,
+              "source": "resources_before",
+              "deltaMs": -816
+            }
+          },
+          {
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -37992.82,
+              "y": 480259.6,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -512,
+              "afterDeltaMs": 270,
+              "jump": 2897.3
+            }
+          },
+          {
+            "player": "Leviackerman",
+            "targetID": 28,
+            "position": {
+              "hasPosition": true,
+              "x": -38216.28,
+              "y": 479538.59,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1960,
+              "afterDeltaMs": 2787,
+              "jump": 2462.11
+            }
+          },
+          {
+            "player": "残夜将歇",
+            "targetID": 29,
+            "position": {
+              "hasPosition": true,
+              "x": -38121.71,
+              "y": 479318.41,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2731,
+              "afterDeltaMs": 6608,
+              "jump": 4647.0
+            }
+          },
+          {
+            "player": "八妖灵九琦舞",
+            "targetID": 41,
+            "position": {
+              "hasPosition": true,
+              "x": -38084.0,
+              "y": 477975.0,
+              "source": "resources_before",
+              "deltaMs": -3199
+            }
+          },
+          {
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -38773.67,
+              "y": 478908.99,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1439,
+              "afterDeltaMs": 576,
+              "jump": 1137.26
+            }
+          },
+          {
+            "player": "Superhunter",
+            "targetID": 82,
+            "position": {
+              "hasPosition": true,
+              "x": -37534.93,
+              "y": 480428.4,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -116,
+              "afterDeltaMs": 3770,
+              "jump": 237.84
+            }
+          },
+          {
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": true,
+              "x": -37479.0,
+              "y": 478151.0,
+              "source": "resources_before",
+              "deltaMs": -7952
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fightID": 30,
+      "kill": true,
+      "duration": "07:35.033",
+      "counts": {
+        "deaths": 2,
+        "casts": 10581,
+        "debuffs": 662,
+        "enemyDebuffs": 94,
+        "buffs": 4,
+        "damage": 997,
+        "resources": 13630,
+        "enemyResources": 6,
+        "phantomDamage": 1240
+      },
+      "phase": {
+        "p15Start": "02:21.792",
+        "silverHavocEventTime": null,
+        "p2Start": "02:59.792",
+        "scatterFadeFirst": "02:31.490",
+        "scatterFadeLast": "02:59.792",
+        "barrierApply": null,
+        "barrierRemove": null,
+        "radiationApply": "05:11.933",
+        "radiationRemove": "05:26.552",
+        "p2DurationUntilBarrier": "02:12.141",
+        "p2LastedFull140s": false
+      },
+      "p1": {
+        "voidRepulsion": [
+          {
+            "time": "00:18.973",
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -33639.42,
+              "y": 481545.41,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -522,
+              "afterDeltaMs": 582,
+              "jump": 364.17
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.988",
+            "player": "Superhunter",
+            "targetID": 82,
+            "position": {
+              "hasPosition": true,
+              "x": -33100.07,
+              "y": 481238.27,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -595,
+              "afterDeltaMs": 2681,
+              "jump": 979.29
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:18.989",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -31329.0,
+              "y": 479055.4,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -100,
+              "afterDeltaMs": 25,
+              "jump": 117.66
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.963",
+            "player": "Superhunter",
+            "targetID": 82,
+            "position": {
+              "hasPosition": true,
+              "x": -34495.52,
+              "y": 477678.7,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2781,
+              "afterDeltaMs": 3130,
+              "jump": 2196.02
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.963",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -32959.19,
+              "y": 475328.25,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -319,
+              "afterDeltaMs": 888,
+              "jump": 559.4
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.964",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "00:58.964",
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -33518.97,
+              "y": 475303.44,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1808,
+              "afterDeltaMs": 353,
+              "jump": 150.42
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.479",
+            "player": "三坑不二",
+            "targetID": 42,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.501",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -38845.72,
+              "y": 476601.59,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -289,
+              "afterDeltaMs": 1098,
+              "jump": 501.55
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:31.502",
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -41611.33,
+              "y": 479413.43,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -903,
+              "afterDeltaMs": 13,
+              "jump": 37.8
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.585",
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": true,
+              "x": -41468.43,
+              "y": 481238.58,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1092,
+              "afterDeltaMs": 1827,
+              "jump": 78.6
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.586",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -38815.48,
+              "y": 479943.16,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -580,
+              "afterDeltaMs": 258,
+              "jump": 126.59
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "01:58.586",
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -39899.0,
+              "y": 479333.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -18,
+              "afterDeltaMs": 39,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "silverArrows": [
+          {
+            "markTime": "00:19.969",
+            "expectedHitTime": "00:25.969",
+            "markedPlayers": [
+              "小树暖暖",
+              "花落冬阳"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "爱音",
+              "小树暖暖",
+              "花落冬阳"
+            ]
+          },
+          {
+            "markTime": "00:37.480",
+            "expectedHitTime": "00:43.480",
+            "markedPlayers": [
+              "Polonaise",
+              "Breezeluck"
+            ],
+            "bossHitTime": "00:43.486",
+            "bossHitTarget": "殆米阿尔",
+            "corruptionBeforeHit": 8,
+            "playerDamageTargets": [
+              "Breezeluck",
+              "Polonaise",
+              "Loveating"
+            ]
+          },
+          {
+            "markTime": "00:56.630",
+            "expectedHitTime": "01:02.630",
+            "markedPlayers": [
+              "三坑不二",
+              "染小九"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "三坑不二",
+              "Polonaise",
+              "染小九"
+            ]
+          },
+          {
+            "markTime": "01:15.778",
+            "expectedHitTime": "01:21.778",
+            "markedPlayers": [
+              "Leviackerman",
+              "小树暖暖"
+            ],
+            "bossHitTime": null,
+            "bossHitTarget": null,
+            "corruptionBeforeHit": null,
+            "playerDamageTargets": [
+              "Leviackerman",
+              "小树暖暖"
+            ]
+          },
+          {
+            "markTime": "01:33.322",
+            "expectedHitTime": "01:39.322",
+            "markedPlayers": [
+              "Loveating",
+              "叶问"
+            ],
+            "bossHitTime": "01:39.318",
+            "bossHitTarget": "殁里乌姆",
+            "corruptionBeforeHit": 18,
+            "playerDamageTargets": [
+              "叶问",
+              "Loveating"
+            ]
+          },
+          {
+            "markTime": "01:59.569",
+            "expectedHitTime": "02:05.569",
+            "markedPlayers": [
+              "小树暖暖",
+              "Oogi"
+            ],
+            "bossHitTime": "02:05.572",
+            "bossHitTarget": "龌勒卢斯",
+            "corruptionBeforeHit": 17,
+            "playerDamageTargets": [
+              "Oogi",
+              "小树暖暖"
+            ]
+          }
+        ]
+      },
+      "p15": {
+        "deaths": []
+      },
+      "p2": {
+        "rangerMarks": [
+          {
+            "index": 1,
+            "markStart": "03:26.427",
+            "markedPlayers": [
+              "Leviackerman",
+              "飞天小喷菇",
+              "Breezeluck",
+              "叮咚好烦"
+            ],
+            "fadeTimes": [
+              "03:32.453",
+              "03:32.723",
+              "03:34.434",
+              "03:34.753"
+            ],
+            "ricochetHits": 10,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "03:32.977",
+                "resourceChange": -5,
+                "resourceAfter": 31
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 2,
+            "markStart": "03:51.427",
+            "markedPlayers": [
+              "毛绒微醺爬爬",
+              "Jokermeow",
+              "Breezeluck",
+              "三坑不二"
+            ],
+            "fadeTimes": [
+              "03:57.435",
+              "03:57.741",
+              "03:59.450",
+              "03:59.740"
+            ],
+            "ricochetHits": 10,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "03:57.985",
+                "resourceChange": -5,
+                "resourceAfter": 49
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 3,
+            "markStart": "04:18.462",
+            "markedPlayers": [
+              "Loveating",
+              "爱音",
+              "Breezeluck",
+              "毛绒微醺爬爬"
+            ],
+            "fadeTimes": [
+              "04:24.468",
+              "04:24.780",
+              "04:26.502",
+              "04:26.781"
+            ],
+            "ricochetHits": 6,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "04:27.022",
+                "resourceChange": -5,
+                "resourceAfter": 70
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 4,
+            "markStart": "04:43.465",
+            "markedPlayers": [
+              "Leviackerman",
+              "染小九",
+              "毛绒微醺爬爬",
+              "Jokermeow"
+            ],
+            "fadeTimes": [
+              "04:49.463",
+              "04:49.769",
+              "04:51.501",
+              "04:51.782"
+            ],
+            "ricochetHits": 17,
+            "bossEnergyDrainCount": 1,
+            "bossEnergyDrains": [
+              {
+                "time": "04:52.025",
+                "resourceChange": -5,
+                "resourceAfter": 88
+              }
+            ],
+            "success": true
+          },
+          {
+            "index": 5,
+            "markStart": "05:10.478",
+            "markedPlayers": [
+              "叮咚好烦",
+              "八妖灵九琦舞"
+            ],
+            "fadeTimes": [
+              "05:11.405",
+              "05:13.423"
+            ],
+            "ricochetHits": 4,
+            "bossEnergyDrainCount": 0,
+            "bossEnergyDrains": [],
+            "success": false
+          }
+        ],
+        "voidRepulsion": [
+          {
+            "time": "03:27.426",
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -34520.96,
+              "y": 478262.32,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -712,
+              "afterDeltaMs": 1203,
+              "jump": 142.7
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:27.427",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:27.427",
+            "player": "茶喵不吃糖",
+            "targetID": 1,
+            "position": {
+              "hasPosition": true,
+              "x": -33518.0,
+              "y": 479016.0,
+              "source": "resources_before",
+              "deltaMs": -6578
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:27.428",
+            "player": "八妖灵九琦舞",
+            "targetID": 41,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:52.413",
+            "player": "残夜将歇",
+            "targetID": 29,
+            "position": {
+              "hasPosition": true,
+              "x": -36985.29,
+              "y": 482970.45,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1080,
+              "afterDeltaMs": 1171,
+              "jump": 1075.03
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:52.414",
+            "player": "三坑不二",
+            "targetID": 42,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:52.414",
+            "player": "染小九",
+            "targetID": 19,
+            "position": {
+              "hasPosition": true,
+              "x": -36295.1,
+              "y": 484072.49,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -540,
+              "afterDeltaMs": 3027,
+              "jump": 1521.55
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "03:52.415",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -35390.81,
+              "y": 484967.19,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -138,
+              "afterDeltaMs": 54,
+              "jump": 85.09
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:19.452",
+            "player": "残夜将歇",
+            "targetID": 29,
+            "position": {
+              "hasPosition": true,
+              "x": -39225.89,
+              "y": 483216.89,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2619,
+              "afterDeltaMs": 1058,
+              "jump": 1289.11
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:19.452",
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -37878.48,
+              "y": 484150.5,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1375,
+              "afterDeltaMs": 1428,
+              "jump": 712.97
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:19.453",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -38846.0,
+              "y": 484876.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1082,
+              "afterDeltaMs": 588,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:19.454",
+            "player": "染小九",
+            "targetID": 19,
+            "position": {
+              "hasPosition": true,
+              "x": -38723.5,
+              "y": 484142.77,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1550,
+              "afterDeltaMs": 2394,
+              "jump": 1333.33
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:44.459",
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": true,
+              "x": -41117.0,
+              "y": 478076.0,
+              "source": "resources_after",
+              "deltaMs": 6847
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:44.460",
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": true,
+              "x": -40669.98,
+              "y": 480561.8,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2948,
+              "afterDeltaMs": 3037,
+              "jump": 2932.72
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:44.460",
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -40579.0,
+              "y": 481372.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -82,
+              "afterDeltaMs": 323,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "04:44.482",
+            "player": "三坑不二",
+            "targetID": 42,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:11.405",
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -41680.57,
+              "y": 477980.66,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -99,
+              "afterDeltaMs": 190,
+              "jump": 137.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:11.405",
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -42316.0,
+              "y": 479375.0,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -116,
+              "afterDeltaMs": 378,
+              "jump": 0.0
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:11.405",
+            "player": "Leviackerman",
+            "targetID": 28,
+            "position": {
+              "hasPosition": true,
+              "x": -41295.0,
+              "y": 476289.0,
+              "source": "resources_before",
+              "deltaMs": -5266
+            },
+            "impactCountWithin1s": 0
+          },
+          {
+            "time": "05:11.405",
+            "player": "花落冬阳",
+            "targetID": 56,
+            "position": {
+              "hasPosition": false
+            },
+            "impactCountWithin1s": 0
+          }
+        ],
+        "phantomActorIDs": [
+          369
+        ],
+        "phantomSegments": [
+          {
+            "firstDamage": "03:38.087",
+            "lastDamage": "03:48.512",
+            "tickCount": 6,
+            "possibleEliminator": "Superhunter",
+            "voidGraspFadeTime": "03:49.210"
+          },
+          {
+            "firstDamage": "04:02.326",
+            "lastDamage": "04:15.939",
+            "tickCount": 8,
+            "possibleEliminator": "小楚唯",
+            "voidGraspFadeTime": "04:16.212"
+          },
+          {
+            "firstDamage": "04:29.046",
+            "lastDamage": "05:10.156",
+            "tickCount": 29,
+            "possibleEliminator": "Breezeluck",
+            "voidGraspFadeTime": "05:08.258"
+          }
+        ]
+      },
+      "p3": {
+        "portalCastTime": "05:42.541",
+        "portalCastTimes": [
+          "05:42.541",
+          "06:42.616"
+        ],
+        "portalPlayerPositions": [
+          {
+            "player": "Loveating",
+            "targetID": 2,
+            "position": {
+              "hasPosition": true,
+              "x": -38138.16,
+              "y": 479359.49,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1910,
+              "afterDeltaMs": 3201,
+              "jump": 3248.15
+            }
+          },
+          {
+            "player": "叮咚好烦",
+            "targetID": 3,
+            "position": {
+              "hasPosition": true,
+              "x": -38872.42,
+              "y": 478942.18,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1523,
+              "afterDeltaMs": 3457,
+              "jump": 4014.39
+            }
+          },
+          {
+            "player": "小树暖暖",
+            "targetID": 8,
+            "position": {
+              "hasPosition": true,
+              "x": -38214.36,
+              "y": 479142.66,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1946,
+              "afterDeltaMs": 1464,
+              "jump": 1304.7
+            }
+          },
+          {
+            "player": "飞天小喷菇",
+            "targetID": 9,
+            "position": {
+              "hasPosition": true,
+              "x": -39163.63,
+              "y": 477842.07,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -12,
+              "afterDeltaMs": 29,
+              "jump": 32.28
+            }
+          },
+          {
+            "player": "爱音",
+            "targetID": 12,
+            "position": {
+              "hasPosition": true,
+              "x": -38666.74,
+              "y": 477994.91,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -534,
+              "afterDeltaMs": 468,
+              "jump": 396.11
+            }
+          },
+          {
+            "player": "Breezeluck",
+            "targetID": 16,
+            "position": {
+              "hasPosition": true,
+              "x": -39057.95,
+              "y": 478217.87,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -61,
+              "afterDeltaMs": 3057,
+              "jump": 2902.39
+            }
+          },
+          {
+            "player": "染小九",
+            "targetID": 19,
+            "position": {
+              "hasPosition": true,
+              "x": -39112.74,
+              "y": 478335.67,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -800,
+              "afterDeltaMs": 47,
+              "jump": 295.99
+            }
+          },
+          {
+            "player": "Jokermeow",
+            "targetID": 25,
+            "position": {
+              "hasPosition": true,
+              "x": -37180.77,
+              "y": 478877.28,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -2291,
+              "afterDeltaMs": 3268,
+              "jump": 2139.76
+            }
+          },
+          {
+            "player": "小楚唯",
+            "targetID": 26,
+            "position": {
+              "hasPosition": true,
+              "x": -38916.59,
+              "y": 478491.91,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -342,
+              "afterDeltaMs": 3165,
+              "jump": 3349.85
+            }
+          },
+          {
+            "player": "Polonaise",
+            "targetID": 27,
+            "position": {
+              "hasPosition": true,
+              "x": -37980.28,
+              "y": 477723.58,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -140,
+              "afterDeltaMs": 788,
+              "jump": 50.93
+            }
+          },
+          {
+            "player": "Leviackerman",
+            "targetID": 28,
+            "position": {
+              "hasPosition": true,
+              "x": -37627.57,
+              "y": 479345.5,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -1946,
+              "afterDeltaMs": 892,
+              "jump": 2656.9
+            }
+          },
+          {
+            "player": "残夜将歇",
+            "targetID": 29,
+            "position": {
+              "hasPosition": true,
+              "x": -39106.51,
+              "y": 478088.05,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -926,
+              "afterDeltaMs": 89,
+              "jump": 131.55
+            }
+          },
+          {
+            "player": "Oogi",
+            "targetID": 48,
+            "position": {
+              "hasPosition": true,
+              "x": -38576.19,
+              "y": 478901.16,
+              "source": "resources_interpolated",
+              "beforeDeltaMs": -957,
+              "afterDeltaMs": 6950,
+              "jump": 2153.85
+            }
+          },
+          {
+            "player": "Superhunter",
+            "targetID": 82,
+            "position": {
+              "hasPosition": true,
+              "x": -38095.0,
+              "y": 478143.0,
+              "source": "resources_before",
+              "deltaMs": -2361
+            }
+          },
+          {
+            "player": "叶问",
+            "targetID": 83,
+            "position": {
+              "hasPosition": true,
+              "x": -37611.0,
+              "y": 477807.0,
+              "source": "resources_before",
+              "deltaMs": -7907
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
