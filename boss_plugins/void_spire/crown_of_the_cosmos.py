@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -68,6 +69,7 @@ SPELLS = {
     1233602: "银锋箭标记",
     1233649: "银锋箭",
     1233778: "回响黑暗",
+    1233819: "虚空斥力",
     1233787: "黑暗之手",
     1233789: "黑暗之手",
     1233826: "虚空斥力",
@@ -118,6 +120,8 @@ P3_LINE_FALLBACK_LEAD_MS = 55_000
 MYTHIC_RAID_SIZE = 20
 SILVER_ARROW_DAMAGE_ID = 1233649
 SILVER_ARROW_DAMAGE_WARN = 300_000
+VOID_REPULSION_DISTANCE_WARN = 2_500.0
+VOID_REPULSION_SPREAD_MULTIPLIER = 1.8
 
 PULL_DEATH_IDS = {1255378, 1235631, 1235553, 1243981, SILVER_ARROW_DAMAGE_ID, 1233826, 1260027, 1242553}
 SHADOW_AOE_IDS = {1261289, 1260019}
@@ -136,7 +140,10 @@ RAGE_STACK_ID = 1233778
 SHADOW_BINDING_IDS = {1233470, 1237844}
 CORRUPTION_ID = 1261531
 SILVER_ARROW_MARK_ID = 1233602
+SILVER_RESIDUE_ID = 1233689
 RANGER_MARK_ID = 1259861
+VOID_REPULSION_DEBUFF_ID = 1283236
+VOID_REPULSION_CAST_ID = 1233819
 VOID_GRASP_ID = 1260027
 COLLAPSING_VOID_ID = 1255378
 GRAVITY_COLLAPSE_DEBUFF_ID = 1255453
@@ -163,8 +170,11 @@ ACTOR_NAME_OVERRIDES = {
     "Alleria Windrunner": "奥蕾莉亚·风行者",
     "The Crown of the Cosmos": "宇宙之冕",
     "Mawrius": "殁里乌姆",
+    "Morium": "殁里乌姆",
     "Damiar": "殆米阿尔",
+    "Demiar": "殆米阿尔",
     "Voreluth": "龌勒卢斯",
+    "Vorelus": "龌勒卢斯",
 }
 
 
@@ -193,14 +203,26 @@ def get_token():
 
 def graphql(token, query, variables):
     headers = {"Authorization": f"Bearer {token}"}
-    res = requests.post(
-        f"{WCL_BASE_URL}/api/v2/client",
-        json={"query": query, "variables": variables},
-        headers=headers,
-        proxies=PROXIES,
-        verify=False,
-        timeout=90,
-    )
+    last_error = None
+    for attempt in range(1, 4):
+        try:
+            res = requests.post(
+                f"{WCL_BASE_URL}/api/v2/client",
+                json={"query": query, "variables": variables},
+                headers=headers,
+                proxies=PROXIES,
+                verify=False,
+                timeout=90,
+            )
+            break
+        except requests.RequestException as error:
+            last_error = error
+            if attempt >= 3:
+                raise
+            progress(f"WCL 请求失败，{attempt}/3，稍后重试：{error}", 2)
+            time.sleep(2 * attempt)
+    else:
+        raise last_error
     res.raise_for_status()
     payload = res.json()
     if payload.get("errors"):
@@ -272,14 +294,18 @@ def fetch_actor_maps(token, report_id):
     return actor_map, actor_type
 
 
-def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None):
+def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None, hostility_type=None, include_resources=False):
     ability_arg = ", $abilityID: Float" if ability_id is not None else ""
     ability_filter = ", abilityID: $abilityID" if ability_id is not None else ""
+    hostility_arg = ", $hostilityType: HostilityType" if hostility_type else ""
+    hostility_filter = ", hostilityType: $hostilityType" if hostility_type else ""
+    resources_arg = ", $includeResources: Boolean" if include_resources else ""
+    resources_filter = ", includeResources: $includeResources" if include_resources else ""
     query = f"""
-    query($code: String!, $dataType: EventDataType!, $startTime: Float!, $endTime: Float!, $fightIDs: [Int]{ability_arg}) {{
+    query($code: String!, $dataType: EventDataType!, $startTime: Float!, $endTime: Float!, $fightIDs: [Int]{ability_arg}{hostility_arg}{resources_arg}) {{
       reportData {{
         report(code: $code) {{
-          events(dataType: $dataType, startTime: $startTime, endTime: $endTime, fightIDs: $fightIDs, limit: 10000{ability_filter}) {{
+          events(dataType: $dataType, startTime: $startTime, endTime: $endTime, fightIDs: $fightIDs, limit: 10000{ability_filter}{hostility_filter}{resources_filter}) {{
             data
             nextPageTimestamp
           }}
@@ -296,15 +322,19 @@ def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_ti
     }
     if ability_id is not None:
         variables["abilityID"] = float(ability_id)
+    if hostility_type:
+        variables["hostilityType"] = hostility_type
+    if include_resources:
+        variables["includeResources"] = True
     return graphql(token, query, variables)["events"]
 
 
-def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None):
+def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None, hostility_type=None, include_resources=False):
     rows = []
     current_start = start_time if start_time is not None else fight["startTime"]
     final_end = end_time if end_time is not None else fight["endTime"]
     while current_start < final_end:
-        page = fetch_event_page(token, report_id, data_type, fight, current_start, final_end, ability_id)
+        page = fetch_event_page(token, report_id, data_type, fight, current_start, final_end, ability_id, hostility_type, include_resources)
         rows.extend(page.get("data") or [])
         next_page = page.get("nextPageTimestamp")
         if not next_page or next_page <= current_start:
@@ -313,12 +343,12 @@ def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_ti
     return rows
 
 
-def fetch_spell_events(token, report_id, fight, data_type, spell_ids, label):
+def fetch_spell_events(token, report_id, fight, data_type, spell_ids, label, hostility_type=None, include_resources=False):
     rows = []
     spell_ids = sorted(spell_ids)
     for index, spell_id in enumerate(spell_ids, start=1):
         progress(f"{label} {index}/{len(spell_ids)}：{SPELLS.get(spell_id, spell_id)} ({spell_id})", 2)
-        spell_rows = fetch_events_all(token, report_id, data_type, fight, ability_id=spell_id)
+        spell_rows = fetch_events_all(token, report_id, data_type, fight, ability_id=spell_id, hostility_type=hostility_type, include_resources=include_resources)
         rows.extend(spell_rows)
         if spell_rows:
             progress(f"{SPELLS.get(spell_id, spell_id)}：{len(spell_rows)} 条", 2)
@@ -407,12 +437,20 @@ def deep_link(report_id, fight_id, view_type, event_time, before_ms=15_000, afte
     )
 
 
+def fight_type_link(report_id, fight_id, view_type):
+    return f"{WCL_BASE_URL}/reports/{report_id}?fight={fight_id}&type={view_type}"
+
+
+def deaths_link(report_id, fight_id):
+    return fight_type_link(report_id, fight_id, "deaths")
+
+
 def replay_link(report_id, fight_id, position_ms):
     return f"{WCL_BASE_URL}/reports/{report_id}?fight={fight_id}&view=replay&position={max(0, int(position_ms))}"
 
 
 def event_is_apply(event):
-    return str(event.get("type", "")).lower() in {"applybuff", "applydebuff", "refreshbuff", "refreshdebuff"}
+    return str(event.get("type", "")).lower() in {"applybuff", "applydebuff", "applybuffstack", "applydebuffstack", "refreshbuff", "refreshdebuff"}
 
 
 def event_is_remove(event):
@@ -745,21 +783,21 @@ def detail_spell_plan(classification, deaths):
     cast_ids = set()
 
     if classification["phase"] == "P1" or key in {"p1_add_rage", "p1_team_collapse"}:
-        debuff_ids |= {CORRUPTION_ID, SILVER_ARROW_MARK_ID, VOID_GRASP_ID}
-        buff_ids |= SHADOW_BINDING_IDS | {RAGE_STACK_ID}
-        damage_ids |= {1233649, 1255378, 1281707}
+        debuff_ids |= SHADOW_BINDING_IDS | {CORRUPTION_ID, SILVER_ARROW_MARK_ID, VOID_GRASP_ID, SILVER_RESIDUE_ID, VOID_REPULSION_DEBUFF_ID}
+        buff_ids |= SHADOW_BINDING_IDS | {RAGE_STACK_ID, SILVER_RESIDUE_ID}
+        damage_ids |= {1233649, 1255378, 1281707, VOID_REPULSION_DEBUFF_ID, 1242553}
 
     if key in {"p15_pull_deaths", "p15_team_collapse"}:
         damage_ids |= P15_AVOIDABLE_IDS | {1234570, 1255378}
 
     if classification["phase"] in {"P2", "P2.5"} or key.startswith("p2"):
-        debuff_ids |= {VOID_GRASP_ID, RANGER_MARK_ID}
-        damage_ids |= {COLLAPSING_VOID_ID}
+        debuff_ids |= {VOID_GRASP_ID, RANGER_MARK_ID, VOID_REPULSION_DEBUFF_ID}
+        damage_ids |= {COLLAPSING_VOID_ID, VOID_REPULSION_DEBUFF_ID, 1242553}
         buff_ids |= {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID}
 
     if classification["phase"] == "P3" or key.startswith("p3"):
-        debuff_ids |= {VOID_GRASP_ID, GRAVITY_COLLAPSE_DEBUFF_ID, TERMINAL_GUARD_DEBUFF_ID, RANGER_MARK_ID}
-        damage_ids |= {COLLAPSING_VOID_ID, P3_LINE_DEATH_ID, COSMIC_RADIATION_DAMAGE_ID, COSMIC_DEVOUR_ID}
+        debuff_ids |= {VOID_GRASP_ID, GRAVITY_COLLAPSE_DEBUFF_ID, TERMINAL_GUARD_DEBUFF_ID, RANGER_MARK_ID, VOID_REPULSION_DEBUFF_ID}
+        damage_ids |= {COLLAPSING_VOID_ID, P3_LINE_DEATH_ID, COSMIC_RADIATION_DAMAGE_ID, COSMIC_DEVOUR_ID, VOID_REPULSION_DEBUFF_ID, 1242553}
         buff_ids |= ENRAGE_IDS | {COSMIC_RADIATION_BUFF_ID}
         cast_ids |= {PORTAL_CAST_ID}
 
@@ -779,6 +817,9 @@ def detail_spell_plan(classification, deaths):
     if any(death.get("killingAbilityGameID") in TANK_DEATH_IDS for death in deaths[:3]):
         damage_ids |= P1_TANK_IDS | P2_TANK_IDS | P3_TANK_IDS
         buff_ids.add(RAGE_STACK_ID)
+
+    if VOID_REPULSION_DEBUFF_ID in debuff_ids:
+        cast_ids.add(VOID_REPULSION_CAST_ID)
 
     return {
         "damage": damage_ids,
@@ -877,16 +918,16 @@ def is_marked_by_arrow(target_id, mark_cluster):
 def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
     mark_clusters = silver_arrow_mark_clusters(fight, actor_map, debuffs, markers)
     binding_removes = [
-        event for event in buffs
+        event for event in buffs + debuffs
         if ability_id(event) in SHADOW_BINDING_IDS and event_is_remove(event)
+    ]
+    residue_applies = [
+        event for event in buffs + debuffs
+        if ability_id(event) == SILVER_RESIDUE_ID and event_is_apply(event)
     ]
     corruption_removes = [
         event for event in debuffs
         if ability_id(event) == CORRUPTION_ID and event_is_remove(event)
-    ]
-    silver_arrow_hits = [
-        event for event in damage_events
-        if ability_id(event) == 1233649
     ]
     issues = []
     rows = []
@@ -899,7 +940,7 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
         if not mark_cluster or abs(mark_cluster["start"] - expected_timestamp) > 8_000:
             continue
         window_start = mark_cluster["start"] - 1_000
-        window_end = mark_cluster["start"] + 9_000
+        window_end = mark_cluster["start"] + 12_000
         binding_hits = [
             event for event in binding_removes
             if window_start <= event.get("timestamp", 0) <= window_end
@@ -922,13 +963,24 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
             and is_boss_binding_target(actor_map, event)
             and not event_hits_expected_target(actor_map, event, expected)
         ]
-        arrow_hits = [
-            event for event in silver_arrow_hits
+        residue_hits = [
+            event for event in residue_applies
             if window_start <= event.get("timestamp", 0) <= window_end
             and event_hits_expected_target(actor_map, event, expected)
-            and (not mark_cluster or event.get("sourceID") in {player["id"] for player in mark_cluster.get("players", [])})
         ]
-        wrong_target_hit = (wrong_binding_hits or wrong_corruption_hits)
+        wrong_residue_hits = [
+            event for event in residue_applies
+            if window_start <= event.get("timestamp", 0) <= window_end
+            and is_boss_binding_target(actor_map, event)
+            and not event_hits_expected_target(actor_map, event, expected)
+        ]
+        arrow_hits = [
+            event for event in damage_events
+            if ability_id(event) == SILVER_ARROW_DAMAGE_ID
+            and window_start <= event.get("timestamp", 0) <= window_end
+            and event_hits_expected_target(actor_map, event, expected)
+        ]
+        wrong_target_hit = (wrong_binding_hits or wrong_residue_hits or wrong_corruption_hits)
         if wrong_target_hit:
             wrong = wrong_target_hit[0]
             issues.append({
@@ -941,17 +993,30 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
                 "text": f"预期银锋箭应命中 {expected_arrow_target(expected)}，但本轮清除了 {event_target_name(actor_map, wrong)} 的幽影束缚，本轮银锋箭点名为 {arrow_mark_names(mark_cluster)}。",
             })
             continue
-        if not binding_hits and not corruption_hits and not arrow_hits:
-            issues.append({
-                "time": format_time(expected),
-                "positionMs": expected,
-                "type": "missing_expected_arrow",
-                "expectedTarget": expected_arrow_target(expected),
+        if not binding_hits and not residue_hits:
+            if corruption_hits or arrow_hits:
+                rows.append({
+                    "time": format_time(expected),
+                    "kind": "arrow_damage_only",
+                    "target": expected_arrow_target(expected),
+                    "expectedTime": format_time(expected),
+                    "markedPlayers": mark_cluster.get("players", []) if mark_cluster else [],
+                    "text": f"{format_time(expected)} 只识别到银锋箭/腐化精华相关记录，未识别到 {expected_arrow_target(expected)} 的幽影束缚移除；本轮点名为 {arrow_mark_names(mark_cluster)}。",
+                })
+            continue
+        hit = binding_hits[0] if binding_hits else residue_hits[0]
+        evidence_label = "幽影束缚移除" if binding_hits else "银色残渣获得"
+        if not binding_hits:
+            rows.append({
+                "time": format_time(fight_elapsed(hit, fight)),
+                "kind": "silver_residue",
+                "target": event_target_name(actor_map, hit),
+                "expectedTime": format_time(expected),
                 "markedPlayers": mark_cluster.get("players", []) if mark_cluster else [],
-                "text": f"预期银锋箭未命中 {expected_arrow_target(expected)}，本轮银锋箭点名为 {arrow_mark_names(mark_cluster)}。",
+                "text": f"{event_target_name(actor_map, hit)} 通过银色残渣获得记录判定本轮已处理，本轮点名为 {arrow_mark_names(mark_cluster)}。",
             })
             continue
-        hit = binding_hits[0] if binding_hits else (corruption_hits[0] if corruption_hits else arrow_hits[0])
+        hit = binding_hits[0]
         target = event_target_name(actor_map, hit)
         nearby_corruption = [
             event for event in corruption_removes
@@ -961,11 +1026,12 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
         stack = max((int(event.get("stack") or event.get("stacks") or 0) for event in nearby_corruption), default=0)
         rows.append({
             "time": format_time(fight_elapsed(hit, fight)),
+            "kind": "binding_removed",
             "target": target,
             "stack": stack,
             "expectedTime": format_time(expected),
             "markedPlayers": mark_cluster.get("players", []) if mark_cluster else [],
-            "text": f"{target} 银锋箭判定成功，本轮点名为 {arrow_mark_names(mark_cluster)}，腐化精华约 {stack} 层",
+            "text": f"{target} 银锋箭判定成功：{evidence_label}，本轮点名为 {arrow_mark_names(mark_cluster)}，腐化精华约 {stack} 层",
         })
     for hit in binding_removes:
         elapsed = fight_elapsed(hit, fight)
@@ -1390,6 +1456,220 @@ def silver_arrow_damage_for_death(death, damage_events):
     return max(candidates, key=lambda event: event_amount(event))
 
 
+def event_point(event, prefix=""):
+    for key in (f"{prefix}position", f"{prefix}Position", f"{prefix}location", f"{prefix}Location"):
+        value = event.get(key)
+        if isinstance(value, dict):
+            try:
+                return float(value.get("x") or value.get("X")), float(value.get("y") or value.get("Y"))
+            except (TypeError, ValueError):
+                continue
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            try:
+                return float(value[0]), float(value[1])
+            except (TypeError, ValueError):
+                continue
+    pairs = [
+        (f"{prefix}x", f"{prefix}y"),
+        (f"{prefix}X", f"{prefix}Y"),
+        (f"{prefix}positionX", f"{prefix}positionY"),
+        (f"{prefix}PositionX", f"{prefix}PositionY"),
+    ]
+    for x_key, y_key in pairs:
+        if x_key not in event or y_key not in event:
+            continue
+        try:
+            return float(event[x_key]), float(event[y_key])
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def point_distance(a, b):
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+
+
+def coordinate_distance_yards(distance):
+    return distance / 100
+
+
+def nearest_actor_position(timestamp, target_id, resource_events, window_ms=8_000):
+    candidates = [
+        event for event in resource_events
+        if (event.get("targetID") == target_id or event.get("sourceID") == target_id)
+        and event_point(event)
+        and abs(event.get("timestamp", 0) - timestamp) <= window_ms
+    ]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda event: abs(event.get("timestamp", 0) - timestamp))
+
+
+def first_actor_position(actor_ids, resource_events, fight, window_ms=30_000):
+    actor_ids = {actor_id for actor_id in actor_ids if actor_id is not None}
+    if not actor_ids:
+        return None
+    candidates = [
+        event for event in resource_events
+        if (event.get("targetID") in actor_ids or event.get("sourceID") in actor_ids)
+        and event_point(event)
+    ]
+    if not candidates:
+        return None
+    early = [
+        event for event in candidates
+        if fight["startTime"] <= event.get("timestamp", 0) <= fight["startTime"] + window_ms
+    ]
+    return min(early or candidates, key=lambda event: abs(event.get("timestamp", 0) - fight["startTime"]))
+
+
+def nearest_void_repulsion_cast(timestamp, casts):
+    casts = [
+        event for event in casts
+        if ability_id(event) == VOID_REPULSION_CAST_ID
+    ]
+    if not casts:
+        return None
+    candidates = [
+        event for event in casts
+        if -2_000 <= timestamp - event.get("timestamp", 0) <= 12_000
+    ]
+    return min(candidates or casts, key=lambda event: abs(timestamp - event.get("timestamp", 0)))
+
+
+def void_repulsion_cast_index(cast_event, casts):
+    if not cast_event:
+        return None
+    cast_timestamps = sorted({
+        event.get("timestamp", 0)
+        for event in casts
+        if ability_id(event) == VOID_REPULSION_CAST_ID
+    })
+    try:
+        return cast_timestamps.index(cast_event.get("timestamp", 0)) + 1
+    except ValueError:
+        return None
+
+
+def build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_events=None, casts=None):
+    resource_events = resource_events or []
+    casts = casts or []
+    events = [
+        event for event in debuffs
+        if ability_id(event) == VOID_REPULSION_DEBUFF_ID
+    ]
+    active = {}
+    records = []
+    for event in sorted(events, key=lambda item: item.get("timestamp", 0)):
+        target_id = event.get("targetID")
+        if event_is_apply(event):
+            active[target_id] = event
+            continue
+        if not event_is_remove(event):
+            continue
+        apply_event = active.pop(target_id, None)
+        position_event = nearest_actor_position(event.get("timestamp", 0), target_id, resource_events)
+        source_position_event = nearest_actor_position(event.get("timestamp", 0), event.get("sourceID"), resource_events, 5_000)
+        cast_event = nearest_void_repulsion_cast((apply_event or event).get("timestamp", 0), casts)
+        point = (
+            event_point(event, "target") or event_point(event)
+            or event_point(apply_event or {}, "target") or event_point(apply_event or {})
+            or event_point(position_event or {})
+        )
+        source_point = (
+            event_point(event, "source") or event_point(apply_event or {}, "source")
+            or event_point(source_position_event or {})
+        )
+        drop_timestamp = event.get("timestamp", 0)
+        record = {
+            "time": format_time(drop_timestamp - fight["startTime"]),
+            "positionMs": int(drop_timestamp - fight["startTime"]),
+            "phase": phase_at(drop_timestamp, markers, fight),
+            "player": actor(actor_map, event.get("targetID")),
+            "targetID": target_id,
+            "hasPosition": bool(point),
+            "x": round(point[0], 2) if point else None,
+            "y": round(point[1], 2) if point else None,
+            "_point": point,
+            "_sourcePoint": source_point,
+        }
+        if position_event:
+            record["positionSourceTime"] = format_time(position_event.get("timestamp", 0) - fight["startTime"])
+            record["positionSourceDeltaMs"] = int(position_event.get("timestamp", 0) - drop_timestamp)
+        if source_position_event:
+            record["sourcePositionTime"] = format_time(source_position_event.get("timestamp", 0) - fight["startTime"])
+        if cast_event:
+            record["castTime"] = format_time(cast_event.get("timestamp", 0) - fight["startTime"])
+            record["castPositionMs"] = int(cast_event.get("timestamp", 0) - fight["startTime"])
+            record["castIndex"] = void_repulsion_cast_index(cast_event, casts)
+        if apply_event:
+            record["markTime"] = format_time(apply_event.get("timestamp", 0) - fight["startTime"])
+            record["markPositionMs"] = int(apply_event.get("timestamp", 0) - fight["startTime"])
+        records.append(record)
+
+    return records
+
+
+def clean_void_repulsion_record(record):
+    return {
+        key: value for key, value in record.items()
+        if not key.startswith("_")
+    }
+
+
+def analyze_void_repulsion_placement(fight, actor_map, debuffs, markers, resource_events=None, casts=None):
+    records = build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_events, casts)
+    if not records:
+        return [], []
+
+    clean_records = [clean_void_repulsion_record(record) for record in records]
+    drops_with_position = [record for record in records if record.get("_point")]
+    if not drops_with_position:
+        return [], clean_records
+
+    boss_ids = {
+        event.get("sourceID")
+        for event in debuffs
+        if ability_id(event) == VOID_REPULSION_DEBUFF_ID
+    }
+    boss_center_event = first_actor_position(boss_ids, resource_events or [], fight)
+    boss_center = event_point(boss_center_event or {}) or next((record.get("_sourcePoint") for record in drops_with_position if record.get("_sourcePoint")), None)
+    rows = []
+    for phase in ["P1", "P1.5", "P2", "P2.5", "P3"]:
+        phase_records = [record for record in drops_with_position if record.get("phase") == phase]
+        if len(phase_records) < 2:
+            continue
+        center_candidates = [boss_center] if boss_center else [record["_point"] for record in phase_records]
+        center = (
+            sum(point[0] for point in center_candidates) / len(center_candidates),
+            sum(point[1] for point in center_candidates) / len(center_candidates),
+        )
+        distances = [point_distance(record["_point"], center) for record in phase_records]
+        average_distance = sum(distances) / len(distances)
+        max_distance = max(distances)
+        warn_distance = max(VOID_REPULSION_DISTANCE_WARN, average_distance * VOID_REPULSION_SPREAD_MULTIPLIER)
+        outliers = [
+            record for record, distance in zip(phase_records, distances)
+            if distance > warn_distance
+        ]
+        for record, distance in zip(phase_records, distances):
+            record["distanceFromCenter"] = round(coordinate_distance_yards(distance), 1)
+            record["distanceFromCenterRaw"] = round(distance, 1)
+            record["status"] = "偏散" if record in outliers else "正常"
+        if not outliers:
+            continue
+        names = "、".join(record["player"] for record in outliers[:5])
+        rows.append({
+            "time": phase_records[0]["time"],
+            "phase": phase,
+            "type": "void_repulsion_scattered",
+            "severity": "warning",
+            "details": [clean_void_repulsion_record(record) for record in phase_records],
+            "text": f"{phase} 虚空斥力放水位置疑似偏散：本阶段识别 {len(phase_records)} 次，最大偏离约 {coordinate_distance_yards(max_distance):.1f} 码，异常玩家：{names}。",
+        })
+    return rows, [clean_void_repulsion_record(record) for record in records]
+
+
 def first_combat_initiator(initial_events, actor_map, actor_type):
     candidates = []
     for event in initial_events:
@@ -1418,6 +1698,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     detail_debuffs = payload["detailDebuffs"]
     detail_buffs = payload["detailBuffs"]
     detail_casts = payload["detailCasts"]
+    position_events = (payload.get("positionEvents") or []) + [event for event in detail_damage if event_point(event)]
     player_roles = payload.get("playerRoles") or {}
     initial_events = payload.get("initialEvents") or []
 
@@ -1442,16 +1723,10 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 ability = "跳楼失误"
         if death.get("killingAbilityGameID") == SILVER_ARROW_DAMAGE_ID:
             mark_cluster = nearest_arrow_mark_cluster(arrow_mark_clusters, death.get("timestamp", 0))
-            damage_event = silver_arrow_damage_for_death(death, detail_damage)
-            amount = event_amount(damage_event) if damage_event else 0
-            amount_text = f"{amount:,}" if amount else "未知"
             if is_marked_by_arrow(death.get("targetID"), mark_cluster):
-                if amount > SILVER_ARROW_DAMAGE_WARN:
-                    ability = f"银锋箭（点名死亡，伤害 {amount_text}，疑似未开减伤）"
-                else:
-                    ability = f"银锋箭（点名死亡，伤害 {amount_text}）"
+                ability = "银锋箭（伤害）"
             else:
-                ability = f"银锋箭（误伤，本轮点名：{arrow_mark_names_with_ids(mark_cluster)}）"
+                ability = "银锋箭（误伤）"
         death_timeline.append({
             "time": format_time(fight_elapsed(death, fight)),
             "absoluteTime": death.get("timestamp"),
@@ -1470,7 +1745,9 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         shadow_misses = []
         energy_misses = []
         gravity_rows = []
-        p3_ranger_mark_rows = []
+        p2_ranger_mark_rows = []
+        void_repulsion_rows = []
+        void_repulsion_records = []
     else:
         if phase == "P1":
             p1_arrow_rows, p1_arrow_issues = analyze_p1_arrows(fight, actor_map, detail_buffs, detail_debuffs, detail_damage, markers)
@@ -1480,7 +1757,8 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         shadow_misses = analyze_p2_shadow_misses(fight, actor_map, detail_damage, detail_debuffs, markers)
         energy_misses = analyze_p2_energy(markers, fight, detail_debuffs)
         gravity_rows = analyze_gravity_attribution(fight, actor_map, deaths, detail_debuffs)
-        p3_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P3"), actor_map, "P3")
+        p2_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P2"), actor_map, "P2")
+        void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts)
 
     wipe_reason = classification["label"]
     wcl_link = ""
@@ -1540,14 +1818,14 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         elif reason_key == "p3_add_enrage":
             portal_cast = min((event for event in detail_casts if ability_id(event) == PORTAL_CAST_ID), key=lambda item: item.get("timestamp", 0), default=None)
             investigation = "P3 发现大怪或裂隙幻影获得狂暴，判定为大怪狂暴。"
-            wcl_link = replay_link(report_id, fight["id"], fight_elapsed(portal_cast, fight) - 3_000) if portal_cast else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else (replay_link(report_id, fight["id"], fight_elapsed(portal_cast, fight) - 3_000) if portal_cast else "")
         elif reason_key == "p3_line_aoe":
             investigation = gravity_rows[0]["text"] if gravity_rows else "P3 低减员状态下重力坍缩造成多人同秒死亡，判定为拉线 AoE 崩溃。"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 15_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "p3_boss_enrage":
-            ranger_text = f" P3 银锋弹射检查：{'; '.join(row['text'] for row in p3_ranger_mark_rows[:4])}。" if p3_ranger_mark_rows else " P3 未识别到游侠队长印记消失记录。"
+            ranger_text = f" P2 消能异常：{'; '.join(row['text'] for row in energy_misses[:4])}。" if energy_misses else " 请同步检查 P2 游侠队长印记连线是否按时消到 Boss 能量。"
             investigation = f"玩家陆续死于噬灭宇宙，判定为奥蕾莉亚狂暴；请同步检查 P2 是否提前结束。{ranger_text}"
-            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
+            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key == "tank_death":
             investigation = "最早 3 个死亡中出现坦克相关死亡，判定为倒坦。"
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
@@ -1557,10 +1835,11 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     trial_records = []
     if not is_kill and phase == "P1" and (p1_arrow_rows or p1_arrow_issues):
+        binding_remove_count = sum(1 for row in p1_arrow_rows if row.get("kind") == "binding_removed")
         trial_records.append({
             "type": "p1_arrows",
             "title": "P1 银锋箭 / 腐化精华",
-            "summary": f"{len(p1_arrow_rows)} 次幽影束缚移除，{len(p1_arrow_issues)} 个异常",
+            "summary": f"{binding_remove_count} 次幽影束缚移除，{len(p1_arrow_issues)} 个异常",
             "rows": p1_arrow_rows + p1_arrow_issues,
         })
     if collapsing_deaths:
@@ -1591,12 +1870,12 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "summary": f"{len(gravity_rows)} 次多人死亡",
             "rows": gravity_rows,
         })
-    if reason_key == "p3_boss_enrage" and p3_ranger_mark_rows:
+    if void_repulsion_rows:
         trial_records.append({
-            "type": "p3_ranger_marks",
-            "title": "P3 银锋弹射检查",
-            "summary": f"{len(p3_ranger_mark_rows)} 组",
-            "rows": p3_ranger_mark_rows,
+            "type": "void_repulsion_placement",
+            "title": "虚空斥力放水位置",
+            "summary": f"{len(void_repulsion_rows)} 条位置结论",
+            "rows": void_repulsion_rows,
         })
 
     local_board = {
@@ -1662,7 +1941,9 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "missedShadows": shadow_misses,
             "missedEnergy": energy_misses,
             "gravityRows": gravity_rows,
-            "p3RangerMarkRows": p3_ranger_mark_rows,
+            "p2RangerMarkRows": p2_ranger_mark_rows,
+            "voidRepulsionPlacement": void_repulsion_rows,
+            "voidRepulsionRecords": void_repulsion_records,
         },
     }
 
@@ -1681,10 +1962,44 @@ def fetch_fight_payload(token, report_id, fight):
     progress(f"死亡归因初判：{classification['phase']} / {classification['label']}", 2)
 
     plan = detail_spell_plan(classification, deaths)
-    detail_damage = fetch_spell_events(token, report_id, fight, "DamageTaken", plan["damage"], "读取明细伤害")
+    needs_positions = VOID_REPULSION_DEBUFF_ID in plan["debuffs"]
+    detail_damage = fetch_spell_events(
+        token,
+        report_id,
+        fight,
+        "DamageTaken",
+        plan["damage"],
+        "读取明细伤害",
+        include_resources=needs_positions,
+    )
     detail_debuffs = debuffs + fetch_spell_events(token, report_id, fight, "Debuffs", plan["debuffs"], "读取明细 Debuff")
     detail_buffs = buffs + fetch_spell_events(token, report_id, fight, "Buffs", plan["buffs"], "读取明细 Buff")
+    if SHADOW_BINDING_IDS & plan["debuffs"] or SILVER_RESIDUE_ID in plan["debuffs"] or CORRUPTION_ID in plan["debuffs"]:
+        detail_debuffs += fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "Debuffs",
+            SHADOW_BINDING_IDS | {SILVER_RESIDUE_ID, CORRUPTION_ID},
+            "读取敌方明细 Debuff",
+            hostility_type="Enemies",
+        )
+    if SHADOW_BINDING_IDS & plan["buffs"] or SILVER_RESIDUE_ID in plan["buffs"]:
+        detail_buffs += fetch_spell_events(
+            token,
+            report_id,
+            fight,
+            "Buffs",
+            SHADOW_BINDING_IDS | {SILVER_RESIDUE_ID},
+            "读取敌方明细 Buff",
+            hostility_type="Enemies",
+        )
     detail_casts = casts + fetch_spell_events(token, report_id, fight, "Casts", plan["casts"], "读取明细读条")
+    position_events = []
+    if VOID_REPULSION_DEBUFF_ID in plan["debuffs"]:
+        progress("读取坐标资源事件", 2)
+        position_events = fetch_events_all(token, report_id, "Resources", fight, include_resources=True)
+        progress(f"坐标资源事件：{len(position_events)} 条", 2)
     combatant_info = fetch_combatant_info(token, report_id, fight)
     initial_events = fetch_initial_combat_events(token, report_id, fight) if classification["key"] == "phase_abandon" else []
     return {
@@ -1695,6 +2010,7 @@ def fetch_fight_payload(token, report_id, fight):
         "detailDebuffs": detail_debuffs,
         "detailBuffs": detail_buffs,
         "detailCasts": detail_casts,
+        "positionEvents": position_events,
         "playerRoles": build_player_roles(combatant_info),
         "initialEvents": initial_events,
     }
@@ -1713,7 +2029,7 @@ def build_aggregated_json(report_ids):
         "code": 200,
         "meta": {
             "analyzedReports": report_id_list,
-            "mechanicVersion": "crown-of-the-cosmos-2026-07-01",
+            "mechanicVersion": "crown-of-the-cosmos-2026-07-06",
             "version": "12.0",
             "raidKey": "void_spire",
             "raidName": "虚影尖塔",

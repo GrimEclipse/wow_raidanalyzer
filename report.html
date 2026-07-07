@@ -90,7 +90,12 @@
                                         <div class="text-xs text-gray-400 font-mono">{{ fight.reportID.slice(0,8) }} / Fight {{ fight.fightID }}</div>
                                         <div class="text-xs text-gray-500 mt-1">开始：{{ fight.startDateTime || fight.date || '-' }} · 时长：{{ fight.duration }}</div>
                                     </div>
-                                    <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200 whitespace-nowrap">查看 WCL</a>
+                                    <div class="flex flex-col items-end gap-1">
+                                        <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200 whitespace-nowrap">查看 WCL</a>
+                                        <button v-if="hasVoidRepulsionMap(fight)" @click="openVoidRepulsionDialog(fight)" class="text-xs px-2 py-0.5 rounded border border-purple-700 bg-purple-950/70 text-purple-100 hover:bg-purple-900 whitespace-nowrap">
+                                            查看场地图
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="p-4">
                                     <div v-if="fight.investigation" class="mb-4 p-3 bg-gray-950 rounded border border-gray-800 text-sm leading-6" v-html="highlightCulprit(fight.investigation)"></div>
@@ -152,6 +157,13 @@
                                                         <template v-else-if="record.type === 'combat_res'">
                                                             <span class="font-mono text-gray-500">{{ row.time }}</span>
                                                             <span class="text-gray-300 ml-1">{{ row.text }}</span>
+                                                        </template>
+                                                        <template v-else-if="record.type === 'void_repulsion_placement'">
+                                                            <span v-if="row.time" class="font-mono text-gray-500">{{ row.time }}</span>
+                                                            <span class="text-gray-300 ml-1">{{ row.text }}</span>
+                                                            <button v-if="row.details && row.details.length" @click="openVoidRepulsionDialog(fight, row)" class="ml-2 px-2 py-0.5 rounded border border-sky-700 bg-sky-950/70 text-sky-200 hover:bg-sky-900">
+                                                                查看场地图
+                                                            </button>
                                                         </template>
                                                         <template v-else-if="record.type === 'dispel_issue'">
                                                             <div class="space-y-1">
@@ -386,6 +398,114 @@
             </div>
         </section>
     </main>
+
+    <div v-if="voidRepulsionDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+        <div class="w-full max-w-7xl bg-gray-950 border border-gray-700 rounded-lg shadow-2xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-800 flex items-start justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-purple-100">虚空斥力场地图</h2>
+                    <div class="text-xs text-gray-500 mt-1">
+                        {{ voidRepulsionDialog.fight.reportID?.slice(0, 8) }} / Fight {{ voidRepulsionDialog.fight.fightID }}
+                        <span class="mx-1">·</span>{{ voidRepulsionDialog.selectedPhase || '-' }}
+                        <span class="mx-1">·</span>{{ activeVoidMapDrops().length }} 个放水点
+                    </div>
+                </div>
+                <button @click="closeVoidRepulsionDialog" class="px-2 py-1 rounded border border-gray-700 text-gray-300 hover:bg-gray-800">关闭</button>
+            </div>
+            <div class="p-4 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-4">
+                <div class="space-y-3">
+                    <div class="relative overflow-hidden rounded border border-gray-800 bg-black aspect-[873/794]"
+                         :style="{ backgroundImage: `url(${voidArenaConfig.image})`, backgroundSize: '100% 100%', backgroundPosition: 'center' }">
+                        <div class="absolute rounded-full border border-cyan-200 bg-cyan-300 shadow shadow-cyan-300/60"
+                             :style="voidCenterStyle()"></div>
+                        <template v-for="drop in activeVoidMapDrops()" :key="voidDropKey(drop)">
+                            <template v-if="drop.hasPosition && drop.x !== null && drop.y !== null">
+                                <a v-if="drop.positionMs !== undefined"
+                                   :href="makeReplayLink(voidRepulsionDialog.fight, drop.positionMs)"
+                                   target="_blank"
+                                   class="absolute rounded-full border transition hover:brightness-125"
+                                   :class="voidDropCircleClass(drop)"
+                                   :style="voidDropCircleStyle(drop)"
+                                   :title="voidDropTitle(drop)"></a>
+                                <div v-else class="absolute rounded-full border"
+                                     :class="voidDropCircleClass(drop)"
+                                     :style="voidDropCircleStyle(drop)"
+                                     :title="voidDropTitle(drop)"></div>
+                                <div class="absolute -translate-x-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-black/75 border text-[10px] leading-none whitespace-nowrap pointer-events-none"
+                                     :class="voidDropLabelClass(drop)"
+                                     :style="voidDropMarkerStyle(drop)">
+                                    {{ drop.player }}
+                                </div>
+                            </template>
+                        </template>
+                    </div>
+                    <div class="text-xs text-gray-400 leading-5">
+                        紫色圆形为 20 码虚空残渣覆盖范围；蓝点为奥蕾莉亚初始中心
+                        {{ voidArenaConfig.centerX }}, {{ voidArenaConfig.centerY }}。切换阶段会只显示该阶段的水。
+                    </div>
+                </div>
+                <aside class="space-y-3">
+                    <div class="flex flex-wrap gap-2">
+                        <button v-for="phase in voidPhaseList(voidRepulsionDialog.fight)" :key="phase"
+                                @click="setVoidPhase(phase)"
+                                class="px-3 py-1 rounded border text-xs"
+                                :class="voidRepulsionDialog.selectedPhase === phase ? 'bg-purple-900 border-purple-500 text-purple-100' : 'bg-gray-900 border-gray-700 text-gray-300 hover:bg-gray-800'">
+                            {{ phase }}
+                        </button>
+                    </div>
+                    <div class="bg-gray-900/80 rounded border border-gray-800 p-3 space-y-2">
+                        <button @click="setVoidRound('all')"
+                                class="w-full text-left px-3 py-2 rounded border text-xs"
+                                :class="voidRepulsionDialog.selectedRoundKey === 'all' ? 'bg-purple-950 border-purple-600 text-purple-100' : 'bg-gray-950 border-gray-800 text-gray-300 hover:bg-gray-800'">
+                            当前阶段全部放水
+                            <span class="float-right text-gray-500">{{ voidRecordsForPhase().length }} 个点</span>
+                        </button>
+                        <button v-for="(group, index) in voidRoundGroups()" :key="group.key"
+                                @click="setVoidRound(group.key)"
+                                class="w-full text-left px-3 py-2 rounded border text-xs"
+                                :class="voidRepulsionDialog.selectedRoundKey === group.key ? 'bg-purple-950 border-purple-600 text-purple-100' : 'bg-gray-950 border-gray-800 text-gray-300 hover:bg-gray-800'">
+                            <span class="font-mono text-gray-500">{{ group.time }}</span>
+                            <span class="ml-2">{{ voidRoundLabel(group, index) }}</span>
+                            <span class="float-right" :class="group.outliers.length ? 'text-red-300' : 'text-emerald-300'">
+                                {{ group.drops.length }}/{{ voidExpectedDrops(group.phase, index) }}
+                            </span>
+                        </button>
+                    </div>
+                    <div class="overflow-auto max-h-[42vh] border border-gray-800 rounded">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-900 text-gray-400 sticky top-0">
+                                <tr>
+                                    <th class="py-2 px-3 text-left">时间</th>
+                                    <th class="py-2 px-3 text-left">玩家</th>
+                                    <th class="py-2 px-3 text-right">X</th>
+                                    <th class="py-2 px-3 text-right">Y</th>
+                                    <th class="py-2 px-3 text-right">偏离</th>
+                                    <th class="py-2 px-3 text-left">状态</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="drop in activeVoidMapDrops()" :key="voidDropKey(drop) + '-row'" class="border-t border-gray-800">
+                                    <td class="py-2 px-3 font-mono text-gray-400">
+                                        <a v-if="drop.positionMs !== undefined" :href="makeReplayLink(voidRepulsionDialog.fight, drop.positionMs)" target="_blank" class="text-sky-300 hover:text-sky-200">{{ drop.time }}</a>
+                                        <span v-else>{{ drop.time || '-' }}</span>
+                                    </td>
+                                    <td class="py-2 px-3 text-blue-200 font-semibold">{{ drop.player }}</td>
+                                    <td class="py-2 px-3 text-right font-mono">{{ worldCoord(drop.x) }}</td>
+                                    <td class="py-2 px-3 text-right font-mono">{{ worldCoord(drop.y) }}</td>
+                                    <td class="py-2 px-3 text-right font-mono">{{ drop.distanceFromCenter ?? '-' }}</td>
+                                    <td class="py-2 px-3">
+                                        <span class="px-2 py-0.5 rounded border" :class="voidStatusClass(drop)">
+                                            {{ drop.status || (drop.hasPosition ? '正常' : '无坐标') }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -430,7 +550,20 @@ createApp({
             p1EndMs: 231000,
             p2EndMs: 330000,
             p2ToP3EndMs: 342000,
-            avoidablePalette: ['#3b82f6', '#a855f7', '#eab308', '#ef4444', '#14b8a6', '#f97316', '#22c55e', '#ec4899']
+            avoidablePalette: ['#3b82f6', '#a855f7', '#eab308', '#ef4444', '#14b8a6', '#f97316', '#22c55e', '#ec4899'],
+            voidRepulsionDialog: null,
+            voidArenaConfig: {
+                image: './assets/crown_of_cosmos_arena.png',
+                imageWidth: 873,
+                imageHeight: 794,
+                centerX: -363.85,
+                centerY: 4788.22,
+                centerPixelX: 436.5,
+                centerPixelY: 397,
+                pixelsPerYard: 4.6,
+                waterRadiusYards: 20,
+                yAxis: -1
+            }
         };
     },
     computed: {
@@ -706,6 +839,174 @@ createApp({
         makeReplayLink(fight, positionMs) {
             if (!fight.reportID || !fight.fightID) return fight.wclDeepLink || '';
             return `https://cn.warcraftlogs.com/reports/${fight.reportID}#fight=${fight.fightID}&view=replay&position=${Math.max(0, Math.floor(positionMs))}`;
+        },
+        voidRecords(fight) {
+            return fight?.crownOfTheCosmos?.voidRepulsionRecords || [];
+        },
+        hasVoidRepulsionMap(fight) {
+            return this.voidRecords(fight).some(drop => drop.hasPosition && drop.x !== null && drop.y !== null);
+        },
+        openVoidRepulsionDialog(fight, row) {
+            const phases = this.voidPhaseList(fight);
+            const selectedPhase = row?.phase || phases[0] || 'P1';
+            this.voidRepulsionDialog = {
+                fight,
+                sourceRow: row || null,
+                selectedPhase,
+                selectedRoundKey: 'all'
+            };
+        },
+        closeVoidRepulsionDialog() {
+            this.voidRepulsionDialog = null;
+        },
+        setVoidPhase(phase) {
+            if (!this.voidRepulsionDialog) return;
+            this.voidRepulsionDialog.selectedPhase = phase;
+            this.voidRepulsionDialog.selectedRoundKey = 'all';
+        },
+        setVoidRound(key) {
+            if (!this.voidRepulsionDialog) return;
+            this.voidRepulsionDialog.selectedRoundKey = key;
+        },
+        voidPhaseList(fight) {
+            const phases = [...new Set(this.voidRecords(fight)
+                .filter(drop => drop.hasPosition)
+                .map(drop => drop.phase || '未知阶段'))];
+            const order = ['P1', 'P1.5', 'P2', 'P2.5', 'P3'];
+            return phases.sort((a, b) => {
+                const ai = order.indexOf(a);
+                const bi = order.indexOf(b);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            });
+        },
+        voidRecordsForPhase() {
+            if (!this.voidRepulsionDialog) return [];
+            return this.voidRecords(this.voidRepulsionDialog.fight)
+                .filter(drop => drop.phase === this.voidRepulsionDialog.selectedPhase)
+                .sort((a, b) => this.voidDropTimeMs(a) - this.voidDropTimeMs(b));
+        },
+        voidDropTimeMs(drop) {
+            return Number(drop.castPositionMs ?? drop.markPositionMs ?? drop.positionMs ?? 0);
+        },
+        voidRoundGroups() {
+            const records = this.voidRecordsForPhase();
+            const groups = [];
+            records.forEach(drop => {
+                const castIndex = drop.castIndex ? Number(drop.castIndex) : null;
+                const anchor = this.voidDropTimeMs(drop);
+                let group = null;
+                if (castIndex) {
+                    group = groups.find(item => item.castIndex === castIndex);
+                } else {
+                    group = groups[groups.length - 1];
+                    if (!group || Math.abs(anchor - group.anchorMs) > 9000) group = null;
+                }
+                if (!group) {
+                    group = {
+                        key: castIndex ? `cast-${castIndex}` : `round-${groups.length + 1}-${anchor}`,
+                        phase: drop.phase,
+                        castIndex,
+                        anchorMs: anchor,
+                        time: drop.castTime || drop.markTime || drop.time || this.formatMs(anchor),
+                        drops: []
+                    };
+                    groups.push(group);
+                }
+                group.drops.push(drop);
+                group.anchorMs = Math.min(group.anchorMs, anchor);
+                group.time = group.castTime || group.time;
+            });
+            groups.forEach(group => {
+                group.drops.sort((a, b) => (a.positionMs || 0) - (b.positionMs || 0));
+                group.outliers = group.drops.filter(drop => this.isVoidOutlier(drop));
+            });
+            return groups;
+        },
+        activeVoidMapDrops() {
+            if (!this.voidRepulsionDialog) return [];
+            if (this.voidRepulsionDialog.selectedRoundKey === 'all') return this.voidRecordsForPhase();
+            const group = this.voidRoundGroups().find(item => item.key === this.voidRepulsionDialog.selectedRoundKey);
+            return group ? group.drops : this.voidRecordsForPhase();
+        },
+        voidExpectedDrops(phase, index) {
+            if (phase === 'P1') return 4;
+            if (phase === 'P2') return index === 0 ? 2 : (index === 1 ? 3 : 4);
+            if (phase === 'P3') return 1;
+            return '-';
+        },
+        voidRoundLabel(group, index) {
+            const number = group.castIndex || index + 1;
+            return `第 ${number} 次`;
+        },
+        isVoidOutlier(drop) {
+            const status = String(drop.status || '');
+            return status.includes('偏') || status.toLowerCase().includes('outlier');
+        },
+        voidStatusClass(drop) {
+            if (!drop.hasPosition) return 'bg-gray-900 border-gray-700 text-gray-400';
+            return this.isVoidOutlier(drop)
+                ? 'bg-red-950/70 border-red-800 text-red-200'
+                : 'bg-emerald-950/50 border-emerald-800 text-emerald-200';
+        },
+        voidDropCircleClass(drop) {
+            return this.isVoidOutlier(drop)
+                ? 'bg-red-600/35 border-red-300 shadow-[0_0_22px_rgba(248,113,113,0.45)]'
+                : 'bg-purple-600/30 border-purple-300 shadow-[0_0_18px_rgba(168,85,247,0.4)]';
+        },
+        voidDropLabelClass(drop) {
+            return this.isVoidOutlier(drop)
+                ? 'border-red-500 text-red-100'
+                : 'border-purple-500 text-purple-100';
+        },
+        voidDropKey(drop) {
+            return `${drop.phase || ''}-${drop.castIndex || ''}-${drop.time || ''}-${drop.player || ''}-${drop.x || ''}-${drop.y || ''}`;
+        },
+        worldCoord(value) {
+            if (value === undefined || value === null || value === '') return '-';
+            return (Number(value) / 100).toFixed(2);
+        },
+        voidPointPercent(drop) {
+            const cfg = this.voidArenaConfig;
+            const worldX = Number(drop.x) / 100;
+            const worldY = Number(drop.y) / 100;
+            const leftPx = cfg.centerPixelX + ((worldX - cfg.centerX) * cfg.pixelsPerYard);
+            const topPx = cfg.centerPixelY + ((worldY - cfg.centerY) * cfg.pixelsPerYard * cfg.yAxis);
+            return {
+                left: (leftPx / cfg.imageWidth) * 100,
+                top: (topPx / cfg.imageHeight) * 100
+            };
+        },
+        voidDropCircleStyle(drop) {
+            const cfg = this.voidArenaConfig;
+            const point = this.voidPointPercent(drop);
+            const radiusPx = cfg.waterRadiusYards * cfg.pixelsPerYard;
+            return {
+                left: `${point.left}%`,
+                top: `${point.top}%`,
+                width: `${(radiusPx * 2 / cfg.imageWidth) * 100}%`,
+                height: `${(radiusPx * 2 / cfg.imageHeight) * 100}%`,
+                transform: 'translate(-50%, -50%)'
+            };
+        },
+        voidDropMarkerStyle(drop) {
+            const point = this.voidPointPercent(drop);
+            return {
+                left: `${point.left}%`,
+                top: `${point.top}%`
+            };
+        },
+        voidCenterStyle() {
+            const cfg = this.voidArenaConfig;
+            return {
+                left: `${(cfg.centerPixelX / cfg.imageWidth) * 100}%`,
+                top: `${(cfg.centerPixelY / cfg.imageHeight) * 100}%`,
+                width: '10px',
+                height: '10px',
+                transform: 'translate(-50%, -50%)'
+            };
+        },
+        voidDropTitle(drop) {
+            return `${drop.player || '-'} ${drop.time || ''} (${this.worldCoord(drop.x)}, ${this.worldCoord(drop.y)}) 偏离 ${drop.distanceFromCenter ?? '-'} 码`;
         },
         bindData(result) {
             if (result.code !== 200 || !result.data) throw new Error('bad json');

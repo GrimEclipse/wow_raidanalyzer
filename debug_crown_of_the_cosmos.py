@@ -4,7 +4,7 @@ from pathlib import Path
 VERSION = "12.0"
 RAID = "void_spire"
 BOSS = "crown_of_the_cosmos"
-REPORT_ID = "AGkdfNWKtR28xMTB"
+REPORT_ID = "VMxJ7p1NCYXAahb4"
 OUTPUT = Path(__file__).resolve().with_name("wcl_hardcore_api.json")
 
 
