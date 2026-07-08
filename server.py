@@ -15,6 +15,7 @@ from typing import Dict, List, Optional
 from urllib.parse import unquote, urlparse
 
 from analyzer_core.catalog import find_boss, to_frontend_catalog
+from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
 
 
@@ -23,6 +24,7 @@ JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
 
 FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
+COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
 MATCHED_FIGHTS_RE = re.compile(r"匹配到\s+(\d+)\s+场")
 
 
@@ -42,6 +44,7 @@ class Job:
 
 JOBS: Dict[str, Job] = {}
 JOBS_LOCK = threading.Lock()
+JOB_SEMAPHORE = threading.BoundedSemaphore(MAX_JOB_THREADS)
 
 
 def publish(job: Job, event: dict):
@@ -107,6 +110,14 @@ def translate_plugin_progress(job: Job, raw_event: dict):
         set_job_progress(job, percent=percent, message=f"分析战斗 {index}/{total}", stage="analyze")
         return
 
+    completed = COMPLETED_FIGHTS_RE.search(message)
+    if completed:
+        count = int(completed.group(1))
+        total = max(1, int(completed.group(2)))
+        percent = 20 + round(count / total * 68)
+        set_job_progress(job, percent=percent, message=f"已完成战斗 {count}/{total}", stage="analyze")
+        return
+
     if "输出完成" in message:
         set_job_progress(job, percent=98, message="写入分析结果", stage="write")
         return
@@ -116,8 +127,12 @@ def translate_plugin_progress(job: Job, raw_event: dict):
 
 
 def run_job(job: Job, payload: dict):
+    acquired = False
     try:
-        set_job_progress(job, status="running", percent=1, message="任务已创建", stage="queued", force=True)
+        set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
+        JOB_SEMAPHORE.acquire()
+        acquired = True
+        set_job_progress(job, status="running", percent=2, message="任务已开始", stage="queued", force=True)
         version = payload["version"]
         raid = payload["raid"]
         boss = payload["boss"]
@@ -158,6 +173,9 @@ def run_job(job: Job, payload: dict):
             "message": str(exc),
             "stage": "error",
         })
+    finally:
+        if acquired:
+            JOB_SEMAPHORE.release()
 
 
 def json_bytes(data, status=HTTPStatus.OK):

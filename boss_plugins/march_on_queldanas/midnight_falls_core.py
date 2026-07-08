@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 import requests
 import urllib3
 
+from analyzer_core.concurrency import MAX_REQUEST_THREADS, request_post, run_parallel_indexed
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -121,7 +123,7 @@ def get_token():
     if not CLIENT_ID or not CLIENT_SECRET:
         raise RuntimeError("请先在项目 .env 或系统环境变量中设置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET。")
     url = f"{WCL_BASE_URL}/oauth/token"
-    res = requests.post(url, data={"grant_type": "client_credentials"}, auth=(CLIENT_ID, CLIENT_SECRET),
+    res = request_post(url, data={"grant_type": "client_credentials"}, auth=(CLIENT_ID, CLIENT_SECRET),
                         proxies=PROXIES, verify=False, timeout=30)
     if res.status_code == 401:
         raise RuntimeError(
@@ -135,7 +137,7 @@ def get_token():
 def graphql(token, query, variables):
     url = f"{WCL_BASE_URL}/api/v2/client"
     headers = {"Authorization": f"Bearer {token}"}
-    res = requests.post(url, json={"query": query, "variables": variables}, headers=headers, proxies=PROXIES,
+    res = request_post(url, json={"query": query, "variables": variables}, headers=headers, proxies=PROXIES,
                         verify=False, timeout=90)
     res.raise_for_status()
     payload = res.json()
@@ -227,16 +229,27 @@ def fetch_events(token, report_id, data_type, fight, start_time=None, end_time=N
 
 def fetch_avoidable_damage(token, report_id, fight, emit_progress=None):
     rows, seen = [], set()
+    ability_jobs = []
     for config in AVOIDABLE_SPELLS.values():
         if emit_progress:
             emit_progress(f"读取可躲避伤害：{config['label']}")
-        for aid in config["ids"]:
-            for event in fetch_events(token, report_id, "DamageTaken", fight, ability_id=aid):
-                key = (event.get("timestamp"), event.get("sourceID"), event.get("targetID"), event.get("abilityGameID"),
-                       event.get("amount"))
-                if key not in seen:
-                    seen.add(key)
-                    rows.append(event)
+        ability_jobs.extend(sorted(config["ids"]))
+
+    def fetch_one(index_and_ability):
+        index, aid = index_and_ability
+        return index, fetch_events(token, report_id, "DamageTaken", fight, ability_id=aid)
+
+    for _, events in run_parallel_indexed(
+        list(enumerate(ability_jobs, start=1)),
+        fetch_one,
+        max_workers=MAX_REQUEST_THREADS,
+    ):
+        for event in events:
+            key = (event.get("timestamp"), event.get("sourceID"), event.get("targetID"), event.get("abilityGameID"),
+                   event.get("amount"))
+            if key not in seen:
+                seen.add(key)
+                rows.append(event)
     return rows
 
 
@@ -269,11 +282,19 @@ def fetch_fight_data(token, report_id, fight, actor_map, emit_progress=None):
     if find_p4_signal_death(deaths, fight) or (not deaths and wipe_elapsed_ms > P4_NO_DEATH_MS):
         if emit_progress:
             emit_progress("判定存在 P4 信号，读取星辰裂片 debuff faded")
-        for ability in STELLAR_SHARD_DEBUFF_IDS:
-            p4_stellar_debuffs.extend(fetch_events(
+        def fetch_one_debuff(index_and_ability):
+            index, ability = index_and_ability
+            return index, fetch_events(
                 token, report_id, "Debuffs", fight,
                 start_time=fight["startTime"] + P4_SIGNAL_AFTER_MS,
-                end_time=fight["endTime"], ability_id=ability))
+                end_time=fight["endTime"], ability_id=ability)
+
+        for _, events in run_parallel_indexed(
+            list(enumerate(sorted(STELLAR_SHARD_DEBUFF_IDS), start=1)),
+            fetch_one_debuff,
+            max_workers=MAX_REQUEST_THREADS,
+        ):
+            p4_stellar_debuffs.extend(events)
         if emit_progress:
             emit_progress(f"P4 星辰裂片 debuff：{len(p4_stellar_debuffs)} 条")
 
@@ -565,6 +586,27 @@ def analyze_fight(report_id, fight, raw, global_avoidable):
     }
 
 
+def merge_avoidable_summary(global_avoidable, summary):
+    for key, rows in summary.items():
+        bucket = global_avoidable.setdefault(key, {})
+        for row in rows:
+            target = row["name"]
+            merged = bucket.setdefault(
+                target,
+                {
+                    "name": target,
+                    "spellKey": row.get("spellKey", key),
+                    "spellName": row.get("spellName", ""),
+                    "totalDamage": 0,
+                    "hitCount": 0,
+                    "deathCount": 0,
+                },
+            )
+            merged["totalDamage"] += row.get("totalDamage", 0)
+            merged["hitCount"] += row.get("hitCount", 0)
+            merged["deathCount"] += row.get("deathCount", 0)
+
+
 # ================= 5. 聚合输出 =================
 def build_aggregated_json():
     progress("启动鲁拉开荒复盘分析")
@@ -608,7 +650,9 @@ def build_aggregated_json():
         progress("匹配鲁拉战斗列表", 1)
         fights = fetch_report_fights(token, report_id)
         progress(f"匹配鲁拉战斗：{len(fights)} 场", 1)
-        for fight_idx, fight in enumerate(fights, start=1):
+
+        def analyze_one_fight(index_and_fight):
+            fight_idx, fight = index_and_fight
             bar = progress_bar(fight_idx, len(fights))
             duration = format_time(fight["endTime"] - fight["startTime"])
             progress(f"{bar} Fight {fight['id']}，时长 {duration}", 1)
@@ -618,7 +662,23 @@ def build_aggregated_json():
 
             raw = fetch_fight_data(token, report_id, fight, actor_map, emit_progress=fight_progress)
             progress("分析灭团原因与个人榜单", 2)
-            result = analyze_fight(report_id, fight, raw, global_avoidable)
+            local_avoidable = {key: {} for key in AVOIDABLE_SPELLS}
+            result = analyze_fight(report_id, fight, raw, local_avoidable)
+            return fight_idx, result
+
+        def report_fight_done(completed, total, result):
+            _, fight_result = result
+            progress(
+                f"已完成 {completed}/{total} 场鲁拉战斗：Fight {fight_result['fightID']}",
+                1,
+            )
+
+        for _, result in run_parallel_indexed(
+            list(enumerate(fights, start=1)),
+            analyze_one_fight,
+            on_complete=report_fight_done,
+        ):
+            merge_avoidable_summary(global_avoidable, result["avoidableSummary"])
             if result["deathTimeline"] or result["wipePhase"] == "P4":
                 final_output["data"]["page1_wipeAnalysis"].append(result)
                 progress(f"判定结果：{result['wipePhase']} / {result['wipeReason']} / 死亡时间线 {len(result['deathTimeline'])} 条", 2)
