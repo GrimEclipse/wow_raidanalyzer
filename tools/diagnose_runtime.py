@@ -17,7 +17,7 @@ def env_file_keys(root):
 
 
 def main():
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parents[1]
     analyze_path = root / "analyze.py"
     env_keys = env_file_keys(root)
     print("[diagnose] Python executable:", sys.executable, flush=True)

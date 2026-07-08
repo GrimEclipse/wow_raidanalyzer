@@ -5,11 +5,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from contextvars import copy_context
 
-try:
-    import requests
-except ModuleNotFoundError as exc:
-    raise RuntimeError("缺少 requests 依赖，请先在当前 Python 环境执行：python -m pip install -r requirements.txt") from exc
-
 
 def env_int(name, default, minimum=1):
     raw = os.getenv(name, "").strip()
@@ -32,6 +27,14 @@ _REQUEST_SEMAPHORE = threading.BoundedSemaphore(MAX_REQUEST_THREADS)
 _RETRY_STATUSES = {429, 500, 502, 503, 504}
 
 
+def requests_module():
+    try:
+        import requests
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("缺少 requests 依赖，请先在当前 Python 环境执行：python -m pip install -r requirements.txt") from exc
+    return requests
+
+
 @contextmanager
 def wcl_request_slot():
     _REQUEST_SEMAPHORE.acquire()
@@ -42,6 +45,7 @@ def wcl_request_slot():
 
 
 def request_post(*args, **kwargs):
+    requests = requests_module()
     last_error = None
     for attempt in range(1, MAX_REQUEST_RETRIES + 1):
         try:

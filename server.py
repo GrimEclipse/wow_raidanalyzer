@@ -282,6 +282,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/": "/index.html",
             "/online": "/online.html",
             "/report": "/report.html",
+            "/mythic-dungeon": "/mythic-dungeon.html",
             "/LuraJudgement.html": "/report.html",
         }
         path = route_map.get(path, path)
