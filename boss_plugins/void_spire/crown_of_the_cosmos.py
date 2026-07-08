@@ -11,6 +11,7 @@ except ModuleNotFoundError as exc:
     raise RuntimeError("缺少 requests 依赖,请检查requirements！") from exc
 import urllib3
 
+from analyzer_core.concurrency import MAX_REQUEST_THREADS, request_post, run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from boss_plugins.common import write_json_result
 
@@ -200,7 +201,7 @@ def get_token():
     if not CLIENT_ID or not CLIENT_SECRET:
         raise RuntimeError("请先在项目 .env 或系统环境变量中设置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET。")
     progress(f"连接 WCL 鉴权端点：{WCL_BASE_URL}/oauth/token", 1)
-    res = requests.post(
+    res = request_post(
         f"{WCL_BASE_URL}/oauth/token",
         data={"grant_type": "client_credentials"},
         auth=(CLIENT_ID, CLIENT_SECRET),
@@ -219,7 +220,7 @@ def graphql(token, query, variables):
     last_error = None
     for attempt in range(1, 4):
         try:
-            res = requests.post(
+            res = request_post(
                 f"{WCL_BASE_URL}/api/v2/client",
                 json={"query": query, "variables": variables},
                 headers=headers,
@@ -379,9 +380,20 @@ def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_ti
 def fetch_spell_events(token, report_id, fight, data_type, spell_ids, label, hostility_type=None, include_resources=False):
     rows = []
     spell_ids = sorted(spell_ids)
-    for index, spell_id in enumerate(spell_ids, start=1):
+    if not spell_ids:
+        return rows
+
+    def fetch_one(index_and_spell):
+        index, spell_id = index_and_spell
         progress(f"{label} {index}/{len(spell_ids)}：{SPELLS.get(spell_id, spell_id)} ({spell_id})", 2)
         spell_rows = fetch_events_all(token, report_id, data_type, fight, ability_id=spell_id, hostility_type=hostility_type, include_resources=include_resources)
+        return index, spell_id, spell_rows
+
+    for _, spell_id, spell_rows in run_parallel_indexed(
+        list(enumerate(spell_ids, start=1)),
+        fetch_one,
+        max_workers=MAX_REQUEST_THREADS,
+    ):
         rows.extend(spell_rows)
         if spell_rows:
             progress(f"{SPELLS.get(spell_id, spell_id)}：{len(spell_rows)} 条", 2)
@@ -2539,11 +2551,27 @@ def build_aggregated_json(report_ids):
         fights = fetch_report_fights(token, report_id)
         actor_map, actor_type, actor_game_id = fetch_actor_maps(token, report_id)
         progress(f"匹配到 {len(fights)} 场宇宙之冕战斗", 1)
-        for index, fight in enumerate(fights, start=1):
+
+        def analyze_one_fight(index_and_fight):
+            index, fight = index_and_fight
             progress(f"分析 Fight {fight['id']} ({index}/{len(fights)})", 1)
             payload = fetch_fight_payload(token, report_id, fight, actor_game_id)
             payload["actorGameID"] = actor_game_id
             fight_result = analyze_fight(report_id, fight, actor_map, actor_type, payload)
+            return index, fight_result
+
+        def report_fight_done(completed, total, result):
+            _, fight_result = result
+            progress(
+                f"已完成 {completed}/{total} 场宇宙之冕战斗：Fight {fight_result['fightID']}",
+                1,
+            )
+
+        for _, fight_result in run_parallel_indexed(
+            list(enumerate(fights, start=1)),
+            analyze_one_fight,
+            on_complete=report_fight_done,
+        ):
             merge_board(global_board, fight_result["avoidableSummary"])
             final_output["data"]["page1_wipeAnalysis"].append(fight_result)
 
