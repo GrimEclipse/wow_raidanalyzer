@@ -216,6 +216,97 @@
 
         <!-- 可躲避伤害 -->
         <section v-show="currentTab === 'avoidable'" class="space-y-5">
+            <div v-if="courtFightCards.length" class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-4">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-white">开庭分析</h2>
+                        <p class="text-xs text-gray-500 mt-1">按全量与阶段返回可审查证据链，重点展示崩裂空无射线与 P1 银锋箭命中 Boss 定位。</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button v-for="tab in courtPhaseTabs" :key="tab.key" @click="courtPhase=tab.key"
+                                :class="courtPhase === tab.key ? 'bg-amber-600 text-white border-amber-300' : 'bg-gray-950 text-gray-400 border-gray-700 hover:bg-gray-800'"
+                                class="px-3 py-1.5 rounded border text-xs font-bold transition">
+                            {{ tab.label }}
+                        </button>
+                    </div>
+                </div>
+
+                <article v-for="fight in courtFightCards" :key="'court-' + fight.reportID + '-' + fight.fightID"
+                         class="border border-gray-800 rounded bg-gray-950 overflow-hidden">
+                    <header class="px-4 py-3 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <div class="text-xs text-gray-500 font-mono">{{ fight.reportID?.slice(0, 8) }} / Fight {{ fight.fightID }}</div>
+                            <div class="text-sm font-bold text-white">{{ fight.fightName || 'Crown of the Cosmos' }} · {{ fight.duration }} · {{ fight.fightStatus === 'kill' ? '击杀' : fight.wipePhase }}</div>
+                        </div>
+                        <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200">查看 WCL</a>
+                    </header>
+
+                    <div v-if="courtSections(fight).length" class="p-4 space-y-4">
+                        <section v-for="section in courtSections(fight)" :key="section.key" class="border border-gray-800 rounded bg-gray-900/60 p-3">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                <h3 class="font-bold text-amber-100">{{ section.title }}</h3>
+                                <span class="text-xs text-gray-500">{{ section.summary }}</span>
+                            </div>
+
+                            <div v-if="section.type === 'void_grasp_rays'" class="space-y-3">
+                                <div v-for="row in section.rows" :key="'ray-' + row.index + '-' + row.player" class="rounded border border-gray-800 bg-gray-950 p-3">
+                                    <div class="flex flex-wrap justify-between gap-2 text-xs">
+                                        <div><span class="text-gray-500">{{ row.phase }}</span> <span class="text-blue-300 font-bold">{{ row.player }}</span> <span class="text-gray-400">{{ row.fireTime }}</span></div>
+                                        <div class="text-gray-400">幻影 {{ row.phantomHits || 0 }} · 误伤玩家 <span :class="row.playerHits ? 'text-red-300 font-bold' : 'text-green-400'">{{ row.playerHits || 0 }}</span> · 置信度 {{ row.state?.confidence || 'unknown' }}</div>
+                                    </div>
+                                    <div class="mt-2 h-56 rounded border border-gray-800 bg-black overflow-hidden">
+                                        <svg class="w-full h-full" viewBox="-10500 -10500 21000 21000" preserveAspectRatio="xMidYMid meet">
+                                            <circle cx="0" cy="0" r="180" fill="#60a5fa"></circle>
+                                            <line v-for="ray in row.rays" :key="ray.label"
+                                                  x1="0" y1="0"
+                                                  :x2="ray.endX - ray.startX"
+                                                  :y2="ray.endY - ray.startY"
+                                                  stroke="#f59e0b" stroke-width="3" vector-effect="non-scaling-stroke" stroke-linecap="round"></line>
+                                            <circle v-for="hit in row.hits" :key="hit.time + '-' + hit.target"
+                                                    :cx="courtHitX(hit, row)" :cy="courtHitY(hit, row)" r="260"
+                                                    :fill="hit.targetType === 'player' ? '#ef4444' : '#a855f7'" opacity="0.85"></circle>
+                                        </svg>
+                                    </div>
+                                    <div class="mt-2 grid gap-2 md:grid-cols-2 text-xs text-gray-400">
+                                        <div>点名 {{ row.applyTime }}，发射 {{ row.fireTime }}，取样 {{ row.state?.time || '-' }}，偏移 {{ row.state?.deltaMs ?? '-' }}ms</div>
+                                        <div>坐标 {{ row.state?.point ? `${row.state.point.yardX}, ${row.state.point.yardY}` : '-' }}，朝向 {{ row.state?.facingRadians ?? '-' }}</div>
+                                    </div>
+                                    <div v-if="row.hits?.length" class="mt-2 flex flex-wrap gap-2 text-[11px]">
+                                        <span v-for="hit in row.hits" :key="'hit-' + hit.time + hit.target" class="px-2 py-1 rounded border border-gray-700 text-gray-300">
+                                            {{ hit.time }} {{ hit.targetType }} {{ hit.target }} {{ number(hit.amount) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-else-if="section.type === 'p1_arrow_audit'" class="grid gap-2 md:grid-cols-2">
+                                <div v-for="row in section.rows" :key="'arrow-' + row.index" class="rounded border border-gray-800 bg-gray-950 p-3 text-xs">
+                                    <div class="flex justify-between gap-2">
+                                        <span class="text-amber-200 font-bold">第 {{ row.index }} 轮 {{ row.time }}</span>
+                                        <span :class="['hit_boss','removed_boss_buff'].includes(row.status) ? 'text-green-400' : 'text-red-300'">{{ row.status }}</span>
+                                    </div>
+                                    <div class="mt-1 text-gray-400">点名：{{ courtPlayerList(row.markedPlayers) }}</div>
+                                    <div class="text-gray-400">实际射击：{{ courtPlayerList(row.shotPlayers) || '-' }}</div>
+                                    <div class="text-gray-400">目标：{{ row.expectedTarget }} / 预期 {{ row.expectedTime }}</div>
+                                    <div v-if="row.bossHits?.length" class="mt-2 text-green-300">
+                                        <div v-for="hit in row.bossHits" :key="'boss-' + hit.time + hit.target">{{ hit.time }} {{ hit.source }} -> {{ hit.target }} {{ number(hit.amount) }}</div>
+                                    </div>
+                                    <div v-if="row.friendlyHits?.length" class="mt-2 text-red-300">
+                                        <div v-for="hit in row.friendlyHits" :key="'friend-' + hit.time + hit.target">{{ hit.time }} {{ hit.source }} -> {{ hit.target }} {{ number(hit.amount) }}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-else class="space-y-2 text-xs text-gray-300">
+                                <div v-for="(row, idx) in section.rows" :key="'generic-' + section.key + '-' + idx" class="rounded border border-gray-800 bg-gray-950 p-2">
+                                    {{ row.text || row.summary || JSON.stringify(row) }}
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                    <div v-else class="p-6 text-sm text-gray-500">当前阶段没有可展示的开庭证据。</div>
+                </article>
+            </div>
             <div class="bg-gray-900 border border-gray-800 rounded-lg p-4">
                 <div class="flex flex-wrap gap-2 mb-4">
                         <button v-for="tab in avoidableTabs" :key="tab.key" @click="avoidableTab=tab.key" :class="avoidableTab === tab.key ? 'bg-blue-600 text-white border-blue-400' : 'bg-gray-950 text-gray-400 border-gray-700 hover:bg-gray-800'" class="px-4 py-2 rounded border text-sm font-bold transition">
@@ -517,6 +608,7 @@ createApp({
             dataLoaded: false,
             currentTab: 'wipe',
             avoidableTab: 'total',
+            courtPhase: 'all',
             avoidableSortKey: 'totalDamage',
             avoidableSortDir: 'desc',
             meta: {},
@@ -634,6 +726,27 @@ createApp({
         activeAvoidableMax() {
             if (this.activeAvoidableRows.length === 0) return 1;
             return this.activeAvoidableRows[0].totalDamage || 1;
+        },
+        courtPhaseTabs() {
+            return [
+                { key: 'all', label: '全量' },
+                { key: 'P1', label: 'P1' },
+                { key: 'P1.5', label: 'P1.5' },
+                { key: 'P2', label: 'P2' },
+                { key: 'P2.5', label: 'P2.5' },
+                { key: 'P3', label: 'P3' },
+            ];
+        },
+        courtFightCards() {
+            return this.rawWipeAnalysis.filter(fight => {
+                const crown = fight.crownOfTheCosmos || {};
+                return (crown.p1ArrowAudit || []).length
+                    || (crown.voidGraspRays || []).length
+                    || (crown.missedEnergy || []).length
+                    || (crown.missedShadows || []).length
+                    || (crown.gravityRows || []).length
+                    || (fight.trialRecords || []).length;
+            });
         },
         interruptBoard() {
             if (!this.showInterruptTab) return [];
@@ -779,6 +892,64 @@ createApp({
         getPhaseFromTime(timeStr) {
             return this.getPhaseFromElapsedMs(this.parseTimeToSeconds(timeStr) * 1000);
         },
+        courtPhaseMatches(row) {
+            return this.courtPhase === 'all' || row?.phase === this.courtPhase;
+        },
+        courtSections(fight) {
+            const crown = fight.crownOfTheCosmos || {};
+            const sections = [];
+            const p1ArrowAudit = (crown.p1ArrowAudit || []).filter(row => this.courtPhase === 'all' || this.courtPhase === 'P1');
+            if (p1ArrowAudit.length) {
+                sections.push({
+                    key: 'p1-arrow-audit',
+                    type: 'p1_arrow_audit',
+                    title: 'P1 银锋箭命中 Boss 定位',
+                    summary: `${p1ArrowAudit.length} 轮`,
+                    rows: p1ArrowAudit,
+                });
+            }
+            const rayRows = (crown.voidGraspRays || []).filter(row => this.courtPhaseMatches(row));
+            if (rayRows.length) {
+                const friendlyFire = rayRows.reduce((sum, row) => sum + (row.playerHits || 0), 0);
+                sections.push({
+                    key: 'void-grasp-rays',
+                    type: 'void_grasp_rays',
+                    title: '崩裂空无射线模拟',
+                    summary: `${rayRows.length} 次，误伤 ${friendlyFire}`,
+                    rows: rayRows,
+                });
+            }
+            const missedEnergy = (crown.missedEnergy || []).filter(row => this.courtPhase === 'all' || this.courtPhase === 'P2');
+            if (missedEnergy.length) {
+                sections.push({ key: 'missed-energy', type: 'generic', title: 'P2 银锋弹射消能失败', summary: `${missedEnergy.length} 条`, rows: missedEnergy });
+            }
+            const missedShadows = (crown.missedShadows || []).filter(row => this.courtPhase === 'all' || this.courtPhase === 'P2');
+            if (missedShadows.length) {
+                sections.push({ key: 'missed-shadows', type: 'generic', title: 'P2 银色幻影处理失败', summary: `${missedShadows.length} 条`, rows: missedShadows });
+            }
+            const gravityRows = (crown.gravityRows || []).filter(row => this.courtPhase === 'all' || this.courtPhase === 'P3');
+            if (gravityRows.length) {
+                sections.push({ key: 'gravity', type: 'generic', title: 'P3 重力坍缩归因', summary: `${gravityRows.length} 条`, rows: gravityRows });
+            }
+            const voidWater = (crown.voidRepulsionPlacement || []).filter(row => this.courtPhase === 'all' || row.phase === this.courtPhase);
+            if (voidWater.length) {
+                sections.push({ key: 'void-water', type: 'generic', title: '虚空斥力放水', summary: `${voidWater.length} 组`, rows: voidWater });
+            }
+            return sections;
+        },
+        courtPlayerList(players) {
+            return (players || []).map(player => player.name || player.player || player).filter(Boolean).join('、');
+        },
+        courtHitX(hit, row) {
+            const origin = row?.rays?.[0];
+            if (!origin || !hit?.point) return 0;
+            return Number(hit.point.x || 0) - Number(origin.startX || 0);
+        },
+        courtHitY(hit, row) {
+            const origin = row?.rays?.[0];
+            if (!origin || !hit?.point) return 0;
+            return Number(hit.point.y || 0) - Number(origin.startY || 0);
+        },
         formatMs(ms) {
             const secs = Math.max(0, Math.floor(Number(ms || 0) / 1000));
             const minutes = String(Math.floor(secs / 60)).padStart(2, '0');
@@ -820,7 +991,15 @@ createApp({
         },
         roleIcons(value) {
             const roles = Array.isArray(value) ? value : [value];
-            const icons = { tank: '🛡', healer: '✚', dps: '🗡' };
+            const icons = {
+                tank: 'T',
+                healer: 'H',
+                dps: 'D',
+                'melee-dps': 'MD',
+                'melee-healer': 'MH',
+                'range-dps': 'RD',
+                'range-healer': 'RH',
+            };
             const unique = [...new Set(roles.filter(Boolean))];
             return unique.length ? unique.map(role => icons[role] || '?').join(' ') : '?';
         },

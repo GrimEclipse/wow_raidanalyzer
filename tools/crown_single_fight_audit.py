@@ -1,0 +1,879 @@
+import json
+import math
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+from crown_pam_probe import (
+    PHANTOM_GAME_ID,
+    REPORT_ID,
+    SPELL,
+    actor_name,
+    ability_id,
+    event_point,
+    event_type,
+    fetch_actor_maps,
+    fetch_events_all,
+    fetch_events_all_ext,
+    fetch_report_fights,
+    fmt,
+    get_token,
+    group_by_window,
+)
+
+
+FIGHT_ID = 30
+OUT_PATH = Path("tmp") / "crown_fight30_audit.json"
+
+ALLERIA_GAME_ID = 240430
+ADD_GAME_IDS = {
+    243805: "殁里乌姆",
+    243810: "殆米阿尔",
+    243811: "龌勒卢斯",
+    254172: "龌勒卢斯",
+    254173: "殆米阿尔",
+    254174: "殁里乌姆",
+}
+P1_ADD_GAME_IDS = {243805, 243810, 243811}
+
+HEALER_SPEC_IDS = {65, 105, 256, 257, 264, 270, 1468}
+WATER_OUTLIER_YARDS = 8.0
+RAY_LENGTH_RAW = 10_000.0
+RAY_WIDTH_RAW = 300.0
+OBELISK_DISTANCE_RAW = 500.0
+
+
+def rel(fight, timestamp):
+    if timestamp is None:
+        return None
+    return int(timestamp - fight["startTime"])
+
+
+def seconds(ms):
+    return round((ms or 0) / 1000, 1)
+
+
+def to_yards(value):
+    return None if value is None else round(value / 100.0, 2)
+
+
+def point_payload(point):
+    if not point:
+        return None
+    return {
+        "x": round(point[0], 2),
+        "y": round(point[1], 2),
+        "yardX": to_yards(point[0]),
+        "yardY": to_yards(point[1]),
+    }
+
+
+def event_facing(event):
+    value = event.get("facing") if event else None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def normalize_facing(raw):
+    if raw is None:
+        return None
+    radians = float(raw) / 100.0
+    while radians <= -math.pi:
+        radians += math.tau
+    while radians > math.pi:
+        radians -= math.tau
+    return radians
+
+
+def actor_event_id(event):
+    if event.get("sourceID") is not None:
+        return event.get("sourceID")
+    return event.get("targetID")
+
+
+def build_position_index(events):
+    rows = defaultdict(list)
+
+    def add_row(event, actor_id, point, facing_raw):
+        if actor_id is None or not point:
+            return
+        rows[actor_id].append({
+            "timestamp": event.get("timestamp", 0),
+            "x": point[0],
+            "y": point[1],
+            "facingRaw": facing_raw,
+            "sourceType": event.get("type"),
+            "abilityID": ability_id(event),
+            "sourceInstance": event.get("sourceInstance"),
+            "targetInstance": event.get("targetInstance"),
+        })
+
+    for event in events:
+        add_row(event, actor_event_id(event), event_point(event), event_facing(event))
+        add_row(event, event.get("sourceID"), event_point(event, "source"), event_facing(event))
+        add_row(event, event.get("targetID"), event_point(event, "target"), event_facing(event))
+    for actor_rows in rows.values():
+        actor_rows.sort(key=lambda item: item["timestamp"])
+    return rows
+
+
+def state_at(index, actor_id, timestamp, max_gap_ms=3_000, allow_loose_position=False):
+    rows = index.get(actor_id) or []
+    if not rows:
+        return None
+    before = None
+    after = None
+    nearest_facing = None
+    for row in rows:
+        if row["timestamp"] <= timestamp:
+            before = row
+        elif row["timestamp"] > timestamp:
+            after = row
+            break
+    candidates = [row for row in (before, after) if row]
+    for row in sorted(rows, key=lambda item: abs(item["timestamp"] - timestamp)):
+        if abs(row["timestamp"] - timestamp) <= max_gap_ms and row.get("facingRaw") is not None:
+            nearest_facing = row
+            break
+    if before and after and after["timestamp"] - before["timestamp"] <= max_gap_ms:
+        span = after["timestamp"] - before["timestamp"]
+        ratio = 0.0 if span <= 0 else (timestamp - before["timestamp"]) / span
+        x = before["x"] + (after["x"] - before["x"]) * ratio
+        y = before["y"] + (after["y"] - before["y"]) * ratio
+        source = "interpolated"
+        delta = 0
+    else:
+        close = sorted(candidates, key=lambda item: abs(item["timestamp"] - timestamp))
+        if not close:
+            return None
+        best = close[0]
+        if abs(best["timestamp"] - timestamp) > max_gap_ms and not allow_loose_position:
+            return None
+        x, y = best["x"], best["y"]
+        source = "nearest"
+        delta = int(best["timestamp"] - timestamp)
+    facing_row = nearest_facing or before or after
+    raw_facing = facing_row.get("facingRaw") if facing_row else None
+    return {
+        "x": x,
+        "y": y,
+        "point": point_payload((x, y)),
+        "source": source,
+        "deltaMs": delta,
+        "facingRaw": raw_facing,
+        "facingRadians": normalize_facing(raw_facing),
+        "confidence": "high" if abs(delta) <= 500 else ("medium" if abs(delta) <= 1500 else "low"),
+    }
+
+
+def line_end_from_points(start, through, length=RAY_LENGTH_RAW):
+    dx = through[0] - start[0]
+    dy = through[1] - start[1]
+    dist = math.hypot(dx, dy)
+    if dist <= 0:
+        return start
+    scale = length / dist
+    return (start[0] + dx * scale, start[1] + dy * scale)
+
+
+def distance_point_to_segment(point, start, end):
+    sx, sy = start
+    ex, ey = end
+    px, py = point
+    dx = ex - sx
+    dy = end[1] - start[1]
+    span = dx * dx + dy * dy
+    if span <= 0:
+        return math.dist(point, start)
+    t = max(0.0, min(1.0, ((px - sx) * dx + (py - sy) * dy) / span))
+    closest = (sx + t * dx, sy + t * dy)
+    return math.dist(point, closest)
+
+
+def make_obelisks(apply_state):
+    point = apply_state["point"]
+    facing = apply_state.get("facingRadians")
+    if not point or facing is None:
+        return []
+    origin = (point["x"], point["y"])
+    directions = [
+        ("behind", facing + math.pi),
+        ("leftFront", facing + math.pi / 3),
+        ("rightFront", facing - math.pi / 3),
+    ]
+    rows = []
+    for label, angle in directions:
+        rows.append({
+            "label": label,
+            "point": point_payload((
+                origin[0] + math.cos(angle) * OBELISK_DISTANCE_RAW,
+                origin[1] + math.sin(angle) * OBELISK_DISTANCE_RAW,
+            )),
+            "angleRadians": round(angle, 4),
+        })
+    return rows
+
+
+def make_rays(fade_state, obelisks):
+    if not fade_state or not fade_state.get("point"):
+        return []
+    start = (fade_state["point"]["x"], fade_state["point"]["y"])
+    rows = []
+    for obelisk in obelisks:
+        target = obelisk.get("point")
+        if not target:
+            continue
+        through = (target["x"], target["y"])
+        end = line_end_from_points(start, through)
+        rows.append({
+            "label": obelisk["label"],
+            "start": point_payload(start),
+            "through": target,
+            "end": point_payload(end),
+            "widthYards": 3,
+        })
+    return rows
+
+
+def event_actor_name(actor_map, actor_game_id, actor_id):
+    if actor_game_id.get(actor_id) == ALLERIA_GAME_ID:
+        return "奥蕾莉亚"
+    if actor_game_id.get(actor_id) in ADD_GAME_IDS:
+        return ADD_GAME_IDS[actor_game_id.get(actor_id)]
+    if actor_game_id.get(actor_id) == PHANTOM_GAME_ID:
+        return "银色幻影"
+    return actor_name(actor_map, actor_game_id, actor_id)
+
+
+def phase_window(fight, phase, phase_name):
+    labels = phase.get("labels") or {}
+    start, end = labels.get(phase_name, [fight["startTime"], fight["endTime"]])
+    return start or fight["startTime"], end or fight["endTime"]
+
+
+def phase_at(timestamp, phase):
+    if phase.get("p3Start") and timestamp >= phase["p3Start"]:
+        return "P3"
+    if phase.get("p25Start") and timestamp >= phase["p25Start"]:
+        return "P2.5"
+    if phase.get("p2Start") and timestamp >= phase["p2Start"]:
+        return "P2"
+    if phase.get("p15Start") and timestamp >= phase["p15Start"]:
+        return "P1.5"
+    return "P1"
+
+
+def dedupe(events):
+    seen = set()
+    rows = []
+    for event in events:
+        key = (
+            event.get("timestamp"),
+            event.get("type"),
+            ability_id(event),
+            event.get("sourceID"),
+            event.get("targetID"),
+            event.get("sourceInstance"),
+            event.get("targetInstance"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(event)
+    return rows
+
+
+def first_event(events, spell_id, kind=None, start=None, end=None):
+    rows = []
+    for event in events:
+        if ability_id(event) != spell_id:
+            continue
+        if kind and kind not in event_type(event):
+            continue
+        ts = event.get("timestamp", 0)
+        if start is not None and ts < start:
+            continue
+        if end is not None and ts > end:
+            continue
+        rows.append(event)
+    return min(rows, key=lambda item: item.get("timestamp", 0), default=None)
+
+
+def fetch_spell_bundle(token, report_id, fight):
+    print("fetching events for single-fight audit...")
+    casts = fetch_events_all(token, report_id, "Casts", fight, include_resources=True)
+    debuffs = []
+    buffs = []
+    damage = []
+    for spell_id in [
+        SPELL["void_grasp"],
+        SPELL["void_repulsion_mark"],
+        SPELL["ranger_mark"],
+        SPELL["star_scatter"],
+        SPELL["silver_havoc"],
+        SPELL["cosmic_barrier"],
+        SPELL["cosmic_radiation"],
+    ]:
+        debuffs.extend(fetch_events_all(token, report_id, "Debuffs", fight, ability_id=spell_id, include_resources=True))
+    for spell_id in [SPELL["cosmic_barrier"], SPELL["cosmic_radiation"], SPELL["silver_havoc"], 26662, 27680, 1239672]:
+        buffs.extend(fetch_events_all(token, report_id, "Buffs", fight, ability_id=spell_id, include_resources=True))
+        buffs.extend(fetch_events_all(token, report_id, "Buffs", fight, ability_id=spell_id, hostility_type="Enemies", include_resources=True))
+    for spell_id in [
+        SPELL["collapsing_void"],
+        SPELL["void_repulsion_damage"],
+        SPELL["silver_ricochet"],
+        SPELL["silver_ricochet_energy_drain"],
+    ]:
+        damage.extend(fetch_events_all(token, report_id, "DamageTaken", fight, ability_id=spell_id, include_resources=True))
+        damage.extend(fetch_events_all(token, report_id, "DamageDone", fight, ability_id=spell_id, hostility_type="Enemies", include_resources=True))
+    deaths = fetch_events_all(token, report_id, "Deaths", fight)
+    healing = fetch_events_all(token, report_id, "Healing", fight)
+    combatants = fetch_events_all(token, report_id, "CombatantInfo", fight)
+    resources = fetch_events_all(token, report_id, "Resources", fight, include_resources=True)
+    enemy_resources = fetch_events_all(token, report_id, "Resources", fight, hostility_type="Enemies", include_resources=True)
+    return {
+        "casts": dedupe(casts),
+        "debuffs": dedupe(debuffs),
+        "buffs": dedupe(buffs),
+        "damage": dedupe(damage),
+        "deaths": dedupe(deaths),
+        "healing": dedupe(healing),
+        "combatants": dedupe(combatants),
+        "resources": dedupe(resources),
+        "enemyResources": dedupe(enemy_resources),
+    }
+
+
+def fetch_actor_position_events(token, report_id, fight, actor_ids):
+    rows = []
+    for actor_id in sorted(actor_ids):
+        for data_type in ("Resources", "Casts", "DamageDone"):
+            rows.extend(fetch_events_all_ext(
+                token,
+                report_id,
+                data_type,
+                fight,
+                source_id=actor_id,
+                hostility_type="Enemies",
+                include_resources=True,
+            ))
+        rows.extend(fetch_events_all_ext(
+            token,
+            report_id,
+            "DamageTaken",
+            fight,
+            target_id=actor_id,
+            hostility_type="Enemies",
+            include_resources=True,
+        ))
+    return dedupe(rows)
+
+
+def combatant_spec_id(event):
+    for key in ("specID", "specId", "spec", "specializationID", "specializationId"):
+        value = event.get(key)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+    return None
+
+
+def healer_ids(combatants):
+    return {
+        event.get("sourceID") or event.get("targetID")
+        for event in combatants
+        if combatant_spec_id(event) in HEALER_SPEC_IDS and (event.get("sourceID") or event.get("targetID"))
+    }
+
+
+def build_phase(fight, events):
+    start = fight["startTime"]
+    silver_havoc = first_event(events["casts"] + events["buffs"] + events["debuffs"], SPELL["silver_havoc"], start=start + 123_000)
+    star_fades = [
+        event for event in events["debuffs"]
+        if ability_id(event) == SPELL["star_scatter"] and "remove" in event_type(event)
+    ]
+    p2_start = max((event.get("timestamp", 0) for event in star_fades), default=None)
+    p15_start = silver_havoc.get("timestamp") if silver_havoc else (p2_start - 38_000 if p2_start else None)
+    barrier_apply = first_event(events["buffs"], SPELL["cosmic_barrier"], "apply", p2_start, fight["endTime"])
+    barrier_remove = first_event(events["buffs"], SPELL["cosmic_barrier"], "remove", barrier_apply.get("timestamp") if barrier_apply else p2_start, fight["endTime"])
+    radiation_apply = first_event(events["buffs"], SPELL["cosmic_radiation"], "apply", p2_start, fight["endTime"])
+    radiation_remove = first_event(events["buffs"], SPELL["cosmic_radiation"], "remove", radiation_apply.get("timestamp") if radiation_apply else p2_start, fight["endTime"])
+    p25_start = (barrier_apply or radiation_apply or {}).get("timestamp")
+    p3_start = (barrier_remove or radiation_remove or {}).get("timestamp")
+    return {
+        "p15Start": p15_start,
+        "p2Start": p2_start,
+        "p25Start": p25_start,
+        "p3Start": p3_start,
+        "labels": {
+            "P1": [start, p15_start],
+            "P1.5": [p15_start, p2_start],
+            "P2": [p2_start, p25_start],
+            "P2.5": [p25_start, p3_start],
+            "P3": [p3_start, fight["endTime"]],
+        },
+    }
+
+
+def pair_void_grasp(debuffs):
+    active = {}
+    rows = []
+    for event in sorted(debuffs, key=lambda item: item.get("timestamp", 0)):
+        if ability_id(event) != SPELL["void_grasp"]:
+            continue
+        target_id = event.get("targetID")
+        if "apply" in event_type(event):
+            active[target_id] = event
+        elif "remove" in event_type(event) and target_id in active:
+            rows.append({"targetID": target_id, "apply": active.pop(target_id), "remove": event})
+    return rows
+
+
+def group_void_grasp_pairs(pairs):
+    clusters = []
+    for pair in sorted(pairs, key=lambda item: item["apply"].get("timestamp", 0)):
+        ts = pair["apply"].get("timestamp", 0)
+        if not clusters or ts - clusters[-1]["end"] > 2_500:
+            clusters.append({"start": ts, "end": ts, "pairs": [pair]})
+        else:
+            clusters[-1]["end"] = ts
+            clusters[-1]["pairs"].append(pair)
+    return clusters
+
+
+def active_phantoms_at(phantom_segments, timestamp):
+    return [
+        segment for segment in phantom_segments
+        if segment["first"] - 12_000 <= timestamp <= segment["last"] + 4_000
+    ]
+
+
+def phantom_segments_from_damage(damage_events, actor_game_id):
+    by_instance = defaultdict(list)
+    for event in damage_events:
+        if actor_game_id.get(event.get("sourceID")) != PHANTOM_GAME_ID:
+            continue
+        key = (event.get("sourceID"), event.get("sourceInstance"))
+        by_instance[key].append(event)
+    segments = []
+    for (source_id, source_instance), events in by_instance.items():
+        ticks = []
+        for event in sorted(events, key=lambda item: item.get("timestamp", 0)):
+            ts = event.get("timestamp", 0)
+            if not ticks or ts - ticks[-1]["time"] > 550:
+                ticks.append({"time": ts, "events": [event]})
+            else:
+                ticks[-1]["events"].append(event)
+        for tick in ticks:
+            if not segments or segments[-1].get("key") != (source_id, source_instance) or tick["time"] - segments[-1]["last"] > 3_500:
+                segments.append({
+                    "key": (source_id, source_instance),
+                    "sourceID": source_id,
+                    "sourceInstance": source_instance,
+                    "first": tick["time"],
+                    "last": tick["time"],
+                    "events": tick["events"][:],
+                })
+            else:
+                segments[-1]["last"] = tick["time"]
+                segments[-1]["events"].extend(tick["events"])
+    return segments
+
+
+def phantom_position(segment, timestamp, position_index):
+    state = state_at(position_index, segment["sourceID"], timestamp, max_gap_ms=4_000, allow_loose_position=True)
+    if state:
+        return state["point"]
+    nearest = min(segment["events"], key=lambda item: abs(item.get("timestamp", 0) - timestamp), default=None)
+    point = event_point(nearest) if nearest else None
+    return point_payload(point)
+
+
+def actors_at(timestamp, actor_ids, position_index, actor_map, actor_game_id):
+    rows = []
+    for actor_id in actor_ids:
+        state = state_at(position_index, actor_id, timestamp, max_gap_ms=6_000, allow_loose_position=True)
+        rows.append({
+            "id": actor_id,
+            "name": event_actor_name(actor_map, actor_game_id, actor_id),
+            "gameID": actor_game_id.get(actor_id),
+            "position": state["point"] if state else None,
+            "confidence": state.get("confidence") if state else "unknown",
+        })
+    return rows
+
+
+def actor_ids_for_phase(actor_game_id, phase_name):
+    game_ids = {ALLERIA_GAME_ID}
+    if phase_name == "P1":
+        game_ids.update(P1_ADD_GAME_IDS)
+    return sorted(
+        actor_id for actor_id, game_id in actor_game_id.items()
+        if game_id in game_ids
+    )
+
+
+def build_water(debuffs, damage, position_index, actor_map, actor_game_id, fight, phase):
+    active = {}
+    drops = []
+    for event in sorted(debuffs, key=lambda item: item.get("timestamp", 0)):
+        if ability_id(event) != SPELL["void_repulsion_mark"]:
+            continue
+        target_id = event.get("targetID")
+        if "apply" in event_type(event):
+            active[target_id] = event
+        elif "remove" in event_type(event):
+            exact = event_point(event, "target") or event_point(event)
+            state = {"point": point_payload(exact), "confidence": "high", "source": "fadeEvent"} if exact else state_at(position_index, target_id, event.get("timestamp", 0), max_gap_ms=5_000)
+            drops.append({
+                "id": f"water-{len(drops) + 1}",
+                "timeMs": rel(fight, event.get("timestamp")),
+                "time": fmt(rel(fight, event.get("timestamp"))),
+                "phase": phase_at(event.get("timestamp", 0), phase),
+                "player": event_actor_name(actor_map, actor_game_id, target_id),
+                "targetID": target_id,
+                "position": state.get("point") if state else None,
+                "confidence": state.get("confidence") if state else "unknown",
+            })
+    for group in group_by_window([{"timestamp": fight["startTime"] + drop["timeMs"], **drop} for drop in drops], 9_000):
+        members = group["events"]
+        points = [drop["position"] for drop in members if drop.get("position")]
+        if len(points) < 2:
+            continue
+        cx = sum(point["x"] for point in points) / len(points)
+        cy = sum(point["y"] for point in points) / len(points)
+        for drop in members:
+            if not drop.get("position"):
+                continue
+            distance_yards = math.dist((drop["position"]["x"], drop["position"]["y"]), (cx, cy)) / 100.0
+            match = next(item for item in drops if item["id"] == drop["id"])
+            match["distanceFromGroupYards"] = round(distance_yards, 1)
+            match["isOutlier"] = distance_yards > WATER_OUTLIER_YARDS
+    return drops
+
+
+def build_water_events(fight, actor_map, actor_game_id, water_drops, phase, position_index):
+    rows = []
+    events = [
+        {"timestamp": fight["startTime"] + drop["timeMs"], **drop}
+        for drop in water_drops
+    ]
+    for index, group in enumerate(group_by_window(events, 9_000), start=1):
+        phase_name = phase_at(group["start"], phase)
+        phase_start, _ = phase_window(fight, phase, phase_name)
+        time_ms = rel(fight, group["end"])
+        rows.append({
+            "id": f"water-event-{index}",
+            "index": index,
+            "eventType": "water",
+            "phase": phase_name,
+            "timeMs": time_ms,
+            "time": fmt(time_ms),
+            "drops": group["events"],
+            "water": [
+                drop for drop in water_drops
+                if drop["phase"] == phase_name
+                and phase_start <= fight["startTime"] + drop["timeMs"] <= group["end"]
+            ],
+            "actors": actors_at(group["end"], actor_ids_for_phase(actor_game_id, phase_name), position_index, actor_map, actor_game_id),
+        })
+    return rows
+
+
+def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase, position_index, phantom_segments, water_drops):
+    pairs = pair_void_grasp(events["debuffs"])
+    clusters = group_void_grasp_pairs(pairs)
+    groups = []
+    for index, cluster in enumerate(clusters, start=1):
+        fire_ts = max(pair["remove"].get("timestamp", 0) for pair in cluster["pairs"])
+        phase_name = phase_at(cluster["start"], phase)
+        phase_start, _ = phase_window(fight, phase, phase_name)
+        active_phantoms = active_phantoms_at(phantom_segments, fire_ts)
+        phantom_rows = []
+        for segment in active_phantoms:
+            phantom_rows.append({
+                "sourceID": segment["sourceID"],
+                "sourceInstance": segment["sourceInstance"],
+                "name": "银色幻影",
+                "firstTime": fmt(rel(fight, segment["first"])),
+                "lastTime": fmt(rel(fight, segment["last"])),
+                "position": phantom_position(segment, fire_ts, position_index),
+            })
+        players = []
+        group_hits = [
+            event for event in events["damage"]
+            if ability_id(event) == SPELL["collapsing_void"]
+            and cluster["start"] <= event.get("timestamp", 0) <= fire_ts + 2_000
+        ]
+        for pair in cluster["pairs"]:
+            target_id = pair["targetID"]
+            apply_ts = pair["apply"].get("timestamp", 0)
+            fade_ts = pair["remove"].get("timestamp", 0)
+            apply_state = state_at(position_index, target_id, apply_ts, max_gap_ms=3_000)
+            fade_state = state_at(position_index, target_id, fade_ts, max_gap_ms=3_000)
+            obelisks = make_obelisks(apply_state) if apply_state else []
+            rays = make_rays(fade_state, obelisks) if fade_state else []
+            actual_hits = [
+                event for event in group_hits
+                if abs(event.get("timestamp", 0) - fade_ts) <= 1_500
+            ]
+            actual_phantom_hits = [
+                event for event in actual_hits
+                if actor_game_id.get(event.get("targetID")) == PHANTOM_GAME_ID
+            ]
+            predicted_phantom_hits = []
+            for phantom in phantom_rows:
+                point = phantom.get("position")
+                if not point:
+                    continue
+                p = (point["x"], point["y"])
+                for ray in rays:
+                    start = (ray["start"]["x"], ray["start"]["y"])
+                    end = (ray["end"]["x"], ray["end"]["y"])
+                    distance = distance_point_to_segment(p, start, end)
+                    if distance <= RAY_WIDTH_RAW:
+                        predicted_phantom_hits.append({
+                            "phantom": phantom.get("sourceInstance") or phantom.get("sourceID"),
+                            "ray": ray["label"],
+                            "distanceYards": round(distance / 100.0, 1),
+                        })
+            players.append({
+                "targetID": target_id,
+                "player": event_actor_name(actor_map, actor_game_id, target_id),
+                "applyTimeMs": rel(fight, apply_ts),
+                "applyTime": fmt(rel(fight, apply_ts)),
+                "fadeTimeMs": rel(fight, fade_ts),
+                "fadeTime": fmt(rel(fight, fade_ts)),
+                "applyState": apply_state,
+                "fadeState": fade_state,
+                "obelisks": obelisks,
+                "rays": rays,
+                "actualHits": [
+                    {
+                        "time": fmt(rel(fight, event.get("timestamp"))),
+                        "target": event_actor_name(actor_map, actor_game_id, event.get("targetID")),
+                        "targetID": event.get("targetID"),
+                        "targetType": "phantom" if actor_game_id.get(event.get("targetID")) == PHANTOM_GAME_ID else actor_type.get(event.get("targetID")),
+                        "amount": int(event.get("amount") or 0) + int(event.get("absorbed") or 0),
+                    }
+                    for event in actual_hits
+                ],
+                "actualPhantomHitCount": len(actual_phantom_hits),
+                "predictedPhantomHits": predicted_phantom_hits,
+                "missedPhantom": phase_name == "P2" and bool(active_phantoms) and len(actual_phantom_hits) == 0 and len(predicted_phantom_hits) == 0,
+            })
+        groups.append({
+            "id": f"bow-{index}",
+            "index": index,
+            "phase": phase_name,
+            "applyStartMs": rel(fight, cluster["start"]),
+            "applyStart": fmt(rel(fight, cluster["start"])),
+            "fireTimeMs": rel(fight, fire_ts),
+            "fireTime": fmt(rel(fight, fire_ts)),
+            "players": players,
+            "actors": actors_at(fire_ts, actor_ids_for_phase(actor_game_id, phase_name), position_index, actor_map, actor_game_id),
+            "phantoms": phantom_rows,
+            "water": [
+                drop for drop in water_drops
+                if drop["phase"] == phase_name
+                and phase_start <= fight["startTime"] + drop["timeMs"] <= fire_ts
+            ],
+            "activePhantomCount": len(active_phantoms),
+            "eventType": "bow",
+        })
+    return groups
+
+
+def build_void_death_healing(fight, actor_map, actor_game_id, events, healer_set, phantom_segments):
+    rows = []
+    for death in events["deaths"]:
+        if death.get("killingAbilityGameID") not in {SPELL["collapsing_void"], SPELL["void_grasp"]}:
+            continue
+        target_id = death.get("targetID")
+        ts = death.get("timestamp", 0)
+        totals = defaultdict(int)
+        for event in events["healing"]:
+            if event.get("targetID") != target_id:
+                continue
+            if event.get("sourceID") not in healer_set:
+                continue
+            if not (ts - 6_000 <= event.get("timestamp", 0) <= ts):
+                continue
+            totals[event.get("sourceID")] += int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
+        active_count = len(active_phantoms_at(phantom_segments, ts))
+        rows.append({
+            "timeMs": rel(fight, ts),
+            "time": fmt(rel(fight, ts)),
+            "player": event_actor_name(actor_map, actor_game_id, target_id),
+            "targetID": target_id,
+            "abilityID": death.get("killingAbilityGameID"),
+            "activePhantomCount": active_count,
+            "exemptByPhantoms": active_count >= 4,
+            "healingByHealer": [
+                {
+                    "healerID": healer_id,
+                    "healer": event_actor_name(actor_map, actor_game_id, healer_id),
+                    "amount": amount,
+                }
+                for healer_id, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+            ],
+            "totalHealing": sum(totals.values()),
+        })
+    return rows
+
+
+def build_ranger_energy(fight, actor_map, actor_game_id, events, phase):
+    rows = []
+    p2_start = phase.get("p2Start") or fight["startTime"]
+    p2_end = phase.get("p25Start") or fight["endTime"]
+    marks = [
+        event for event in events["debuffs"]
+        if ability_id(event) == SPELL["ranger_mark"]
+        and "apply" in event_type(event)
+        and p2_start <= event.get("timestamp", 0) <= p2_end
+    ]
+    for index, group in enumerate(group_by_window(marks, 3_000), start=1):
+        window_end = group["end"] + 8_000
+        drains = [
+            event for event in events["enemyResources"]
+            if ability_id(event) == SPELL["silver_ricochet_energy_drain"]
+            and group["start"] <= event.get("timestamp", 0) <= window_end
+        ]
+        rows.append({
+            "index": index,
+            "timeMs": rel(fight, group["start"]),
+            "time": fmt(rel(fight, group["start"])),
+            "players": [event_actor_name(actor_map, actor_game_id, event.get("targetID")) for event in group["events"]],
+            "success": bool(drains),
+            "drainCount": len(drains),
+        })
+    return rows
+
+
+def summarize_counts(bow_groups, ranger_energy, water_drops):
+    missed_phantom = defaultdict(int)
+    for group in bow_groups:
+        if group["phase"] != "P2":
+            continue
+        for player in group["players"]:
+            if player.get("missedPhantom"):
+                missed_phantom[player["player"]] += 1
+    missed_energy = defaultdict(int)
+    for row in ranger_energy:
+        if row["success"]:
+            continue
+        for player in row["players"]:
+            missed_energy[player] += 1
+    water_outliers = defaultdict(lambda: defaultdict(int))
+    for drop in water_drops:
+        if drop.get("isOutlier"):
+            water_outliers[drop["phase"]][drop["player"]] += 1
+    return {
+        "bowGroupsByPhase": dict(sorted((phase, sum(1 for group in bow_groups if group["phase"] == phase)) for phase in ["P1", "P1.5", "P2", "P2.5", "P3"])),
+        "p2MissedPhantomByPlayer": [{"player": player, "count": count} for player, count in sorted(missed_phantom.items(), key=lambda item: item[1], reverse=True)],
+        "p2MissedEnergyByPlayer": [{"player": player, "count": count} for player, count in sorted(missed_energy.items(), key=lambda item: item[1], reverse=True)],
+        "waterOutliersByPhase": {
+            phase: [{"player": player, "count": count} for player, count in sorted(players.items(), key=lambda item: item[1], reverse=True)]
+            for phase, players in water_outliers.items()
+        },
+    }
+
+
+def main():
+    token = get_token()
+    fights = fetch_report_fights(token, REPORT_ID)
+    fight = next((item for item in fights if item["id"] == FIGHT_ID), None)
+    if not fight:
+        raise RuntimeError(f"fight {FIGHT_ID} not found")
+    actor_map, actor_type, actor_game_id = fetch_actor_maps(token, REPORT_ID)
+    events = fetch_spell_bundle(token, REPORT_ID, fight)
+    phase = build_phase(fight, events)
+    relevant_actor_ids = sorted(
+        actor_id for actor_id, game_id in actor_game_id.items()
+        if game_id == ALLERIA_GAME_ID or game_id in ADD_GAME_IDS
+    )
+    extra_position_events = fetch_actor_position_events(token, REPORT_ID, fight, relevant_actor_ids)
+
+    phantom_actor_ids = sorted(actor_id for actor_id, game_id in actor_game_id.items() if game_id == PHANTOM_GAME_ID)
+    phantom_damage = []
+    for actor_id in phantom_actor_ids:
+        phantom_damage.extend(fetch_events_all_ext(token, REPORT_ID, "DamageDone", fight, source_id=actor_id, hostility_type="Enemies", include_resources=True))
+    events["damage"].extend(dedupe(phantom_damage))
+
+    position_events = (
+        events["resources"]
+        + events["enemyResources"]
+        + events["casts"]
+        + events["debuffs"]
+        + events["buffs"]
+        + events["damage"]
+        + extra_position_events
+    )
+    position_index = build_position_index(position_events)
+    phantom_segments = phantom_segments_from_damage(events["damage"], actor_game_id)
+    water_drops = build_water(events["debuffs"], events["damage"], position_index, actor_map, actor_game_id, fight, phase)
+    bow_groups = build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase, position_index, phantom_segments, water_drops)
+    water_events = build_water_events(fight, actor_map, actor_game_id, water_drops, phase, position_index)
+    ranger_energy = build_ranger_energy(fight, actor_map, actor_game_id, events, phase)
+    void_deaths = build_void_death_healing(fight, actor_map, actor_game_id, events, healer_ids(events["combatants"]), phantom_segments)
+
+    result = {
+        "meta": {
+            "reportID": REPORT_ID,
+            "fightID": FIGHT_ID,
+            "sourceURL": f"https://www.warcraftlogs.com/reports/{REPORT_ID}?fight={FIGHT_ID}",
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks.",
+        },
+        "fight": {
+            "id": fight["id"],
+            "name": fight.get("name"),
+            "kill": fight.get("kill"),
+            "durationMs": fight["endTime"] - fight["startTime"],
+            "duration": fmt(fight["endTime"] - fight["startTime"]),
+        },
+        "phase": {
+            key: (fmt(rel(fight, value)) if isinstance(value, int) else value)
+            for key, value in phase.items()
+            if key != "labels"
+        },
+        "arena": {
+            "image": "assets/crown_of_cosmos_arena.png",
+            "center": {"x": -36385, "y": 478822},
+            "pixelsPerYard": 4.6,
+            "waterRadiusYards": 25,
+            "rayLengthYards": 100,
+            "rayWidthPixels": 3,
+        },
+        "icons": {
+            "alleria": "boss_plugins/assets/alleria_windrunner.png",
+            "silverPhantom": "boss_plugins/assets/silver_phantom.png",
+        },
+        "bowGroups": bow_groups,
+        "waterEvents": water_events,
+        "waterDrops": water_drops,
+        "voidDeaths": void_deaths,
+        "rangerEnergy": ranger_energy,
+        "summary": summarize_counts(bow_groups, ranger_energy, water_drops),
+        "debugCounts": {
+            **{key: len(value) for key, value in events.items() if isinstance(value, list)},
+            "extraPositionEvents": len(extra_position_events),
+        },
+    }
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUT_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"wrote {OUT_PATH}")
+    print(json.dumps({
+        "bowGroupsByPhase": result["summary"]["bowGroupsByPhase"],
+        "voidDeaths": len(void_deaths),
+        "p2MissedPhantom": result["summary"]["p2MissedPhantomByPlayer"],
+        "p2MissedEnergy": result["summary"]["p2MissedEnergyByPlayer"],
+    }, ensure_ascii=False, indent=2))
+
+
+if __name__ == "__main__":
+    main()

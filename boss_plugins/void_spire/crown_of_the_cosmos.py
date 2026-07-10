@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import time
 from collections import defaultdict
@@ -13,7 +14,7 @@ import urllib3
 
 from analyzer_core.concurrency import MAX_REQUEST_THREADS, request_post, run_parallel_indexed
 from analyzer_core.progress import emit_progress
-from boss_plugins.common import write_json_result
+from boss_plugins.common import build_player_mechanic_roles, role_text as common_role_text, write_json_result
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -430,31 +431,24 @@ def actor(actor_map, actor_id):
 
 
 def build_player_roles(combatant_info):
-    roles = {}
-    for event in combatant_info:
-        source_id = event.get("sourceID")
-        spec_id = event.get("specID") or event.get("specId") or event.get("spec")
-        try:
-            spec_id = int(spec_id)
-        except (TypeError, ValueError):
-            spec_id = None
-        if not source_id:
-            continue
-        if spec_id in TANK_SPEC_IDS:
-            roles[source_id] = "tank"
-        elif spec_id in HEALER_SPEC_IDS:
-            roles[source_id] = "healer"
-        else:
-            roles.setdefault(source_id, "dps")
-    return roles
+    return build_player_mechanic_roles(combatant_info)
 
 
 def role_text(role):
-    return {"tank": "坦克", "healer": "治疗", "dps": "伤害输出"}.get(role or "unknown", "未知")
+    return common_role_text(role)
 
 
 def merge_roles(existing_roles, new_roles):
-    order = {"tank": 0, "healer": 1, "dps": 2, "unknown": 3}
+    order = {
+        "tank": 0,
+        "melee-healer": 1,
+        "range-healer": 2,
+        "melee-dps": 3,
+        "range-dps": 4,
+        "healer": 5,
+        "dps": 6,
+        "unknown": 7,
+    }
     roles = {role for role in (existing_roles or []) + (new_roles or []) if role and role != "unknown"}
     return sorted(roles, key=lambda role: order.get(role, 99))
 
@@ -1876,6 +1870,306 @@ def actor_position_at(timestamp, target_id, resource_events, window_ms=10_000):
     }
 
 
+def event_facing(event):
+    value = event.get("facing")
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def normalize_facing_radians(raw_facing):
+    if raw_facing is None:
+        return None
+    # WCL position resources in this report encode facing as radians * 100.
+    radians = float(raw_facing) / 100.0
+    while radians <= -math.pi:
+        radians += math.tau
+    while radians > math.pi:
+        radians -= math.tau
+    return radians
+
+
+def nearest_actor_state(timestamp, actor_id, resource_events, window_ms=2_500):
+    candidates = [
+        event for event in resource_events
+        if (event.get("targetID") == actor_id or event.get("sourceID") == actor_id)
+        and event_point(event)
+        and abs(event.get("timestamp", 0) - timestamp) <= window_ms
+    ]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda event: (
+        0 if event_facing(event) is not None else 1,
+        abs(event.get("timestamp", 0) - timestamp),
+    ))
+    event = candidates[0]
+    x, y = event_point(event)
+    delta = int(event.get("timestamp", 0) - timestamp)
+    abs_delta = abs(delta)
+    confidence = "high" if abs_delta <= 500 else ("medium" if abs_delta <= 1_500 else "low")
+    return {
+        "timestamp": event.get("timestamp", 0),
+        "deltaMs": delta,
+        "confidence": confidence,
+        "sourceRule": "nearestEventWithFacing" if event_facing(event) is not None else "nearestEvent",
+        "x": x,
+        "y": y,
+        "rawFacing": event_facing(event),
+        "facingRadians": normalize_facing_radians(event_facing(event)),
+    }
+
+
+def confidence_from_delta(delta_ms):
+    if delta_ms is None:
+        return "unknown"
+    delta = abs(int(delta_ms))
+    if delta <= 500:
+        return "high"
+    if delta <= 1_500:
+        return "medium"
+    return "low"
+
+
+def project_point(point, angle, distance):
+    return (
+        point[0] + math.cos(angle) * distance,
+        point[1] + math.sin(angle) * distance,
+    )
+
+
+def distance_point_to_segment(point, start, end):
+    sx, sy = start
+    ex, ey = end
+    px, py = point
+    dx = ex - sx
+    dy = ey - sy
+    span = dx * dx + dy * dy
+    if span <= 0:
+        return point_distance(point, start)
+    t = max(0.0, min(1.0, ((px - sx) * dx + (py - sy) * dy) / span))
+    closest = (sx + t * dx, sy + t * dy)
+    return point_distance(point, closest)
+
+
+def ray_record(label, origin, angle, length=10_000):
+    end = project_point(origin, angle, length)
+    obelisk = project_point(origin, angle, 500)
+    return {
+        "label": label,
+        "angleRadians": round(angle, 4),
+        "startX": round(origin[0], 2),
+        "startY": round(origin[1], 2),
+        "endX": round(end[0], 2),
+        "endY": round(end[1], 2),
+        "obeliskX": round(obelisk[0], 2),
+        "obeliskY": round(obelisk[1], 2),
+    }
+
+
+def void_grasp_ray_set(origin, facing_radians):
+    if origin is None or facing_radians is None:
+        return []
+    directions = [
+        ("back", facing_radians + math.pi),
+        ("leftFront", facing_radians + math.pi / 3),
+        ("leftBack", facing_radians - math.pi / 3),
+    ]
+    return [ray_record(label, origin, angle) for label, angle in directions]
+
+
+def clean_point(point):
+    if not point:
+        return None
+    return {"x": round(point[0], 2), "y": round(point[1], 2), "yardX": round(point[0] / 100, 2), "yardY": round(point[1] / 100, 2)}
+
+
+def pair_void_grasp_events(debuffs, start_time=None, end_time=None):
+    active = {}
+    pairs = []
+    for event in sorted(debuffs, key=lambda item: item.get("timestamp", 0)):
+        if ability_id(event) != VOID_GRASP_ID:
+            continue
+        ts = event.get("timestamp", 0)
+        if start_time and ts < start_time:
+            continue
+        if end_time and ts > end_time:
+            continue
+        target_id = event.get("targetID")
+        if event_is_apply(event):
+            active[target_id] = event
+        elif event_is_remove(event):
+            apply_event = active.pop(target_id, None)
+            if apply_event:
+                pairs.append((apply_event, event))
+    return pairs
+
+
+def analyze_void_grasp_rays(fight, actor_map, actor_type, actor_game_id, debuffs, damage_events, resource_events, markers):
+    pairs = pair_void_grasp_events(debuffs, fight["startTime"], fight["endTime"])
+    records = []
+    for index, (apply_event, remove_event) in enumerate(pairs, start=1):
+        target_id = apply_event.get("targetID")
+        apply_ts = apply_event.get("timestamp", 0)
+        remove_ts = remove_event.get("timestamp", 0)
+        state = nearest_actor_state(apply_ts, target_id, resource_events, window_ms=3_000)
+        origin = (state["x"], state["y"]) if state else None
+        rays = void_grasp_ray_set(origin, state.get("facingRadians") if state else None)
+        hit_window_start = remove_ts - 500
+        hit_window_end = remove_ts + 2_000
+        hits = [
+            event for event in damage_events
+            if ability_id(event) == COLLAPSING_VOID_ID
+            and hit_window_start <= event.get("timestamp", 0) <= hit_window_end
+        ]
+        hit_rows = []
+        phantom_hits = 0
+        player_hits = 0
+        for event in hits:
+            target = event.get("targetID")
+            is_phantom = is_phantom_actor(actor_map, actor_game_id, target)
+            is_player = actor_type.get(target) == "Player"
+            if is_phantom:
+                phantom_hits += 1
+            if is_player:
+                player_hits += 1
+            point = event_point(event, "target") or event_point(event)
+            nearest_ray = None
+            if point and rays:
+                distances = [
+                    (ray["label"], distance_point_to_segment(point, (ray["startX"], ray["startY"]), (ray["endX"], ray["endY"])))
+                    for ray in rays
+                ]
+                label, distance = min(distances, key=lambda item: item[1])
+                nearest_ray = {"label": label, "distanceYards": round(coordinate_distance_yards(distance), 1)}
+            hit_rows.append({
+                "time": format_time(event.get("timestamp", 0) - fight["startTime"]),
+                "positionMs": int(event.get("timestamp", 0) - fight["startTime"]),
+                "target": actor(actor_map, target),
+                "targetID": target,
+                "targetType": "phantom" if is_phantom else ("player" if is_player else actor_type.get(target, "unknown")),
+                "amount": event_amount(event),
+                "point": clean_point(point),
+                "nearestRay": nearest_ray,
+            })
+        records.append({
+            "index": index,
+            "phase": phase_at(apply_ts, markers, fight),
+            "player": actor(actor_map, target_id),
+            "targetID": target_id,
+            "applyTime": format_time(apply_ts - fight["startTime"]),
+            "fireTime": format_time(remove_ts - fight["startTime"]),
+            "positionMs": int(remove_ts - fight["startTime"]),
+            "durationMs": int(remove_ts - apply_ts),
+            "state": {
+                "time": format_time(state["timestamp"] - fight["startTime"]) if state else None,
+                "deltaMs": state.get("deltaMs") if state else None,
+                "confidence": state.get("confidence") if state else "unknown",
+                "sourceRule": state.get("sourceRule") if state else "missing",
+                "point": clean_point(origin),
+                "facingRaw": round(state["rawFacing"], 2) if state and state.get("rawFacing") is not None else None,
+                "facingRadians": round(state["facingRadians"], 4) if state and state.get("facingRadians") is not None else None,
+            },
+            "rays": rays,
+            "hits": hit_rows,
+            "phantomHits": phantom_hits,
+            "playerHits": player_hits,
+            "status": "friendly_fire" if player_hits else ("hit_phantom" if phantom_hits else "no_hit"),
+            "text": f"{format_time(remove_ts - fight['startTime'])} {actor(actor_map, target_id)} 崩裂空无：命中幻影 {phantom_hits} 次，误伤玩家 {player_hits} 次，坐标置信度 {state.get('confidence') if state else 'unknown'}。",
+        })
+    return records
+
+
+def marked_player_id_set(row):
+    return {player.get("id") for player in row.get("markedPlayers", []) if player.get("id") is not None}
+
+
+def analyze_p1_arrow_audit(fight, actor_map, debuffs, damage_events, markers, resolved_rows=None):
+    clusters = silver_arrow_mark_clusters(fight, actor_map, debuffs, markers)
+    rows = []
+    for index, cluster in enumerate(clusters, start=1):
+        start = cluster["start"]
+        window_end = start + 12_000
+        hits = [
+            event for event in damage_events
+            if ability_id(event) == SILVER_ARROW_DAMAGE_ID
+            and start - 1_000 <= event.get("timestamp", 0) <= window_end
+        ]
+        boss_hits = [event for event in hits if is_boss_binding_target(actor_map, event)]
+        player_hits = [event for event in hits if event.get("targetID") in {player.get("id") for player in cluster.get("players", [])}]
+        source_ids = sorted({
+            event.get("sourceID")
+            for event in hits
+            if event.get("sourceID") in {player.get("id") for player in cluster.get("players", [])}
+        })
+        expected = nearest_expected_arrow(start - fight["startTime"])
+        rows.append({
+            "index": index,
+            "phase": "P1",
+            "time": format_time(start - fight["startTime"]),
+            "positionMs": int(start - fight["startTime"]),
+            "expectedTime": format_time(expected),
+            "expectedTarget": expected_arrow_target(expected),
+            "markedPlayers": cluster.get("players", []),
+            "shotPlayers": [{"id": player_id, "name": actor(actor_map, player_id)} for player_id in source_ids],
+            "bossHits": [
+                {
+                    "time": format_time(event.get("timestamp", 0) - fight["startTime"]),
+                    "target": event_target_name(actor_map, event),
+                    "source": actor(actor_map, event.get("sourceID")),
+                    "amount": event_amount(event),
+                }
+                for event in boss_hits
+            ],
+            "friendlyHits": [
+                {
+                    "time": format_time(event.get("timestamp", 0) - fight["startTime"]),
+                    "target": event_target_name(actor_map, event),
+                    "source": actor(actor_map, event.get("sourceID")),
+                    "amount": event_amount(event),
+                }
+                for event in player_hits
+            ],
+            "status": "hit_boss" if boss_hits else ("hit_player_only" if player_hits else "no_damage_hit"),
+            "text": f"P1 第 {index} 轮银锋箭：点名 {arrow_mark_names(cluster)}，命中 Boss/add {len(boss_hits)} 次，误伤点名玩家 {len(player_hits)} 次。",
+        })
+    for resolved in resolved_rows or []:
+        if resolved.get("kind") not in {"binding_removed", "silver_residue"}:
+            continue
+        resolved_ids = marked_player_id_set(resolved)
+        match = next((row for row in rows if resolved_ids and marked_player_id_set(row) == resolved_ids), None)
+        if not match:
+            match = {
+                "index": len(rows) + 1,
+                "phase": "P1",
+                "time": resolved.get("time"),
+                "positionMs": 0,
+                "expectedTime": resolved.get("expectedTime"),
+                "expectedTarget": resolved.get("target"),
+                "markedPlayers": resolved.get("markedPlayers") or [],
+                "shotPlayers": resolved.get("markedPlayers") or [],
+                "bossHits": [],
+                "friendlyHits": [],
+            }
+            rows.append(match)
+        match["status"] = "removed_boss_buff"
+        match["resolvedTarget"] = resolved.get("target")
+        match["resolvedKind"] = resolved.get("kind")
+        match["resolvedStack"] = resolved.get("stack")
+        match["shotPlayers"] = resolved.get("markedPlayers") or match.get("shotPlayers") or []
+        match["bossHits"] = [{
+            "time": resolved.get("time"),
+            "target": resolved.get("target"),
+            "source": arrow_mark_names({"players": resolved.get("markedPlayers") or []}),
+            "amount": 0,
+            "evidence": resolved.get("kind"),
+        }]
+        match["text"] = resolved.get("text") or match.get("text")
+    return rows
+
+
 def first_actor_position(actor_ids, resource_events, fight, window_ms=30_000):
     actor_ids = {actor_id for actor_id in actor_ids if actor_id is not None}
     if not actor_ids:
@@ -2212,6 +2506,9 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         p2_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P2"), actor_map, "P2")
         void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage)
 
+    void_grasp_rays = analyze_void_grasp_rays(fight, actor_map, actor_type, actor_game_id, detail_debuffs, detail_damage, position_events, markers)
+    p1_arrow_audit = analyze_p1_arrow_audit(fight, actor_map, detail_debuffs, detail_damage, markers, p1_arrow_rows)
+
     wipe_reason = classification["label"]
     wcl_link = ""
     investigation = ""
@@ -2321,6 +2618,20 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "summary": f"{len(shadow_misses)} 次",
             "rows": shadow_misses[:20],
         })
+    if p1_arrow_audit:
+        trial_records.append({
+            "type": "p1_arrow_audit",
+            "title": "P1 Silver Arrow boss-hit audit",
+            "summary": f"{len(p1_arrow_audit)} arrow rounds",
+            "rows": p1_arrow_audit,
+        })
+    if void_grasp_rays:
+        trial_records.append({
+            "type": "void_grasp_rays",
+            "title": "Collapsing Void ray simulation",
+            "summary": f"{len(void_grasp_rays)} void grasp casts",
+            "rows": void_grasp_rays,
+        })
     if energy_misses:
         trial_records.append({
             "type": "missed_energy",
@@ -2421,6 +2732,8 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "classificationKey": reason_key,
             "p1ArrowRows": p1_arrow_rows,
             "p1ArrowIssues": p1_arrow_issues,
+            "p1ArrowAudit": p1_arrow_audit,
+            "voidGraspRays": void_grasp_rays,
             "collapsingVoidDeaths": collapsing_deaths,
             "missedShadows": shadow_misses,
             "missedEnergy": energy_misses,
@@ -2451,7 +2764,9 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
     progress(f"死亡归因初判：{classification['phase']} / {classification['label']}", 2)
 
     plan = detail_spell_plan(classification, deaths)
-    needs_positions = VOID_REPULSION_DEBUFF_ID in plan["debuffs"]
+    needs_positions = bool(
+        {VOID_REPULSION_DEBUFF_ID, VOID_GRASP_ID, SILVER_ARROW_MARK_ID} & set(plan["debuffs"])
+    )
     detail_damage = fetch_spell_events(
         token,
         report_id,
@@ -2485,7 +2800,7 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
         )
     detail_casts = casts + fetch_spell_events(token, report_id, fight, "Casts", plan["casts"], "读取明细读条")
     position_events = []
-    if VOID_REPULSION_DEBUFF_ID in plan["debuffs"]:
+    if needs_positions:
         progress("读取坐标资源事件", 2)
         position_events = fetch_events_all(token, report_id, "Resources", fight, include_resources=True)
         progress(f"坐标资源事件：{len(position_events)} 条", 2)
@@ -2534,7 +2849,7 @@ def build_aggregated_json(report_ids):
             "raidName": "虚影尖塔",
             "bossKey": "crown_of_the_cosmos",
             "bossName": "宇宙之冕",
-            "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "机制统计"},
+            "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "开庭分析"},
             "avoidableSpells": {
                 "p15AvoidableDeaths": "P1.5 跑位死亡",
                 "collapsingVoidFriendlyFire": "崩裂空无误伤",
