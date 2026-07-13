@@ -224,6 +224,8 @@
     </section>
   </main>
 
+  <script src="./assets/vendor/wcl_hardcore_api.js"></script>
+  <script src="./assets/vendor/offline-data-loader.js"></script>
   <script>
     const ROUTE = new URLSearchParams(window.location.search);
     const DATA_URL = ROUTE.get('source') || 'tmp/crown_fight30_audit.json';
@@ -281,8 +283,7 @@
       const gravity = (state.data.gravityRounds || []).map(event => ({
         ...event, eventType: 'gravity', key: `gravity:${event.index}`, sortMs: event.applyTimeMs, displayTime: event.applyTime,
       }));
-      const rows = [...bows, ...waters, ...arrows, ...p3Events].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
-      return ROUTE_PHASE ? rows.filter(row => row.phase === ROUTE_PHASE) : rows;
+      return [...bows, ...waters, ...arrows, ...p3Events, ...gravity].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
     }
 
     function selectedEvent() {
@@ -640,7 +641,7 @@
 
     function renderDeathHealing() {
       const holder = document.getElementById('deathHealing');
-      const rows = state.data.voidDeaths.filter(row => (!ROUTE_PHASE || row.phase === ROUTE_PHASE) && (state.includeExempt || !row.exemptByPhantoms));
+      const rows = state.data.voidDeaths.filter(row => state.includeExempt || !row.exemptByPhantoms);
       holder.innerHTML = `<table><thead><tr><th>时间</th><th>死亡玩家</th><th>幻影数</th><th>6秒治疗总量</th><th>治疗拆分</th><th>不追究</th></tr></thead><tbody>${
         rows.map(row => `<tr>
           <td>${row.time}</td>
@@ -655,8 +656,7 @@
 
     function renderP2Stats() {
       const holder = document.getElementById('p2Stats');
-      holder.closest('.panel').style.display = ROUTE_PHASE && ROUTE_PHASE !== 'P2' ? 'none' : '';
-      if (ROUTE_PHASE && ROUTE_PHASE !== 'P2') return;
+      holder.closest('.panel').style.display = '';
       const missPhantom = state.data.summary.p2MissedPhantomByPlayer || [];
       const missEnergy = state.data.summary.p2MissedEnergyByPlayer || [];
       holder.innerHTML = `
@@ -666,22 +666,21 @@
 
     function renderWaterStats() {
       const allRows = state.data.summary.waterOutliersByPhase || {};
-      const rows = ROUTE_PHASE ? (allRows[ROUTE_PHASE] ? {[ROUTE_PHASE]: allRows[ROUTE_PHASE]} : {}) : allRows;
+      const rows = allRows;
       document.getElementById('waterStats').innerHTML = Object.keys(rows).length
         ? Object.entries(rows).map(([phase, players]) => `<div class="card"><h3>${phase}</h3><table><tbody>${players.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('')}</tbody></table></div>`).join('')
-        : '<div class="card muted">没有识别到超过 8 码的放水偏离。</div>';
+        : '<div class="card muted">没有识别到超过 15 码的放水偏离。</div>';
     }
 
     function renderPhaseStats() {
       const allRows = state.data.summary.bowGroupsByPhase || {};
-      const rows = ROUTE_PHASE ? {[ROUTE_PHASE]: allRows[ROUTE_PHASE] || 0} : allRows;
+      const rows = allRows;
       document.getElementById('phaseStats').innerHTML = `<table><tbody>${Object.entries(rows).map(([phase, count]) => `<tr><td>${phase}</td><td>${count}</td></tr>`).join('')}</tbody></table>`;
     }
 
     function renderGravityStats() {
       const holder = document.getElementById('gravityStats');
-      holder.closest('.panel').style.display = ROUTE_PHASE && ROUTE_PHASE !== 'P3' ? 'none' : '';
-      if (ROUTE_PHASE && ROUTE_PHASE !== 'P3') return;
+      holder.closest('.panel').style.display = '';
       const rows = state.data.gravityRounds || [];
       holder.innerHTML = `<table><thead><tr><th>轮次</th><th>点名</th><th>1棒</th><th>2棒间隔</th><th>3棒间隔</th><th>违规</th><th>死亡/归因</th></tr></thead><tbody>${rows.map(row => {
         const breaks = row.breaks || [];
@@ -731,7 +730,11 @@
           data = audit;
         }
         state.data = data;
-        if (ROUTE_TAG) state.selectedKey = ROUTE_TAG;
+        if (ROUTE_TAG) {
+          state.selectedKey = ROUTE_TAG;
+        } else if (ROUTE_PHASE) {
+          state.selectedKey = auditEvents().find(event => event.phase === ROUTE_PHASE)?.key || null;
+        }
         render();
       })
       .catch(error => {

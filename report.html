@@ -221,9 +221,9 @@
         <section v-if="isCrownBoss" v-show="currentTab === 'transition'" class="space-y-5">
             <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
                 <div class="px-5 py-4 border-b border-gray-800"><h2 class="text-lg font-bold text-white">转阶段死亡排名</h2></div>
-                <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排名</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">P1.5死亡</th><th class="p-3 text-center">P2.5击飞</th><th class="p-3 text-center">次元斩</th><th class="p-3 text-center">死亡</th><th class="p-3 text-right">合计</th></tr></thead>
-                    <tbody><tr v-for="(row,index) in transitionRanking" :key="row.name" class="border-t border-gray-800 hover:bg-gray-800/60"><td class="p-3 text-center text-gray-500">{{ index+1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono text-red-300">{{ row.categories['P1.5死亡'] || 0 }}</td><td class="p-3 text-center font-mono text-purple-300">{{ row.categories['P2.5击飞'] || 0 }}</td><td class="p-3 text-center font-mono text-amber-300">{{ row.categories['次元斩'] || 0 }}</td><td class="p-3 text-center font-mono">{{ transitionDeathDisplay(row) }}</td><td class="p-3 text-right font-mono font-bold">{{ row.total }}</td></tr>
-                    <tr v-if="!transitionRanking.length"><td colspan="8" class="p-12 text-center text-gray-500">没有识别到转阶段死亡。</td></tr></tbody>
+                <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排名</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">P1.5死亡</th><th class="p-3 text-center">P2.5死亡</th><th class="p-3 text-center">死亡</th><th class="p-3 text-right">合计</th></tr></thead>
+                    <tbody><tr v-for="(row,index) in transitionRanking" :key="row.name" class="border-t border-gray-800 hover:bg-gray-800/60"><td class="p-3 text-center text-gray-500">{{ index+1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono text-red-300">{{ row.categories['P1.5死亡'] || 0 }}</td><td class="p-3 text-center font-mono text-purple-300">{{ row.categories['P2.5死亡'] || 0 }}</td><td class="p-3 text-center font-mono">{{ transitionDeathDisplay(row) }}</td><td class="p-3 text-right font-mono font-bold">{{ row.total }}</td></tr>
+                    <tr v-if="!transitionRanking.length"><td colspan="7" class="p-12 text-center text-gray-500">没有识别到转阶段死亡。</td></tr></tbody>
                 </table>
             </div>
         </section>
@@ -1013,7 +1013,7 @@ createApp({
             return sections;
         },
         isSpatialCourtTab() {
-            return ['collapsingVoidSnapAiming','waterOutliers','p1SilverArrowDeaths','missedShadows','voidGraspHealingLow','voidGraspDeaths'].includes(this.avoidableTab);
+            return ['collapsingVoidSnapAiming','waterOutliers','p1SilverArrowDeaths','missedShadows','voidGraspHealingLow'].includes(this.avoidableTab);
         },
         activeCourtAnalysisRows() {
             const rows = [];
@@ -1088,26 +1088,6 @@ createApp({
                 }));
                 return rows;
             }
-            if (this.avoidableTab === 'voidGraspDeaths') {
-                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.voidGraspHealing || []).forEach((event, index) => {
-                    const displayedHealers = event.exempt ? (event.healers || []).filter(healer => Number(healer.healing8s || 0) > 0) : (event.healers || []);
-                    const healers = displayedHealers.map(healer => `${healer.healer} 8s=${this.number(healer.healing8s)}`).join('、') || '无治疗记录';
-                    const lowHealers = (event.healers || []).filter(healer => healer.insufficient === true);
-                    const exemption = (event.exemptionReasons || []).join('、');
-                    const bowText = event.bowGroup ? `${event.bowPhase || ''}拉弓#${event.phaseBowGroup || '-'}（全场#${event.bowGroup}）` : '未匹配到拉弓轮次';
-                    rows.push({
-                        key: `void-death-${fight.fightID}-${index}`,
-                        fightID: fight.fightID,
-                        group: event.bowGroup || index + 1,
-                        player: event.player,
-                        players: [event.player],
-                        counted: false,
-                        text: `${event.player} 于 ${bowText}中死于空虚之握（${event.time}）；死亡前8秒治疗阈值 ${this.number(this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000)}；${healers}${lowHealers.length ? `；低于阈值：${lowHealers.map(healer => healer.healer).join('、')}` : ''}${exemption ? `；豁免：${exemption}` : ''}`,
-                        link: this.fightAuditLink(fight),
-                    });
-                }));
-                return rows;
-            }
             (this.activeAvoidableRows || []).forEach(player => (player.events || []).forEach((event,index) => {
                 const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
                 if (!fight) return;
@@ -1117,7 +1097,7 @@ createApp({
                     : (event.text || event.countReason || `${player.name}：${event.ability || this.activeAvoidableLabel}`);
                 rows.push({ key:`${this.avoidableTab}-${player.name}-${event.fightID}-${index}`, fightID:event.fightID,
                     group:event.group || event.index || event.castIndex || (index + 1), player:player.name, players:names,
-                    counted:this.avoidableTab === 'voidGraspDeaths' ? false : event.counted !== false, text:names.length ? `点名玩家：${names.join('、')}；${detailText}` : detailText,
+                    counted:event.counted !== false, text:names.length ? `点名玩家：${names.join('、')}；${detailText}` : detailText,
                     link:this.courtEventLink(fight,event,this.avoidableTab) });
             }));
             return rows.sort((a,b) => Number(a.fightID)-Number(b.fightID) || Number(a.group||0)-Number(b.group||0));
@@ -1218,6 +1198,8 @@ createApp({
         fightAuditLink(fight, phase = null, tag = null) {
             const source = encodeURIComponent(this.jsonSource || './wcl_hardcore_api.json');
             const params = [`source=${source}`, `report=${encodeURIComponent(fight.reportID || '')}`, `fight=${encodeURIComponent(fight.fightID || '')}`];
+            if (phase) params.push(`phase=${encodeURIComponent(phase)}`);
+            if (tag) params.push(`tag=${encodeURIComponent(tag)}`);
             return `crown-fight-audit.html?${params.join('&')}`;
         },
         auditPhaseLinks(fight) {
@@ -1264,13 +1246,11 @@ createApp({
             return this.fightAuditLink(fight, phase || match?.phase, match ? `${type}:${match.id}` : null);
         },
         transitionCardClass(category) {
-            if (category === '次元斩') return 'bg-amber-950/40 border-amber-700 text-amber-200';
-            if (category === 'P2.5击飞') return 'bg-purple-950/40 border-purple-700 text-purple-200';
+            if (category === 'P2.5死亡') return 'bg-purple-950/40 border-purple-700 text-purple-200';
             return 'bg-red-950/40 border-red-700 text-red-200';
         },
         transitionTextClass(category) {
-            if (category === '次元斩') return 'text-amber-300';
-            if (category === 'P2.5击飞') return 'text-purple-300';
+            if (category === 'P2.5死亡') return 'text-purple-300';
             return 'text-red-300';
         },
         transitionDeathDisplay(row) {
@@ -1548,7 +1528,7 @@ createApp({
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
             const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
-            const avoidableDamageOrder = ['dailyAvoidableDamage','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter','devouringAbyss','voidResidue','corruptionEssenceDamage'];
+            const avoidableDamageOrder = ['dailyAvoidableDamage','devouringAbyss','voidResidue','corruptionEssenceDamage'];
             const skillKeys = Object.keys(this.avoidableBoard)
                 .filter(key => key !== 'total' && Array.isArray(this.avoidableBoard[key]))
                 .sort((a, b) => {

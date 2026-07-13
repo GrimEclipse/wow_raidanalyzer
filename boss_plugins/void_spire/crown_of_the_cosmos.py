@@ -155,9 +155,6 @@ P2_SHADOW_BINDING_ID = 1237844
 SHADOW_BINDING_IDS = {P1_SHADOW_BINDING_ID, P2_SHADOW_BINDING_ID}
 CORRUPTION_ID = 1261531
 AVOIDABLE_DAMAGE_SPELLS = {
-    "dimensionalSlashSteel": {"id": 1260838, "name": "次元斩（P3转阶段·钢铁）"},
-    "dimensionalSlashMoonRing": {"id": 1260839, "name": "次元斩（P3转阶段·月环）"},
-    "orbitingMatter": {"id": 1246001, "name": "环绕物质"},
     "devouringAbyss": {"id": 1243753, "name": "暴食深渊"},
     "voidResidue": {"id": 1242553, "name": "虚空残渣"},
     "corruptionEssenceDamage": {"id": CORRUPTION_ID, "name": "腐化精华"},
@@ -2954,16 +2951,12 @@ def build_transition_details(fight, actor_map, player_roles, deaths, markers, bu
         ability = death.get("killingAbilityGameID")
         if phase not in {"P1.5", "P2.5"} and ability not in DIMENSIONAL_SLASH_IDS:
             continue
-        if ability in DIMENSIONAL_SLASH_IDS:
-            category = "次元斩"
-        elif phase == "P2.5" and ability in {None, 3}:
-            category = "P2.5击飞"
-        else:
-            category = "P1.5死亡" if phase == "P1.5" else "P2.5击飞"
+        transition_phase = "P2.5" if ability in DIMENSIONAL_SLASH_IDS else phase
+        category = "P1.5死亡" if transition_phase == "P1.5" else "P2.5死亡"
         target_id = death.get("targetID")
         rows.append({
             "category": category,
-            "phase": phase,
+            "phase": transition_phase,
             "time": format_time(death.get("timestamp", 0) - fight["startTime"]),
             "positionMs": int(death.get("timestamp", 0) - fight["startTime"]),
             "player": actor(actor_map, target_id),
@@ -2982,7 +2975,7 @@ def build_transition_details(fight, actor_map, player_roles, deaths, markers, bu
             continue
         target_id = event.get("targetID")
         rows.append({
-            "category": "P1.5死亡" if phase == "P1.5" else "P2.5击飞",
+            "category": "P1.5死亡" if phase == "P1.5" else "P2.5死亡",
             "phase": phase,
             "time": format_time(event.get("timestamp", 0) - fight["startTime"]),
             "positionMs": int(event.get("timestamp", 0) - fight["startTime"]),
@@ -3346,7 +3339,6 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         "interferenceShockInterrupts": [],
         "waterOutliers": [],
         "voidGraspHealingLow": [],
-        "voidGraspDeaths": [],
         "p1SilverArrowDeaths": [],
         "missedShadows": [],
         "gravityLineViolation": [],
@@ -3366,16 +3358,34 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     local_board["interferenceShockInterrupts"] = list(shock_board.values())
 
     water_board = {}
-    for row in void_repulsion_rows:
-        if row.get("phase") == "P2" and (row.get("details") or [{}])[0].get("castIndex") == 1:
+    audit_water_events = (field_audit or {}).get("waterEvents") or []
+    first_p2_water_id = next((event.get("id") for event in audit_water_events if event.get("phase") == "P2"), None)
+    for water_event in audit_water_events:
+        if water_event.get("id") == first_p2_water_id:
             continue
-        for drop in row.get("details") or []:
-            if drop.get("status") != "偏散":
+        for drop in water_event.get("drops") or []:
+            if not drop.get("isOutlier") or drop.get("applyTimeMs") is None:
                 continue
             name = drop.get("player")
             item = water_board.setdefault(name, build_board_row(name, "waterOutliers", "放水未集中", role=player_roles.get(drop.get("targetID"), "unknown")))
             item["hitCount"] += 1
-            item["events"].append({**drop, "fightID": fight["id"], "counted": True, "countReason": "坐标离组超过15码"})
+            item["events"].append({
+                "time": drop.get("time"),
+                "positionMs": drop.get("timeMs"),
+                "phase": water_event.get("phase"),
+                "group": water_event.get("index"),
+                "player": name,
+                "targetID": drop.get("targetID"),
+                "markTime": format_time(drop.get("applyTimeMs")),
+                "markPositionMs": drop.get("applyTimeMs"),
+                "distanceFromCenter": drop.get("distanceFromGroupYards"),
+                "distanceFromGroupYards": drop.get("distanceFromGroupYards"),
+                "position": drop.get("position"),
+                "fightID": fight["id"],
+                "tag": f"water:{water_event.get('id')}",
+                "counted": True,
+                "countReason": "坐标离组超过15码",
+            })
     local_board["waterOutliers"] = list(water_board.values())
 
     healing_board = {}
@@ -3410,32 +3420,6 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 "text": f"{death_row['player']} 于 Fight{fight['id']} {bow_text}中阵亡（{death_row['time']}）；死亡前8秒内 {name} 对其治疗量为 {healing_amount:,}",
             })
     local_board["voidGraspHealingLow"] = list(healing_board.values())
-
-    void_grasp_death_board = {}
-    for death_row in void_grasp_healing:
-        name = death_row["player"]
-        target_id = death_row["playerID"]
-        item = void_grasp_death_board.setdefault(
-            name,
-            build_board_row(name, "voidGraspDeaths", "空虚之握死亡", role=player_roles.get(target_id, "unknown")),
-        )
-        item["hitCount"] += 1
-        item["deathCount"] += 1
-        low_healers = [
-            healer for healer in death_row.get("healers") or []
-            if healer.get("insufficient")
-        ]
-        item["events"].append({
-            **death_row,
-            "fightID": fight["id"],
-            "counted": False,
-            "countReason": (
-                f"豁免：{'、'.join(death_row.get('exemptionReasons') or [])}"
-                if death_row.get("exempt") else "空虚之握死亡记录，暂不计入终审"
-            ),
-            "lowHealers": low_healers,
-        })
-    local_board["voidGraspDeaths"] = list(void_grasp_death_board.values())
 
     silver_death_board = {}
     for death_row in death_timeline:
@@ -3743,7 +3727,6 @@ def build_aggregated_json(report_ids):
                 "missedShadows": "P2 拉弓未命中幻影",
                 "waterOutliers": "放水未集中",
                 "voidGraspHealingLow": "空虚之握死亡治疗不足",
-                "voidGraspDeaths": "空虚之握死亡",
                 "p1SilverArrowDeaths": "P1 银锋箭高伤致死",
                 **{key: row["name"] for key, row in AVOIDABLE_DAMAGE_SPELLS.items()},
                 "interferenceShockInterrupts": "干扰震荡打断",
