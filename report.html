@@ -379,9 +379,10 @@
                                 <th class="py-2 px-3 text-center w-16">排名</th>
                                 <th class="py-2 px-3 text-left">玩家</th>
                                 <th class="py-2 px-3 text-center">职责</th>
-                                <th class="py-2 px-3 text-right cursor-pointer select-none" @click="setAvoidableSort('totalDamage')">承受伤害 <span class="text-gray-600">{{ sortIcon('totalDamage') }}</span></th>
-                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('hitCount')">次数 <span class="text-gray-600">{{ sortIcon('hitCount') }}</span></th>
-                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('deathCount')">直接死亡 <span class="text-gray-600">{{ sortIcon('deathCount') }}</span></th>
+                                <th v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-right cursor-pointer select-none" @click="setAvoidableSort('totalDamage')">承受伤害 <span class="text-gray-600">{{ sortIcon('totalDamage') }}</span></th>
+                                <th v-if="['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('markedCount')">{{ avoidableTab === 'missedShadows' ? 'P2被点名次数' : '被点名次数' }} <span class="text-gray-600">{{ sortIcon('markedCount') }}</span></th>
+                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('hitCount')">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '甩狙次数' : (avoidableTab === 'missedShadows' ? '未命中次数' : '次数') }} <span class="text-gray-600">{{ sortIcon('hitCount') }}</span></th>
+                                <th v-if="avoidableTab !== 'missedShadows'" class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('deathCount')">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '导致队友死亡次数' : '直接死亡' }} <span class="text-gray-600">{{ sortIcon('deathCount') }}</span></th>
                                 <th class="py-2 px-3 text-center">明细</th>
                             </tr>
                             </thead>
@@ -390,12 +391,13 @@
                                 <td class="py-2 px-3 text-center text-gray-500 font-bold">{{ index + 1 }}</td>
                                 <td class="py-2 px-3 text-blue-300 font-bold">{{ player.name }}</td>
                                 <td class="py-2 px-3 text-center text-gray-300">{{ roleIcons(player.roles || player.role) }}</td>
-                                <td class="py-2 px-3 text-right font-mono">{{ player.damageText || (Number(player.totalDamage || 0) > 0 ? number(player.totalDamage) : '-') }}</td>
+                                <td v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-right font-mono">{{ player.damageText || (Number(player.totalDamage || 0) > 0 ? number(player.totalDamage) : '-') }}</td>
+                                <td v-if="['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-center text-blue-200 font-mono">{{ player.markedCount || 0 }}</td>
                                 <td class="py-2 px-3 text-center text-amber-300 font-mono">{{ player.hitCount }}</td>
-                                <td class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
+                                <td v-if="avoidableTab !== 'missedShadows'" class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
                                     {{ player.deathCount || 0 }}<span v-if="player.deathCompensationCount" class="text-amber-300">({{ avoidableDeathTotal(player) }})</span>
                                 </td>
-                                <td class="py-2 px-3 text-center"><button @click="courtDetailPlayer = player.name" class="px-2 py-1 rounded border border-sky-700 bg-sky-950/70 text-sky-100 hover:bg-sky-900 text-xs">查看明细</button></td>
+                                <td class="py-2 px-3 text-center"><button v-if="player.events?.length" @click="courtDetailPlayer = player.name" class="px-2 py-1 rounded border border-sky-700 bg-sky-950/70 text-sky-100 hover:bg-sky-900 text-xs">查看明细</button><span v-else class="text-gray-600">-</span></td>
                             </tr>
                             <tr v-if="activeAvoidableRows.length === 0">
                                 <td colspan="7" class="py-10 text-center text-gray-500">暂无确定归责的玩家；上方仍会展示不计数的分析结果。</td>
@@ -420,12 +422,12 @@
                         <h3 class="font-bold text-white mb-3">当前汇总</h3>
                         <div class="space-y-3 text-sm border-b border-gray-800 pb-4">
                             <div class="flex justify-between"><span class="text-gray-400">汇总项目</span><span class="font-bold text-amber-400">{{ activeAvoidableLabel }}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-400">总计伤害</span><span class="font-mono">{{ number(activeAvoidableTotal) }}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-400">命中次数</span><span class="font-mono">{{ activeAvoidableHits }}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-400">直接死亡</span><span class="font-mono text-red-300">{{ activeAvoidableDeaths }}</span></div>
+                            <div v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="flex justify-between"><span class="text-gray-400">总计伤害</span><span class="font-mono">{{ number(activeAvoidableTotal) }}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '甩狙次数' : (avoidableTab === 'missedShadows' ? '未命中次数' : '命中次数') }}</span><span class="font-mono">{{ activeAvoidableHits }}</span></div>
+                            <div v-if="avoidableTab !== 'missedShadows'" class="flex justify-between"><span class="text-gray-400">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '导致队友死亡次数' : '直接死亡' }}</span><span class="font-mono text-red-300">{{ activeAvoidableDeaths }}</span></div>
                         </div>
 
-                        <div class="mt-4">
+                        <div v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="mt-4">
                             <div class="flex justify-between items-end mb-2">
                                 <h4 class="text-xs text-gray-500">Details 伤害排行</h4>
                             </div>
@@ -461,9 +463,9 @@
         </section>
 
         <section v-if="isCrownBoss" v-show="currentTab === 'verdict'" class="bg-gray-900 border border-fuchsia-900 rounded-lg overflow-hidden">
-            <div class="px-5 py-4 border-b border-fuchsia-900 bg-fuchsia-950/30"><h2 class="text-xl font-black text-fuchsia-200">终审判决</h2><p class="text-xs text-gray-500 mt-1">智商损失按事件权重扣除后 × {{ meta?.courtConfig?.verdictPointsPerCount || 10 }}；坦克普通失误按 {{ meta?.courtConfig?.verdictTankMultiplier || 0.5 }} 倍，裂隙挥砍致倒坦及 P3 过场死亡按 3 倍。</p></div>
+            <div class="px-5 py-4 border-b border-fuchsia-900 bg-fuchsia-950/30"><h2 class="text-xl font-black text-fuchsia-200">终审判决</h2><p class="text-xs text-gray-500 mt-1">智商损失按事件权重扣除后 × {{ meta?.courtConfig?.verdictPointsPerCount || 10 }}；系统识别次数可在当前页面手动调整，刷新后恢复 JSON 初始判定值。</p></div>
             <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排行</th><th class="p-3 text-left">玩家名称</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">识别次数</th><th class="p-3 text-center">申诉无罪次数</th><th class="p-3 text-right">智商损失合计</th><th class="p-3 text-center w-40">明细</th></tr></thead>
-                <tbody><tr v-for="(row,index) in finalVerdict" :key="row.name" class="border-t border-gray-800 hover:bg-fuchsia-950/20 relative"><td class="p-3 text-center text-gray-500 font-mono">{{ index + 1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono">{{ row.recognitionCount }}</td><td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustAcquittal(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-emerald-300">{{ row.appealAcquittalCount }}</span><button @click="adjustAcquittal(row,1)" class="w-7 h-7 rounded border border-emerald-800 bg-emerald-950/60 hover:bg-emerald-900">＋</button></div></td><td class="p-3 text-right font-mono font-black text-fuchsia-300">{{ row.iqLoss }}</td><td class="p-3 text-center"><div class="relative inline-block"><button @click="verdictDetailPlayer = verdictDetailPlayer === row.name ? '' : row.name" class="px-2 py-1 rounded border border-fuchsia-700 bg-fuchsia-950/70 text-fuchsia-100 hover:bg-fuchsia-900 text-xs whitespace-nowrap">{{ verdictDetailPlayer === row.name ? '收起' : '查看明细' }}</button><div v-if="verdictDetailPlayer === row.name" class="absolute right-0 top-full mt-2 z-30 w-72 rounded border border-fuchsia-900 bg-gray-950 shadow-2xl p-3 text-left"><div class="flex items-center justify-between gap-2 mb-2"><h3 class="text-sm font-bold text-fuchsia-200 truncate">{{ row.name }}</h3><button @click.stop="verdictDetailPlayer=''" class="text-xs text-gray-400 hover:text-white shrink-0">×</button></div><div class="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar"><div v-for="item in verdictBreakdownRows(row)" :key="item.key" class="flex justify-between gap-3 rounded border border-gray-800 bg-gray-900 px-2.5 py-1.5 text-xs"><span class="text-gray-300">{{ item.label }}</span><span class="font-mono font-bold text-amber-300 shrink-0">{{ item.count }} 次</span></div><div v-if="!verdictBreakdownRows(row).length" class="text-xs text-gray-500 py-2 text-center">暂无明细</div></div></div></div></td></tr>
+                <tbody><tr v-for="(row,index) in finalVerdict" :key="row.name" class="border-t border-gray-800 hover:bg-fuchsia-950/20 relative"><td class="p-3 text-center text-gray-500 font-mono">{{ index + 1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustRecognition(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-amber-300">{{ row.recognitionCount }}</span><button @click="adjustRecognition(row,1)" class="w-7 h-7 rounded border border-amber-800 bg-amber-950/60 hover:bg-amber-900">＋</button></div></td><td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustAcquittal(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-emerald-300">{{ row.appealAcquittalCount }}</span><button @click="adjustAcquittal(row,1)" class="w-7 h-7 rounded border border-emerald-800 bg-emerald-950/60 hover:bg-emerald-900">＋</button></div></td><td class="p-3 text-right font-mono font-black text-fuchsia-300">{{ row.iqLoss }}</td><td class="p-3 text-center"><div class="relative inline-block"><button @click="verdictDetailPlayer = verdictDetailPlayer === row.name ? '' : row.name" class="px-2 py-1 rounded border border-fuchsia-700 bg-fuchsia-950/70 text-fuchsia-100 hover:bg-fuchsia-900 text-xs whitespace-nowrap">{{ verdictDetailPlayer === row.name ? '收起' : '查看明细' }}</button><div v-if="verdictDetailPlayer === row.name" class="absolute right-0 top-full mt-2 z-30 w-72 rounded border border-fuchsia-900 bg-gray-950 shadow-2xl p-3 text-left"><div class="flex items-center justify-between gap-2 mb-2"><h3 class="text-sm font-bold text-fuchsia-200 truncate">{{ row.name }}</h3><button @click.stop="verdictDetailPlayer=''" class="text-xs text-gray-400 hover:text-white shrink-0">×</button></div><div class="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar"><div v-for="item in verdictBreakdownRows(row)" :key="item.key" class="flex justify-between gap-3 rounded border border-gray-800 bg-gray-900 px-2.5 py-1.5 text-xs"><span class="text-gray-300">{{ item.label }}</span><span class="font-mono font-bold text-amber-300 shrink-0">{{ item.count }} 次</span></div><div v-if="!verdictBreakdownRows(row).length" class="text-xs text-gray-500 py-2 text-center">暂无明细</div></div></div></div></td></tr>
                 <tr v-if="!finalVerdict.length"><td colspan="7" class="p-12 text-center text-gray-500">暂无判决记录。</td></tr></tbody>
             </table>
             <div class="p-4 border-t border-fuchsia-900 flex justify-end"><button @click="confirmVerdict" class="px-5 py-2 rounded border border-fuchsia-500 bg-fuchsia-800 text-white font-bold hover:bg-fuchsia-700">确认申诉并重新排序<span v-if="verdictDirty"> *</span></button></div>
@@ -1011,7 +1013,7 @@ createApp({
             return sections;
         },
         isSpatialCourtTab() {
-            return ['collapsingVoidFriendlyFire','waterOutliers','p1SilverArrowDeaths','missedShadows','voidGraspHealingLow','voidGraspDeaths'].includes(this.avoidableTab);
+            return ['collapsingVoidSnapAiming','waterOutliers','p1SilverArrowDeaths','missedShadows','voidGraspHealingLow','voidGraspDeaths'].includes(this.avoidableTab);
         },
         activeCourtAnalysisRows() {
             const rows = [];
@@ -1023,15 +1025,15 @@ createApp({
                     const audit = fight?.crownOfTheCosmos?.fieldAudit;
                     const arrow = (audit?.silverArrows || []).find(row => row.phase === 'P2' && Number(row.index) === Number(group));
                     rows.push({ key:`energy-${fight.fightID}-${group}-${index}`, fightID:fight.fightID, group, player:players[0], players,
-                        counted:event.counted === true, countedPlayers:event.counted === true ? players : [],
-                        text: players.length ? `点名玩家：${players.join('、')}；${event.countReason || event.text}` : event.text,
+                        counted:event.verdictCounted === true, countedPlayers:event.verdictCounted === true ? players : [],
+                        text: players.length ? `点名玩家：${players.join('、')}；${event.countReason || event.text}；仅展示，不计入终审` : `${event.text || ''}；仅展示，不计入终审`,
                         link: this.fightAuditLink(fight, 'P2', arrow ? `silverArrow:${arrow.id}` : null) });
                 }));
                 return rows;
             }
             if (this.avoidableTab === 'missedShadows') {
                 this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.fieldAudit?.bowGroups || []).filter(group => group.phase === 'P2').forEach(group => {
-                    const missed = (group.players || []).filter(player => player.missedPhantom);
+                    const missed = (group.players || []).filter(player => player.missedPhantom && !player.diedAtFire);
                     if (!missed.length) return;
                     const countedPlayers = missed.filter(player => (player.shotAttribution || []).some(attr => ['high','medium'].includes(attr.confidence) && String(attr.verdict || '').includes('未命中'))).map(player => player.player);
                     rows.push({ key:`shadow-${fight.fightID}-${group.id}`, fightID:fight.fightID, group:group.index,
@@ -1044,7 +1046,7 @@ createApp({
             if (this.avoidableTab === 'tankRiftSlashFailure') {
                 this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.riftSlashTankSwaps || []).forEach((event,index) => rows.push({
                     key:`rift-${fight.fightID}-${index}`, fightID:fight.fightID, group:index+1,
-                    player:event.offender, players:[event.offender], counted:event.counted === true,
+                    player:event.offender, players:[event.offender], counted:event.counted === true && event.causedTankDeath === true,
                     text:event.text + ` ${event.countReason || ''}`, link:this.courtEventLink(fight,event,'tankRiftSlashFailure'),
                 })));
                 return rows;
@@ -1092,26 +1094,17 @@ createApp({
                     const healers = displayedHealers.map(healer => `${healer.healer} 8s=${this.number(healer.healing8s)}`).join('、') || '无治疗记录';
                     const lowHealers = (event.healers || []).filter(healer => healer.insufficient === true);
                     const exemption = (event.exemptionReasons || []).join('、');
+                    const bowText = event.bowGroup ? `${event.bowPhase || ''}拉弓#${event.phaseBowGroup || '-'}（全场#${event.bowGroup}）` : '未匹配到拉弓轮次';
                     rows.push({
                         key: `void-death-${fight.fightID}-${index}`,
                         fightID: fight.fightID,
-                        group: index + 1,
+                        group: event.bowGroup || index + 1,
                         player: event.player,
                         players: [event.player],
                         counted: false,
-                        text: `${event.player} 死于空虚之握（${event.time}）；8秒治疗阈值 ${this.number(this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000)}；${healers}${lowHealers.length ? `；低于阈值：${lowHealers.map(healer => healer.healer).join('、')}` : ''}${exemption ? `；豁免：${exemption}` : ''}`,
+                        text: `${event.player} 于 ${bowText}中死于空虚之握（${event.time}）；死亡前8秒治疗阈值 ${this.number(this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000)}；${healers}${lowHealers.length ? `；低于阈值：${lowHealers.map(healer => healer.healer).join('、')}` : ''}${exemption ? `；豁免：${exemption}` : ''}`,
                         link: this.fightAuditLink(fight),
                     });
-                }));
-                return rows;
-            }
-            if (this.avoidableTab === 'p3TransitionMistake') {
-                this.rawWipeAnalysis.forEach(fight => (fight.transitionDetails || []).filter(event => event.phase === 'P2.5' && event.deathCount).forEach((event,index) => {
-                    const abandoned = fight?.crownOfTheCosmos?.transitionAbandoned === true || fight?.crownOfTheCosmos?.classificationKey === 'phase_abandon';
-                    rows.push({ key:`p3-transition-${fight.fightID}-${index}`, fightID:fight.fightID, group:index+1,
-                        player:event.player, players:[event.player], counted:!abandoned,
-                        text:`${event.player} ${event.ability}；${abandoned ? '本场已判定放弃，不计数' : (event.role === 'tank' ? '坦克过场失误，按3倍' : '过场失误死亡')}`,
-                        link:this.fightAuditLink(fight,'P3') });
                 }));
                 return rows;
             }
@@ -1124,7 +1117,7 @@ createApp({
                     : (event.text || event.countReason || `${player.name}：${event.ability || this.activeAvoidableLabel}`);
                 rows.push({ key:`${this.avoidableTab}-${player.name}-${event.fightID}-${index}`, fightID:event.fightID,
                     group:event.group || event.index || event.castIndex || (index + 1), player:player.name, players:names,
-                    counted:this.avoidableTab === 'collapsingVoidFriendlyFire' || this.avoidableTab === 'voidGraspDeaths' ? false : event.counted !== false, text:names.length ? `点名玩家：${names.join('、')}；${detailText}` : detailText,
+                    counted:this.avoidableTab === 'voidGraspDeaths' ? false : event.counted !== false, text:names.length ? `点名玩家：${names.join('、')}；${detailText}` : detailText,
                     link:this.courtEventLink(fight,event,this.avoidableTab) });
             }));
             return rows.sort((a,b) => Number(a.fightID)-Number(b.fightID) || Number(a.group||0)-Number(b.group||0));
@@ -1240,10 +1233,10 @@ createApp({
                 || (skillKey === 'p1SilverArrowDeaths' || skillKey === 'corruptionEssenceHits' ? 'P1' : null)
                 || (skillKey === 'p15AvoidableDeaths' ? 'P1.5' : null)
                 || (skillKey === 'tankRiftSlashFailure' || skillKey === 'missedShadows' || skillKey === 'missedEnergy' ? 'P2' : null)
-                || (skillKey === 'p3TransitionMistake' || skillKey === 'gravityLineViolation' ? 'P3' : null);
+                || (skillKey === 'gravityLineViolation' ? 'P3' : null);
             if (skillKey === 'p15AvoidableDeaths') return this.fightAuditLink(fight, 'P1.5');
             if (event.tag) return this.fightAuditLink(fight, phase, event.tag);
-            if (skillKey === 'p3TransitionMistake' || skillKey === 'gravityLineViolation') return this.fightAuditLink(fight, 'P3');
+            if (skillKey === 'gravityLineViolation') return this.fightAuditLink(fight, 'P3');
             if (!audit) return this.fightAuditLink(fight, phase);
             const timeMs = event.positionMs ?? event.timeMs ?? this.parseTimeToSeconds(event.time || '') * 1000;
             let type = 'bow'; let candidates = audit.bowGroups || [];
@@ -1255,12 +1248,6 @@ createApp({
         },
         courtDetailLinkForPlayer(player) {
             let event = (player?.events || [])[0];
-            if ((!event || !event.fightID) && this.avoidableTab === 'collapsingVoidFriendlyFire') {
-                for (const candidateFight of this.rawWipeAnalysis) {
-                    const ray = (candidateFight?.crownOfTheCosmos?.voidGraspRays || []).find(row => row.player === player.name && (row.playerHits || 0) > 0);
-                    if (ray) { event = { fightID: candidateFight.fightID, phase: ray.phase, positionMs: ray.positionMs, time: ray.fireTime }; break; }
-                }
-            }
             if (!event) return '';
             const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
             if (!fight) return '';
@@ -1296,13 +1283,21 @@ createApp({
             row.appealAcquittalCount = Math.max(0, Math.min(Number(row.recognitionCount || 0), current + delta));
             this.verdictDirty = true;
         },
+        adjustRecognition(row, delta) {
+            const current = Number(row.recognitionCount || 0);
+            row.recognitionCount = Math.max(0, current + delta);
+            row.appealAcquittalCount = Math.min(Number(row.appealAcquittalCount || 0), row.recognitionCount);
+            this.verdictDirty = true;
+        },
         confirmVerdict() {
             const base = Number(this.meta?.courtConfig?.verdictPointsPerCount || 10);
             const tankMultiplier = Number(this.meta?.courtConfig?.verdictTankMultiplier || 0.5);
             this.finalVerdict.forEach(row => {
                 const multiplier = (row.roles || []).includes('tank') ? tankMultiplier : 1;
                 row.scoreMultiplier = multiplier;
-                const penaltyUnits = Number(row.penaltyUnits ?? (Number(row.recognitionCount || 0) * multiplier));
+                const initialRecognition = Number(row.initialRecognitionCount ?? row.recognitionCount ?? 0);
+                const initialPenaltyUnits = Number(row.initialPenaltyUnits ?? row.penaltyUnits ?? (initialRecognition * multiplier));
+                const penaltyUnits = Math.max(0, initialPenaltyUnits + (Number(row.recognitionCount || 0) - initialRecognition) * multiplier);
                 row.iqLoss = Math.round(Math.max(0, penaltyUnits - Number(row.appealAcquittalCount || 0) * Number(row.appealUnitMultiplier || multiplier)) * base);
             });
             this.finalVerdict.sort((a,b) => b.iqLoss - a.iqLoss || b.recognitionCount - a.recognitionCount || a.name.localeCompare(b.name));
@@ -1538,7 +1533,11 @@ createApp({
 
             this.glaiveBoard = result.data.page2_glaiveBoard || [];
             this.transitionAnalysis = result.data.page2_transitionAnalysis || { summary: [], fights: [] };
-            this.finalVerdict = result.data.page4_finalVerdict || [];
+            this.finalVerdict = (result.data.page4_finalVerdict || []).map(row => ({
+                ...row,
+                initialRecognitionCount: Number(row.recognitionCount || 0),
+                initialPenaltyUnits: Number(row.penaltyUnits ?? 0),
+            }));
             this.verdictDirty = false;
             if (this.isCrownBoss) this.confirmVerdict();
             this.avoidableBoard = { ...(result.data.page2_avoidableBoard || {}) };
@@ -1549,8 +1548,14 @@ createApp({
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
             const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
+            const avoidableDamageOrder = ['dailyAvoidableDamage','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter','devouringAbyss','voidResidue','corruptionEssenceDamage'];
             const skillKeys = Object.keys(this.avoidableBoard)
-                .filter(key => key !== 'total' && Array.isArray(this.avoidableBoard[key]));
+                .filter(key => key !== 'total' && Array.isArray(this.avoidableBoard[key]))
+                .sort((a, b) => {
+                    const rankA = avoidableDamageOrder.includes(a) ? avoidableDamageOrder.indexOf(a) : avoidableDamageOrder.length;
+                    const rankB = avoidableDamageOrder.includes(b) ? avoidableDamageOrder.indexOf(b) : avoidableDamageOrder.length;
+                    return rankA - rankB;
+                });
 
             if (showAvoidableTotal) {
                 skillKeys.forEach(key => {

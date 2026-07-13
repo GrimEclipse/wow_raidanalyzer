@@ -660,7 +660,7 @@
       const missPhantom = state.data.summary.p2MissedPhantomByPlayer || [];
       const missEnergy = state.data.summary.p2MissedEnergyByPlayer || [];
       holder.innerHTML = `
-        <div class="card"><h3>没有射到银色幻影</h3><table><tbody>${missPhantom.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('') || '<tr><td class="muted">无</td></tr>'}</tbody></table></div>
+        <div class="card"><h3>没有射到银色幻影</h3><table><thead><tr><th>玩家</th><th>P2被点名</th><th>未命中</th></tr></thead><tbody>${missPhantom.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.markedCount || 0}</td><td>${row.count}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">无</td></tr>'}</tbody></table></div>
         <div class="card"><h3>没有成功消 Boss 能量</h3><table><tbody>${missEnergy.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('') || '<tr><td class="muted">无</td></tr>'}</tbody></table></div>`;
     }
 

@@ -60,6 +60,7 @@ RIFT_SIMULACRUM_GAME_ID = 254098
 HEALER_SPEC_IDS = {65, 105, 256, 257, 264, 270, 1468}
 WATER_OUTLIER_YARDS = 15.0
 SNAP_MOVEMENT_YARDS = 5.0
+FIELD_AUDIT_VERSION = "2026-07-13-phantom-per-player-v2"
 RAY_LENGTH_RAW = 10_000.0
 RAY_WIDTH_RAW = 300.0
 OBELISK_DISTANCE_RAW = 500.0
@@ -677,11 +678,29 @@ def refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments
     for group in bow_groups:
         if group.get("phase") != "P2":
             continue
-        next_event = min((row for row in water_events if row.get("timeMs", 0) > group.get("fireTimeMs", 0)), key=lambda row: row["timeMs"], default=None)
+        evidence_nodes = [
+            {"timeMs": row.get("timeMs"), "time": row.get("time")}
+            for row in water_events
+            if row.get("timeMs", 0) > group.get("fireTimeMs", 0)
+        ]
+        evidence_nodes.extend({
+            "timeMs": row.get("applyStartMs"),
+            "time": row.get("applyStart"),
+        } for row in bow_groups if row is not group and row.get("applyStartMs", 0) > group.get("fireTimeMs", 0))
+        next_event = min(evidence_nodes, key=lambda row: row["timeMs"], default=None)
         if not next_event:
             continue
         next_abs = fight["startTime"] + next_event["timeMs"]
         shown_instances = {row.get("sourceInstance") for row in group.get("phantoms") or [] if row.get("sourceInstance") is not None}
+        group["phantomEligible"] = bool(shown_instances)
+        for player in group.get("players") or []:
+            if player.get("diedAtFire"):
+                player["missedPhantom"] = False
+                player["missedPhantomExemptReason"] = "崩裂空无结算期间死亡，暂不统计未命中幻影"
+        if not shown_instances:
+            for player in group.get("players") or []:
+                player["missedPhantom"] = False
+            continue
         surviving_instances = {
             segment.get("sourceInstance") for segment in phantom_segments
             if segment.get("sourceInstance") in shown_instances
@@ -695,6 +714,8 @@ def refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments
         if not removed_instances:
             if shown_instances and surviving_instances == shown_instances:
                 for player in group.get("players") or []:
+                    if player.get("diedAtFire") or not player.get("activePhantomInstances"):
+                        continue
                     player.setdefault("shotAttribution", []).append({
                         "phantom": None,
                         "verdict": "未命中",
@@ -711,7 +732,11 @@ def refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments
                 player_counts[platform] += 1
         phantom_by_instance = {row.get("sourceInstance"): row for row in group.get("phantoms") or []}
         for removed_instance in removed_instances:
-            direct = [player for player in group.get("players") or [] if any(hit.get("phantom") == removed_instance for hit in player.get("predictedPhantomHits") or [])]
+            direct = [
+                player for player in group.get("players") or []
+                if not player.get("diedAtFire")
+                and any(hit.get("phantom") == removed_instance for hit in player.get("predictedPhantomHits") or [])
+            ]
             if len(direct) == 1:
                 direct[0].setdefault("shotAttribution", []).append({"phantom": removed_instance, "verdict": "命中", "confidence": "high", "basis": "下个技能实例消失+射线相交"})
                 continue
@@ -720,6 +745,10 @@ def refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments
             expected = "range" if player_counts.get(platform, 0) >= 4 else "melee"
             candidates = []
             for player in group.get("players") or []:
+                if player.get("diedAtFire"):
+                    continue
+                if removed_instance not in (player.get("activePhantomInstances") or []):
+                    continue
                 role = player_roles.get(player.get("targetID"), "unknown")
                 role_side = "range" if role.startswith("range-") else ("melee" if role.startswith("melee-") or role == "tank" else "unknown")
                 player["mechanicRole"] = role
@@ -727,13 +756,35 @@ def refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments
                     candidates.append(player)
             if len(candidates) == 1:
                 candidates[0].setdefault("shotAttribution", []).append({"phantom": removed_instance, "verdict": "大概率命中", "confidence": "medium", "basis": f"下个技能实例消失；{platform}板块职责={expected}"})
-                for player in group.get("players") or []:
-                    if player is not candidates[0]:
-                        player.setdefault("shotAttribution", []).append({"phantom": removed_instance, "verdict": "大概率未命中", "confidence": "medium", "basis": "职责分配反证"})
             else:
                 for player in group.get("players") or []:
+                    if player.get("diedAtFire"):
+                        continue
+                    if removed_instance not in (player.get("activePhantomInstances") or []):
+                        continue
                     player.setdefault("shotAttribution", []).append({"phantom": removed_instance, "verdict": "无法唯一归因", "confidence": "low", "basis": "实例消失已确认，但射线/职责不能唯一归因"})
+        hit_players = [
+            player for player in group.get("players") or []
+            if any(item.get("verdict") in {"命中", "大概率命中"} for item in player.get("shotAttribution") or [])
+        ]
+        unassigned_players = [
+            player for player in group.get("players") or []
+            if not player.get("diedAtFire")
+            and player.get("activePhantomInstances")
+            and player not in hit_players
+        ]
+        if surviving_instances and len(unassigned_players) == 1:
+            unassigned_players[0].setdefault("shotAttribution", []).append({
+                "phantom": sorted(surviving_instances)[0],
+                "verdict": "未命中",
+                "confidence": "high",
+                "basis": "另一名点名已确认命中；该玩家对应幻影在下个技能节点仍存活",
+            })
         for player in group.get("players") or []:
+            if player.get("diedAtFire"):
+                player["missedPhantom"] = False
+                player["missedPhantomExemptReason"] = "崩裂空无结算期间死亡，暂不统计未命中幻影"
+                continue
             attributions = player.get("shotAttribution") or []
             if any(item["verdict"] in {"命中", "大概率命中"} for item in attributions):
                 player["missedPhantom"] = False
@@ -938,13 +989,16 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
         fire_ts = max(pair["remove"].get("timestamp", 0) for pair in cluster["pairs"])
         phase_name = phase_at(cluster["start"], phase)
         phase_start, _ = phase_window(fight, phase, phase_name)
-        active_phantoms = active_phantoms_at(phantom_segments, fire_ts)
-        resolved_instance_ids = {
-            segment.get("sourceInstance") for segment in active_phantoms
-            if segment.get("sourceInstance") is not None
-            and segment["first"] <= fire_ts
-            and 0 <= fire_ts - segment["last"] <= 2_200
-        }
+        active_by_player = {}
+        active_phantom_map = {}
+        for pair in cluster["pairs"]:
+            fade_ts = pair["remove"].get("timestamp", 0)
+            pair_key = (pair["targetID"], fade_ts)
+            pair_active = active_phantoms_at(phantom_segments, fade_ts)
+            active_by_player[pair_key] = pair_active
+            for segment in pair_active:
+                active_phantom_map[(segment.get("sourceID"), segment.get("sourceInstance"))] = segment
+        active_phantoms = list(active_phantom_map.values())
         phantom_rows = []
         for segment in active_phantoms:
             phantom_rows.append({
@@ -965,6 +1019,17 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
             target_id = pair["targetID"]
             apply_ts = pair["apply"].get("timestamp", 0)
             fade_ts = pair["remove"].get("timestamp", 0)
+            player_active_phantoms = active_by_player.get((target_id, fade_ts), [])
+            player_active_instances = sorted({
+                segment.get("sourceInstance") for segment in player_active_phantoms
+                if segment.get("sourceInstance") is not None
+            })
+            resolved_instance_ids = {
+                segment.get("sourceInstance") for segment in player_active_phantoms
+                if segment.get("sourceInstance") is not None
+                and segment["first"] <= fade_ts
+                and 0 <= fade_ts - segment["last"] <= 2_200
+            }
             death = next((
                 item for item in events["deaths"]
                 if item.get("targetID") == target_id
@@ -1010,6 +1075,8 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
             all_healing = healing_breakdown(events, healer_set, target_id, apply_ts, healing_end, actor_map, actor_game_id)
             predicted_phantom_hits = []
             for phantom in phantom_rows:
+                if phantom.get("sourceInstance") not in player_active_instances:
+                    continue
                 point = phantom.get("position")
                 if not point:
                     continue
@@ -1062,7 +1129,10 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 "resolvedPhantomInstances": resolved_by_geometry,
                 "resolutionEvidence": "damageEvent" if actual_phantom_hits else ("instance2sCycle+geometry" if resolved_by_geometry else "none"),
                 "predictedPhantomHits": predicted_phantom_hits,
-                "missedPhantom": phase_name == "P2" and bool(active_phantoms) and len(actual_phantom_hits) == 0 and len(predicted_phantom_hits) == 0,
+                "activePhantomInstances": player_active_instances,
+                "phantomEligible": phase_name == "P2" and bool(player_active_instances),
+                "potentialMissedPhantom": phase_name == "P2" and bool(player_active_instances) and len(actual_phantom_hits) == 0 and len(predicted_phantom_hits) == 0,
+                "missedPhantom": False,
                 "snapAimingDeaths": [{
                     "targetID": item.get("targetID"),
                     "player": event_actor_name(actor_map, actor_game_id, item.get("targetID")),
@@ -1091,6 +1161,7 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 and drop.get("maturesAtMs") is not None and drop["maturesAtMs"] <= rel(fight, fire_ts)
             ],
             "activePhantomCount": len(active_phantoms),
+            "phantomEligible": phase_name == "P2" and bool(active_phantoms),
             "eventType": "bow",
         })
     return groups
@@ -1309,11 +1380,19 @@ def build_ranger_energy(fight, actor_map, actor_game_id, events, phase):
 
 def summarize_counts(bow_groups, ranger_energy, water_drops):
     missed_phantom = defaultdict(int)
+    p2_marked = defaultdict(int)
+    snap_aiming = defaultdict(lambda: {"markedCount": 0, "snapCount": 0, "deathCount": 0})
     for group in bow_groups:
-        if group["phase"] != "P2":
-            continue
         for player in group["players"]:
-            if player.get("missedPhantom"):
+            snap_row = snap_aiming[player["player"]]
+            snap_row["markedCount"] += 1
+            if player.get("isSnapAiming"):
+                snap_row["snapCount"] += 1
+                snap_row["deathCount"] += len(player.get("snapAimingDeaths") or [])
+            if group["phase"] != "P2" or not player.get("phantomEligible"):
+                continue
+            p2_marked[player["player"]] += 1
+            if player.get("missedPhantom") and not player.get("diedAtFire"):
                 missed_phantom[player["player"]] += 1
     missed_energy = defaultdict(int)
     for row in ranger_energy:
@@ -1327,7 +1406,15 @@ def summarize_counts(bow_groups, ranger_energy, water_drops):
             water_outliers[drop["phase"]][drop["player"]] += 1
     return {
         "bowGroupsByPhase": dict(sorted((phase, sum(1 for group in bow_groups if group["phase"] == phase)) for phase in ["P1", "P1.5", "P2", "P2.5", "P3"])),
-        "p2MissedPhantomByPlayer": [{"player": player, "count": count} for player, count in sorted(missed_phantom.items(), key=lambda item: item[1], reverse=True)],
+        "p2MissedPhantomByPlayer": [
+            {"player": player, "markedCount": p2_marked[player], "count": count}
+            for player, count in sorted(missed_phantom.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "p2MarkedByPlayer": [{"player": player, "count": count} for player, count in sorted(p2_marked.items(), key=lambda item: item[1], reverse=True)],
+        "snapAimingByPlayer": [
+            {"player": player, **counts}
+            for player, counts in sorted(snap_aiming.items(), key=lambda item: (item[1]["deathCount"], item[1]["snapCount"], item[1]["markedCount"]), reverse=True)
+        ],
         "p2MissedEnergyByPlayer": [{"player": player, "count": count} for player, count in sorted(missed_energy.items(), key=lambda item: item[1], reverse=True)],
         "waterOutliersByPhase": {
             phase: [{"player": player, "count": count} for player, count in sorted(players.items(), key=lambda item: item[1], reverse=True)]
@@ -1414,6 +1501,7 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
         "meta": {
             "reportID": report_id,
             "fightID": fight["id"],
+            "schemaVersion": FIELD_AUDIT_VERSION,
             "sourceURL": f"https://www.warcraftlogs.com/reports/{report_id}?fight={fight['id']}",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks.",
