@@ -245,7 +245,7 @@
                     </div>
                 </div>
 
-                <div v-if="avoidableTab !== 'interferenceShockInterrupts'" class="border border-gray-800 rounded bg-gray-950 p-4">
+                <div class="border border-gray-800 rounded bg-gray-950 p-4">
                     <div class="flex items-center justify-between gap-3 mb-3"><h3 class="font-bold text-amber-100">{{ activeAvoidableLabel || '请选择分项' }}</h3><span class="text-xs text-gray-500">逐把分析 {{ activeCourtAnalysisRows().length }} 条</span></div>
                     <div class="space-y-2 max-h-72 overflow-y-auto no-scrollbar">
                         <div v-for="row in activeCourtAnalysisRows()" :key="row.key" class="grid grid-cols-[90px_1fr_72px_90px] gap-3 items-center rounded border border-gray-800 bg-gray-900/60 p-2 text-xs">
@@ -327,6 +327,14 @@
                                 </div>
                             </div>
 
+                            <div v-else-if="section.type === 'interference_shock'" class="space-y-2 text-xs text-gray-300">
+                                <div v-for="(row, idx) in section.rows" :key="'shock-' + idx" class="rounded border border-gray-800 bg-gray-950 p-2">
+                                    <div class="text-amber-200 font-bold">{{ row.time }} {{ row.source }} · {{ row.interruptedCount }} 人</div>
+                                    <div v-for="cast in row.interrupted" :key="cast.playerID + '-' + cast.spellID" class="mt-1 text-gray-400">
+                                        <span class="text-blue-300">{{ cast.player }}</span>：{{ cast.spell }}（{{ cast.spellID }}），{{ cast.castStart }} 开始读条
+                                    </div>
+                                </div>
+                            </div>
                             <div v-else class="space-y-2 text-xs text-gray-300">
                                 <div v-for="(row, idx) in section.rows" :key="'generic-' + section.key + '-' + idx" class="rounded border border-gray-800 bg-gray-950 p-2">
                                     {{ row.text || row.summary || JSON.stringify(row) }}
@@ -382,7 +390,7 @@
                                 <td class="py-2 px-3 text-center text-gray-500 font-bold">{{ index + 1 }}</td>
                                 <td class="py-2 px-3 text-blue-300 font-bold">{{ player.name }}</td>
                                 <td class="py-2 px-3 text-center text-gray-300">{{ roleIcons(player.roles || player.role) }}</td>
-                                <td class="py-2 px-3 text-right font-mono">{{ player.damageText || number(player.totalDamage) }}</td>
+                                <td class="py-2 px-3 text-right font-mono">{{ player.damageText || (Number(player.totalDamage || 0) > 0 ? number(player.totalDamage) : '-') }}</td>
                                 <td class="py-2 px-3 text-center text-amber-300 font-mono">{{ player.hitCount }}</td>
                                 <td class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
                                     {{ player.deathCount || 0 }}<span v-if="player.deathCompensationCount" class="text-amber-300">({{ avoidableDeathTotal(player) }})</span>
@@ -432,7 +440,7 @@
                                 <div v-for="player in activeAvoidableRows.slice(0, 10)" :key="'bar-' + player.name">
                                     <div class="flex justify-between text-xs mb-1">
                                         <span class="text-gray-300 truncate font-semibold">{{ player.name }}</span>
-                                        <span class="text-gray-400 font-mono">{{ player.damageText || number(player.totalDamage) }}</span>
+                                        <span class="text-gray-400 font-mono">{{ player.damageText || (Number(player.totalDamage || 0) > 0 ? number(player.totalDamage) : '-') }}</span>
                                     </div>
                                     <div class="h-2.5 bg-gray-800/80 rounded overflow-hidden flex w-full">
                                         <div class="flex h-full transition-all duration-500 ease-out" :style="{ width: percent(player.totalDamage, activeAvoidableMax) + '%' }">
@@ -997,7 +1005,7 @@ createApp({
                 sections.push({ key: 'gravity', type: 'generic', title: 'P3 重力坍缩归因', summary: `${gravityRows.length} 条`, rows: gravityRows });
             }
             const shocks = (crown.interferenceShockRows || []).filter(row => this.courtPhase === 'all' || row.phase === this.courtPhase);
-            if (shocks.length) sections.push({ key: 'interference-shock', type: 'generic', title: '干扰震荡打断', summary: `${shocks.reduce((sum,row)=>sum+(row.interruptedCount||0),0)} 人次`, rows: shocks });
+            if (shocks.length) sections.push({ key: 'interference-shock', type: 'interference_shock', title: '干扰震荡打断', summary: `${shocks.reduce((sum,row)=>sum+(row.interruptedCount||0),0)} 人次`, rows: shocks });
             const healing = crown.voidGraspHealing || [];
             if (healing.length && this.courtPhase === 'all') sections.push({ key: 'void-healing', type: 'generic', title: '空虚之握死亡治疗', summary: `${healing.length} 次死亡`, rows: healing });
             return sections;
@@ -1014,7 +1022,8 @@ createApp({
                     const players = event.players || [];
                     const audit = fight?.crownOfTheCosmos?.fieldAudit;
                     const arrow = (audit?.silverArrows || []).find(row => row.phase === 'P2' && Number(row.index) === Number(group));
-                    rows.push({ key:`energy-${fight.fightID}-${group}-${index}`, fightID:fight.fightID, group, players, counted:false,
+                    rows.push({ key:`energy-${fight.fightID}-${group}-${index}`, fightID:fight.fightID, group, player:players[0], players,
+                        counted:event.counted === true, countedPlayers:event.counted === true ? players : [],
                         text: players.length ? `点名玩家：${players.join('、')}；${event.countReason || event.text}` : event.text,
                         link: this.fightAuditLink(fight, 'P2', arrow ? `silverArrow:${arrow.id}` : null) });
                 }));
@@ -1040,10 +1049,49 @@ createApp({
                 })));
                 return rows;
             }
+            if (this.avoidableTab === 'interferenceShockInterrupts') {
+                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.interferenceShockRows || []).forEach(shock => {
+                    (shock.interrupted || []).forEach((cast, index) => rows.push({
+                        key:`shock-${fight.fightID}-${shock.index}-${cast.playerID}-${index}`,
+                        fightID:fight.fightID,
+                        group:shock.index,
+                        player:cast.player,
+                        players:[cast.player],
+                        counted:true,
+                        text:`${cast.player} 被干扰震荡打断：${cast.spell}（${cast.spellID}），${cast.castStart} 开始读条`,
+                        link:this.fightAuditLink(fight),
+                    }));
+                }));
+                return rows;
+            }
+            if (this.avoidableTab === 'gravityLineViolation') {
+                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.fieldAudit?.gravityRounds || []).forEach((event, index) => {
+                    const first = event.firstViolation || (event.violations || []).slice().sort((a,b) => Number(a.order || 99) - Number(b.order || 99))[0];
+                    const deathCount = Number(event.deathCount || 0);
+                    const deathText = deathCount && first ? `是（${first.player}·${deathCount}人）` : '否';
+                    const attribution = first
+                        ? `归因：${first.player}为第一个违规者（${first.rule}，${(Number(first.delayMs || 0) / 1000).toFixed(3)}秒）`
+                        : '归因：本轮没有发现违反时序的玩家';
+                    const exemption = event.exemptReason ? `；豁免：${event.exemptReason}` : '';
+                    rows.push({
+                        key:`gravity-${fight.fightID}-${event.index || index}`,
+                        fightID:fight.fightID,
+                        group:event.index || index + 1,
+                        player:first?.player,
+                        players:event.targets || [],
+                        counted:event.counted === true,
+                        text:`${event.applyTime || ''} 本轮是否减员：${deathText}；${attribution}${exemption}`,
+                        link:this.fightAuditLink(fight, 'P3'),
+                    });
+                }));
+                return rows;
+            }
             if (this.avoidableTab === 'voidGraspDeaths') {
                 this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.voidGraspHealing || []).forEach((event, index) => {
-                    const healers = (event.healers || []).map(healer => `${healer.healer} 8s=${this.number(healer.healing8s)}`).join('、') || '无治疗记录';
-                    const lowHealers = (event.healers || []).filter(healer => Number(healer.healing8s || 0) <= (this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000));
+                    const displayedHealers = event.exempt ? (event.healers || []).filter(healer => Number(healer.healing8s || 0) > 0) : (event.healers || []);
+                    const healers = displayedHealers.map(healer => `${healer.healer} 8s=${this.number(healer.healing8s)}`).join('、') || '无治疗记录';
+                    const lowHealers = (event.healers || []).filter(healer => healer.insufficient === true);
+                    const exemption = (event.exemptionReasons || []).join('、');
                     rows.push({
                         key: `void-death-${fight.fightID}-${index}`,
                         fightID: fight.fightID,
@@ -1051,7 +1099,7 @@ createApp({
                         player: event.player,
                         players: [event.player],
                         counted: false,
-                        text: `${event.player} 死于空虚之握（${event.time}）；8秒治疗阈值 ${this.number(this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000)}；${healers}${lowHealers.length ? `；低于阈值：${lowHealers.map(healer => healer.healer).join('、')}` : ''}`,
+                        text: `${event.player} 死于空虚之握（${event.time}）；8秒治疗阈值 ${this.number(this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000)}；${healers}${lowHealers.length ? `；低于阈值：${lowHealers.map(healer => healer.healer).join('、')}` : ''}${exemption ? `；豁免：${exemption}` : ''}`,
                         link: this.fightAuditLink(fight),
                     });
                 }));
@@ -1177,8 +1225,6 @@ createApp({
         fightAuditLink(fight, phase = null, tag = null) {
             const source = encodeURIComponent(this.jsonSource || './wcl_hardcore_api.json');
             const params = [`source=${source}`, `report=${encodeURIComponent(fight.reportID || '')}`, `fight=${encodeURIComponent(fight.fightID || '')}`];
-            if (phase) params.push(`phase=${encodeURIComponent(phase)}`);
-            if (tag) params.push(`tag=${encodeURIComponent(tag)}`);
             return `crown-fight-audit.html?${params.join('&')}`;
         },
         auditPhaseLinks(fight) {

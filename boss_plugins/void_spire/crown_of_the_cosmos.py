@@ -189,9 +189,31 @@ DESIGNATED_HEALER_IDS = {
     int(value) for value in os.getenv("CROWN_DESIGNATED_HEALER_IDS", "").split(",")
     if value.strip().isdigit()
 }
+
+PLAYER_CAST_NAMES = {
+    116: "Frostbolt",
+    596: "Prayer of Healing",
+    686: "Shadow Bolt",
+    1064: "Chain Heal",
+    2061: "Flash Heal",
+    6353: "Soul Fire",
+    29722: "Incinerate",
+    77472: "Healing Wave",
+    82326: "Holy Light",
+    105174: "Hand of Gul'dan",
+    116858: "Chaos Bolt",
+    199786: "Glacial Spike",
+    361469: "Living Flame",
+    373861: "Temporal Anomaly",
+}
+DESIGNATED_HEALER_NAMES = {
+    name.strip()
+    for name in os.getenv("CROWN_DESIGNATED_HEALER_NAMES", "旖旎云逸,暗黑膏药").split(",")
+    if name.strip()
+}
 VOID_GRASP_HEALING_MIN = int(os.getenv("CROWN_VOID_GRASP_HEALING_MIN", "200000"))
 VERDICT_POINTS_PER_COUNT = int(os.getenv("CROWN_VERDICT_POINTS_PER_COUNT", "10"))
-VERDICT_TANK_MULTIPLIER = float(os.getenv("CROWN_VERDICT_TANK_MULTIPLIER", "0.5"))
+VERDICT_TANK_MULTIPLIER = float(os.getenv("CROWN_VERDICT_TANK_MULTIPLIER", "1"))
 
 
 def configured_acquittals():
@@ -757,9 +779,10 @@ def fight_phase(markers, fight):
 def primary_wipe_phase(deaths, markers, fight):
     if not deaths:
         return fight_phase(markers, fight)
-    for cluster in cluster_events(deaths, window_ms=5_000):
-        if len(cluster["events"]) >= 2:
-            return phase_at(cluster["start"], markers, fight)
+    clusters = cluster_events(deaths, window_ms=5_000)
+    decisive = max(clusters, key=lambda cluster: len(cluster["events"]), default=None)
+    if decisive and len(decisive["events"]) >= 2:
+        return phase_at(decisive["start"], markers, fight)
     return phase_at(deaths[0].get("timestamp", fight["endTime"]), markers, fight)
 
 
@@ -899,9 +922,20 @@ def classify_fight(fight, deaths, markers, buffs):
 
     if phase in {"P2", "P2.5"}:
         if bridge_cluster_phase in {"P2", "P2.5", "P3"} and is_abandon_after_losses(deaths, bridge_cluster):
-            return {"key": "phase_abandon", "phase": bridge_cluster_phase, "label": f"{bridge_cluster_phase} 坠崖"}
+            prior_p2_real = [
+                death for death in deaths
+                if death.get("timestamp", 0) < bridge_cluster["start"]
+                and phase_at(death.get("timestamp", 0), markers, fight) == "P2"
+                and not is_bridge_death(death)
+            ]
+            label = (
+                "P2 入场时因 P1.5 前置减员过多放弃"
+                if bridge_cluster_phase == "P2" and not prior_p2_real
+                else f"{bridge_cluster_phase} 团队减员后放弃"
+            )
+            return {"key": "phase_abandon", "phase": bridge_cluster_phase, "label": label}
         if len(cosmic_barrier_deaths) >= max(2, int(len(phase_deaths) * 0.6)):
-            return {"key": "p2_phantom_barrier", "phase": phase, "label": f"{phase} 裂隙幻影未转火"}
+            return {"key": "p2_phantom_barrier", "phase": phase, "label": f"{phase} 宇宙屏障狂暴（裂隙幻影未及时击杀）"}
         if phase == "P2.5" and phase_bridge_deaths:
             if is_mass_abandon(deaths, phase_bridge_deaths):
                 return {"key": "phase_abandon", "phase": "P2.5", "label": "P2.5 坠崖"}
@@ -1343,7 +1377,7 @@ def analyze_collapsing_void(fight, actor_map, actor_type, deaths, damage_events,
         row = rows_by_player[source_name]
         row["name"] = source_name
         row["spellKey"] = "collapsingVoidFriendlyFire"
-        row["spellName"] = "崩裂空无误伤"
+        row["spellName"] = "崩裂空无误伤他人"
         source_id = source.get("targetID") if source else None
         source_role = player_roles.get(source_id, "unknown")
         row["role"] = source_role
@@ -1374,7 +1408,7 @@ def analyze_collapsing_void(fight, actor_map, actor_type, deaths, damage_events,
         row = rows_by_player[source_name]
         row["name"] = source_name
         row["spellKey"] = "collapsingVoidFriendlyFire"
-        row["spellName"] = "崩裂空无误伤"
+        row["spellName"] = "崩裂空无误伤他人"
         source_id = source.get("targetID") if source else None
         source_role = player_roles.get(source_id, "unknown")
         row["role"] = source_role
@@ -1590,6 +1624,36 @@ def analyze_p2_energy(markers, fight, debuffs, damage_events, energy_events, act
                 "text": f"{format_time(cluster['start'] - fight['startTime'])} 第 {index} 组游侠队长印记已消失 2 人（{player_names}），但未识别到奥蕾莉亚能量 -5（1259998）",
             })
     return rows
+
+
+def refine_p2_energy_with_field_audit(rows, field_audit, actor_map):
+    if not field_audit:
+        return rows
+    reverse_actor = {name: actor_id for actor_id, name in actor_map.items()}
+    refined = [row for row in rows if not row.get("counted")]
+    for arrow in field_audit.get("silverArrows") or []:
+        if arrow.get("phase") != "P2":
+            continue
+        for assignment in arrow.get("sourceAssignments") or []:
+            if assignment.get("bossEnergyDrained"):
+                continue
+            players = list(assignment.get("players") or [])
+            if not players:
+                continue
+            player_text = "、".join(players)
+            source_instance = assignment.get("sourceInstance")
+            refined.append({
+                "time": arrow.get("time"),
+                "group": arrow.get("index"),
+                "sourceInstance": source_instance,
+                "missingCount": 0,
+                "players": players,
+                "playerIDs": [reverse_actor.get(player) for player in players],
+                "counted": True,
+                "countReason": "该银色幻影对应的两名点名未使奥蕾莉亚能量 -5",
+                "text": f"{arrow.get('time')} 点名玩家：{player_text}；对应银色幻影 {source_instance or '-'} 未成功消除 Boss 能量",
+            })
+    return refined if len(refined) > sum(1 for row in rows if not row.get("counted")) else rows
 
 
 def analyze_ranger_mark_groups(markers, fight, debuffs, phase_name):
@@ -2589,7 +2653,7 @@ def analyze_interference_shock(fight, actor_map, actor_type, shock_casts, player
                 "player": actor(actor_map, source_id),
                 "role": "unknown",
                 "spellID": spell_id,
-                "spell": ability_name(event),
+                "spell": event.get("abilityName") or event.get("name") or PLAYER_CAST_NAMES.get(spell_id, f"Spell {spell_id}"),
                 "castStart": format_time(event.get("timestamp", 0) - fight["startTime"]),
                 "elapsedMs": int(shock_ts - event.get("timestamp", 0)),
             })
@@ -2607,8 +2671,14 @@ def analyze_interference_shock(fight, actor_map, actor_type, shock_casts, player
     return rows
 
 
-def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_target):
+def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_target, player_roles=None, field_audit=None, classification_key=None):
     rows = []
+    player_roles = player_roles or {}
+    audit_deaths = (field_audit or {}).get("voidDeaths") or []
+    if DESIGNATED_HEALER_IDS:
+        designated_ids = set(DESIGNATED_HEALER_IDS)
+    else:
+        designated_ids = {actor_id for actor_id, name in actor_map.items() if name in DESIGNATED_HEALER_NAMES}
     for death in deaths:
         if death.get("killingAbilityGameID") != VOID_GRASP_ID:
             continue
@@ -2625,16 +2695,33 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
                 eight[source_id] += amount
             if death_ts - 6_000 <= ts <= death_ts:
                 six[source_id] += amount
-        healer_ids = set(DESIGNATED_HEALER_IDS) or {
-            source_id for source_id in eight
-            if actor_type.get(source_id) == "Player"
+        prior_dead_ids = {
+            row.get("targetID") for row in deaths
+            if row.get("timestamp", 0) < death_ts
         }
+        healer_ids = designated_ids - prior_dead_ids
+        audit_death = min(
+            (
+                row for row in audit_deaths
+                if row.get("targetID") == target_id
+                and abs(int(row.get("timeMs") or 0) - int(death_ts - fight["startTime"])) <= 1_000
+            ),
+            key=lambda row: abs(int(row.get("timeMs") or 0) - int(death_ts - fight["startTime"])),
+            default=None,
+        )
+        active_phantoms = int((audit_death or {}).get("activePhantomCount") or 0)
+        exemption_reasons = []
+        if classification_key == "phase_abandon":
+            exemption_reasons.append("放弃/add引怪战斗")
+        if active_phantoms >= 4:
+            exemption_reasons.append(f"场上存活银色幻影{active_phantoms}个")
+        exempt = bool(exemption_reasons)
         breakdown = [{
             "healerID": source_id,
             "healer": actor(actor_map, source_id),
             "healing6s": six.get(source_id, 0),
             "healing8s": eight.get(source_id, 0),
-            "insufficient": source_id in DESIGNATED_HEALER_IDS and eight.get(source_id, 0) <= VOID_GRASP_HEALING_MIN,
+            "insufficient": not exempt and eight.get(source_id, 0) < VOID_GRASP_HEALING_MIN,
         } for source_id in sorted(healer_ids, key=lambda item: actor(actor_map, item))]
         rows.append({
             "time": format_time(death_ts - fight["startTime"]),
@@ -2642,9 +2729,13 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
             "playerID": target_id,
             "player": actor(actor_map, target_id),
             "healers": breakdown,
-            "totalHealing6s": sum(six.values()),
+            "totalHealing6s": sum(item["healing6s"] for item in breakdown),
             "window6s": f"{format_time(max(0, death_ts - fight['startTime'] - 6_000))}-{format_time(death_ts - fight['startTime'])}",
             "threshold8s": VOID_GRASP_HEALING_MIN,
+            "activePhantomCount": active_phantoms,
+            "exempt": exempt,
+            "exemptionReasons": exemption_reasons,
+            "counted": not exempt,
         })
     return rows
 
@@ -2853,7 +2944,11 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     void_grasp_rays = analyze_void_grasp_rays(fight, actor_map, actor_type, actor_game_id, detail_debuffs, detail_damage, position_events, markers)
     p1_arrow_audit = analyze_p1_arrow_audit(fight, actor_map, detail_debuffs, detail_damage, markers, p1_arrow_rows)
     interference_rows = analyze_interference_shock(fight, actor_map, actor_type, shock_casts, player_casts, markers)
-    void_grasp_healing = analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_target)
+    energy_misses = refine_p2_energy_with_field_audit(energy_misses, field_audit, actor_map)
+    void_grasp_healing = analyze_void_grasp_healing(
+        fight, actor_map, actor_type, deaths, healing_by_target,
+        player_roles=player_roles, field_audit=field_audit, classification_key=reason_key,
+    )
     transition_details = build_transition_details(fight, actor_map, player_roles, deaths, markers, detail_buffs)
     p3_portal_summons = build_p3_portal_summons(fight, actor_map, actor_game_id, detail_casts)
     rift_slash_rows = analyze_rift_slash_tank_swaps(fight, actor_map, actor_type, player_roles, detail_debuffs, deaths, markers)
@@ -2964,7 +3059,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     if collapsing_deaths:
         trial_records.append({
             "type": "collapsing_void_deaths",
-            "title": "崩裂空无误伤致死",
+            "title": "崩裂空无误伤他人致死",
             "summary": f"{len(collapsing_deaths)} 条致死记录",
             "rows": [{"text": text} for text in collapsing_deaths],
         })
@@ -3075,6 +3170,8 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     healing_board = {}
     for death_row in void_grasp_healing:
+        if death_row.get("exempt"):
+            continue
         for healer in death_row.get("healers") or []:
             if not healer.get("insufficient"):
                 continue
@@ -3097,13 +3194,16 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         item["deathCount"] += 1
         low_healers = [
             healer for healer in death_row.get("healers") or []
-            if int(healer.get("healing8s") or 0) <= VOID_GRASP_HEALING_MIN
+            if healer.get("insufficient")
         ]
         item["events"].append({
             **death_row,
             "fightID": fight["id"],
             "counted": False,
-            "countReason": "空虚之握死亡记录，暂不计入终审",
+            "countReason": (
+                f"豁免：{'、'.join(death_row.get('exemptionReasons') or [])}"
+                if death_row.get("exempt") else "空虚之握死亡记录，暂不计入终审"
+            ),
             "lowHealers": low_healers,
         })
     local_board["voidGraspDeaths"] = list(void_grasp_death_board.values())
@@ -3146,18 +3246,23 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     gravity_board = {}
     for gravity in (field_audit or {}).get("gravityRounds", []):
-        if not gravity.get("deathCount"):
+        first_violation = gravity.get("firstViolation") or min(
+            (row for row in gravity.get("violations") or []),
+            key=lambda row: int(row.get("order") or 999),
+            default=None,
+        )
+        if not first_violation or not gravity.get("deathCount") or gravity.get("counted") is False:
             continue
-        for violation in gravity.get("violations") or []:
-            name = violation.get("player")
-            item = gravity_board.setdefault(name, build_board_row(name, "gravityLineViolation", "P3 重力坍缩违规致死", role=player_roles.get(violation.get("targetID"), "unknown")))
-            item["hitCount"] += 1
-            item["deathCount"] += int(gravity.get("deathCount") or 0)
-            item["events"].append({
-                **violation, "fightID": fight["id"], "phase": "P3", "group": gravity.get("index"),
-                "deathCount": gravity.get("deathCount"), "counted": True,
-                "countReason": "违反拉线时序且本轮重力坍缩造成死亡",
-            })
+        name = first_violation.get("player")
+        item = gravity_board.setdefault(name, build_board_row(name, "gravityLineViolation", "P3 重力坍缩违规致死", role=player_roles.get(first_violation.get("targetID"), "unknown")))
+        item["hitCount"] += 1
+        item["deathCount"] += int(gravity.get("deathCount") or 0)
+        item["events"].append({
+            **first_violation, "fightID": fight["id"], "phase": "P3", "group": gravity.get("index"),
+            "players": gravity.get("targets") or [], "deathCount": gravity.get("deathCount"),
+            "deathPlayers": gravity.get("deathPlayers") or [], "counted": True,
+            "countReason": f"首个违规者导致本轮减员{int(gravity.get('deathCount') or 0)}人",
+        })
     local_board["gravityLineViolation"] = list(gravity_board.values())
 
     transition_board = {}
@@ -3445,7 +3550,7 @@ def build_aggregated_json(report_ids):
             "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "开庭面板", "transitionDetails": True, "finalVerdict": True},
             "avoidableSpells": {
                 "p15AvoidableDeaths": "P1.5 跑位死亡",
-                "collapsingVoidFriendlyFire": "崩裂空无误伤",
+                "collapsingVoidFriendlyFire": "崩裂空无误伤他人",
                 "missedEnergy": "P2消Boss能量失误",
                 "missedShadows": "P2 拉弓未命中幻影",
                 "waterOutliers": "放水未集中",
@@ -3462,6 +3567,7 @@ def build_aggregated_json(report_ids):
                 "waterOutlierYards": 15,
                 "voidGraspHealingThreshold8s": VOID_GRASP_HEALING_MIN,
                 "designatedHealerIDs": sorted(DESIGNATED_HEALER_IDS),
+                "designatedHealerNames": sorted(DESIGNATED_HEALER_NAMES),
                 "verdictPointsPerCount": VERDICT_POINTS_PER_COUNT,
                 "verdictTankMultiplier": VERDICT_TANK_MULTIPLIER,
             },

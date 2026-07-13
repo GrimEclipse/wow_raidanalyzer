@@ -963,14 +963,13 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
         ]
         for pair in cluster["pairs"]:
             target_id = pair["targetID"]
-            if any(
-                death.get("targetID") == target_id
-                and death.get("timestamp", 0) <= fire_ts
-                for death in events["deaths"]
-            ):
-                continue
             apply_ts = pair["apply"].get("timestamp", 0)
             fade_ts = pair["remove"].get("timestamp", 0)
+            death = next((
+                item for item in events["deaths"]
+                if item.get("targetID") == target_id
+                and apply_ts <= item.get("timestamp", 0) <= fade_ts + 1_000
+            ), None)
             apply_exact = event_point(pair["apply"], "target") or event_point(pair["apply"])
             apply_state = state_at(position_index, target_id, apply_ts, max_gap_ms=12_000)
             if apply_exact:
@@ -981,8 +980,8 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                     "facingRaw": event_facing(pair["apply"]),
                     "facingRadians": normalize_facing(event_facing(pair["apply"])),
                 })
-            fade_state = state_at(position_index, target_id, fade_ts, max_gap_ms=3_000)
-            last_second_state = state_at(position_index, target_id, fade_ts - 1_000, max_gap_ms=3_000)
+            fade_state = None if death else state_at(position_index, target_id, fade_ts, max_gap_ms=3_000)
+            last_second_state = None if death else state_at(position_index, target_id, fade_ts - 1_000, max_gap_ms=3_000)
             last_second_yards = None
             if last_second_state and fade_state:
                 last_second_yards = math.dist(
@@ -1006,7 +1005,6 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 and death.get("killingAbilityGameID") == SPELL["collapsing_void"]
                 and fade_ts <= death.get("timestamp", 0) <= fade_ts + 2_000
             ]
-            death = next((item for item in events["deaths"] if item.get("targetID") == target_id and apply_ts <= item.get("timestamp", 0) <= fade_ts), None)
             healing_end = death.get("timestamp", 0) if death else fade_ts
             healing_start = max(apply_ts, healing_end - 6_000) if death else apply_ts
             all_healing = healing_breakdown(events, healer_set, target_id, apply_ts, healing_end, actor_map, actor_game_id)
@@ -1039,6 +1037,9 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 "applyTime": fmt(rel(fight, apply_ts)),
                 "fadeTimeMs": rel(fight, fade_ts),
                 "fadeTime": fmt(rel(fight, fade_ts)),
+                "diedAtFire": bool(death),
+                "deathTimeMs": rel(fight, death.get("timestamp")) if death else None,
+                "deathTime": fmt(rel(fight, death.get("timestamp"))) if death else None,
                 "applyState": apply_state,
                 "applyFacingReliable": facing_reliable,
                 "fadeState": fade_state,
@@ -1177,7 +1178,7 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
     return rows
 
 
-def build_gravity_rounds(fight, actor_map, debuffs, deaths):
+def build_gravity_rounds(fight, actor_map, debuffs, deaths, player_roles):
     guard_applies = [event for event in debuffs if ability_id(event) == TERMINAL_GUARD_ID and event_type(event) == "applydebuff"]
     rounds = []
     for index, cluster in enumerate(group_by_window(guard_applies, 1_000), start=1):
@@ -1203,6 +1204,20 @@ def build_gravity_rounds(fight, actor_map, debuffs, deaths):
             })
             previous = event.get("timestamp", 0)
         gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == GRAVITY_COLLAPSE_DAMAGE_ID and start <= death.get("timestamp", 0) <= start + 25_000]
+        prior_deaths = [death for death in deaths if death.get("timestamp", 0) < start]
+        prior_dead_ids = {death.get("targetID") for death in prior_deaths if death.get("targetID") is not None}
+        prior_healer_deaths = [
+            death for death in prior_deaths
+            if str(player_roles.get(death.get("targetID"), "")).endswith("-healer")
+        ]
+        round_healer_deaths = [
+            death for death in gravity_deaths
+            if str(player_roles.get(death.get("targetID"), "")).endswith("-healer")
+        ]
+        healer_death_count = len(prior_healer_deaths) + len(round_healer_deaths)
+        first_violation = next((row for row in break_rows if not row["compliant"]), None)
+        attrition_exempt = len(prior_dead_ids) > 4 or healer_death_count > 2
+        counted = bool(gravity_deaths and first_violation and not attrition_exempt)
         trigger = max((row for row in break_rows if not gravity_deaths or fight["startTime"] + row["timeMs"] <= gravity_deaths[0].get("timestamp", 0)), key=lambda row: row["timeMs"], default=None)
         rounds.append({
             "index": index, "applyTimeMs": rel(fight, start), "applyTime": fmt(rel(fight, start)),
@@ -1210,6 +1225,18 @@ def build_gravity_rounds(fight, actor_map, debuffs, deaths):
             "breaks": break_rows, "violations": [row for row in break_rows if not row["compliant"]],
             "deathCount": len(gravity_deaths), "deathPlayers": [event_actor_name(actor_map, {}, death.get("targetID")) for death in gravity_deaths],
             "collapseTrigger": trigger,
+            "priorDeathCount": len(prior_dead_ids),
+            "priorHealerDeathCount": len(prior_healer_deaths),
+            "healerDeathCountThroughRound": healer_death_count,
+            "firstViolation": first_violation,
+            "attributedPlayer": first_violation.get("player") if first_violation else None,
+            "attributedPlayerID": first_violation.get("targetID") if first_violation else None,
+            "causedDeaths": bool(gravity_deaths),
+            "counted": counted,
+            "exemptReason": (
+                f"大团已减员过多（本轮前已有{len(prior_dead_ids)}名不同玩家死亡，本轮结算后治疗死亡{healer_death_count}人）"
+                if attrition_exempt else ("本轮没有造成减员" if not gravity_deaths else None)
+            ),
         })
     return rounds
 
@@ -1377,7 +1404,7 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
     ranger_energy = build_ranger_energy(fight, actor_map, actor_game_id, events, phase)
     void_deaths = build_void_death_healing(fight, actor_map, actor_game_id, events, healers, phantom_segments)
     p3_events, p3_contaminations = build_p3_events(fight, actor_map, actor_game_id, events, phase, position_index, players)
-    gravity_rounds = build_gravity_rounds(fight, actor_map, events["debuffs"], events["deaths"])
+    gravity_rounds = build_gravity_rounds(fight, actor_map, events["debuffs"], events["deaths"], player_roles)
     refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments, player_roles)
     rift_instances = build_rift_instances(fight, events["casts"] + extra_position_events, events["enemyDeaths"], actor_game_id)
     apply_npc_lifetimes(fight, events["enemyDeaths"], bow_groups + water_events + silver_arrows + p3_events)

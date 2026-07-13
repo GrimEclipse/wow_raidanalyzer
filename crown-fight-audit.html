@@ -612,7 +612,7 @@
         <tr>
           <td>${escapeHtml(player.player)}</td>
           <td>${player.applyTime}<br><span class="muted">${player.applyState?.confidence || 'unknown'}</span></td>
-          <td>${player.fadeTime}<br><span class="muted">${player.fadeState?.confidence || 'unknown'}</span></td>
+          <td>${player.fadeTime}<br><span class="muted">${player.diedAtFire ? '死亡时触发（不模拟射线）' : (player.fadeState?.confidence || 'unknown')}</span></td>
           <td>${player.actualPhantomHitCount || 0}</td>
           <td>${player.predictedPhantomHits?.length || 0}</td>
           <td>${(player.shotAttribution || []).map(item => `幻影${item.phantom}：${item.verdict}（${item.confidence}，${item.basis}）`).join('<br>') || '-'}</td>
