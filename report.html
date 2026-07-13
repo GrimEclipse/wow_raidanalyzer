@@ -37,8 +37,14 @@
             <button @click="currentTab='wipe'" :class="tabClass('wipe','red')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 灭团复盘
             </button>
+            <button v-if="isCrownBoss" @click="currentTab='transition'" :class="tabClass('transition','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
+                转阶段死亡
+            </button>
             <button @click="currentTab='avoidable'" :class="tabClass('avoidable','blue')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 {{ avoidablePanelLabel }}
+            </button>
+            <button v-if="isCrownBoss" @click="currentTab='verdict'" :class="tabClass('verdict','red')" class="px-5 py-2 text-sm rounded border border-fuchsia-500 bg-fuchsia-950/70 text-fuchsia-100 font-black transition hover:bg-fuchsia-900">
+                终审判决
             </button>
             <button v-if="showInterruptTab" @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 漏断统计
@@ -92,9 +98,7 @@
                                     </div>
                                     <div class="flex flex-col items-end gap-1">
                                         <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200 whitespace-nowrap">查看 WCL</a>
-                                        <button v-if="hasVoidRepulsionMap(fight)" @click="openVoidRepulsionDialog(fight)" class="text-xs px-2 py-0.5 rounded border border-purple-700 bg-purple-950/70 text-purple-100 hover:bg-purple-900 whitespace-nowrap">
-                                            查看场地图
-                                        </button>
+                                        <a v-if="isCrownBoss" :href="fightAuditLink(fight)" target="_blank" class="text-xs px-2 py-0.5 rounded border border-purple-700 bg-purple-950/70 text-purple-100 hover:bg-purple-900 whitespace-nowrap">场地分析 / 明细断案</a>
                                     </div>
                                 </div>
                                 <div class="p-4">
@@ -113,7 +117,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div v-if="fight.trialRecords && fight.trialRecords.length" class="mb-4 bg-gray-950 rounded border border-amber-900/70 overflow-hidden">
+                                    <div v-if="!isCrownBoss && fight.trialRecords && fight.trialRecords.length" class="mb-4 bg-gray-950 rounded border border-amber-900/70 overflow-hidden">
                                         <div class="px-3 py-2 text-xs font-bold text-amber-200 border-b border-amber-900/70">明细数据</div>
                                         <div class="max-h-44 overflow-y-auto no-scrollbar p-2 space-y-3">
                                             <section v-for="record in fight.trialRecords" :key="record.type + record.title" class="text-xs border-l border-amber-800 pl-2">
@@ -214,15 +218,25 @@
             </div>
         </section>
 
+        <section v-if="isCrownBoss" v-show="currentTab === 'transition'" class="space-y-5">
+            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-800"><h2 class="text-lg font-bold text-white">转阶段死亡排名</h2></div>
+                <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排名</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">P1.5死亡</th><th class="p-3 text-center">P2.5击飞</th><th class="p-3 text-center">次元斩</th><th class="p-3 text-center">死亡</th><th class="p-3 text-right">合计</th></tr></thead>
+                    <tbody><tr v-for="(row,index) in transitionRanking" :key="row.name" class="border-t border-gray-800 hover:bg-gray-800/60"><td class="p-3 text-center text-gray-500">{{ index+1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono text-red-300">{{ row.categories['P1.5死亡'] || 0 }}</td><td class="p-3 text-center font-mono text-purple-300">{{ row.categories['P2.5击飞'] || 0 }}</td><td class="p-3 text-center font-mono text-amber-300">{{ row.categories['次元斩'] || 0 }}</td><td class="p-3 text-center font-mono">{{ transitionDeathDisplay(row) }}</td><td class="p-3 text-right font-mono font-bold">{{ row.total }}</td></tr>
+                    <tr v-if="!transitionRanking.length"><td colspan="8" class="p-12 text-center text-gray-500">没有识别到转阶段死亡。</td></tr></tbody>
+                </table>
+            </div>
+        </section>
+
         <!-- 可躲避伤害 -->
         <section v-show="currentTab === 'avoidable'" class="space-y-5">
             <div v-if="courtFightCards.length" class="bg-gray-900 border border-gray-800 rounded-lg p-4 space-y-4">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                         <h2 class="text-lg font-bold text-white">开庭分析</h2>
-                        <p class="text-xs text-gray-500 mt-1">按全量与阶段返回可审查证据链，重点展示崩裂空无射线与 P1 银锋箭命中 Boss 定位。</p>
+                        <p class="text-xs text-gray-500 mt-1">这里只展示量化断案。坐标、射线和逐技能场面通过右侧阶段按钮进入完整场地推演。</p>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div v-if="false" class="flex flex-wrap gap-2">
                         <button v-for="tab in courtPhaseTabs" :key="tab.key" @click="courtPhase=tab.key"
                                 :class="courtPhase === tab.key ? 'bg-amber-600 text-white border-amber-300' : 'bg-gray-950 text-gray-400 border-gray-700 hover:bg-gray-800'"
                                 class="px-3 py-1.5 rounded border text-xs font-bold transition">
@@ -231,14 +245,30 @@
                     </div>
                 </div>
 
-                <article v-for="fight in courtFightCards" :key="'court-' + fight.reportID + '-' + fight.fightID"
+                <div v-if="avoidableTab !== 'interferenceShockInterrupts'" class="border border-gray-800 rounded bg-gray-950 p-4">
+                    <div class="flex items-center justify-between gap-3 mb-3"><h3 class="font-bold text-amber-100">{{ activeAvoidableLabel || '请选择分项' }}</h3><span class="text-xs text-gray-500">逐把分析 {{ activeCourtAnalysisRows().length }} 条</span></div>
+                    <div class="space-y-2 max-h-72 overflow-y-auto no-scrollbar">
+                        <div v-for="row in activeCourtAnalysisRows()" :key="row.key" class="grid grid-cols-[90px_1fr_72px_90px] gap-3 items-center rounded border border-gray-800 bg-gray-900/60 p-2 text-xs">
+                            <span class="font-mono text-gray-500">Fight{{ row.fightID }} #{{ row.group }}</span>
+                            <span class="text-gray-300">{{ row.text }}</span>
+                            <span class="font-bold" :class="row.counted ? 'text-red-300' : 'text-emerald-300'">{{ row.counted ? '计数' : '不计数' }}</span>
+                            <a v-if="row.link" :href="row.link" target="_blank" class="text-center px-2 py-1 rounded border border-purple-700 bg-purple-950/70 text-purple-100">定位Tag</a>
+                        </div>
+                        <div v-if="!activeCourtAnalysisRows().length" class="py-6 text-center text-gray-500">该分项暂无逐把记录。</div>
+                    </div>
+                </div>
+
+                <article v-if="false" v-for="fight in courtFightCards" :key="'court-' + fight.reportID + '-' + fight.fightID"
                          class="border border-gray-800 rounded bg-gray-950 overflow-hidden">
                     <header class="px-4 py-3 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <div class="text-xs text-gray-500 font-mono">{{ fight.reportID?.slice(0, 8) }} / Fight {{ fight.fightID }}</div>
                             <div class="text-sm font-bold text-white">{{ fight.fightName || 'Crown of the Cosmos' }} · {{ fight.duration }} · {{ fight.fightStatus === 'kill' ? '击杀' : fight.wipePhase }}</div>
                         </div>
-                        <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200">查看 WCL</a>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <a v-for="phase in auditPhaseLinks(fight)" :key="phase" :href="fightAuditLink(fight, phase)" target="_blank" class="text-xs px-2 py-1 rounded border border-purple-700 bg-purple-950/70 text-purple-100 hover:bg-purple-900">查看 {{ phase }} 场地</a>
+                            <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200">查看 WCL</a>
+                        </div>
                     </header>
 
                     <div v-if="courtSections(fight).length" class="p-4 space-y-4">
@@ -344,6 +374,7 @@
                                 <th class="py-2 px-3 text-right cursor-pointer select-none" @click="setAvoidableSort('totalDamage')">承受伤害 <span class="text-gray-600">{{ sortIcon('totalDamage') }}</span></th>
                                 <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('hitCount')">次数 <span class="text-gray-600">{{ sortIcon('hitCount') }}</span></th>
                                 <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('deathCount')">直接死亡 <span class="text-gray-600">{{ sortIcon('deathCount') }}</span></th>
+                                <th class="py-2 px-3 text-center">明细</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -356,15 +387,28 @@
                                 <td class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
                                     {{ player.deathCount || 0 }}<span v-if="player.deathCompensationCount" class="text-amber-300">({{ avoidableDeathTotal(player) }})</span>
                                 </td>
+                                <td class="py-2 px-3 text-center"><button @click="courtDetailPlayer = player.name" class="px-2 py-1 rounded border border-sky-700 bg-sky-950/70 text-sky-100 hover:bg-sky-900 text-xs">查看明细</button></td>
                             </tr>
                             <tr v-if="activeAvoidableRows.length === 0">
-                                <td colspan="6" class="py-10 text-center text-gray-500">暂无该技能承伤记录，若有数据请补充后端 Spell ID。</td>
+                                <td colspan="7" class="py-10 text-center text-gray-500">暂无确定归责的玩家；上方仍会展示不计数的分析结果。</td>
                             </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <aside class="bg-gray-950 border border-gray-800 rounded p-4 h-fit">
+                    <div v-if="courtDetailPlayer" class="order-3 lg:col-span-2 mt-4 rounded border border-sky-900 bg-gray-950 p-4">
+                        <div class="flex justify-between gap-3 mb-3"><h3 class="font-bold text-sky-200">{{ courtDetailPlayer }} · {{ activeAvoidableLabel }}明细</h3><button @click="courtDetailPlayer=''" class="text-xs text-gray-400">关闭</button></div>
+                        <div class="space-y-2">
+                            <div v-for="(row,index) in courtPlayerDetailRows()" :key="row.key" class="flex flex-wrap items-center gap-2 text-xs border-l-2 border-sky-800 pl-3 py-1">
+                                <span class="font-mono text-gray-500">{{ index+1 }}. Fight{{ row.fightID }} #{{ row.group || '-' }}</span>
+                                <span class="text-gray-300">{{ row.text }}</span>
+                                <span :class="row.counted ? 'text-red-300' : 'text-emerald-300'">{{ row.counted ? '计数' : '不计数' }}</span>
+                                <a v-if="row.link" :href="row.link" target="_blank" class="px-2 py-0.5 rounded border border-purple-700 text-purple-200">定位Tag</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <aside class="order-2 bg-gray-950 border border-gray-800 rounded p-4 h-fit">
                         <h3 class="font-bold text-white mb-3">当前汇总</h3>
                         <div class="space-y-3 text-sm border-b border-gray-800 pb-4">
                             <div class="flex justify-between"><span class="text-gray-400">汇总项目</span><span class="font-bold text-amber-400">{{ activeAvoidableLabel }}</span></div>
@@ -406,6 +450,15 @@
                     </aside>
                 </div>
             </div>
+        </section>
+
+        <section v-if="isCrownBoss" v-show="currentTab === 'verdict'" class="bg-gray-900 border border-fuchsia-900 rounded-lg overflow-hidden">
+            <div class="px-5 py-4 border-b border-fuchsia-900 bg-fuchsia-950/30"><h2 class="text-xl font-black text-fuchsia-200">终审判决</h2><p class="text-xs text-gray-500 mt-1">智商损失按事件权重扣除后 × {{ meta?.courtConfig?.verdictPointsPerCount || 10 }}；坦克普通失误按 {{ meta?.courtConfig?.verdictTankMultiplier || 0.5 }} 倍，裂隙挥砍致倒坦及 P3 过场死亡按 3 倍。</p></div>
+            <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排行</th><th class="p-3 text-left">玩家名称</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">识别次数</th><th class="p-3 text-center">申诉无罪次数</th><th class="p-3 text-right">智商损失合计</th><th class="p-3 text-center w-40">明细</th></tr></thead>
+                <tbody><tr v-for="(row,index) in finalVerdict" :key="row.name" class="border-t border-gray-800 hover:bg-fuchsia-950/20 relative"><td class="p-3 text-center text-gray-500 font-mono">{{ index + 1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono">{{ row.recognitionCount }}</td><td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustAcquittal(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-emerald-300">{{ row.appealAcquittalCount }}</span><button @click="adjustAcquittal(row,1)" class="w-7 h-7 rounded border border-emerald-800 bg-emerald-950/60 hover:bg-emerald-900">＋</button></div></td><td class="p-3 text-right font-mono font-black text-fuchsia-300">{{ row.iqLoss }}</td><td class="p-3 text-center"><div class="relative inline-block"><button @click="verdictDetailPlayer = verdictDetailPlayer === row.name ? '' : row.name" class="px-2 py-1 rounded border border-fuchsia-700 bg-fuchsia-950/70 text-fuchsia-100 hover:bg-fuchsia-900 text-xs whitespace-nowrap">{{ verdictDetailPlayer === row.name ? '收起' : '查看明细' }}</button><div v-if="verdictDetailPlayer === row.name" class="absolute right-0 top-full mt-2 z-30 w-72 rounded border border-fuchsia-900 bg-gray-950 shadow-2xl p-3 text-left"><div class="flex items-center justify-between gap-2 mb-2"><h3 class="text-sm font-bold text-fuchsia-200 truncate">{{ row.name }}</h3><button @click.stop="verdictDetailPlayer=''" class="text-xs text-gray-400 hover:text-white shrink-0">×</button></div><div class="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar"><div v-for="item in verdictBreakdownRows(row)" :key="item.key" class="flex justify-between gap-3 rounded border border-gray-800 bg-gray-900 px-2.5 py-1.5 text-xs"><span class="text-gray-300">{{ item.label }}</span><span class="font-mono font-bold text-amber-300 shrink-0">{{ item.count }} 次</span></div><div v-if="!verdictBreakdownRows(row).length" class="text-xs text-gray-500 py-2 text-center">暂无明细</div></div></div></div></td></tr>
+                <tr v-if="!finalVerdict.length"><td colspan="7" class="p-12 text-center text-gray-500">暂无判决记录。</td></tr></tbody>
+            </table>
+            <div class="p-4 border-t border-fuchsia-900 flex justify-end"><button @click="confirmVerdict" class="px-5 py-2 rounded border border-fuchsia-500 bg-fuchsia-800 text-white font-bold hover:bg-fuchsia-700">确认申诉并重新排序<span v-if="verdictDirty"> *</span></button></div>
         </section>
 
         <!-- 漏断统计 -->
@@ -614,6 +667,11 @@ createApp({
             meta: {},
             rawWipeAnalysis: [],
             avoidableBoard: {},
+            transitionAnalysis: { summary: [], fights: [] },
+            finalVerdict: [],
+            verdictDirty: false,
+            verdictDetailPlayer: '',
+            courtDetailPlayer: '',
             avoidableFirstDeathBoard: [],
             dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
@@ -685,6 +743,31 @@ createApp({
                     };
                 })
                 .sort((a, b) => this.phaseRank(b.phase) - this.phaseRank(a.phase));
+        },
+        isCrownBoss() {
+            return this.meta?.bossKey === 'crown_of_the_cosmos';
+        },
+        verdictDetailRow() {
+            return this.finalVerdict.find(row => row.name === this.verdictDetailPlayer) || null;
+        },
+        transitionRanking() {
+            const players = {};
+            (this.transitionAnalysis.fights || []).forEach(fight => (fight.rows || []).forEach(row => {
+                const item = players[row.player] || (players[row.player] = { name: row.player, roles: [], categories: {}, deathCount: 0, compensationCount: 0, total: 0 });
+                if (row.role && row.role !== 'unknown' && !item.roles.includes(row.role)) item.roles.push(row.role);
+                if (row.deathCount > 0) {
+                    item.categories[row.category] = (item.categories[row.category] || 0) + row.deathCount;
+                }
+                item.deathCount += row.deathCount || 0;
+                item.compensationCount += row.compensationCount || 0;
+                item.total += row.displayDeathCount || 1;
+            }));
+            Object.values(players).forEach(item => {
+                if (item.roles.length) return;
+                const globalRole = (this.finalVerdict || []).find(row => row.name === item.name)?.roles || [];
+                item.roles = globalRole.filter(role => role && role !== 'unknown');
+            });
+            return Object.values(players).sort((a,b) => b.total - a.total || b.deathCount - a.deathCount || a.name.localeCompare(b.name));
         },
         activeAvoidableRows() {
             return this.avoidableBoard[this.avoidableTab] || [];
@@ -815,6 +898,9 @@ createApp({
         },
         selectedRaid() {
             this.ensureSelection();
+        },
+        avoidableTab() {
+            this.courtDetailPlayer = '';
         }
     },
     methods: {
@@ -898,27 +984,6 @@ createApp({
         courtSections(fight) {
             const crown = fight.crownOfTheCosmos || {};
             const sections = [];
-            const p1ArrowAudit = (crown.p1ArrowAudit || []).filter(row => this.courtPhase === 'all' || this.courtPhase === 'P1');
-            if (p1ArrowAudit.length) {
-                sections.push({
-                    key: 'p1-arrow-audit',
-                    type: 'p1_arrow_audit',
-                    title: 'P1 银锋箭命中 Boss 定位',
-                    summary: `${p1ArrowAudit.length} 轮`,
-                    rows: p1ArrowAudit,
-                });
-            }
-            const rayRows = (crown.voidGraspRays || []).filter(row => this.courtPhaseMatches(row));
-            if (rayRows.length) {
-                const friendlyFire = rayRows.reduce((sum, row) => sum + (row.playerHits || 0), 0);
-                sections.push({
-                    key: 'void-grasp-rays',
-                    type: 'void_grasp_rays',
-                    title: '崩裂空无射线模拟',
-                    summary: `${rayRows.length} 次，误伤 ${friendlyFire}`,
-                    rows: rayRows,
-                });
-            }
             const missedEnergy = (crown.missedEnergy || []).filter(row => this.courtPhase === 'all' || this.courtPhase === 'P2');
             if (missedEnergy.length) {
                 sections.push({ key: 'missed-energy', type: 'generic', title: 'P2 银锋弹射消能失败', summary: `${missedEnergy.length} 条`, rows: missedEnergy });
@@ -931,11 +996,94 @@ createApp({
             if (gravityRows.length) {
                 sections.push({ key: 'gravity', type: 'generic', title: 'P3 重力坍缩归因', summary: `${gravityRows.length} 条`, rows: gravityRows });
             }
-            const voidWater = (crown.voidRepulsionPlacement || []).filter(row => this.courtPhase === 'all' || row.phase === this.courtPhase);
-            if (voidWater.length) {
-                sections.push({ key: 'void-water', type: 'generic', title: '虚空斥力放水', summary: `${voidWater.length} 组`, rows: voidWater });
-            }
+            const shocks = (crown.interferenceShockRows || []).filter(row => this.courtPhase === 'all' || row.phase === this.courtPhase);
+            if (shocks.length) sections.push({ key: 'interference-shock', type: 'generic', title: '干扰震荡打断', summary: `${shocks.reduce((sum,row)=>sum+(row.interruptedCount||0),0)} 人次`, rows: shocks });
+            const healing = crown.voidGraspHealing || [];
+            if (healing.length && this.courtPhase === 'all') sections.push({ key: 'void-healing', type: 'generic', title: '空虚之握死亡治疗', summary: `${healing.length} 次死亡`, rows: healing });
             return sections;
+        },
+        isSpatialCourtTab() {
+            return ['collapsingVoidFriendlyFire','waterOutliers','p1SilverArrowDeaths','missedShadows','voidGraspHealingLow','voidGraspDeaths'].includes(this.avoidableTab);
+        },
+        activeCourtAnalysisRows() {
+            const rows = [];
+            if (!this.avoidableTab) return rows;
+            if (this.avoidableTab === 'missedEnergy') {
+                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.missedEnergy || []).forEach((event, index) => {
+                    const group = event.group || '汇总';
+                    const players = event.players || [];
+                    const audit = fight?.crownOfTheCosmos?.fieldAudit;
+                    const arrow = (audit?.silverArrows || []).find(row => row.phase === 'P2' && Number(row.index) === Number(group));
+                    rows.push({ key:`energy-${fight.fightID}-${group}-${index}`, fightID:fight.fightID, group, players, counted:false,
+                        text: players.length ? `点名玩家：${players.join('、')}；${event.countReason || event.text}` : event.text,
+                        link: this.fightAuditLink(fight, 'P2', arrow ? `silverArrow:${arrow.id}` : null) });
+                }));
+                return rows;
+            }
+            if (this.avoidableTab === 'missedShadows') {
+                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.fieldAudit?.bowGroups || []).filter(group => group.phase === 'P2').forEach(group => {
+                    const missed = (group.players || []).filter(player => player.missedPhantom);
+                    if (!missed.length) return;
+                    const countedPlayers = missed.filter(player => (player.shotAttribution || []).some(attr => ['high','medium'].includes(attr.confidence) && String(attr.verdict || '').includes('未命中'))).map(player => player.player);
+                    rows.push({ key:`shadow-${fight.fightID}-${group.id}`, fightID:fight.fightID, group:group.index,
+                        players:(group.players || []).map(player => player.player), counted:countedPlayers.length > 0, countedPlayers,
+                        text:`点名玩家：${(group.players || []).map(player => player.player).join('、')}；疑似未命中：${missed.map(player => player.player).join('、')}${countedPlayers.length ? `；确定归责：${countedPlayers.join('、')}` : '；证据不足，不计数'}`,
+                        link:this.fightAuditLink(fight, 'P2', `bow:${group.id}`) });
+                }));
+                return rows;
+            }
+            if (this.avoidableTab === 'tankRiftSlashFailure') {
+                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.riftSlashTankSwaps || []).forEach((event,index) => rows.push({
+                    key:`rift-${fight.fightID}-${index}`, fightID:fight.fightID, group:index+1,
+                    player:event.offender, players:[event.offender], counted:event.counted === true,
+                    text:event.text + ` ${event.countReason || ''}`, link:this.courtEventLink(fight,event,'tankRiftSlashFailure'),
+                })));
+                return rows;
+            }
+            if (this.avoidableTab === 'voidGraspDeaths') {
+                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.voidGraspHealing || []).forEach((event, index) => {
+                    const healers = (event.healers || []).map(healer => `${healer.healer} 8s=${this.number(healer.healing8s)}`).join('、') || '无治疗记录';
+                    const lowHealers = (event.healers || []).filter(healer => Number(healer.healing8s || 0) <= (this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000));
+                    rows.push({
+                        key: `void-death-${fight.fightID}-${index}`,
+                        fightID: fight.fightID,
+                        group: index + 1,
+                        player: event.player,
+                        players: [event.player],
+                        counted: false,
+                        text: `${event.player} 死于空虚之握（${event.time}）；8秒治疗阈值 ${this.number(this.meta?.courtConfig?.voidGraspHealingThreshold8s || 200000)}；${healers}${lowHealers.length ? `；低于阈值：${lowHealers.map(healer => healer.healer).join('、')}` : ''}`,
+                        link: this.fightAuditLink(fight),
+                    });
+                }));
+                return rows;
+            }
+            if (this.avoidableTab === 'p3TransitionMistake') {
+                this.rawWipeAnalysis.forEach(fight => (fight.transitionDetails || []).filter(event => event.phase === 'P2.5' && event.deathCount).forEach((event,index) => {
+                    const abandoned = fight?.crownOfTheCosmos?.transitionAbandoned === true || fight?.crownOfTheCosmos?.classificationKey === 'phase_abandon';
+                    rows.push({ key:`p3-transition-${fight.fightID}-${index}`, fightID:fight.fightID, group:index+1,
+                        player:event.player, players:[event.player], counted:!abandoned,
+                        text:`${event.player} ${event.ability}；${abandoned ? '本场已判定放弃，不计数' : (event.role === 'tank' ? '坦克过场失误，按3倍' : '过场失误死亡')}`,
+                        link:this.fightAuditLink(fight,'P3') });
+                }));
+                return rows;
+            }
+            (this.activeAvoidableRows || []).forEach(player => (player.events || []).forEach((event,index) => {
+                const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
+                if (!fight) return;
+                const names = event.players || event.markPlayers || [];
+                const detailText = event.count != null && (this.avoidableTab === 'corruptionEssenceHits' || this.avoidableTab === 'corruptionEssenceTop3')
+                    ? `本场 ${event.count} 次；${event.countReason || ''}`
+                    : (event.text || event.countReason || `${player.name}：${event.ability || this.activeAvoidableLabel}`);
+                rows.push({ key:`${this.avoidableTab}-${player.name}-${event.fightID}-${index}`, fightID:event.fightID,
+                    group:event.group || event.index || event.castIndex || (index + 1), player:player.name, players:names,
+                    counted:this.avoidableTab === 'collapsingVoidFriendlyFire' || this.avoidableTab === 'voidGraspDeaths' ? false : event.counted !== false, text:names.length ? `点名玩家：${names.join('、')}；${detailText}` : detailText,
+                    link:this.courtEventLink(fight,event,this.avoidableTab) });
+            }));
+            return rows.sort((a,b) => Number(a.fightID)-Number(b.fightID) || Number(a.group||0)-Number(b.group||0));
+        },
+        courtPlayerDetailRows() {
+            if (!this.courtDetailPlayer) return [];
+            return this.activeCourtAnalysisRows().filter(row => row.player === this.courtDetailPlayer || (row.countedPlayers || []).includes(this.courtDetailPlayer) || (row.counted && (row.players || []).includes(this.courtDetailPlayer)));
         },
         courtPlayerList(players) {
             return (players || []).map(player => player.name || player.player || player).filter(Boolean).join('、');
@@ -992,16 +1140,23 @@ createApp({
         roleIcons(value) {
             const roles = Array.isArray(value) ? value : [value];
             const icons = {
-                tank: 'T',
-                healer: 'H',
-                dps: 'D',
-                'melee-dps': 'MD',
-                'melee-healer': 'MH',
-                'range-dps': 'RD',
-                'range-healer': 'RH',
+                tank: '🛡️',
+                healer: '✚',
+                dps: '⚔️',
+                'melee-dps': '🗡️',
+                'melee-healer': '✚',
+                'range-dps': '🏹',
+                'range-healer': '✚',
             };
             const unique = [...new Set(roles.filter(Boolean))];
             return unique.length ? unique.map(role => icons[role] || '?').join(' ') : '?';
+        },
+        verdictBreakdownRows(row) {
+            const labels = this.meta?.avoidableSpells || {};
+            return Object.entries(row?.breakdown || {})
+                .filter(([, count]) => Number(count || 0) > 0)
+                .map(([key, count]) => ({ key, count: Number(count), label: labels[key] || key }))
+                .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
         },
         setAvoidableSort(key) {
             if (this.avoidableSortKey === key) {
@@ -1018,6 +1173,94 @@ createApp({
         makeReplayLink(fight, positionMs) {
             if (!fight.reportID || !fight.fightID) return fight.wclDeepLink || '';
             return `https://cn.warcraftlogs.com/reports/${fight.reportID}#fight=${fight.fightID}&view=replay&position=${Math.max(0, Math.floor(positionMs))}`;
+        },
+        fightAuditLink(fight, phase = null, tag = null) {
+            const source = encodeURIComponent(this.jsonSource || './wcl_hardcore_api.json');
+            const params = [`source=${source}`, `report=${encodeURIComponent(fight.reportID || '')}`, `fight=${encodeURIComponent(fight.fightID || '')}`];
+            if (phase) params.push(`phase=${encodeURIComponent(phase)}`);
+            if (tag) params.push(`tag=${encodeURIComponent(tag)}`);
+            return `crown-fight-audit.html?${params.join('&')}`;
+        },
+        auditPhaseLinks(fight) {
+            const audit = fight?.crownOfTheCosmos?.fieldAudit;
+            if (!audit) return ['P1','P2','P3'];
+            const phases = new Set();
+            [...(audit.bowGroups || []), ...(audit.waterEvents || []), ...(audit.silverArrows || []), ...(audit.p3Events || [])].forEach(row => row.phase && phases.add(row.phase));
+            return ['P1','P2','P3'].filter(phase => phases.has(phase));
+        },
+        courtEventLink(fight, event, skillKey) {
+            const audit = fight?.crownOfTheCosmos?.fieldAudit;
+            const phase = event.phase
+                || (skillKey === 'p1SilverArrowDeaths' || skillKey === 'corruptionEssenceHits' ? 'P1' : null)
+                || (skillKey === 'p15AvoidableDeaths' ? 'P1.5' : null)
+                || (skillKey === 'tankRiftSlashFailure' || skillKey === 'missedShadows' || skillKey === 'missedEnergy' ? 'P2' : null)
+                || (skillKey === 'p3TransitionMistake' || skillKey === 'gravityLineViolation' ? 'P3' : null);
+            if (skillKey === 'p15AvoidableDeaths') return this.fightAuditLink(fight, 'P1.5');
+            if (event.tag) return this.fightAuditLink(fight, phase, event.tag);
+            if (skillKey === 'p3TransitionMistake' || skillKey === 'gravityLineViolation') return this.fightAuditLink(fight, 'P3');
+            if (!audit) return this.fightAuditLink(fight, phase);
+            const timeMs = event.positionMs ?? event.timeMs ?? this.parseTimeToSeconds(event.time || '') * 1000;
+            let type = 'bow'; let candidates = audit.bowGroups || [];
+            if (skillKey === 'waterOutliers') { type='water'; candidates=audit.waterEvents || []; }
+            else if (skillKey === 'p1SilverArrowDeaths' || skillKey === 'missedEnergy') { type='silverArrow'; candidates=audit.silverArrows || []; }
+            candidates = candidates.filter(row => !phase || row.phase === phase);
+            const match = candidates.sort((a,b) => Math.abs((a.fireTimeMs ?? a.timeMs ?? 0)-timeMs)-Math.abs((b.fireTimeMs ?? b.timeMs ?? 0)-timeMs))[0];
+            return this.fightAuditLink(fight, phase || match?.phase, match ? `${type}:${match.id}` : null);
+        },
+        courtDetailLinkForPlayer(player) {
+            let event = (player?.events || [])[0];
+            if ((!event || !event.fightID) && this.avoidableTab === 'collapsingVoidFriendlyFire') {
+                for (const candidateFight of this.rawWipeAnalysis) {
+                    const ray = (candidateFight?.crownOfTheCosmos?.voidGraspRays || []).find(row => row.player === player.name && (row.playerHits || 0) > 0);
+                    if (ray) { event = { fightID: candidateFight.fightID, phase: ray.phase, positionMs: ray.positionMs, time: ray.fireTime }; break; }
+                }
+            }
+            if (!event) return '';
+            const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
+            if (!fight) return '';
+            const audit = fight?.crownOfTheCosmos?.fieldAudit;
+            const phase = event.phase || (this.avoidableTab === 'p1SilverArrowDeaths' ? 'P1' : (['missedShadows'].includes(this.avoidableTab) ? 'P2' : null));
+            if (!audit) return this.fightAuditLink(fight, phase);
+            const timeMs = event.positionMs ?? this.parseTimeToSeconds(event.time || '') * 1000;
+            let type = 'bow';
+            let rows = audit.bowGroups || [];
+            if (this.avoidableTab === 'waterOutliers') { type = 'water'; rows = audit.waterEvents || []; }
+            if (this.avoidableTab === 'p1SilverArrowDeaths') { type = 'silverArrow'; rows = audit.silverArrows || []; }
+            const candidates = rows.filter(row => !phase || row.phase === phase);
+            const match = candidates.sort((a,b) => Math.abs((a.fireTimeMs ?? a.timeMs ?? 0)-timeMs) - Math.abs((b.fireTimeMs ?? b.timeMs ?? 0)-timeMs))[0];
+            return this.fightAuditLink(fight, phase || match?.phase, match ? `${type}:${match.id}` : null);
+        },
+        transitionCardClass(category) {
+            if (category === '次元斩') return 'bg-amber-950/40 border-amber-700 text-amber-200';
+            if (category === 'P2.5击飞') return 'bg-purple-950/40 border-purple-700 text-purple-200';
+            return 'bg-red-950/40 border-red-700 text-red-200';
+        },
+        transitionTextClass(category) {
+            if (category === '次元斩') return 'text-amber-300';
+            if (category === 'P2.5击飞') return 'text-purple-300';
+            return 'text-red-300';
+        },
+        transitionDeathDisplay(row) {
+            const deaths = Number(row?.deathCount || 0);
+            const compensation = Number(row?.compensationCount || 0);
+            return compensation ? `${deaths} (${deaths + compensation})` : String(deaths);
+        },
+        adjustAcquittal(row, delta) {
+            const current = Number(row.appealAcquittalCount || 0);
+            row.appealAcquittalCount = Math.max(0, Math.min(Number(row.recognitionCount || 0), current + delta));
+            this.verdictDirty = true;
+        },
+        confirmVerdict() {
+            const base = Number(this.meta?.courtConfig?.verdictPointsPerCount || 10);
+            const tankMultiplier = Number(this.meta?.courtConfig?.verdictTankMultiplier || 0.5);
+            this.finalVerdict.forEach(row => {
+                const multiplier = (row.roles || []).includes('tank') ? tankMultiplier : 1;
+                row.scoreMultiplier = multiplier;
+                const penaltyUnits = Number(row.penaltyUnits ?? (Number(row.recognitionCount || 0) * multiplier));
+                row.iqLoss = Math.round(Math.max(0, penaltyUnits - Number(row.appealAcquittalCount || 0) * Number(row.appealUnitMultiplier || multiplier)) * base);
+            });
+            this.finalVerdict.sort((a,b) => b.iqLoss - a.iqLoss || b.recognitionCount - a.recognitionCount || a.name.localeCompare(b.name));
+            this.verdictDirty = false;
         },
         voidRecords(fight) {
             return fight?.crownOfTheCosmos?.voidRepulsionRecords || [];
@@ -1248,6 +1491,10 @@ createApp({
             }
 
             this.glaiveBoard = result.data.page2_glaiveBoard || [];
+            this.transitionAnalysis = result.data.page2_transitionAnalysis || { summary: [], fights: [] };
+            this.finalVerdict = result.data.page4_finalVerdict || [];
+            this.verdictDirty = false;
+            if (this.isCrownBoss) this.confirmVerdict();
             this.avoidableBoard = { ...(result.data.page2_avoidableBoard || {}) };
             this.avoidableFirstDeathBoard = result.data.page2_avoidableFirstDeathBoard || [];
             this.dispelAnalysis = result.data.page3_dispelAnalysis || { enabled: false, logic: '', summary: [], fights: [] };
@@ -1286,7 +1533,7 @@ createApp({
                 ...(showAvoidableTotal ? [{ key: 'total', label: '全项合计' }] : []),
                 ...skillKeys.map(key => ({
                     key,
-                    label: spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key
+                    label: key === 'missedEnergy' ? 'P2消Boss能量失误' : (key === 'waterOutliers' ? '放水未集中' : (spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key))
                 }))
             ];
             if (!this.avoidableTabs.some(tab => tab.key === this.avoidableTab)) {

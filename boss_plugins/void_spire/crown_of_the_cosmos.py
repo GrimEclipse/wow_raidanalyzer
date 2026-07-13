@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -12,7 +13,7 @@ except ModuleNotFoundError as exc:
     raise RuntimeError("缺少 requests 依赖,请检查requirements！") from exc
 import urllib3
 
-from analyzer_core.concurrency import MAX_REQUEST_THREADS, request_post, run_parallel_indexed
+from analyzer_core.concurrency import MAX_REQUEST_RETRIES, MAX_REQUEST_THREADS, REQUEST_RETRY_BASE_SECONDS, request_post, run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from boss_plugins.common import build_player_mechanic_roles, role_text as common_role_text, write_json_result
 
@@ -60,6 +61,8 @@ WCL_BASE_URL = os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com").rstrip(
 PROXY_URL = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 CN_TZ = timezone(timedelta(hours=8))
+_API_METRICS_LOCK = threading.Lock()
+_API_LOGICAL_REQUESTS = 0
 
 
 SPELLS = {
@@ -92,6 +95,7 @@ SPELLS = {
     1243981: "银锋弹幕射击",
     1246001: "环绕物质",
     1246461: "裂隙挥砍",
+    1246462: "裂隙挥砍",
     1242553: "虚空残渣",
     1255378: "崩裂空无",
     1255453: "重力坍缩",
@@ -167,6 +171,38 @@ SILVER_HAVOC_CAST_ID = 1234546
 ALLERIA_GAME_ID = 240430
 MAWRIUS_GAME_ID = 243805
 PHANTOM_GAME_ID = 253742
+INTERFERENCE_SHOCK_ID = 1243743
+DEATH_COMPENSATION_ID = 211319
+RIFT_SLASH_ID = 1246462
+RIFT_SLASH_DAMAGE_ID = 1246461
+P3_ADD_GAME_IDS = {
+    1: 254172,  # 龌勒卢斯
+    2: 254173,  # 殆米阿尔
+    3: 254174,  # 殁里乌姆
+}
+P3_ADD_NAMES = {
+    254172: "龌勒卢斯",
+    254173: "殆米阿尔",
+    254174: "殁里乌姆",
+}
+DESIGNATED_HEALER_IDS = {
+    int(value) for value in os.getenv("CROWN_DESIGNATED_HEALER_IDS", "").split(",")
+    if value.strip().isdigit()
+}
+VOID_GRASP_HEALING_MIN = int(os.getenv("CROWN_VOID_GRASP_HEALING_MIN", "200000"))
+VERDICT_POINTS_PER_COUNT = int(os.getenv("CROWN_VERDICT_POINTS_PER_COUNT", "10"))
+VERDICT_TANK_MULTIPLIER = float(os.getenv("CROWN_VERDICT_TANK_MULTIPLIER", "0.5"))
+
+
+def configured_acquittals():
+    result = {}
+    for item in os.getenv("CROWN_APPEAL_ACQUITTALS", "").split(","):
+        if ":" not in item:
+            continue
+        name, value = item.rsplit(":", 1)
+        if name.strip() and value.strip().isdigit():
+            result[name.strip()] = int(value.strip())
+    return result
 
 TANK_SPEC_IDS = {
     66, 104, 250, 268, 581, 1446,
@@ -217,9 +253,12 @@ def get_token():
 
 
 def graphql(token, query, variables):
+    global _API_LOGICAL_REQUESTS
+    with _API_METRICS_LOCK:
+        _API_LOGICAL_REQUESTS += 1
     headers = {"Authorization": f"Bearer {token}"}
     last_error = None
-    for attempt in range(1, 4):
+    for attempt in range(1, MAX_REQUEST_RETRIES + 1):
         try:
             res = request_post(
                 f"{WCL_BASE_URL}/api/v2/client",
@@ -232,10 +271,10 @@ def graphql(token, query, variables):
             break
         except requests.RequestException as error:
             last_error = error
-            if attempt >= 3:
+            if attempt >= MAX_REQUEST_RETRIES:
                 raise
-            progress(f"WCL 请求失败，{attempt}/3，稍后重试：{error}", 2)
-            time.sleep(2 * attempt)
+            progress(f"WCL 请求失败，{attempt}/{MAX_REQUEST_RETRIES}，稍后重试：{error}", 2)
+            time.sleep(REQUEST_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
     else:
         raise last_error
     res.raise_for_status()
@@ -361,7 +400,14 @@ def fetch_event_page(token, report_id, data_type, fight, start_time=None, end_ti
         variables["sourceID"] = int(source_id)
     if target_id is not None:
         variables["targetID"] = int(target_id)
-    return graphql(token, query, variables)["events"]
+    for attempt in range(1, MAX_REQUEST_RETRIES + 1):
+        report = graphql(token, query, variables)
+        events = report.get("events")
+        if events is not None:
+            return events
+        progress(f"WCL events 为空，{attempt}/{MAX_REQUEST_RETRIES} 稍后重试", 2)
+        time.sleep(REQUEST_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
+    return {"data": [], "nextPageTimestamp": None}
 
 
 def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_time=None, ability_id=None, hostility_type=None, include_resources=False, source_id=None, target_id=None):
@@ -370,6 +416,8 @@ def fetch_events_all(token, report_id, data_type, fight, start_time=None, end_ti
     final_end = end_time if end_time is not None else fight["endTime"]
     while current_start < final_end:
         page = fetch_event_page(token, report_id, data_type, fight, current_start, final_end, ability_id, hostility_type, include_resources, source_id, target_id)
+        if not page:
+            page = {"data": [], "nextPageTimestamp": None}
         rows.extend(page.get("data") or [])
         next_page = page.get("nextPageTimestamp")
         if not next_page or next_page <= current_start:
@@ -410,11 +458,14 @@ def fetch_combatant_info(token, report_id, fight):
 
 
 def fetch_initial_combat_events(token, report_id, fight):
-    try:
-        return fetch_events_all(token, report_id, "DamageDone", fight, fight["startTime"], min(fight["endTime"], fight["startTime"] + 8_000))
-    except Exception as error:
-        progress(f"初始进战斗事件读取失败，无法判断非预期引怪来源：{error}", 2)
-        return []
+    end_time = min(fight["endTime"], fight["startTime"] + 15_000)
+    events = []
+    for data_type in ("DamageDone", "DamageTaken"):
+        try:
+            events.extend(fetch_events_all(token, report_id, data_type, fight, fight["startTime"], end_time))
+        except Exception as error:
+            progress(f"初始进战斗 {data_type} 读取失败，引怪推测可能不完整：{error}", 2)
+    return events
 
 
 def ability_id(event):
@@ -672,6 +723,19 @@ def infer_phase_markers_from_deaths(markers, deaths, fight):
     return markers
 
 
+def sanitize_phase_markers(markers, fight):
+    """Reject mechanically impossible early phase markers from abandon/death noise."""
+    start = fight["startTime"]
+    clean = dict(markers)
+    if clean.get("p2Start") and clean["p2Start"] < start + 120_000:
+        clean["p2Start"] = None
+    p3_values = [clean.get(key) for key in ("p3Transition", "p25Start", "p25End", "p3Start") if clean.get(key)]
+    if p3_values and min(p3_values) < start + 240_000:
+        for key in ("p3Transition", "p25Start", "p25End", "p3Start"):
+            clean[key] = None
+    return clean
+
+
 def phase_at(timestamp, markers, fight):
     if markers.get("p3Start") and timestamp >= markers["p3Start"]:
         return "P3"
@@ -796,7 +860,10 @@ def classify_fight(fight, deaths, markers, buffs):
     death_ids = death_ability_ids(deaths)
     duration = fight["endTime"] - fight["startTime"]
     phase_deaths = [death for death in deaths if phase_at(death.get("timestamp", 0), markers, fight) == phase]
-    pull_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in PULL_DEATH_IDS]
+    if phase == "P1.5":
+        pull_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in P15_AVOIDABLE_IDS]
+    else:
+        pull_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in PULL_DEATH_IDS]
     shadow_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in SHADOW_AOE_IDS]
     tank_deaths = [death for death in phase_deaths[:3] if death.get("killingAbilityGameID") in TANK_DEATH_IDS]
     phase_bridge_deaths = bridge_deaths(phase_deaths)
@@ -907,7 +974,7 @@ def detail_spell_plan(classification, deaths):
         damage_ids |= P15_AVOIDABLE_IDS | {1234570, 1255378}
 
     if classification["phase"] in {"P2", "P2.5"} or key.startswith("p2"):
-        debuff_ids |= {VOID_GRASP_ID, RANGER_MARK_ID, VOID_REPULSION_DEBUFF_ID}
+        debuff_ids |= {VOID_GRASP_ID, RANGER_MARK_ID, VOID_REPULSION_DEBUFF_ID, RIFT_SLASH_ID}
         damage_ids |= {COLLAPSING_VOID_ID, VOID_REPULSION_DAMAGE_ID, 1242553, SILVER_RICOCHET_ID}
         buff_ids |= {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID}
 
@@ -916,6 +983,9 @@ def detail_spell_plan(classification, deaths):
         damage_ids |= {COLLAPSING_VOID_ID, P3_LINE_DEATH_ID, COSMIC_RADIATION_DAMAGE_ID, COSMIC_DEVOUR_ID, VOID_REPULSION_DAMAGE_ID, 1242553}
         buff_ids |= ENRAGE_IDS | {COSMIC_RADIATION_BUFF_ID}
         cast_ids |= {PORTAL_CAST_ID}
+
+    # 裂隙挥砍换坦审计属于全场固定明细，即使灭团主因不在P2也要读取。
+    debuff_ids.add(RIFT_SLASH_ID)
 
     if any(death.get("killingAbilityGameID") == 1233649 for death in deaths):
         debuff_ids.add(SILVER_ARROW_MARK_ID)
@@ -1282,9 +1352,12 @@ def analyze_collapsing_void(fight, actor_map, actor_type, deaths, damage_events,
         row["hitCount"] += 1
         row["events"].append({
             "time": format_time(fight_elapsed(death, fight)),
+            "positionMs": int(fight_elapsed(death, fight)),
             "target": target,
             "source": source_name,
             "ability": "崩裂空无",
+            "counted": source is not None,
+            "countReason": "伤害来源可对应到空虚之握移除玩家" if source else "无法确定射线来源，不计数",
         })
         death_rows.append(f"{format_time(fight_elapsed(death, fight))} {target} 死于 {source_name} 的崩裂空无")
 
@@ -1308,6 +1381,16 @@ def analyze_collapsing_void(fight, actor_map, actor_type, deaths, damage_events,
         row["roles"] = [] if source_role == "unknown" else [source_role]
         row["hitCount"] += 1
         row["totalDamage"] += event_amount(event)
+        row["events"].append({
+            "time": format_time(fight_elapsed(event, fight)),
+            "positionMs": int(fight_elapsed(event, fight)),
+            "target": actor(actor_map, target_id),
+            "source": source_name,
+            "ability": "崩裂空无",
+            "amount": event_amount(event),
+            "counted": source is not None,
+            "countReason": "伤害来源可对应到空虚之握移除玩家" if source else "无法确定射线来源，不计数",
+        })
 
     return sorted(rows_by_player.values(), key=lambda item: (item["deathCount"], item["hitCount"], item["totalDamage"]), reverse=True), death_rows
 
@@ -1467,6 +1550,8 @@ def analyze_p2_energy(markers, fight, debuffs, damage_events, energy_events, act
             "time": format_time(p3_transition - fight["startTime"]),
             "missingCount": missing_drains,
             "missingEnergy": missing_energy,
+            "counted": False,
+            "countReason": "只能确认存在消能缺口，无法归责到具体玩家",
             "text": f"P2 约 {format_time(p2_duration)} 后提前进入宇宙辐射，完整时长应约 02:30；估算少延长 {missing_energy} 秒，约 {missing_drains} 次 -5 能量消除未生效。",
         })
     energy_drains = [
@@ -1489,6 +1574,8 @@ def analyze_p2_energy(markers, fight, debuffs, damage_events, energy_events, act
                 "group": index,
                 "missingCount": 2 - len(players),
                 "players": [row["player"] for row in players],
+                "counted": False,
+                "countReason": "点名人数不足但无法确定责任玩家",
                 "text": f"{format_time(cluster['start'] - fight['startTime'])} 第 {index} 组游侠队长印记消失人数不足：{player_names}",
             })
         elif not nearby_drains:
@@ -1497,6 +1584,9 @@ def analyze_p2_energy(markers, fight, debuffs, damage_events, energy_events, act
                 "group": index,
                 "missingCount": 0,
                 "players": [row["player"] for row in players],
+                "playerIDs": [row["targetID"] for row in players],
+                "counted": True,
+                "countReason": "两名点名均已确认，但本轮未产生奥蕾莉亚能量 -5；两人共同计入并保留申诉入口",
                 "text": f"{format_time(cluster['start'] - fight['startTime'])} 第 {index} 组游侠队长印记已消失 2 人（{player_names}），但未识别到奥蕾莉亚能量 -5（1259998）",
             })
     return rows
@@ -2243,10 +2333,11 @@ def nearest_void_repulsion_impact(timestamp, target_id, damage_events, window_ms
     return min(candidates, key=lambda event: abs(event.get("timestamp", 0) - timestamp))
 
 
-def build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_events=None, casts=None, actor_game_id=None, damage_events=None):
+def build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_events=None, casts=None, actor_game_id=None, damage_events=None, deaths=None):
     resource_events = resource_events or []
     casts = casts or []
     damage_events = damage_events or []
+    deaths = deaths or []
     alleria_position_event = first_actor_position(find_alleria_actor_ids(actor_map, actor_game_id), resource_events, fight)
     arena_center = event_point(alleria_position_event or {})
     events = [
@@ -2263,6 +2354,12 @@ def build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_ev
         if not event_is_remove(event):
             continue
         apply_event = active.pop(target_id, None)
+        if any(
+            death.get("targetID") == target_id
+            and death.get("timestamp", 0) <= event.get("timestamp", 0)
+            for death in deaths
+        ):
+            continue
         faded_point = event_point(event, "target") or event_point(event)
         impact_event = nearest_void_repulsion_impact(event.get("timestamp", 0), target_id, damage_events)
         target_position_event = actor_position_at(event.get("timestamp", 0), target_id, resource_events)
@@ -2359,8 +2456,8 @@ def void_repulsion_round_groups(records):
     return groups
 
 
-def analyze_void_repulsion_placement(fight, actor_map, debuffs, markers, resource_events=None, casts=None, actor_game_id=None, damage_events=None):
-    records = build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_events, casts, actor_game_id, damage_events)
+def analyze_void_repulsion_placement(fight, actor_map, debuffs, markers, resource_events=None, casts=None, actor_game_id=None, damage_events=None, deaths=None):
+    records = build_void_repulsion_records(fight, actor_map, debuffs, markers, resource_events, casts, actor_game_id, damage_events, deaths)
     if not records:
         return [], []
 
@@ -2408,24 +2505,267 @@ def analyze_void_repulsion_placement(fight, actor_map, debuffs, markers, resourc
     return rows, [clean_void_repulsion_record(record) for record in records]
 
 
-def first_combat_initiator(initial_events, actor_map, actor_type):
-    candidates = []
+def first_combat_initiator(initial_events, actor_map, actor_type, detail_debuffs=None, fight=None):
+    aggro_candidates = []
+    pulled_candidates = []
     for event in initial_events:
         source_id = event.get("sourceID")
         target_id = event.get("targetID")
-        if not source_id or actor_type.get(source_id) != "Player":
+        timestamp = event.get("timestamp", 0)
+        if actor_type.get(source_id) == "Player" and actor_type.get(target_id) != "Player":
+            aggro_candidates.append((timestamp, source_id))
+        if actor_type.get(target_id) == "Player" and actor_type.get(source_id) != "Player":
+            pulled_candidates.append((timestamp, target_id))
+    if aggro_candidates:
+        _, source_id = min(aggro_candidates, key=lambda item: item[0])
+        return {"id": source_id, "name": actor(actor_map, source_id), "reason": "最先对敌方造成伤害"}
+    if pulled_candidates:
+        _, target_id = min(pulled_candidates, key=lambda item: item[0])
+        return {"id": target_id, "name": actor(actor_map, target_id), "reason": "最先受到敌方伤害"}
+    if detail_debuffs and fight:
+        early_end = fight["startTime"] + 30_000
+        void_applies = sorted(
+            (
+                event for event in detail_debuffs
+                if ability_id(event) == VOID_GRASP_ID
+                and event_is_apply(event)
+                and fight["startTime"] <= event.get("timestamp", 0) <= early_end
+            ),
+            key=lambda item: item.get("timestamp", 0),
+        )
+        if void_applies:
+            target_id = void_applies[0].get("targetID")
+            return {"id": target_id, "name": actor(actor_map, target_id), "reason": "战斗初期最早空虚之握点名"}
+    return None
+
+
+def count_phase_pull_deaths(deaths, markers, fight, phase):
+    return [
+        death for death in deaths
+        if phase_at(death.get("timestamp", 0), markers, fight) == phase
+        and death.get("killingAbilityGameID") in (P15_AVOIDABLE_IDS if phase == "P1.5" else PULL_DEATH_IDS)
+    ]
+
+
+def analyze_interference_shock(fight, actor_map, actor_type, shock_casts, player_casts, markers):
+    """Infer casts cancelled by Demiar's raid-wide interrupt.
+
+    WCL does not emit these as Interrupts events.  A player is counted when a
+    begincast is still open at the completed shock timestamp.  Successful casts
+    and explicit cancellations before the shock close the candidate.
+    """
+    shocks = sorted(
+        (event for event in shock_casts if ability_id(event) == INTERFERENCE_SHOCK_ID and str(event.get("type", "")).lower() == "cast"),
+        key=lambda event: event.get("timestamp", 0),
+    )
+    cast_rows = sorted(player_casts or [], key=lambda event: event.get("timestamp", 0))
+    rows = []
+    for index, shock in enumerate(shocks, start=1):
+        shock_ts = shock.get("timestamp", 0)
+        active = {}
+        for event in cast_rows:
+            ts = event.get("timestamp", 0)
+            if ts < shock_ts - 8_000:
+                continue
+            if ts > shock_ts + 150:
+                break
+            source_id = event.get("sourceID")
+            if actor_type.get(source_id) != "Player":
+                continue
+            key = (source_id, ability_id(event))
+            event_type = str(event.get("type", "")).lower()
+            if event_type == "begincast" and ts < shock_ts:
+                active[key] = event
+            elif event_type in {"cast", "cancelcast"}:
+                active.pop(key, None)
+        interrupted = []
+        seen_players = set()
+        for (source_id, spell_id), event in sorted(active.items(), key=lambda item: item[1].get("timestamp", 0)):
+            if source_id in seen_players:
+                continue
+            seen_players.add(source_id)
+            interrupted.append({
+                "playerID": source_id,
+                "player": actor(actor_map, source_id),
+                "role": "unknown",
+                "spellID": spell_id,
+                "spell": ability_name(event),
+                "castStart": format_time(event.get("timestamp", 0) - fight["startTime"]),
+                "elapsedMs": int(shock_ts - event.get("timestamp", 0)),
+            })
+        rows.append({
+            "index": index,
+            "phase": phase_at(shock_ts, markers, fight),
+            "time": format_time(shock_ts - fight["startTime"]),
+            "positionMs": int(shock_ts - fight["startTime"]),
+            "source": actor(actor_map, shock.get("sourceID")),
+            "interrupted": interrupted,
+            "interruptedCount": len(interrupted),
+            "confidence": "inferred_from_unfinished_cast",
+            "text": f"{format_time(shock_ts - fight['startTime'])} 干扰震荡打断 {len(interrupted)} 名正在施法的玩家。",
+        })
+    return rows
+
+
+def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_target):
+    rows = []
+    for death in deaths:
+        if death.get("killingAbilityGameID") != VOID_GRASP_ID:
             continue
-        if actor_type.get(target_id) == "Player":
+        death_ts = death.get("timestamp", 0)
+        target_id = death.get("targetID")
+        healing = healing_by_target.get(target_id, [])
+        six = defaultdict(int)
+        eight = defaultdict(int)
+        for event in healing:
+            ts = event.get("timestamp", 0)
+            source_id = event.get("sourceID")
+            amount = event_amount(event)
+            if death_ts - 8_000 <= ts <= death_ts:
+                eight[source_id] += amount
+            if death_ts - 6_000 <= ts <= death_ts:
+                six[source_id] += amount
+        healer_ids = set(DESIGNATED_HEALER_IDS) or {
+            source_id for source_id in eight
+            if actor_type.get(source_id) == "Player"
+        }
+        breakdown = [{
+            "healerID": source_id,
+            "healer": actor(actor_map, source_id),
+            "healing6s": six.get(source_id, 0),
+            "healing8s": eight.get(source_id, 0),
+            "insufficient": source_id in DESIGNATED_HEALER_IDS and eight.get(source_id, 0) <= VOID_GRASP_HEALING_MIN,
+        } for source_id in sorted(healer_ids, key=lambda item: actor(actor_map, item))]
+        rows.append({
+            "time": format_time(death_ts - fight["startTime"]),
+            "positionMs": int(death_ts - fight["startTime"]),
+            "playerID": target_id,
+            "player": actor(actor_map, target_id),
+            "healers": breakdown,
+            "totalHealing6s": sum(six.values()),
+            "window6s": f"{format_time(max(0, death_ts - fight['startTime'] - 6_000))}-{format_time(death_ts - fight['startTime'])}",
+            "threshold8s": VOID_GRASP_HEALING_MIN,
+        })
+    return rows
+
+
+def build_transition_details(fight, actor_map, player_roles, deaths, markers, buffs):
+    rows = []
+    for death in deaths:
+        phase = phase_at(death.get("timestamp", 0), markers, fight)
+        ability = death.get("killingAbilityGameID")
+        if phase not in {"P1.5", "P2.5"} and ability not in DIMENSIONAL_SLASH_IDS:
             continue
-        amount = event_amount(event)
-        candidates.append((event.get("timestamp", 0), amount, source_id))
-    if not candidates:
-        return None
-    _, _, source_id = min(candidates, key=lambda item: item[0])
-    return {
-        "id": source_id,
-        "name": actor(actor_map, source_id),
-    }
+        if ability in DIMENSIONAL_SLASH_IDS:
+            category = "次元斩"
+        elif phase == "P2.5" and ability in {None, 3}:
+            category = "P2.5击飞"
+        else:
+            category = "P1.5死亡" if phase == "P1.5" else "P2.5击飞"
+        target_id = death.get("targetID")
+        rows.append({
+            "category": category,
+            "phase": phase,
+            "time": format_time(death.get("timestamp", 0) - fight["startTime"]),
+            "positionMs": int(death.get("timestamp", 0) - fight["startTime"]),
+            "player": actor(actor_map, target_id),
+            "role": player_roles.get(target_id, "unknown"),
+            "abilityID": ability,
+            "ability": SPELLS.get(ability, "坠崖" if ability in {None, 3} else str(ability)),
+            "deathCount": 1,
+            "compensationCount": 0,
+            "displayDeathCount": 1,
+        })
+    for event in buffs or []:
+        if ability_id(event) != DEATH_COMPENSATION_ID or not event_is_apply(event):
+            continue
+        phase = phase_at(event.get("timestamp", 0), markers, fight)
+        if phase not in {"P1.5", "P2.5"}:
+            continue
+        target_id = event.get("targetID")
+        rows.append({
+            "category": "P1.5死亡" if phase == "P1.5" else "P2.5击飞",
+            "phase": phase,
+            "time": format_time(event.get("timestamp", 0) - fight["startTime"]),
+            "positionMs": int(event.get("timestamp", 0) - fight["startTime"]),
+            "player": actor(actor_map, target_id),
+            "role": player_roles.get(target_id, "unknown"),
+            "abilityID": DEATH_COMPENSATION_ID,
+            "ability": "代偿触发",
+            "deathCount": 0,
+            "compensationCount": 1,
+            "displayDeathCount": 1,
+        })
+    return rows
+
+
+def build_p3_portal_summons(fight, actor_map, actor_game_id, casts):
+    portal_map = {}
+    for event in casts:
+        if ability_id(event) == PORTAL_CAST_ID and str(event.get("type", "")).lower() == "cast":
+            portal_map.setdefault((event.get("sourceID"), event.get("timestamp", 0)), event)
+    portals = sorted(portal_map.values(), key=lambda event: event.get("timestamp", 0))
+    devours = sorted({event.get("timestamp", 0) for event in casts if ability_id(event) == COSMIC_DEVOUR_ID and str(event.get("type", "")).lower() == "cast"})
+    rows = []
+    for index, portal in enumerate(portals, start=1):
+        cycle_index = ((index - 1) % 3) + 1
+        game_id = P3_ADD_GAME_IDS[cycle_index]
+        actor_ids = [actor_id for actor_id, value in actor_game_id.items() if str(value) == str(game_id)]
+        start = portal.get("timestamp", 0)
+        end = min((ts for ts in devours if ts > start), default=fight["endTime"])
+        rows.append({
+            "portalIndex": index,
+            "cycleIndex": cycle_index,
+            "time": format_time(start - fight["startTime"]),
+            "positionMs": int(start - fight["startTime"]),
+            "despawnTime": format_time(end - fight["startTime"]),
+            "gameID": game_id,
+            "actorIDs": actor_ids,
+            "name": P3_ADD_NAMES[game_id],
+        })
+    return rows
+
+
+def analyze_rift_slash_tank_swaps(fight, actor_map, actor_type, player_roles, debuffs, deaths, markers):
+    tank_ids = sorted(player_id for player_id, role in player_roles.items() if role == "tank")
+    rows = []
+    recorded = set()
+    for event in sorted((row for row in debuffs if ability_id(row) == RIFT_SLASH_ID), key=lambda row: row.get("timestamp", 0)):
+        target_id = event.get("targetID")
+        event_kind = str(event.get("type", "")).lower()
+        if "remove" in event_kind:
+            recorded.discard(target_id)
+            continue
+        stack = int(event.get("stack") or event.get("stacks") or 0)
+        if stack < 3 or target_id in recorded or phase_at(event.get("timestamp", 0), markers, fight) != "P2":
+            continue
+        recorded.add(target_id)
+        offender_ids = [player_id for player_id in tank_ids if player_id != target_id]
+        offender_id = offender_ids[0] if len(offender_ids) == 1 else None
+        trigger_ts = event.get("timestamp", 0)
+        victim_death = next((
+            death for death in deaths
+            if death.get("targetID") == target_id
+            and death.get("killingAbilityGameID") in (TANK_DEATH_IDS | {RIFT_SLASH_DAMAGE_ID})
+            and 0 <= death.get("timestamp", 0) - trigger_ts <= 15_000
+        ), None)
+        counted = offender_id is not None
+        rows.append({
+            "time": format_time(trigger_ts - fight["startTime"]),
+            "positionMs": int(trigger_ts - fight["startTime"]),
+            "phase": "P2",
+            "victim": actor(actor_map, target_id),
+            "victimID": target_id,
+            "stack": stack,
+            "offender": actor(actor_map, offender_id) if offender_id else "未能唯一识别另一坦",
+            "offenderID": offender_id,
+            "causedTankDeath": bool(victim_death),
+            "counted": counted,
+            "scoreMultiplier": 3.0 if victim_death else 0.5,
+            "countReason": "另一坦未及时换坦，且15秒内发生倒坦，按3倍" if victim_death else ("另一坦未及时换坦" if counted else "无法唯一识别另一坦，不计数"),
+            "text": f"{format_time(trigger_ts - fight['startTime'])} {actor(actor_map, target_id)} 裂隙挥砍达到 {stack} 层；责任坦克：{actor(actor_map, offender_id) if offender_id else '未识别'}{'；随后倒坦' if victim_death else ''}。",
+        })
+    return rows
 
 
 def analyze_fight(report_id, fight, actor_map, actor_type, payload):
@@ -2442,6 +2782,10 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     player_roles = payload.get("playerRoles") or {}
     initial_events = payload.get("initialEvents") or []
     actor_game_id = payload.get("actorGameID") or {}
+    shock_casts = payload.get("shockCasts") or []
+    player_casts = payload.get("playerCasts") or []
+    healing_by_target = payload.get("healingByTarget") or {}
+    field_audit = payload.get("fieldAudit")
 
     duration_ms = fight["endTime"] - fight["startTime"]
     absolute_ms = fight["reportStartTime"] + fight["startTime"]
@@ -2493,7 +2837,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         energy_misses = analyze_p2_energy(markers, fight, detail_debuffs, detail_damage, energy_events, actor_map, actor_game_id)
         gravity_rows = analyze_gravity_attribution(fight, actor_map, deaths, detail_debuffs)
         p2_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P2"), actor_map, "P2")
-        void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage)
+        void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage, deaths)
     else:
         if phase == "P1":
             p1_arrow_rows, p1_arrow_issues = analyze_p1_arrows(fight, actor_map, detail_buffs, detail_debuffs, detail_damage, markers)
@@ -2504,10 +2848,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         energy_misses = analyze_p2_energy(markers, fight, detail_debuffs, detail_damage, energy_events, actor_map, actor_game_id)
         gravity_rows = analyze_gravity_attribution(fight, actor_map, deaths, detail_debuffs)
         p2_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P2"), actor_map, "P2")
-        void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage)
+        void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage, deaths)
 
     void_grasp_rays = analyze_void_grasp_rays(fight, actor_map, actor_type, actor_game_id, detail_debuffs, detail_damage, position_events, markers)
     p1_arrow_audit = analyze_p1_arrow_audit(fight, actor_map, detail_debuffs, detail_damage, markers, p1_arrow_rows)
+    interference_rows = analyze_interference_shock(fight, actor_map, actor_type, shock_casts, player_casts, markers)
+    void_grasp_healing = analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_target)
+    transition_details = build_transition_details(fight, actor_map, player_roles, deaths, markers, detail_buffs)
+    p3_portal_summons = build_p3_portal_summons(fight, actor_map, actor_game_id, detail_casts)
+    rift_slash_rows = analyze_rift_slash_tank_swaps(fight, actor_map, actor_type, player_roles, detail_debuffs, deaths, markers)
 
     wipe_reason = classification["label"]
     wcl_link = ""
@@ -2539,7 +2888,14 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             else:
                 investigation = f"P1 直接灭团，本场死亡总人数 {len(deaths)}，归因为团队减员过多。"
         elif reason_key in {"p15_pull_deaths", "p2_pull_deaths", "p3_pull_deaths"}:
-            investigation = f"本场有 {sum(1 for death in deaths if death.get('killingAbilityGameID') in PULL_DEATH_IDS)} 名玩家死于拉弓/射击/转阶段走位相关伤害。"
+            if reason_key == "p15_pull_deaths":
+                pull_rows = count_phase_pull_deaths(deaths, markers, fight, "P1.5")
+            else:
+                pull_rows = [death for death in deaths if death.get("killingAbilityGameID") in PULL_DEATH_IDS]
+            pull_names = "、".join(actor(actor_map, death.get("targetID")) for death in pull_rows)
+            investigation = f"本场有 {len(pull_rows)} 名玩家死于拉弓/射击/转阶段走位相关伤害。"
+            if pull_names:
+                investigation += f"相关玩家：【{pull_names}】。"
             wcl_link = deep_link(report_id, fight["id"], "deaths", deaths[0]["timestamp"], 15_000, 5_000) if deaths else ""
         elif reason_key == "p2_shadow_aoe":
             investigation = "死亡记录命中银色幻影相关 AoE，判定为银色幻影过多导致团血崩溃。"
@@ -2557,9 +2913,10 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             first_bridge_ts = min((death.get("timestamp", 0) for death in bridge_rows), default=None)
             deaths_before_repull = prior_real_death_count(deaths, first_bridge_ts) if first_bridge_ts else 0
             investigation = f"团队选择放弃或非预期引怪后快速重开。在选择重开前已有{deaths_before_repull}人死亡。"
-            initiator = first_combat_initiator(initial_events, actor_map, actor_type)
+            initiator = first_combat_initiator(initial_events, actor_map, actor_type, detail_debuffs, fight)
             if initiator:
-                investigation += f" 初始进战斗来源疑似为 {initiator['name']}。"
+                reason = initiator.get("reason") or "初始进战斗来源"
+                investigation += f" 疑似引怪玩家：【{initiator['name']}】（{reason}）。"
             wcl_link = replay_link(report_id, fight["id"], fight_elapsed(bridge_rows[0], fight) - 5_000) if bridge_rows else ""
         elif reason_key == "phase_bridge_mistake":
             bridge_rows = bridge_deaths([death for death in deaths if phase_at(death.get("timestamp", 0), markers, fight) == phase])
@@ -2649,15 +3006,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     if void_repulsion_records:
         if not void_repulsion_rows:
             phase_rows = []
-            for phase in ["P1", "P1.5", "P2", "P2.5", "P3"]:
-                phase_records = [record for record in void_repulsion_records if record.get("phase") == phase]
+            for phase_name in ["P1", "P1.5", "P2", "P2.5", "P3"]:
+                phase_records = [record for record in void_repulsion_records if record.get("phase") == phase_name]
                 if not phase_records:
                     continue
                 phase_rows.append({
                     "time": phase_records[0].get("time"),
-                    "phase": phase,
+                    "phase": phase_name,
                     "details": phase_records,
-                    "text": f"{phase} 已记录 {len(phase_records)} 个虚空斥力放水点。",
+                    "text": f"{phase_name} 已记录 {len(phase_records)} 个虚空斥力放水点。",
                 })
             void_repulsion_rows = phase_rows
         trial_records.append({
@@ -2669,16 +3026,203 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     missed_energy_board = {}
     for event in energy_misses:
-        for player in event.get("players") or []:
-            row = missed_energy_board.setdefault(player, build_board_row(player, "missedEnergy", "未消到 Boss 能量", role="unknown"))
+        if not event.get("counted"):
+            continue
+        player_ids = event.get("playerIDs") or []
+        for player_index, player in enumerate(event.get("players") or []):
+            player_id = player_ids[player_index] if player_index < len(player_ids) else None
+            row = missed_energy_board.setdefault(player, build_board_row(player, "missedEnergy", "P2消Boss能量失误", role=player_roles.get(player_id, "unknown")))
             row["hitCount"] += 1
-            row["events"].append(event)
+            row["events"].append({**event, "counted": True})
 
     local_board = {
         "p15AvoidableDeaths": [],
-        "collapsingVoidFriendlyFire": collapsing_rows,
+        "collapsingVoidFriendlyFire": [row for row in collapsing_rows if row.get("name") != "未知点名"],
         "missedEnergy": list(missed_energy_board.values()),
+        "interferenceShockInterrupts": [],
+        "waterOutliers": [],
+        "voidGraspHealingLow": [],
+        "voidGraspDeaths": [],
+        "p1SilverArrowDeaths": [],
+        "missedShadows": [],
+        "corruptionEssenceHits": [],
+        "gravityLineViolation": [],
+        "p3TransitionMistake": [],
+        "tankRiftSlashFailure": [],
     }
+
+    shock_board = {}
+    for shock in interference_rows:
+        for interrupted in shock.get("interrupted") or []:
+            name = interrupted["player"]
+            row = shock_board.setdefault(name, build_board_row(name, "interferenceShockInterrupts", "干扰震荡打断", role=player_roles.get(interrupted.get("playerID"), "unknown")))
+            row["hitCount"] += 1
+            row["events"].append({**interrupted, "time": shock["time"], "fightID": fight["id"], "counted": True, "countReason": "震荡时读条未完成"})
+    local_board["interferenceShockInterrupts"] = list(shock_board.values())
+
+    water_board = {}
+    for row in void_repulsion_rows:
+        if row.get("phase") == "P2" and (row.get("details") or [{}])[0].get("castIndex") == 1:
+            continue
+        for drop in row.get("details") or []:
+            if drop.get("status") != "偏散":
+                continue
+            name = drop.get("player")
+            item = water_board.setdefault(name, build_board_row(name, "waterOutliers", "放水未集中", role=player_roles.get(drop.get("targetID"), "unknown")))
+            item["hitCount"] += 1
+            item["events"].append({**drop, "fightID": fight["id"], "counted": True, "countReason": "坐标离组超过15码"})
+    local_board["waterOutliers"] = list(water_board.values())
+
+    healing_board = {}
+    for death_row in void_grasp_healing:
+        for healer in death_row.get("healers") or []:
+            if not healer.get("insufficient"):
+                continue
+            name = healer["healer"]
+            item = healing_board.setdefault(name, build_board_row(name, "voidGraspHealingLow", "空虚之握死亡治疗不足", role=player_roles.get(healer.get("healerID"), "unknown")))
+            item["events"].append({**healer, "death": death_row["player"], "time": death_row["time"], "fightID": fight["id"], "counted": True, "countReason": "指定治疗8秒窗口治疗量不超过阈值"})
+    for item in healing_board.values():
+        item["hitCount"] = 1  # 同一场多次不足保留明细，但跨场计数只 +1
+    local_board["voidGraspHealingLow"] = list(healing_board.values())
+
+    void_grasp_death_board = {}
+    for death_row in void_grasp_healing:
+        name = death_row["player"]
+        target_id = death_row["playerID"]
+        item = void_grasp_death_board.setdefault(
+            name,
+            build_board_row(name, "voidGraspDeaths", "空虚之握死亡", role=player_roles.get(target_id, "unknown")),
+        )
+        item["hitCount"] += 1
+        item["deathCount"] += 1
+        low_healers = [
+            healer for healer in death_row.get("healers") or []
+            if int(healer.get("healing8s") or 0) <= VOID_GRASP_HEALING_MIN
+        ]
+        item["events"].append({
+            **death_row,
+            "fightID": fight["id"],
+            "counted": False,
+            "countReason": "空虚之握死亡记录，暂不计入终审",
+            "lowHealers": low_healers,
+        })
+    local_board["voidGraspDeaths"] = list(void_grasp_death_board.values())
+
+    silver_death_board = {}
+    for death_row in death_timeline:
+        if death_row.get("phase") != "P1" or death_row.get("abilityID") != SILVER_ARROW_DAMAGE_ID or int(death_row.get("amount") or 0) <= 275_000:
+            continue
+        name = death_row["player"]
+        item = silver_death_board.setdefault(name, build_board_row(name, "p1SilverArrowDeaths", "P1 银锋箭高伤致死", role=death_row.get("role", "unknown")))
+        item["hitCount"] += 1
+        item["deathCount"] += 1
+        item["totalDamage"] += int(death_row.get("amount") or 0)
+        item["events"].append({**death_row, "fightID": fight["id"], "counted": True, "countReason": "点名玩家受到超过275000的致死银锋箭"})
+    local_board["p1SilverArrowDeaths"] = list(silver_death_board.values())
+
+    shadow_board = {}
+    for bow in (field_audit or {}).get("bowGroups", []):
+        if bow.get("phase") != "P2":
+            continue
+        marked_names = [player.get("player") for player in bow.get("players") or []]
+        for player in bow.get("players") or []:
+            confirmed_misses = [
+                attr for attr in player.get("shotAttribution") or []
+                if attr.get("confidence") in {"high", "medium"} and "未命中" in str(attr.get("verdict", ""))
+            ]
+            if not confirmed_misses or not player.get("missedPhantom"):
+                continue
+            name = player.get("player")
+            item = shadow_board.setdefault(name, build_board_row(name, "missedShadows", "P2 拉弓未命中幻影", role=player_roles.get(player.get("targetID"), "unknown")))
+            item["hitCount"] += 1
+            item["events"].append({
+                "fightID": fight["id"], "phase": "P2", "group": bow.get("index"),
+                "time": bow.get("fireTime"), "positionMs": bow.get("fireTimeMs"),
+                "players": marked_names, "tag": f"bow:{bow.get('id')}",
+                "attribution": confirmed_misses, "counted": True,
+                "countReason": "该玩家存在明确的职责归因未命中记录，且责任幻影在后续节点仍存活",
+            })
+    local_board["missedShadows"] = list(shadow_board.values())
+
+    gravity_board = {}
+    for gravity in (field_audit or {}).get("gravityRounds", []):
+        if not gravity.get("deathCount"):
+            continue
+        for violation in gravity.get("violations") or []:
+            name = violation.get("player")
+            item = gravity_board.setdefault(name, build_board_row(name, "gravityLineViolation", "P3 重力坍缩违规致死", role=player_roles.get(violation.get("targetID"), "unknown")))
+            item["hitCount"] += 1
+            item["deathCount"] += int(gravity.get("deathCount") or 0)
+            item["events"].append({
+                **violation, "fightID": fight["id"], "phase": "P3", "group": gravity.get("index"),
+                "deathCount": gravity.get("deathCount"), "counted": True,
+                "countReason": "违反拉线时序且本轮重力坍缩造成死亡",
+            })
+    local_board["gravityLineViolation"] = list(gravity_board.values())
+
+    transition_board = {}
+    transition_abandoned = reason_key == "phase_abandon" or is_mass_abandon(deaths, bridge_deaths(deaths))
+    for transition in transition_details:
+        if transition.get("phase") != "P2.5" or not transition.get("deathCount"):
+            continue
+        name = transition.get("player")
+        item = transition_board.setdefault(name, build_board_row(name, "p3TransitionMistake", "P3 过场失误死亡", role=transition.get("role", "unknown")))
+        item["hitCount"] += 1
+        item["deathCount"] += 1
+        role = transition.get("role", "unknown")
+        counted = not transition_abandoned
+        multiplier = 3.0 if role == "tank" else 1.0
+        item["events"].append({
+            **transition, "fightID": fight["id"], "counted": counted,
+            "scoreMultiplier": multiplier,
+            "countReason": ("明确放弃后的过场死亡，不计数" if transition_abandoned else ("坦克P3过场失误，按3倍" if role == "tank" else "P3过场期间确认死亡")),
+        })
+        if not counted:
+            item["hitCount"] -= 1
+            item["deathCount"] -= 1
+    local_board["p3TransitionMistake"] = [item for item in transition_board.values() if item.get("hitCount", 0) > 0]
+
+    rift_board = {}
+    for slash in rift_slash_rows:
+        if not slash.get("counted"):
+            continue
+        name = slash.get("offender")
+        item = rift_board.setdefault(name, build_board_row(name, "tankRiftSlashFailure", "P2 裂隙挥砍换坦失误", role="tank"))
+        item["hitCount"] += 1
+        item["deathCount"] += 1 if slash.get("causedTankDeath") else 0
+        item["events"].append({**slash, "fightID": fight["id"]})
+    local_board["tankRiftSlashFailure"] = list(rift_board.values())
+
+    corruption_counts = defaultdict(int)
+    corruption_ids = {}
+    for event in detail_debuffs:
+        if ability_id(event) != CORRUPTION_ID or not event_is_apply(event):
+            continue
+        target_id = event.get("targetID")
+        if actor_type.get(target_id) != "Player":
+            continue
+        if player_roles.get(target_id) == "tank":
+            continue
+        name = actor(actor_map, target_id)
+        corruption_counts[name] += 1
+        corruption_ids[name] = target_id
+    top3_names = {name for name, _ in sorted(corruption_counts.items(), key=lambda item: item[1], reverse=True)[:3]}
+    local_board["corruptionEssenceHits"] = [
+        build_board_row(
+            name,
+            "corruptionEssenceHits",
+            "P1 腐化精华次数",
+            hit_count=count,
+            role=player_roles.get(corruption_ids.get(name), "unknown"),
+            events=[{
+                "fightID": fight["id"],
+                "count": count,
+                "counted": name in top3_names,
+                "countReason": "本场腐化精华次数前三，终审+1" if name in top3_names else "未进入本场前三，不计入终审",
+            }],
+        )
+        for name, count in sorted(corruption_counts.items(), key=lambda item: item[1], reverse=True)
+    ]
 
     p15_death_rows = defaultdict(lambda: {"name": "", "hitCount": 0, "deathCount": 0, "totalDamage": 0, "events": []})
     for death in deaths:
@@ -2697,8 +3241,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             row["events"].append({
                 "time": format_time(fight_elapsed(death, fight)),
                 "ability": SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID"))),
+                "counted": True,
+                "countReason": "确认死于P1.5可归责机制",
             })
     local_board["p15AvoidableDeaths"] = sorted(p15_death_rows.values(), key=lambda item: item["deathCount"], reverse=True)
+
+    for board_rows in local_board.values():
+        for board_row in board_rows:
+            for board_event in board_row.get("events") or []:
+                board_event.setdefault("fightID", fight["id"])
 
     return {
         "reportID": report_id,
@@ -2720,6 +3271,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         "investigation": investigation,
         "wclDeepLink": wcl_link,
         "deathTimeline": death_timeline,
+        "transitionDetails": transition_details,
         "trialRecords": trial_records,
         "avoidableSummary": local_board,
         "crownOfTheCosmos": {
@@ -2741,6 +3293,13 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "p2RangerMarkRows": p2_ranger_mark_rows,
             "voidRepulsionPlacement": void_repulsion_rows,
             "voidRepulsionRecords": void_repulsion_records,
+            "voidGraspHealing": void_grasp_healing,
+            "interferenceShockRows": interference_rows,
+            "p3PortalSummons": p3_portal_summons,
+            "riftSlashTankSwaps": rift_slash_rows,
+            "transitionAbandoned": transition_abandoned,
+            "fieldAuditUrl": f"crown-fight-audit.html?source=wcl_hardcore_api.json&report={report_id}&fight={fight['id']}",
+            "fieldAudit": field_audit,
         },
     }
 
@@ -2750,9 +3309,21 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
     deaths = fetch_events_all(token, report_id, "Deaths", fight)
     progress(f"死亡事件：{len(deaths)} 条", 2)
 
-    casts = fetch_spell_events(token, report_id, fight, "Casts", {SILVER_HAVOC_CAST_ID, PORTAL_CAST_ID}, "读取阶段读条")
-    casts += fetch_spell_events(token, report_id, fight, "Casts", {PORTAL_CAST_ID}, "读取敌方阶段读条", hostility_type="Enemies")
-    buffs = fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID, RAGE_STACK_ID} | ENRAGE_IDS, "读取阶段/狂暴 Buff")
+    casts = fetch_spell_events(token, report_id, fight, "Casts", {SILVER_HAVOC_CAST_ID, PORTAL_CAST_ID, COSMIC_DEVOUR_ID}, "读取阶段读条")
+    casts += fetch_spell_events(token, report_id, fight, "Casts", {PORTAL_CAST_ID, COSMIC_DEVOUR_ID}, "读取敌方阶段读条", hostility_type="Enemies")
+    shock_casts = fetch_spell_events(token, report_id, fight, "Casts", {INTERFERENCE_SHOCK_ID}, "读取干扰震荡", hostility_type="Enemies")
+    player_casts = []
+    completed_shocks = [event for event in shock_casts if str(event.get("type", "")).lower() == "cast"]
+    if completed_shocks:
+        shock_start = min(event.get("timestamp", 0) for event in completed_shocks)
+        shock_end = max(event.get("timestamp", 0) for event in completed_shocks)
+        player_casts = fetch_events_all(
+            token, report_id, "Casts", fight,
+            start_time=max(fight["startTime"], shock_start - 8_000),
+            end_time=min(fight["endTime"], shock_end + 200),
+            hostility_type="Friendlies",
+        )
+    buffs = fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID, RAGE_STACK_ID, DEATH_COMPENSATION_ID} | ENRAGE_IDS, "读取阶段/狂暴 Buff")
     buffs += fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID, RAGE_STACK_ID} | ENRAGE_IDS, "读取敌方阶段/狂暴 Buff", hostility_type="Enemies")
     debuffs = fetch_spell_events(token, report_id, fight, "Debuffs", {1234570, TERMINAL_GUARD_DEBUFF_ID}, "读取阶段 Debuff")
     progress("读取敌方能量事件", 2)
@@ -2760,6 +3331,7 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
     progress(f"敌方能量事件：{len(energy_events)} 条", 2)
     markers = phase_markers(casts, buffs, debuffs, fight, energy_events)
     markers = infer_phase_markers_from_deaths(markers, deaths, fight)
+    markers = sanitize_phase_markers(markers, fight)
     classification = classify_fight(fight, deaths, markers, buffs)
     progress(f"死亡归因初判：{classification['phase']} / {classification['label']}", 2)
 
@@ -2814,6 +3386,20 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
             progress(f"银色幻影伤害事件：{len(phantom_damage)} 条", 2)
     combatant_info = fetch_combatant_info(token, report_id, fight)
     initial_events = fetch_initial_combat_events(token, report_id, fight) if classification["key"] == "phase_abandon" else []
+    healing_by_target = {}
+    void_grasp_death_targets = sorted({
+        death.get("targetID") for death in deaths
+        if death.get("killingAbilityGameID") == VOID_GRASP_ID and death.get("targetID") is not None
+    })
+    for target_id in void_grasp_death_targets:
+        target_deaths = [death.get("timestamp", 0) for death in deaths if death.get("targetID") == target_id and death.get("killingAbilityGameID") == VOID_GRASP_ID]
+        healing_by_target[target_id] = fetch_events_all(
+            token, report_id, "Healing", fight,
+            start_time=max(fight["startTime"], min(target_deaths) - 8_000),
+            end_time=min(fight["endTime"], max(target_deaths) + 1),
+            target_id=target_id,
+            hostility_type="Friendlies",
+        )
     return {
         "deaths": deaths,
         "markers": markers,
@@ -2827,10 +3413,17 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
         "positionEvents": position_events,
         "playerRoles": build_player_roles(combatant_info),
         "initialEvents": initial_events,
+        "shockCasts": shock_casts,
+        "playerCasts": player_casts,
+        "healingByTarget": healing_by_target,
     }
 
 
 def build_aggregated_json(report_ids):
+    global _API_LOGICAL_REQUESTS
+    started_at = time.perf_counter()
+    with _API_METRICS_LOCK:
+        _API_LOGICAL_REQUESTS = 0
     progress(f"WCL 基础地址：{WCL_BASE_URL}", 1)
     progress(f"WCL 代理：{PROXY_URL or '未启用'}", 1)
     progress("启动宇宙之冕复盘分析")
@@ -2849,16 +3442,46 @@ def build_aggregated_json(report_ids):
             "raidName": "虚影尖塔",
             "bossKey": "crown_of_the_cosmos",
             "bossName": "宇宙之冕",
-            "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "开庭分析"},
+            "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "开庭面板", "transitionDetails": True, "finalVerdict": True},
             "avoidableSpells": {
                 "p15AvoidableDeaths": "P1.5 跑位死亡",
                 "collapsingVoidFriendlyFire": "崩裂空无误伤",
-                "missedEnergy": "未消到 Boss 能量",
+                "missedEnergy": "P2消Boss能量失误",
+                "missedShadows": "P2 拉弓未命中幻影",
+                "waterOutliers": "放水未集中",
+                "voidGraspHealingLow": "空虚之握死亡治疗不足",
+                "voidGraspDeaths": "空虚之握死亡",
+                "p1SilverArrowDeaths": "P1 银锋箭高伤致死",
+                "corruptionEssenceHits": "P1 腐化精华次数",
+                "interferenceShockInterrupts": "干扰震荡打断",
+                "gravityLineViolation": "P3 重力坍缩违规致死",
+                "p3TransitionMistake": "P3 过场失误死亡",
+                "tankRiftSlashFailure": "P2 裂隙挥砍换坦失误",
+            },
+            "courtConfig": {
+                "waterOutlierYards": 15,
+                "voidGraspHealingThreshold8s": VOID_GRASP_HEALING_MIN,
+                "designatedHealerIDs": sorted(DESIGNATED_HEALER_IDS),
+                "verdictPointsPerCount": VERDICT_POINTS_PER_COUNT,
+                "verdictTankMultiplier": VERDICT_TANK_MULTIPLIER,
             },
             "spellLabels": {str(key): value for key, value in SPELLS.items()},
         },
-        "data": {"page1_wipeAnalysis": [], "page2_avoidableBoard": {}},
+        "data": {"page1_wipeAnalysis": [], "page2_transitionAnalysis": {"summary": [], "fights": []}, "page3_courtBoard": {}, "page4_finalVerdict": [], "page2_avoidableBoard": {}},
     }
+
+    field_audit_cache = {}
+    cache_path = os.getenv("CROWN_FIELD_AUDIT_CACHE", "").strip()
+    if cache_path and Path(cache_path).exists():
+        try:
+            cached_root = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+            for cached_fight in cached_root.get("data", {}).get("page1_wipeAnalysis", []):
+                audit = (cached_fight.get("crownOfTheCosmos") or {}).get("fieldAudit")
+                if audit:
+                    field_audit_cache[(str(cached_fight.get("reportID")), int(cached_fight.get("fightID")))] = audit
+            progress(f"复用逐技能场地缓存：{len(field_audit_cache)} 场", 1)
+        except Exception as error:
+            progress(f"逐技能场地缓存读取失败，将重新生成：{error}", 1)
 
     global_board = {}
     for report_id in report_id_list:
@@ -2872,6 +3495,19 @@ def build_aggregated_json(report_ids):
             progress(f"分析 Fight {fight['id']} ({index}/{len(fights)})", 1)
             payload = fetch_fight_payload(token, report_id, fight, actor_game_id)
             payload["actorGameID"] = actor_game_id
+            cached_audit = field_audit_cache.get((str(report_id), int(fight["id"])))
+            if cached_audit:
+                payload["fieldAudit"] = cached_audit
+            else:
+                try:
+                    from tools.crown_single_fight_audit import build_single_fight_audit
+                    progress(f"生成 Fight {fight['id']} 逐技能场地推演", 2)
+                    payload["fieldAudit"] = build_single_fight_audit(
+                        token, report_id, fight, actor_map, actor_type, actor_game_id,
+                    )
+                except Exception as error:
+                    progress(f"Fight {fight['id']} 场地推演失败，保留开庭汇总：{error}", 2)
+                    payload["fieldAudit"] = None
             fight_result = analyze_fight(report_id, fight, actor_map, actor_type, payload)
             return index, fight_result
 
@@ -2893,6 +3529,73 @@ def build_aggregated_json(report_ids):
     final_output["data"]["page2_avoidableBoard"] = {
         key: sorted(rows.values(), key=lambda item: (item["deathCount"], item["hitCount"], item["totalDamage"]), reverse=True)
         for key, rows in global_board.items()
+    }
+    final_output["data"]["page3_courtBoard"] = final_output["data"]["page2_avoidableBoard"]
+
+    transition_fights = []
+    transition_summary = defaultdict(lambda: {"category": "", "deathCount": 0, "compensationCount": 0, "displayDeathCount": 0, "players": {}})
+    for fight_result in final_output["data"]["page1_wipeAnalysis"]:
+        rows = fight_result.get("transitionDetails") or []
+        if not rows:
+            continue
+        transition_fights.append({
+            "reportID": fight_result["reportID"], "fightID": fight_result["fightID"],
+            "startDateTime": fight_result.get("startDateTime"), "duration": fight_result.get("duration"),
+            "rows": rows,
+        })
+        for row in rows:
+            summary = transition_summary[row["category"]]
+            summary["category"] = row["category"]
+            summary["deathCount"] += row.get("deathCount", 0)
+            summary["compensationCount"] += row.get("compensationCount", 0)
+            summary["displayDeathCount"] += row.get("displayDeathCount", 0)
+            summary["players"][row["player"]] = summary["players"].get(row["player"], 0) + 1
+    final_output["data"]["page2_transitionAnalysis"] = {
+        "summary": [{**row, "players": [{"name": name, "count": count} for name, count in sorted(row["players"].items(), key=lambda item: item[1], reverse=True)]} for row in transition_summary.values()],
+        "fights": transition_fights,
+    }
+
+    acquittals = configured_acquittals()
+    verdict_players = {}
+    for skill_key, rows in final_output["data"]["page3_courtBoard"].items():
+        if skill_key in {"collapsingVoidFriendlyFire", "interferenceShockInterrupts", "voidGraspDeaths"}:
+            continue
+        for row in rows:
+            name = row.get("name")
+            if not name:
+                continue
+            item = verdict_players.setdefault(name, {"name": name, "roles": [], "recognitionCount": 0, "appealAcquittalCount": acquittals.get(name, 0), "breakdown": {}, "penaltyUnits": 0.0})
+            item["roles"] = merge_roles(item["roles"], row.get("roles") or [row.get("role", "unknown")])
+            if skill_key in {"corruptionEssenceHits", "corruptionEssenceTop3"}:
+                count = sum(1 for event in row.get("events") or [] if event.get("counted"))
+            else:
+                count = int(row.get("hitCount") or row.get("deathCount") or 0)
+            item["recognitionCount"] += count
+            item["breakdown"][skill_key] = item["breakdown"].get(skill_key, 0) + count
+            base_multiplier = VERDICT_TANK_MULTIPLIER if "tank" in (row.get("roles") or [row.get("role")]) else 1.0
+            penalty_units = count * base_multiplier
+            for event in row.get("events") or []:
+                if event.get("counted") is False or event.get("scoreMultiplier") is None:
+                    continue
+                penalty_units += float(event.get("scoreMultiplier")) - base_multiplier
+            item["penaltyUnits"] += penalty_units
+    for item in verdict_players.values():
+        multiplier = VERDICT_TANK_MULTIPLIER if "tank" in item.get("roles", []) else 1.0
+        item["scoreMultiplier"] = multiplier
+        item["appealUnitMultiplier"] = multiplier
+        item["penaltyUnits"] = round(item["penaltyUnits"], 3)
+        item["iqLoss"] = round(max(0, item["penaltyUnits"] - item["appealAcquittalCount"] * multiplier) * VERDICT_POINTS_PER_COUNT)
+    final_output["data"]["page4_finalVerdict"] = sorted(verdict_players.values(), key=lambda item: (item["iqLoss"], item["recognitionCount"]), reverse=True)
+    elapsed_seconds = round(time.perf_counter() - started_at, 3)
+    with _API_METRICS_LOCK:
+        logical_requests = _API_LOGICAL_REQUESTS
+    final_output["meta"]["performance"] = {
+        "fightCount": len(final_output["data"]["page1_wipeAnalysis"]),
+        "elapsedSeconds": elapsed_seconds,
+        "logicalGraphQLRequests": logical_requests,
+        "maxFightThreads": int(os.getenv("WCL_MAX_FIGHT_THREADS", "4") or 4),
+        "maxRequestThreads": MAX_REQUEST_THREADS,
+        "note": "并发只缩短墙钟时间，不减少 WCL GraphQL 请求数或配额消耗。",
     }
     return final_output
 

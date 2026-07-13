@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="873" height="794" viewBox="0 0 873 794">
+  <rect width="873" height="794" fill="#160d38"/>
+  <defs>
+    <!-- The three masks follow the visible left, right and bottom fissures. -->
+    <clipPath id="top-piece">
+      <path d="M 436.5 397 C 390 376 350 351 307 337 C 260 322 214 300 171 270 C 128 240 91 211 54 183 L 0 0 H 873 L 820 151 C 780 178 744 207 704 232 C 654 263 607 286 558 310 C 512 333 474 368 436.5 397 Z"/>
+    </clipPath>
+    <clipPath id="left-piece">
+      <path d="M 436.5 397 C 390 376 350 351 307 337 C 260 322 214 300 171 270 C 128 240 91 211 54 183 L 0 0 V 794 H 337 C 357 735 378 676 394 617 C 410 558 423 484 436.5 397 Z"/>
+    </clipPath>
+    <clipPath id="right-piece">
+      <path d="M 436.5 397 C 474 368 512 333 558 310 C 607 286 654 263 704 232 C 744 207 780 178 820 151 L 873 0 V 794 H 337 C 357 735 378 676 394 617 C 410 558 423 484 436.5 397 Z"/>
+    </clipPath>
+    <filter id="broken-edge" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="0" stdDeviation="1.5" flood-color="#1f8fff" flood-opacity="0.65"/>
+    </filter>
+  </defs>
+  <!-- A small global fit keeps the translated 85-yard arena inside the frame. -->
+  <g transform="translate(436.5 397) scale(.97) translate(-436.5 -397)" filter="url(#broken-edge)">
+    <!-- Each neighboring edge retreats 5 yd normal to its seam. At 4.35 px/yd
+         this requires a 25.1 px radial displacement after the .97 fit scale. -->
+    <image href="crown_of_cosmos_arena.png" width="873" height="794" clip-path="url(#top-piece)" transform="translate(0 -25.88)"/>
+    <image href="crown_of_cosmos_arena.png" width="873" height="794" clip-path="url(#left-piece)" transform="translate(-22.41 12.94)"/>
+    <image href="crown_of_cosmos_arena.png" width="873" height="794" clip-path="url(#right-piece)" transform="translate(22.41 12.94)"/>
+  </g>
+</svg>

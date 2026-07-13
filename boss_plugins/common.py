@@ -76,6 +76,7 @@ RANGE_DPS_SPEC_IDS = {
     267: "Destruction Warlock",
     1467: "Devastation Evoker",
     1473: "Augmentation Evoker",
+    1480: "Devourer Demon Hunter",
 }
 
 RANGE_HEALER_SPEC_IDS = {

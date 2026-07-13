@@ -162,7 +162,7 @@
   <header>
     <div>
       <h1>奥蕾莉亚单场开庭分析</h1>
-      <div class="muted">固定读取 <span class="mono">tmp/crown_fight30_audit.json</span>，用于核对 Fight 30 的真实拉弓与场地污染。</div>
+      <div class="muted">可读取单场审计 JSON，也可从全天汇总 JSON 中按 Report / Fight 打开对应战斗。</div>
     </div>
     <a id="sourceLink" class="muted" target="_blank" rel="noreferrer">WCL 原始记录</a>
   </header>
@@ -190,7 +190,7 @@
           <span class="chip">青圈：此前放水污染，半径 25 码</span>
         </div>
         <div class="map-wrap">
-          <img src="assets/crown_of_cosmos_arena.png" alt="arena">
+          <img id="arenaImage" src="assets/crown_of_cosmos_arena.png" alt="arena">
           <svg id="mapSvg" class="overlay"></svg>
         </div>
         <div id="selectedDetails" class="details"></div>
@@ -210,19 +210,26 @@
         <div id="p2Stats"></div>
       </section>
       <section class="panel">
-        <h2>各阶段放水偏离 &gt; 8 码</h2>
+        <h2>各阶段放水偏离 &gt; 15 码</h2>
         <div id="waterStats"></div>
       </section>
       <section class="panel">
         <h2>阶段拉弓组数</h2>
         <div id="phaseStats"></div>
       </section>
+      <section class="panel" style="grid-column:1/-1">
+        <h2>P3 重力坍缩时序统计</h2>
+        <div id="gravityStats"></div>
+      </section>
     </section>
   </main>
 
   <script>
-    const DATA_URL = 'tmp/crown_fight30_audit.json';
-    const ICON_SIZE = 16;
+    const ROUTE = new URLSearchParams(window.location.search);
+    const DATA_URL = ROUTE.get('source') || 'tmp/crown_fight30_audit.json';
+    const ROUTE_PHASE = ROUTE.get('phase');
+    const ROUTE_TAG = ROUTE.get('tag');
+    const ICON_SIZE = 32;
     const state = { data: null, selectedKey: null, includeExempt: false };
 
     function escapeHtml(value) {
@@ -232,7 +239,8 @@
     function worldToPixel(point) {
       const cfg = state.data.arena;
       const center = cfg.center;
-      const pxPerYard = cfg.pixelsPerYard || 4.6;
+      const phase = selectedEvent()?.phase || 'P1';
+      const pxPerYard = cfg.pixelsPerYardByPhase?.[phase] || cfg.pixelsPerYard || 4.6;
       const centerPx = { x: 436.5, y: 397 };
       return {
         x: centerPx.x + ((point.x - center.x) / 100) * pxPerYard,
@@ -260,7 +268,21 @@
         sortMs: event.timeMs,
         displayTime: event.time,
       }));
-      return [...bows, ...waters].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
+      const arrows = (state.data.silverArrows || []).map(event => ({
+        ...event,
+        eventType: 'silverArrow',
+        key: `silverArrow:${event.id}`,
+        sortMs: event.timeMs,
+        displayTime: event.time,
+      }));
+      const p3Events = (state.data.p3Events || []).map(event => ({
+        ...event, key: `${event.eventType}:${event.id}`, sortMs: event.timeMs, displayTime: event.time,
+      }));
+      const gravity = (state.data.gravityRounds || []).map(event => ({
+        ...event, eventType: 'gravity', key: `gravity:${event.index}`, sortMs: event.applyTimeMs, displayTime: event.applyTime,
+      }));
+      const rows = [...bows, ...waters, ...arrows, ...p3Events].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
+      return ROUTE_PHASE ? rows.filter(row => row.phase === ROUTE_PHASE) : rows;
     }
 
     function selectedEvent() {
@@ -281,16 +303,29 @@
       const holder = document.getElementById('eventList');
       holder.innerHTML = auditEvents().map(event => {
         const isBow = event.eventType === 'bow';
-        const players = isBow
-          ? event.players.map(player => player.player).join(' / ')
-          : event.drops.map(drop => drop.player).join(' / ');
+        const isWater = event.eventType === 'water';
+        const isArrow = event.eventType === 'silverArrow';
+        const isP3Special = event.eventType === 'cosmicDevour' || event.eventType === 'portal';
+        const isGravity = event.eventType === 'gravity';
+        const players = isBow ? event.players.map(player => player.player).join(' / ')
+          : isWater ? event.drops.map(drop => drop.player).join(' / ')
+          : isP3Special ? `${event.snapshot?.players?.length || 0} 人坐标`
+          : isGravity ? (event.targets || []).join(' / ')
+          : (event.markedPlayers || []).join(' / ');
         const miss = isBow ? event.players.filter(player => player.missedPhantom).map(player => player.player) : [];
-        const outliers = !isBow ? event.drops.filter(drop => drop.isOutlier).map(drop => drop.player) : [];
+        const outliers = isWater ? event.drops.filter(drop => drop.isOutlier).map(drop => drop.player) : [];
         const cls = event.key === selectedEvent().key ? 'event active' : 'event';
-        const title = isBow ? `${event.phase} 拉弓 ${event.displayTime}` : `${event.phase} 放水 ${event.displayTime}`;
+        const title = isBow ? `${event.phase} 拉弓 ${event.displayTime}`
+          : isWater ? `${event.phase} 放水 ${event.displayTime}`
+          : isArrow ? `${event.phase} ${event.phase === 'P2' ? '银锋弹射' : '银锋箭'} ${event.displayTime}`
+          : isGravity ? `P3 重力坍缩 ${event.displayTime}`
+          : `${event.phase} ${event.eventType === 'portal' ? '宇宙传送门' : '噬灭宇宙'} ${event.displayTime}`;
         const sub = isBow
-          ? `幻影 ${event.activePhantomCount} 个${miss.length ? ` · 未射中：${escapeHtml(miss.join('、'))}` : ''}`
-          : `本轮 ${event.drops.length} 人${outliers.length ? ` · 偏离：${escapeHtml(outliers.join('、'))}` : ''}`;
+          ? `${event.phase === 'P2' ? `幻影 ${event.activePhantomCount} 个` : ''}${miss.length ? ` · 未射中：${escapeHtml(miss.join('、'))}` : ''}`
+          : isWater ? `本轮 ${event.drops.length} 人${outliers.length ? ` · 偏离：${escapeHtml(outliers.join('、'))}` : ''}`
+          : isArrow ? (event.phase === 'P1' ? `实际命中 ${event.actualHits?.length || 0}` : `点名来源 ${event.sourceAssignments?.length || 0} · ${event.bossEnergyDrained ? '已消能' : '未消能'}`)
+          : isGravity ? `违规 ${event.violations?.length || 0} · 死亡 ${event.deathCount || 0}`
+          : `Boss 能量 ${event.bossEnergy?.amount ?? '未知'}`;
         return `<button class="${cls}" data-id="${event.key}">
           <div class="event-title"><span>${title}</span><span>#${event.index}</span></div>
           <div class="event-sub">${escapeHtml(players)}<br>${sub}</div>
@@ -338,13 +373,13 @@
       svg.appendChild(node);
     }
 
-    function drawIcon(svg, point, href, title) {
+    function drawIcon(svg, point, href, title, offsetX = 0, offsetY = 0) {
       if (!point || !href) return;
       const p = worldToPixel(point);
       const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
       image.setAttribute('href', href);
-      image.setAttribute('x', p.x - ICON_SIZE / 2);
-      image.setAttribute('y', p.y - ICON_SIZE / 2);
+      image.setAttribute('x', p.x - ICON_SIZE / 2 + offsetX);
+      image.setAttribute('y', p.y - ICON_SIZE / 2 + offsetY);
       image.setAttribute('width', ICON_SIZE);
       image.setAttribute('height', ICON_SIZE);
       image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
@@ -356,7 +391,7 @@
       svg.appendChild(image);
     }
 
-    function drawLine(svg, start, end, color, width = 3, dash = '') {
+    function drawLine(svg, start, end, color, width = 3, dash = '', opacity = 1) {
       if (!start || !end) return;
       const a = worldToPixel(start);
       const b = worldToPixel(end);
@@ -368,23 +403,103 @@
       line.setAttribute('stroke', color);
       line.setAttribute('stroke-width', width);
       line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('opacity', opacity);
       if (dash) line.setAttribute('stroke-dasharray', dash);
       svg.appendChild(line);
     }
 
+    function renderAggregatedFight(root) {
+      const reportID = ROUTE.get('report');
+      const fightID = Number(ROUTE.get('fight'));
+      const fight = (root?.data?.page1_wipeAnalysis || []).find(row => String(row.reportID) === String(reportID) && Number(row.fightID) === fightID);
+      if (!fight) throw new Error(`汇总文件中未找到 ${reportID} / Fight ${fightID}`);
+      const crown = fight.crownOfTheCosmos || {};
+      const sections = [
+        ['P1 银锋箭', crown.p1ArrowAudit || []],
+        ['空虚之握 / 崩裂空无', crown.voidGraspRays || []],
+        ['空虚之握治疗', crown.voidGraspHealing || []],
+        ['P2 幻影未处理', crown.missedShadows || []],
+        ['P2 银锋弹射消能', crown.missedEnergy || []],
+        ['P3 重力坍缩', crown.gravityRows || []],
+        ['P3 宇宙传送门召唤', crown.p3PortalSummons || []],
+        ['干扰震荡打断', crown.interferenceShockRows || []],
+      ];
+      const drops = (crown.voidRepulsionRecords || []).filter(row => row.hasPosition && row.x != null && row.y != null);
+      const cx = drops[0]?.originX != null ? 0 : -363.85;
+      const cy = drops[0]?.originY != null ? 0 : 4788.22;
+      const dotHtml = drops.map(row => {
+        const x = 50 + ((Number(row.x) - cx) / 100 / 170 * 100);
+        const y = 50 - ((Number(row.y) - cy) / 100 / 170 * 100);
+        return `<span title="${escapeHtml(row.phase)} ${escapeHtml(row.time)} ${escapeHtml(row.player)}" style="position:absolute;left:${x}%;top:${y}%;width:10px;height:10px;margin:-5px;border-radius:50%;background:${row.status === '偏散' ? '#fb7185' : '#f0abfc'};box-shadow:0 0 8px currentColor"></span>`;
+      }).join('');
+      const sectionHtml = sections.map(([title, rows]) => `<section class="panel"><h2>${title} <span class="muted">${rows.length} 条</span></h2>${rows.length ? `<div style="overflow:auto"><table><tbody>${rows.map(row => `<tr><td class="mono">${escapeHtml(row.time || row.fireTime || '-')}</td><td>${escapeHtml(row.text || JSON.stringify(row))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">本场无记录</div>'}</section>`).join('');
+      document.getElementById('app').innerHTML = `<header><div><h1>宇宙之冕 · Fight ${fight.fightID} 明细断案</h1><div class="muted">${escapeHtml(fight.startDateTime)} · ${escapeHtml(fight.duration)} · ${escapeHtml(fight.fightStatus)}</div></div><a href="https://cn.warcraftlogs.com/reports/${encodeURIComponent(fight.reportID)}#fight=${fight.fightID}&view=replay" target="_blank">打开 WCL Replay</a></header><main><section class="panel"><h2>场地快照（已获取放水坐标）</h2><div style="position:relative;max-width:873px;aspect-ratio:873/794;margin:auto;background:url('./assets/crown_of_cosmos_arena.png') center/100% 100%;border:1px solid #334155;border-radius:8px;overflow:hidden">${dotHtml}</div><div class="muted" style="margin-top:8px">亮紫点为放水坐标，红点为 15 码离组判定。完整技能快照数据列于下方。</div></section><section class="grid">${sectionHtml}</section></main>`;
+    }
+
+    function drawPolygon(svg, points, color, opacity) {
+      const node = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      node.setAttribute('points', points);
+      node.setAttribute('fill', color);
+      node.setAttribute('opacity', opacity);
+      node.setAttribute('stroke', '#c084fc');
+      node.setAttribute('stroke-width', 2);
+      node.setAttribute('stroke-dasharray', '8 6');
+      svg.appendChild(node);
+    }
+
     function renderMap() {
       const event = selectedEvent();
+      const arenaImage = document.getElementById('arenaImage');
+      arenaImage.src = state.data.arena.imageByPhase?.[event.phase] || state.data.arena.image;
       const svg = document.getElementById('mapSvg');
       svg.setAttribute('viewBox', '0 0 873 794');
       svg.innerHTML = '';
 
-      for (const drop of event.water || []) {
+      const eventMs = event.sortMs ?? event.timeMs ?? 0;
+      const currentDropIds = new Set(event.eventType === 'water' ? (event.drops || []).map(drop => drop.id) : []);
+      for (const drop of state.data.waterDrops || []) {
+        if (drop.phase !== event.phase || drop.timeMs > eventMs || currentDropIds.has(drop.id)) continue;
         if (!drop.position) continue;
-        drawCircle(svg, drop.position, 25 * (state.data.arena.pixelsPerYard || 4.6), '#06b6d4', 0.13, '', `${drop.player} 放水 ${drop.time}`);
+        const pxPerYard = state.data.arena.pixelsPerYardByPhase?.[event.phase] || state.data.arena.pixelsPerYard || 4.6;
+        const nextWater = (state.data.waterEvents || []).find(item => item.phase === drop.phase && item.timeMs > drop.timeMs);
+        const startAt = drop.roundTimeMs ?? drop.timeMs;
+        const fullAt = drop.maturesAtMs ?? nextWater?.timeMs ?? (startAt + 25_000);
+        const growth = Math.max(0, Math.min(1, (eventMs - startAt) / Math.max(1, fullAt - startAt)));
+        drawCircle(svg, drop.position, 25 * growth * pxPerYard, '#06b6d4', 0.13, '', `${drop.player} 放水 ${drop.time} · ${(growth * 100).toFixed(0)}%`);
+      }
+
+      if (event.phase === 'P3') {
+        const shapes = {
+          top: '436.5,397 75,190 160,10 713,10 800,175',
+          lowerLeft: '436.5,397 75,190 0,620 310,794',
+          lowerRight: '436.5,397 800,175 873,620 565,794',
+        };
+        for (const contamination of state.data.p3Contaminations || []) {
+          if (contamination.activeTimeMs <= eventMs && shapes[contamination.platform]) {
+            drawPolygon(svg, shapes[contamination.platform], '#6b21a8', 0.34);
+          }
+        }
+      }
+
+      for (const player of event.snapshot?.players || []) {
+        if (!player.position) continue;
+        drawCircle(svg, player.position, 4.5, '#f8ff4a', 0.98, '', `${player.name} · ${player.position.yardX}, ${player.position.yardY}`);
+      }
+
+      for (const marked of event.markedPlayerPositions || []) {
+        if (!marked.position) continue;
+        drawCircle(svg, marked.position, 8, '#d946ef', 0.98, '', `${marked.player} · 银锋箭射出位置`);
+      }
+
+      if (event.eventType === 'water') {
+        for (const drop of event.drops || []) {
+          if (!drop.position) continue;
+          drawCircle(svg, drop.position, 7, '#a855f7', 0.95, '', `${drop.player} · 本轮放水落点（下一轮才形成污染圈）`);
+        }
       }
 
       const icons = state.data.icons || {};
-      for (const actor of event.actors || []) {
+      for (const actor of event.actors || event.snapshot?.bosses || []) {
         if (!actor.position) continue;
         if (actor.gameID === 240430 || actor.name.includes('奥蕾莉亚') || actor.name.includes('Alleria')) {
           drawIcon(svg, actor.position, icons.alleria || 'boss_plugins/assets/alleria_windrunner.png', actor.name);
@@ -393,10 +508,26 @@
         }
       }
 
-      for (const phantom of event.phantoms || []) {
+      let phantoms = [];
+      if (event.phase === 'P2') {
+        const alive = (state.data.phantomInstances || []).filter(item =>
+          item.position && item.spawnTimeMs != null && item.spawnTimeMs <= eventMs && item.lastTimeMs + 2200 >= eventMs
+        ).map(item => ({...item, sourceInstance: item.sourceInstance}));
+        const candidates = [...alive, ...(event.sourcePhantoms || []), ...(event.phantoms || [])];
+        phantoms = [...new Map(candidates.map(item => [item.sourceInstance, item])).values()];
+      }
+      const phantomLocations = new Map();
+      for (const phantom of phantoms) {
         if (!phantom.position) continue;
-        const label = `银色幻影${phantom.sourceInstance ?? phantom.sourceID ?? ''}`;
-        drawIcon(svg, phantom.position, icons.silverPhantom || 'boss_plugins/assets/silver_phantom.png', label);
+        const key = `${phantom.position.x.toFixed(1)},${phantom.position.y.toFixed(1)}`;
+        if (!phantomLocations.has(key)) phantomLocations.set(key, {position: phantom.position, instances: []});
+        phantomLocations.get(key).instances.push(phantom.sourceInstance ?? phantom.sourceID);
+      }
+      for (const location of phantomLocations.values()) {
+        const label = `银色幻影 ${location.instances.map(item => `#${item}`).join('/')}`;
+        drawIcon(svg, location.position, icons.silverPhantom || 'boss_plugins/assets/silver_phantom.png', label);
+        const pixel = worldToPixel(location.position);
+        drawText(svg, pixel.x, pixel.y + 25, location.instances.map(item => `#${item}`).join('/'), '#e9d5ff', 'middle');
       }
 
       if (event.eventType !== 'bow') return;
@@ -407,6 +538,7 @@
           drawCircle(svg, obelisk.point, 5, '#ef4444', 0.95, '', `${player.player} 方尖碑 ${obelisk.label}`);
         }
         for (const ray of player.rays || []) {
+          if (event.phase === 'P2') drawLine(svg, ray.start, ray.end, '#fde68a', 8, '7 7', 0.38);
           drawLine(svg, ray.start, ray.end, '#f59e0b', 3);
           drawLine(svg, ray.start, ray.through, '#ef4444', 1, '4 4');
         }
@@ -416,9 +548,43 @@
     function renderDetails() {
       const group = selectedEvent();
       const holder = document.getElementById('selectedDetails');
-      const actors = (group.actors || []).filter(actor => actor.position).map(actor => `
+      const actors = (group.actors || group.snapshot?.bosses || []).filter(actor => actor.position).map(actor => `
         <tr><td>${escapeHtml(actor.name)}</td><td>${actor.position.yardX}, ${actor.position.yardY}</td><td>${actor.confidence || 'unknown'}</td></tr>
       `).join('');
+      if (group.eventType === 'gravity') {
+        const breaks = (group.breaks || []).map(item => `<tr>
+          <td>${item.order}</td><td>${escapeHtml(item.player)}</td><td>${item.time}</td><td>${(item.delayMs / 1000).toFixed(3)}s</td>
+          <td>${item.rule}</td><td>${item.compliant ? '合规' : '<span style="color:#ef4444;font-weight:700">违反</span>'}</td>
+        </tr>`).join('');
+        holder.innerHTML = `<section class="card"><h3>P3 重力坍缩 #${group.index} ${group.applyTime}</h3>
+          <div class="muted">点名：${escapeHtml((group.targets || []).join(' / '))} · 死亡 ${group.deathCount || 0} 人${group.collapseTrigger ? ` · 团血崩于 ${escapeHtml(group.collapseTrigger.player)} 拉断` : ''}</div>
+          <table><thead><tr><th>棒次</th><th>玩家</th><th>拉断时间</th><th>间隔</th><th>规则</th><th>判定</th></tr></thead><tbody>${breaks}</tbody></table>
+        </section>`;
+        return;
+      }
+      if (group.eventType === 'cosmicDevour' || group.eventType === 'portal') {
+        holder.innerHTML = `<section class="card">
+          <h3>P3 ${group.eventType === 'portal' ? '宇宙传送门' : '噬灭宇宙'} ${group.time}</h3>
+          <div class="muted">Boss 能量：${group.bossEnergy?.amount ?? '未获取'}${group.bossEnergy?.max ? ` / ${group.bossEnergy.max}` : ''}</div>
+          <div class="muted">全团坐标已在地图以亮点显示；噬灭宇宙对应板块在 10 秒后标记为彻底污染。</div>
+        </section><section class="card"><h3>全部 Boss 坐标</h3><table><tbody>${actors}</tbody></table></section>`;
+        return;
+      }
+      if (group.eventType === 'silverArrow') {
+        const hits = (group.actualHits || []).map(hit => `
+          <tr${hit.isMarked ? '' : ' style="color:#ef4444;font-weight:700"'}><td>${escapeHtml(hit.target)}${hit.isMarked ? '' : '（误伤）'}</td><td>${hit.amount}</td></tr>
+        `).join('');
+        const bossAttribution = (group.p1BossAttribution || []).map(item => `${escapeHtml(item.player)}→${item.hitBoss ? escapeHtml(item.bosses.join('、')) : '未命中小Boss'}`).join('；');
+        const ricochetRows = (group.sourceAssignments || []).map(item => `<tr><td>银色幻影${item.sourceInstance}</td><td>${escapeHtml(item.players?.[0] || '-')}</td><td>${escapeHtml(item.players?.[1] || '-')}</td><td>${item.bossEnergyDrained ? '是' : '否'}</td></tr>`).join('');
+        holder.innerHTML = `
+          <section class="card">
+            <h3>${group.phase} ${group.phase === 'P2' ? '银锋弹射' : '银锋箭'} #${group.index} ${group.time}</h3>
+            <div class="muted">点名：${escapeHtml((group.markedPlayers || []).join(' / '))}${group.phase === 'P2' ? ` · ${group.bossEnergyDrained ? '成功消能' : '未消能'}` : ''}</div>
+            ${group.phase === 'P1' ? `<div class="muted">射中小Boss判定：${bossAttribution || '两人均未命中（问题）'}</div><table><thead><tr><th>实际命中对象</th><th>伤害</th></tr></thead><tbody>${hits || '<tr><td colspan="2">无命中记录</td></tr>'}</tbody></table>` : `<table><thead><tr><th>点名来源</th><th>点名玩家A</th><th>点名玩家B</th><th>是否消能</th></tr></thead><tbody>${ricochetRows}</tbody></table>`}
+          </section>
+          <section class="card"><h3>当时 Boss 坐标</h3><table><tbody>${actors}</tbody></table></section>`;
+        return;
+      }
       if (group.eventType === 'water') {
         const drops = (group.drops || []).map(drop => `
           <tr>
@@ -433,6 +599,7 @@
           <section class="card">
             <h3>${group.phase} 放水 #${group.index} ${group.time}</h3>
             <div class="muted">只展示本阶段已发生的污染，转阶段后重置。</div>
+            ${group.remoteStackCheck?.exempt ? '<div class="muted">本轮为 P2 首轮，远程集中度豁免。</div>' : group.remoteStackCheck?.eligible ? `<div class="muted">远程集中度：${group.remoteStackCheck.stacked ? '集中' : '不集中'} · 最远离质心 ${group.remoteStackCheck.maxDistanceFromCentroidYards ?? '-'} 码 · 阈值 15 码${group.remoteStackCheck.outliers?.length ? ` · 离群：${group.remoteStackCheck.outliers.map(item => `${escapeHtml(item.player)} ${item.distanceYards}码`).join('、')}` : ''}</div>` : ''}
             <table><thead><tr><th>玩家</th><th>时间</th><th>坐标</th><th>离组距离</th><th>过偏</th></tr></thead><tbody>${drops}</tbody></table>
           </section>
           <section class="card">
@@ -448,6 +615,8 @@
           <td>${player.fadeTime}<br><span class="muted">${player.fadeState?.confidence || 'unknown'}</span></td>
           <td>${player.actualPhantomHitCount || 0}</td>
           <td>${player.predictedPhantomHits?.length || 0}</td>
+          <td>${(player.shotAttribution || []).map(item => `幻影${item.phantom}：${item.verdict}（${item.confidence}，${item.basis}）`).join('<br>') || '-'}</td>
+          <td>${player.allHealing?.totalHealing ?? 0}<br><span class="muted">${(player.allHealing?.healingByHealer || []).map(item => `${escapeHtml(item.healer)} ${item.amount}`).join(' / ') || '无治疗记录'}</span></td>
           <td>${player.missedPhantom ? '<span style="color:#ef4444;font-weight:700">是</span>' : '否'}</td>
         </tr>`).join('');
       const phantoms = (group.phantoms || []).map(phantom => `
@@ -456,13 +625,13 @@
       holder.innerHTML = `
         <section class="card">
           <h3>${group.phase} #${group.index} ${group.fireTime}</h3>
-          <div class="muted">apply ${group.applyStart}，active phantom ${group.activePhantomCount}，水圈 ${group.water?.length || 0}</div>
-          <table><thead><tr><th>玩家</th><th>apply</th><th>remove/fire</th><th>实际命中幻影</th><th>几何命中幻影</th><th>P2 未射中</th></tr></thead><tbody>${players}</tbody></table>
+          <div class="muted">apply ${group.applyStart}${group.phase === 'P2' ? `，active phantom ${group.activePhantomCount}` : ''}</div>
+          <table><thead><tr><th>玩家</th><th>apply</th><th>remove/fire</th><th>实际命中幻影</th><th>几何命中幻影</th><th>事件/职责归因</th><th>空虚之握全程治疗</th><th>P2 未射中</th></tr></thead><tbody>${players}</tbody></table>
         </section>
-        <section class="card">
+        ${group.phase === 'P2' ? `<section class="card">
           <h3>当前场上银色幻影</h3>
           <table><thead><tr><th>对象</th><th>首次伤害</th><th>末次伤害</th><th>坐标</th></tr></thead><tbody>${phantoms || '<tr><td colspan="4" class="muted">无</td></tr>'}</tbody></table>
-        </section>
+        </section>` : ''}
         <section class="card">
           <h3>当时 Boss / Add 坐标</h3>
           <table><thead><tr><th>对象</th><th>坐标</th><th>置信度</th></tr></thead><tbody>${actors || '<tr><td colspan="3" class="muted">未拿到可用坐标</td></tr>'}</tbody></table>
@@ -470,8 +639,9 @@
     }
 
     function renderDeathHealing() {
-      const rows = state.data.voidDeaths.filter(row => state.includeExempt || !row.exemptByPhantoms);
-      document.getElementById('deathHealing').innerHTML = `<table><thead><tr><th>时间</th><th>死亡玩家</th><th>幻影数</th><th>6秒治疗总量</th><th>治疗拆分</th><th>不追究</th></tr></thead><tbody>${
+      const holder = document.getElementById('deathHealing');
+      const rows = state.data.voidDeaths.filter(row => (!ROUTE_PHASE || row.phase === ROUTE_PHASE) && (state.includeExempt || !row.exemptByPhantoms));
+      holder.innerHTML = `<table><thead><tr><th>时间</th><th>死亡玩家</th><th>幻影数</th><th>6秒治疗总量</th><th>治疗拆分</th><th>不追究</th></tr></thead><tbody>${
         rows.map(row => `<tr>
           <td>${row.time}</td>
           <td>${escapeHtml(row.player)}</td>
@@ -484,23 +654,44 @@
     }
 
     function renderP2Stats() {
+      const holder = document.getElementById('p2Stats');
+      holder.closest('.panel').style.display = ROUTE_PHASE && ROUTE_PHASE !== 'P2' ? 'none' : '';
+      if (ROUTE_PHASE && ROUTE_PHASE !== 'P2') return;
       const missPhantom = state.data.summary.p2MissedPhantomByPlayer || [];
       const missEnergy = state.data.summary.p2MissedEnergyByPlayer || [];
-      document.getElementById('p2Stats').innerHTML = `
+      holder.innerHTML = `
         <div class="card"><h3>没有射到银色幻影</h3><table><tbody>${missPhantom.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('') || '<tr><td class="muted">无</td></tr>'}</tbody></table></div>
         <div class="card"><h3>没有成功消 Boss 能量</h3><table><tbody>${missEnergy.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('') || '<tr><td class="muted">无</td></tr>'}</tbody></table></div>`;
     }
 
     function renderWaterStats() {
-      const rows = state.data.summary.waterOutliersByPhase || {};
+      const allRows = state.data.summary.waterOutliersByPhase || {};
+      const rows = ROUTE_PHASE ? (allRows[ROUTE_PHASE] ? {[ROUTE_PHASE]: allRows[ROUTE_PHASE]} : {}) : allRows;
       document.getElementById('waterStats').innerHTML = Object.keys(rows).length
         ? Object.entries(rows).map(([phase, players]) => `<div class="card"><h3>${phase}</h3><table><tbody>${players.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('')}</tbody></table></div>`).join('')
         : '<div class="card muted">没有识别到超过 8 码的放水偏离。</div>';
     }
 
     function renderPhaseStats() {
-      const rows = state.data.summary.bowGroupsByPhase || {};
+      const allRows = state.data.summary.bowGroupsByPhase || {};
+      const rows = ROUTE_PHASE ? {[ROUTE_PHASE]: allRows[ROUTE_PHASE] || 0} : allRows;
       document.getElementById('phaseStats').innerHTML = `<table><tbody>${Object.entries(rows).map(([phase, count]) => `<tr><td>${phase}</td><td>${count}</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    function renderGravityStats() {
+      const holder = document.getElementById('gravityStats');
+      holder.closest('.panel').style.display = ROUTE_PHASE && ROUTE_PHASE !== 'P3' ? 'none' : '';
+      if (ROUTE_PHASE && ROUTE_PHASE !== 'P3') return;
+      const rows = state.data.gravityRounds || [];
+      holder.innerHTML = `<table><thead><tr><th>轮次</th><th>点名</th><th>1棒</th><th>2棒间隔</th><th>3棒间隔</th><th>违规</th><th>死亡/归因</th></tr></thead><tbody>${rows.map(row => {
+        const breaks = row.breaks || [];
+        const violation = (row.violations || []).map(item => `${escapeHtml(item.player)}：${item.rule}（${(item.delayMs / 1000).toFixed(3)}秒）`).join('<br>') || '无';
+        return `<tr><td>#${row.index} ${row.applyTime}</td><td>${escapeHtml((row.targets || []).join(' / '))}</td>
+          <td>${breaks[0] ? `${escapeHtml(breaks[0].player)} ${(breaks[0].delayMs / 1000).toFixed(3)}s` : '-'}</td>
+          <td>${breaks[1] ? `${escapeHtml(breaks[1].player)} ${(breaks[1].delayMs / 1000).toFixed(3)}s` : '-'}</td>
+          <td>${breaks[2] ? `${escapeHtml(breaks[2].player)} ${(breaks[2].delayMs / 1000).toFixed(3)}s` : '-'}</td>
+          <td>${violation}</td><td>${row.deathCount || 0} 人${row.collapseTrigger ? ` · ${escapeHtml(row.collapseTrigger.player)}` : ''}</td></tr>`;
+      }).join('')}</tbody></table>`;
     }
 
     function render() {
@@ -514,6 +705,7 @@
       renderP2Stats();
       renderWaterStats();
       renderPhaseStats();
+      renderGravityStats();
     }
 
     document.getElementById('includeExempt').addEventListener('change', event => {
@@ -527,7 +719,19 @@
         return response.json();
       })
       .then(data => {
+        if (data?.data?.page1_wipeAnalysis) {
+          const reportID = ROUTE.get('report');
+          const fightID = Number(ROUTE.get('fight'));
+          const fight = (data.data.page1_wipeAnalysis || []).find(row => String(row.reportID) === String(reportID) && Number(row.fightID) === fightID);
+          const audit = fight?.crownOfTheCosmos?.fieldAudit;
+          if (!audit) {
+            renderAggregatedFight(data);
+            return;
+          }
+          data = audit;
+        }
         state.data = data;
+        if (ROUTE_TAG) state.selectedKey = ROUTE_TAG;
         render();
       })
       .catch(error => {
