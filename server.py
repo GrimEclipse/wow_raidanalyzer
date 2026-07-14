@@ -22,6 +22,8 @@ from analyzer_core.runner import analyze_report
 ROOT = Path(__file__).resolve().parent
 JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
+VERDICT_DIR = ROOT / "verdicts"
+VERDICT_DIR.mkdir(exist_ok=True)
 
 FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
@@ -199,6 +201,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/verdicts":
+            return self.handle_save_verdict()
         if parsed.path != "/api/analyze":
             return self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -226,6 +230,43 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "eventsUrl": f"/api/jobs/{job.id}/events",
                 "resultUrl": f"/api/jobs/{job.id}/result",
             }, HTTPStatus.ACCEPTED))
+        except Exception as exc:
+            return self.send_response_body(*json_bytes({"error": str(exc)}, HTTPStatus.BAD_REQUEST))
+
+    def handle_save_verdict(self):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            date = str(payload.get("progressDate") or payload.get("date") or "").strip()
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+                raise ValueError("progressDate 必须是 YYYY-MM-DD")
+            slim = {
+                "schemaVersion": 2,
+                "module": "final_verdict",
+                "author": "卫宇珩",
+                "editor": "卫宇珩",
+                "progressDate": date,
+                "date": date,
+                "sourceReports": payload.get("sourceReports") or [],
+                "sourceFile": payload.get("sourceFile") or "",
+                "pointsPerCount": payload.get("pointsPerCount") or 10,
+                "updatedAt": payload.get("updatedAt") or time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "players": [
+                    {
+                        "name": row.get("name"),
+                        "recognitionCount": row.get("recognitionCount") or 0,
+                        "recognitionReasons": row.get("recognitionReasons") or "",
+                        "appealAcquittalCount": row.get("appealAcquittalCount") or 0,
+                        "appealAcquittalReasons": row.get("appealAcquittalReasons") or "",
+                        "iqLoss": row.get("iqLoss") or 0,
+                    }
+                    for row in (payload.get("players") or [])
+                    if row.get("name")
+                ],
+            }
+            path = VERDICT_DIR / f"verdict-{date}.json"
+            path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
+            return self.send_response_body(*json_bytes({"ok": True, "path": str(path.relative_to(ROOT)).replace("\\", "/")}))
         except Exception as exc:
             return self.send_response_body(*json_bytes({"error": str(exc)}, HTTPStatus.BAD_REQUEST))
 

@@ -3,7 +3,12 @@ from collections import defaultdict
 from pathlib import Path
 
 
-EXCLUDED_FROM_VERDICT = {"collapsingVoidFriendlyFire", "interferenceShockInterrupts"}
+EXCLUDED_FROM_VERDICT = {
+    "collapsingVoidFriendlyFire",
+    "interferenceShockInterrupts",
+    "missedEnergy",
+    "corruptionEssenceDamage",
+}
 
 
 def _first_deaths(audit):

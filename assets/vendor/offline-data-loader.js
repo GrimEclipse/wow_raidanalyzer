@@ -29,8 +29,8 @@
       panel.innerHTML = `
         <div style="font-size:18px;font-weight:700;margin-bottom:8px">选择复盘 JSON</div>
         <div style="font-size:13px;color:#94a3b8;line-height:1.6;margin-bottom:18px">
-          当前页面以静态文件方式打开，浏览器不能自动读取 <code>${String(source || '')}</code>。
-          请选择同目录中的 <code>wcl_hardcore_api.json</code>。
+          未找到打包内嵌数据，且当前为 <code>file://</code> 打开，浏览器不能自动读取
+          <code>${String(source || '')}</code>。请选择同目录中的 JSON 文件。
         </div>
       `;
       const input = document.createElement('input');
@@ -55,13 +55,22 @@
     });
   }
 
-  async function loadJson(source) {
+  function bakedPayload(source) {
+    const path = String(source || '');
+    if (/verdict/i.test(path) && window.__VERDICT_DATA__) return window.__VERDICT_DATA__;
     if (window.__WCL_HARDCORE_DATA__) return window.__WCL_HARDCORE_DATA__;
+    if (window.__OFFLINE_DATA__) return window.__OFFLINE_DATA__;
+    return null;
+  }
+
+  async function loadJson(source) {
+    const baked = bakedPayload(source);
+    if (baked) return baked;
     if (window.location.protocol === 'file:') return chooseLocalJson(source);
     const response = await fetch(source);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   }
 
-  window.OfflineDataLoader = { loadJson };
+  window.OfflineDataLoader = { loadJson, bakedPayload };
 })();

@@ -60,7 +60,7 @@ RIFT_SIMULACRUM_GAME_ID = 254098
 HEALER_SPEC_IDS = {65, 105, 256, 257, 264, 270, 1468}
 WATER_OUTLIER_YARDS = 15.0
 SNAP_MOVEMENT_YARDS = 5.0
-FIELD_AUDIT_VERSION = "2026-07-14-healing-window-v5"
+FIELD_AUDIT_VERSION = "2026-07-14-global-exemption-v6"
 COMBAT_RESURRECTION_IDS = {20484, 20608, 20707, 61999, 391054}
 RAY_LENGTH_RAW = 10_000.0
 RAY_WIDTH_RAW = 300.0
@@ -366,7 +366,9 @@ def fetch_spell_bundle(token, report_id, fight):
         damage.extend(fetch_events_all(token, report_id, "DamageTaken", fight, ability_id=spell_id, include_resources=True))
         damage.extend(fetch_events_all(token, report_id, "DamageDone", fight, ability_id=spell_id, hostility_type="Enemies", include_resources=True))
     deaths = fetch_events_all(token, report_id, "Deaths", fight)
-    healing = fetch_events_all(token, report_id, "Healing", fight)
+    # includeResources 会在部分治疗事件上返回目标当前/最大生命值，供空虚之握
+    # “点名时血量 > 50%”判定使用。没有可靠采样时必须明确豁免。
+    healing = fetch_events_all(token, report_id, "Healing", fight, include_resources=True)
     combatants = fetch_events_all(token, report_id, "CombatantInfo", fight)
     resources = fetch_events_all(token, report_id, "Resources", fight, include_resources=True)
     enemy_resources = fetch_events_all(token, report_id, "Resources", fight, hostility_type="Enemies", include_resources=True)
@@ -1117,11 +1119,16 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 item["phantom"] for item in predicted_phantom_hits
                 if item["phantom"] in resolved_instance_ids
             })
+            apply_health = player_health_snapshot(events, target_id, apply_ts)
             players.append({
                 "targetID": target_id,
                 "player": event_actor_name(actor_map, actor_game_id, target_id),
                 "applyTimeMs": rel(fight, apply_ts),
                 "applyTime": fmt(rel(fight, apply_ts)),
+                "targetHealthAtApply": (apply_health or {}).get("hitPoints"),
+                "targetMaxHealthAtApply": (apply_health or {}).get("maxHitPoints"),
+                "targetHealthPercentAtApply": (apply_health or {}).get("percent"),
+                "targetHealthSampleDeltaMs": (apply_health or {}).get("sampleDeltaMs"),
                 "fadeTimeMs": rel(fight, fade_ts),
                 "fadeTime": fmt(rel(fight, fade_ts)),
                 "triggerTimeMs": rel(fight, trigger_ts),
@@ -1367,7 +1374,44 @@ def alive_players_at(events, player_set, timestamp):
     return alive
 
 
+def player_health_snapshot(events, target_id, timestamp, before_ms=3_000, after_ms=1_000):
+    """Return the nearest reliable target-health sample around a mechanic apply."""
+    candidates = []
+    for event in events.get("healing") or []:
+        event_ts = int(event.get("timestamp") or 0)
+        if event.get("targetID") != target_id or not (timestamp - before_ms <= event_ts <= timestamp + after_ms):
+            continue
+        hit_points = event.get("hitPoints")
+        max_hit_points = event.get("maxHitPoints")
+        if hit_points is None or not max_hit_points:
+            continue
+        resource_actor = event.get("resourceActor")
+        if resource_actor not in {2, "2"} and not (
+            event.get("sourceID") == target_id and resource_actor in {1, "1"}
+        ):
+            continue
+        candidates.append(event)
+    if not candidates:
+        return None
+    before = [event for event in candidates if int(event.get("timestamp") or 0) <= timestamp]
+    event = max(before, key=lambda row: int(row.get("timestamp") or 0)) if before else min(
+        candidates, key=lambda row: int(row.get("timestamp") or 0)
+    )
+    hit_points = int(event.get("hitPoints") or 0)
+    max_hit_points = int(event.get("maxHitPoints") or 0)
+    return {
+        "hitPoints": hit_points,
+        "maxHitPoints": max_hit_points,
+        "percent": round(hit_points * 100 / max_hit_points, 2) if max_hit_points else None,
+        "sampleTimeMs": int(event.get("timestamp") or 0),
+        "sampleDeltaMs": int(event.get("timestamp") or 0) - int(timestamp),
+    }
+
+
 def build_void_death_healing(fight, actor_map, actor_game_id, events, player_set, healer_set, phantom_segments):
+    # player_ids() returns a sorted list for snapshot ordering; coerce to sets for roster math.
+    player_id_set = set(player_set)
+    healer_id_set = set(healer_set)
     rows = []
     for death in events["deaths"]:
         if death.get("killingAbilityGameID") not in {SPELL["collapsing_void"], SPELL["void_grasp"]}:
@@ -1379,7 +1423,7 @@ def build_void_death_healing(fight, actor_map, actor_game_id, events, player_set
         for event in events["healing"]:
             if event.get("targetID") != target_id:
                 continue
-            if event.get("sourceID") not in healer_set:
+            if event.get("sourceID") not in healer_id_set:
                 continue
             event_ts = event.get("timestamp", 0)
             if not (ts - 8_000 <= event_ts <= ts):
@@ -1389,28 +1433,41 @@ def build_void_death_healing(fight, actor_map, actor_game_id, events, player_set
             if ts - 6_000 <= event_ts:
                 totals6s[event.get("sourceID")] += amount
         active_count = len(active_phantoms_at(phantom_segments, ts))
-        alive_players = alive_players_at(events, player_set, ts)
-        alive_healers = healer_set & alive_players
-        dead_players = player_set - alive_players
+        alive_players = alive_players_at(events, player_id_set, ts)
+        alive_healers = healer_id_set & alive_players
+        dead_players = player_id_set - alive_players
+        apply_event = max((
+            event for event in events["debuffs"]
+            if ability_id(event) == SPELL["void_grasp"]
+            and event.get("targetID") == target_id
+            and "apply" in event_type(event)
+            and ts - 15_000 <= event.get("timestamp", 0) <= ts
+        ), key=lambda event: event.get("timestamp", 0), default=None)
+        health = player_health_snapshot(events, target_id, apply_event.get("timestamp", 0)) if apply_event else None
         rows.append({
             "timeMs": rel(fight, ts),
             "time": fmt(rel(fight, ts)),
             "player": event_actor_name(actor_map, actor_game_id, target_id),
             "targetID": target_id,
             "abilityID": death.get("killingAbilityGameID"),
+            "applyTimeMs": rel(fight, apply_event.get("timestamp")) if apply_event else None,
+            "targetHealthAtApply": (health or {}).get("hitPoints"),
+            "targetMaxHealthAtApply": (health or {}).get("maxHitPoints"),
+            "targetHealthPercentAtApply": (health or {}).get("percent"),
+            "targetHealthSampleDeltaMs": (health or {}).get("sampleDeltaMs"),
             "activePhantomCount": active_count,
             "exemptByPhantoms": active_count >= 4,
-            "playerRosterCount": len(player_set),
+            "playerRosterCount": len(player_id_set),
             "deadPlayerCountAtDeath": len(dead_players),
             "deadPlayerIDsAtDeath": sorted(dead_players),
-            "healerRosterCount": len(healer_set),
-            "healerRosterIDs": sorted(healer_set),
+            "healerRosterCount": len(healer_id_set),
+            "healerRosterIDs": sorted(healer_id_set),
             "healerRoster": [
                 {
                     "healerID": healer_id,
                     "healer": event_actor_name(actor_map, actor_game_id, healer_id),
                 }
-                for healer_id in sorted(healer_set)
+                for healer_id in sorted(healer_id_set)
             ],
             "aliveHealerCountAtDeath": len(alive_healers),
             "aliveHealerIDsAtDeath": sorted(alive_healers),

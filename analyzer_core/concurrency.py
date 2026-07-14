@@ -24,7 +24,9 @@ MAX_REQUEST_RETRIES = env_int("WCL_MAX_REQUEST_RETRIES", 3)
 REQUEST_RETRY_BASE_SECONDS = float(os.getenv("WCL_REQUEST_RETRY_BASE_SECONDS", "0.8") or 0.8)
 
 _REQUEST_SEMAPHORE = threading.BoundedSemaphore(MAX_REQUEST_THREADS)
-_RETRY_STATUSES = {429, 500, 502, 503, 504}
+# WCL/Cloudflare 偶尔会在有效 OAuth 凭据和充足额度下瞬时返回 403。
+# 401 仍然不重试（凭据错误），403 则按与 429/5xx 相同的短退避重试。
+_RETRY_STATUSES = {403, 429, 500, 502, 503, 504}
 
 
 def requests_module():

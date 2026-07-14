@@ -5,7 +5,7 @@ from pathlib import Path
 VERSION = "12.0"
 RAID = "void_spire"
 BOSS = "crown_of_the_cosmos"
-FALLBACK_REPORT_ID = "AzMjQTLpg8WXJc23"
+FALLBACK_REPORT_ID = "mH8AFN1xXq94J2kW"
 OUTPUT = Path(__file__).resolve().with_name("wcl_hardcore_api.json")
 
 

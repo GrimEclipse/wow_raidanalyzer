@@ -117,6 +117,7 @@ SPELLS = {
 
 P1_EXPECTED_ARROW_MS = [43_466, 99_350, 125_559]
 P1_EXPECTED_TOLERANCE_MS = 2_000
+GLOBAL_DEATH_EXEMPT_THRESHOLD = 8
 P1_MIN_TRANSITION_START_MS = P1_EXPECTED_ARROW_MS[-1] - P1_EXPECTED_TOLERANCE_MS
 P1_RAGE_LIMIT_MS = 165_000
 P2_EXPECTED_DURATION_MS = 150_000
@@ -243,6 +244,8 @@ P1_ARROW_TARGETS = {
     99_350: "殁里乌姆",
     125_559: "龌勒卢斯",
 }
+MELURIUM_EXPECTED_MS = 99_350
+MELURIUM_GAME_IDS = {254174, MAWRIUS_GAME_ID}
 
 ACTOR_NAME_OVERRIDES = {
     "Alleria Windrunner": "奥蕾莉亚·风行者",
@@ -275,6 +278,11 @@ def get_token():
     )
     if res.status_code == 401:
         raise RuntimeError("WCL 鉴权失败：请确认 .env 中填写的是 API Client ID / Secret。")
+    if res.status_code == 403:
+        raise RuntimeError(
+            f"WCL 鉴权端点连续返回 403（已自动重试 {MAX_REQUEST_RETRIES} 次）。"
+            f"当前代理：{PROXY_URL or '未启用'}。请检查代理出口或稍后重试；这不是额度不足。"
+        )
     res.raise_for_status()
     return res.json()["access_token"]
 
@@ -304,6 +312,12 @@ def graphql(token, query, variables):
             time.sleep(REQUEST_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
     else:
         raise last_error
+    if res.status_code == 403:
+        body = (res.text or "")[:300].replace("\n", " ")
+        raise RuntimeError(
+            f"WCL v2 连续返回 403（已自动重试 {MAX_REQUEST_RETRIES} 次，代理：{PROXY_URL or '未启用'}）。"
+            f"响应摘要：{body or '无'}"
+        )
     res.raise_for_status()
     payload = res.json()
     if payload.get("errors"):
@@ -1097,6 +1111,30 @@ def expected_arrow_target(expected):
     return P1_ARROW_TARGETS.get(expected, "目标大怪")
 
 
+def is_melurium_actor(row):
+    if not row:
+        return False
+    if row.get("gameID") in MELURIUM_GAME_IDS:
+        return True
+    name = str(row.get("name") or "")
+    return "殁里乌姆" in name or "Mawrius" in name or "Morium" in name
+
+
+def melurium_alive_in_arrow_snapshot(arrow):
+    """Whether 殁里乌姆 is still present in the silver-arrow snapshot (alive)."""
+    rows = list((arrow.get("snapshot") or {}).get("bosses") or [])
+    rows.extend(arrow.get("actors") or [])
+    return any(is_melurium_actor(row) for row in rows)
+
+
+def is_melurium_arrow_slot(expected_ms, arrow=None):
+    if expected_ms == MELURIUM_EXPECTED_MS or expected_arrow_target(expected_ms) == "殁里乌姆":
+        return True
+    if arrow and abs(int(arrow.get("timeMs") or 0) - MELURIUM_EXPECTED_MS) <= P1_EXPECTED_TOLERANCE_MS:
+        return True
+    return False
+
+
 def event_target_name(actor_map, event):
     return actor(actor_map, event.get("targetID"))
 
@@ -1662,10 +1700,10 @@ def analyze_p2_energy(markers, fight, debuffs, damage_events, energy_events, act
                 "missingCount": 0,
                 "players": [row["player"] for row in players],
                 "playerIDs": [row["targetID"] for row in players],
-                "counted": True,
+                "counted": False,
                 "verdictCounted": False,
                 "displayOnly": True,
-                "countReason": "两名点名均已确认，但本轮未产生奥蕾莉亚能量 -5；两人共同计入并保留申诉入口",
+                "countReason": "消能失误仅展示分析，永远不计数、不进入终审",
                 "text": f"{format_time(cluster['start'] - fight['startTime'])} 第 {index} 组游侠队长印记已消失 2 人（{player_names}），但未识别到奥蕾莉亚能量 -5（1259998）",
             })
     return rows
@@ -1694,10 +1732,10 @@ def refine_p2_energy_with_field_audit(rows, field_audit, actor_map):
                 "missingCount": 0,
                 "players": players,
                 "playerIDs": [reverse_actor.get(player) for player in players],
-                "counted": True,
+                "counted": False,
                 "verdictCounted": False,
                 "displayOnly": True,
-                "countReason": "该银色幻影对应的两名点名未使奥蕾莉亚能量 -5",
+                "countReason": "消能失误仅展示分析，永远不计数、不进入终审",
                 "text": f"{arrow.get('time')} 点名玩家：{player_text}；对应银色幻影 {source_instance or '-'} 未成功消除 Boss 能量",
             })
     return refined if len(refined) > sum(1 for row in rows if not row.get("counted")) else rows
@@ -1908,11 +1946,97 @@ def build_board_row(name, spell_key, spell_name, hit_count=0, death_count=0, tot
     }
 
 
+def display_time_to_ms(value):
+    try:
+        minutes, seconds = str(value or "0:0").split(":", 1)
+        return int(round((int(minutes) * 60 + float(seconds)) * 1_000))
+    except (TypeError, ValueError):
+        return 0
+
+
+def event_position_ms(event):
+    for key in ("positionMs", "timeMs", "markPositionMs", "fireTimeMs", "applyTimeMs"):
+        if event.get(key) is not None:
+            try:
+                return int(event.get(key))
+            except (TypeError, ValueError):
+                pass
+    return display_time_to_ms(event.get("time") or event.get("deathTime"))
+
+
+def apply_global_death_exemption(local_board, deaths, fight):
+    """Suppress every mistake strictly after the fight's eighth death.
+
+    Suppressed events stay in JSON with an explicit reason so the report can
+    show them under “不计数”.  The eighth-death event itself remains eligible;
+    only later events are globally exempt.
+    """
+    ordered_deaths = sorted(deaths or [], key=lambda row: int(row.get("timestamp") or 0))
+    cutoff_ms = None
+    if len(ordered_deaths) >= GLOBAL_DEATH_EXEMPT_THRESHOLD:
+        cutoff_ms = int(ordered_deaths[GLOBAL_DEATH_EXEMPT_THRESHOLD - 1].get("timestamp") or 0) - int(fight["startTime"])
+    for skill_key, board_rows in local_board.items():
+        for row in board_rows or []:
+            events = row.get("events") or []
+            row["observedHitCount"] = int(row.get("hitCount") or 0)
+            row["observedDeathCount"] = int(row.get("deathCount") or 0)
+            for event in events:
+                position_ms = event_position_ms(event)
+                event.setdefault("positionMs", position_ms)
+                if cutoff_ms is None or position_ms <= cutoff_ms:
+                    continue
+                if event.get("counted") is False and event.get("countReason"):
+                    event["mechanicExemptionReason"] = event.get("countReason")
+                event["counted"] = False
+                event["globalExempt"] = True
+                event["globalExemptionReason"] = (
+                    f"全局最高优先级豁免：本场第{GLOBAL_DEATH_EXEMPT_THRESHOLD}次死亡发生于"
+                    f"{format_time(cutoff_ms)}，该失误发生在其后"
+                )
+                event["countReason"] = event["globalExemptionReason"]
+            if events:
+                counted_events = [event for event in events if event.get("counted") is not False]
+                display_only_keys = set(AVOIDABLE_DAMAGE_SPELLS) | {"missedEnergy", "interferenceShockInterrupts"}
+                if skill_key in display_only_keys:
+                    # 仅展示项：保留观察到的次数；计数字段永远为 0
+                    row["hitCount"] = int(row.get("observedHitCount") or len(events))
+                    row["countedCount"] = 0
+                    row["uncountedCount"] = len(events)
+                    if skill_key in set(AVOIDABLE_DAMAGE_SPELLS):
+                        row["deathCount"] = 0
+                        row["totalDamage"] = 0
+                    continue
+                row["hitCount"] = len(counted_events)
+                row["countedCount"] = len(counted_events)
+                row["uncountedCount"] = len(events) - len(counted_events)
+                if skill_key == "collapsingVoidSnapAiming":
+                    row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted_events)
+                elif skill_key == "gravityLineViolation":
+                    row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted_events)
+                elif skill_key in {"p1SilverArrowDeaths", "p15AvoidableDeaths"}:
+                    row["deathCount"] = len(counted_events)
+                elif skill_key == "tankRiftSlashFailure":
+                    row["deathCount"] = sum(1 for event in counted_events if event.get("causedTankDeath"))
+                if row.get("totalDamage") and all(event.get("amount") is not None for event in events):
+                    row["totalDamage"] = sum(int(event.get("amount") or 0) for event in counted_events)
+    return {
+        "deathThreshold": GLOBAL_DEATH_EXEMPT_THRESHOLD,
+        "deathCount": len(ordered_deaths),
+        "cutoffPositionMs": cutoff_ms,
+        "cutoffTime": format_time(cutoff_ms) if cutoff_ms is not None else None,
+        "reason": (
+            f"本场第{GLOBAL_DEATH_EXEMPT_THRESHOLD}次死亡后所有失误均不计数"
+            if cutoff_ms is not None else
+            f"本场死亡不足{GLOBAL_DEATH_EXEMPT_THRESHOLD}次，不触发全局豁免"
+        ),
+    }
+
+
 def analyze_avoidable_damage(fight, actor_map, actor_type, player_roles, damage_events, deaths, markers):
     """Build the display-only Corruption Essence hit counter.
 
-    This board intentionally carries no damage/death attribution or per-hit
-    details.  It is a simple player hit-count view.
+    Per-hit evidence is retained for counted/uncounted court cards, while
+    damage and death attribution remain excluded from the final verdict.
     """
     spell_by_id = {row["id"]: (key, row["name"]) for key, row in AVOIDABLE_DAMAGE_SPELLS.items()}
     boards = {key: {} for key in AVOIDABLE_DAMAGE_SPELLS}
@@ -1928,6 +2052,19 @@ def analyze_avoidable_damage(fight, actor_map, actor_type, player_roles, damage_
         row = boards[key].setdefault(player, build_board_row(player, key, spell_name, role=role))
         row["hitCount"] += 1
         row["damageText"] = "-"
+        position_ms = int(event.get("timestamp", 0) - fight["startTime"])
+        row["events"].append({
+            "time": format_time(position_ms),
+            "positionMs": position_ms,
+            "abilityID": spell_id,
+            "ability": spell_name,
+            "amount": event_amount(event),
+            "counted": False,
+            "verdictCounted": False,
+            "displayOnly": True,
+            "hitStatOnly": True,
+            "countReason": "腐化精华仅作命中统计，永远不计数、不进入终审",
+        })
     return {
         key: sorted(rows.values(), key=lambda row: row["hitCount"], reverse=True)
         for key, rows in boards.items()
@@ -1951,6 +2088,21 @@ def build_snap_aiming_board(field_audit, player_roles, fight_id):
                 ),
             )
             item["markedCount"] = int(item.get("markedCount") or 0) + 1
+            if player.get("diedAtFire") or player.get("deathTriggeredRay"):
+                item["events"].append({
+                    "fightID": fight_id,
+                    "phase": group.get("phase"),
+                    "group": group.get("index"),
+                    "time": player.get("deathTime") or player.get("fadeTime") or group.get("fireTime"),
+                    "positionMs": player.get("deathTimeMs") or player.get("fadeTimeMs") or group.get("fireTimeMs"),
+                    "players": [],
+                    "deathCount": 0,
+                    "counted": False,
+                    "displayOnly": True,
+                    "countReason": player.get("missedPhantomExemptReason")
+                    or "崩裂空无结算期间点名玩家死亡（提前结算），仅展示不计数",
+                })
+                continue
             if not player.get("isSnapAiming"):
                 continue
             deaths = player.get("snapAimingDeaths") or []
@@ -1990,6 +2142,8 @@ def merge_board(global_board, local_board):
                 "role": row.get("role", "unknown"),
                 "roles": row.get("roles") or ([] if row.get("role") in {None, "", "unknown"} else [row.get("role")]),
                 "hitCount": 0,
+                "countedCount": 0,
+                "uncountedCount": 0,
                 "markedCount": 0,
                 "deathCount": 0,
                 "totalDamage": 0,
@@ -1999,12 +2153,14 @@ def merge_board(global_board, local_board):
             merged["roles"] = merge_roles(merged.get("roles"), row.get("roles") or ([] if row.get("role") in {None, "", "unknown"} else [row.get("role")]))
             merged["role"] = merged["roles"][0] if merged["roles"] else (row.get("role") or merged.get("role") or "unknown")
             merged["hitCount"] += row.get("hitCount", 0)
+            merged["countedCount"] += int(row.get("countedCount", row.get("hitCount") or 0))
+            merged["uncountedCount"] += int(row.get("uncountedCount") or 0)
             merged["markedCount"] += row.get("markedCount", 0)
             merged["deathCount"] += row.get("deathCount", 0)
             merged["totalDamage"] += row.get("totalDamage", 0)
             if row.get("damageText"):
                 merged["damageText"] = row.get("damageText")
-            merged["events"].extend(row.get("events", [])[:10])
+            merged["events"].extend(row.get("events", []))
 
 
 def silver_arrow_damage_for_death(death, damage_events):
@@ -2954,6 +3110,8 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
                 death_designated_name_ids[healer_name].add(healer_id)
         active_phantoms = int((audit_death or {}).get("activePhantomCount") or 0)
         dead_player_count = int((audit_death or {}).get("deadPlayerCountAtDeath") or len(prior_dead_names))
+        death_event_count = sum(1 for row in deaths if row.get("timestamp", 0) <= death_ts)
+        target_health_percent = (audit_death or {}).get("targetHealthPercentAtApply")
         healer_roster_count = int((audit_death or {}).get("healerRosterCount") or sum(
             1 for role in player_roles.values() if str(role).endswith("-healer") or role == "healer"
         ))
@@ -2966,12 +3124,18 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
         exemption_reasons = []
         if classification_key == "phase_abandon":
             exemption_reasons.append("放弃/add引怪战斗")
-        if dead_player_count > 3:
-            exemption_reasons.append(f"死亡时场上已有{dead_player_count}名玩家减员")
+        if death_event_count >= GLOBAL_DEATH_EXEMPT_THRESHOLD:
+            exemption_reasons.append(
+                f"全局最高优先级豁免：该死亡为本场第{death_event_count}次死亡，团队死亡次数已达到{GLOBAL_DEATH_EXEMPT_THRESHOLD}"
+            )
         if active_phantoms >= 4:
             exemption_reasons.append(f"场上存活银色幻影{active_phantoms}个")
         if alive_healer_count < 4:
             exemption_reasons.append(f"死亡时治疗组未满员（存活{alive_healer_count}/4）")
+        if target_health_percent is None:
+            exemption_reasons.append("点名时血量数据缺失，无法确认血量>50%")
+        elif float(target_health_percent) <= 50:
+            exemption_reasons.append(f"点名时血量仅{float(target_health_percent):.2f}%（要求>50%）")
         exempt = bool(exemption_reasons)
         breakdown = []
         for healer_name in sorted(death_designated_name_ids):
@@ -2989,7 +3153,7 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
                 "healer": healer_name,
                 "healing6s": healing6s,
                 "healing8s": healing8s,
-                "insufficient": not exempt and healing8s < VOID_GRASP_HEALING_MIN,
+                "insufficient": healing8s < VOID_GRASP_HEALING_MIN,
             })
         rows.append({
             "time": format_time(death_elapsed_ms),
@@ -3009,6 +3173,11 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
             "threshold8s": VOID_GRASP_HEALING_MIN,
             "activePhantomCount": active_phantoms,
             "deadPlayerCountAtDeath": dead_player_count,
+            "deathEventCountAtDeath": death_event_count,
+            "targetHealthAtApply": (audit_death or {}).get("targetHealthAtApply"),
+            "targetMaxHealthAtApply": (audit_death or {}).get("targetMaxHealthAtApply"),
+            "targetHealthPercentAtApply": target_health_percent,
+            "targetHealthSampleDeltaMs": (audit_death or {}).get("targetHealthSampleDeltaMs"),
             "healerRosterCount": healer_roster_count,
             "aliveHealerCountAtDeath": alive_healer_count,
             "aliveHealerIDsAtDeath": sorted(alive_healer_ids),
@@ -3434,14 +3603,21 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     missed_energy_board = {}
     for event in energy_misses:
-        if not event.get("counted"):
-            continue
         player_ids = event.get("playerIDs") or []
-        for player_index, player in enumerate(event.get("players") or []):
+        players = event.get("players") or []
+        if not players:
+            continue
+        for player_index, player in enumerate(players):
             player_id = player_ids[player_index] if player_index < len(player_ids) else None
             row = missed_energy_board.setdefault(player, build_board_row(player, "missedEnergy", "P2消Boss能量失误", role=player_roles.get(player_id, "unknown")))
             row["hitCount"] += 1
-            row["events"].append({**event, "counted": True})
+            row["events"].append({
+                **event,
+                "counted": False,
+                "verdictCounted": False,
+                "displayOnly": True,
+                "countReason": event.get("countReason") or "消能失误仅展示分析，永远不计数、不进入终审",
+            })
 
     snap_aiming_rows = build_snap_aiming_board(field_audit, player_roles, fight["id"])
 
@@ -3468,21 +3644,29 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             name = interrupted["player"]
             row = shock_board.setdefault(name, build_board_row(name, "interferenceShockInterrupts", "干扰震荡打断", role=player_roles.get(interrupted.get("playerID"), "unknown")))
             row["hitCount"] += 1
-            row["events"].append({**interrupted, "time": shock["time"], "fightID": fight["id"], "counted": True, "countReason": "WCL Interrupts 明确记录"})
+            row["events"].append({
+                **interrupted,
+                "time": shock["time"],
+                "fightID": fight["id"],
+                "positionMs": shock.get("positionMs"),
+                "counted": False,
+                "verdictCounted": False,
+                "displayOnly": True,
+                "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审",
+            })
     local_board["interferenceShockInterrupts"] = list(shock_board.values())
 
     water_board = {}
     audit_water_events = (field_audit or {}).get("waterEvents") or []
     first_p2_water_id = next((event.get("id") for event in audit_water_events if event.get("phase") == "P2"), None)
     for water_event in audit_water_events:
-        if water_event.get("phase") == "P1" or water_event.get("id") == first_p2_water_id:
-            continue
+        counted_event = water_event.get("phase") != "P1" and water_event.get("id") != first_p2_water_id
         for drop in water_event.get("drops") or []:
             if not drop.get("isOutlier") or drop.get("applyTimeMs") is None:
                 continue
             name = drop.get("player")
             item = water_board.setdefault(name, build_board_row(name, "waterOutliers", "放水未集中", role=player_roles.get(drop.get("targetID"), "unknown")))
-            item["hitCount"] += 1
+            item["hitCount"] += 1 if counted_event else 0
             item["events"].append({
                 "time": drop.get("time"),
                 "positionMs": drop.get("timeMs"),
@@ -3497,22 +3681,24 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 "position": drop.get("position"),
                 "fightID": fight["id"],
                 "tag": f"water:{water_event.get('id')}",
-                "counted": True,
-                "countReason": "坐标离组超过15码",
+                "counted": counted_event,
+                "countReason": (
+                    "坐标离组超过15码"
+                    if counted_event else ("P1放水仅展示，不计数" if water_event.get("phase") == "P1" else "P2首轮放水豁免，仅展示不计数")
+                ),
                 "text": f"{name}（actor ID {drop.get('targetID')}）坐标离组 {drop.get('distanceFromGroupYards')} 码",
             })
     local_board["waterOutliers"] = list(water_board.values())
 
     healing_board = {}
     for death_row in void_grasp_healing:
-        if death_row.get("exempt"):
-            continue
         for healer in death_row.get("healers") or []:
             if not healer.get("insufficient"):
                 continue
             name = healer["healer"]
             item = healing_board.setdefault(name, build_board_row(name, "voidGraspHealingLow", "空虚之握死亡治疗不足", role=player_roles.get(healer.get("healerID"), "unknown")))
-            item["hitCount"] += 1
+            counted = not death_row.get("exempt")
+            item["hitCount"] += 1 if counted else 0
             bow_text = (
                 f"{death_row.get('bowPhase')}拉弓#{death_row.get('phaseBowGroup')}（全场#{death_row.get('bowGroup')}）"
                 if death_row.get("bowGroup") else "未匹配到拉弓轮次"
@@ -3530,8 +3716,11 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 "phaseGroup": death_row.get("phaseBowGroup"),
                 "tag": f"bow:{death_row.get('bowID')}" if death_row.get("bowID") else None,
                 "victimVerifiedDead": death_row.get("verifiedDeath") is True,
-                "counted": True,
-                "countReason": "已核对死亡事件；死亡时减员≤3、幻影<4且4名治疗均存活，统计死亡前8秒指定治疗量低于阈值",
+                "counted": counted,
+                "countReason": (
+                    "已核对死亡事件；本场死亡<8、点名时血量>50%、幻影<4且4名治疗均存活，统计死亡前8秒指定治疗量低于200000"
+                    if counted else "；".join(death_row.get("exemptionReasons") or ["命中空虚之握豁免条件"])
+                ),
                 "text": f"{death_row['player']} 于 Fight{fight['id']} {bow_text}中阵亡（{death_row['time']}）；死亡前8秒内 {name} 对其治疗量为 {healing_amount:,}",
             })
     local_board["voidGraspHealingLow"] = list(healing_board.values())
@@ -3545,7 +3734,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         item["hitCount"] += 1
         item["deathCount"] += 1
         item["totalDamage"] += int(death_row.get("amount") or 0)
-        item["events"].append({**death_row, "fightID": fight["id"], "counted": True, "countReason": "点名玩家受到超过275000的致死银锋箭"})
+        amount = int(death_row.get("amount") or 0)
+        item["events"].append({
+            **death_row,
+            "fightID": fight["id"],
+            "counted": True,
+            "verdictCounted": True,
+            "countReason": "点名玩家受到超过275000的致死银锋箭",
+            "text": f"{name} 死于 P1 银锋箭高伤（{amount:,}），按高伤致死计数",
+        })
     local_board["p1SilverArrowDeaths"] = list(silver_death_board.values())
 
     p1_arrow_miss_board = {}
@@ -3564,39 +3761,61 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         if not arrow:
             continue
         used_arrow_ids.add(arrow.get("id"))
-        marked_by_name = {row.get("player"): row for row in arrow.get("markedPlayerPositions") or []}
-        for attribution in arrow.get("p1BossAttribution") or []:
-            if attribution.get("hitBoss"):
+        attributions = arrow.get("p1BossAttribution") or []
+        # 一轮银锋箭由两名玩家共同完成：任一人正确命中目标 Boss/add，
+        # 视为本轮机制成功完成，不进入开庭（既不计也不展示为“不计数豁免”）。
+        # 只有两人均未命中时，两人才各计 1 次失误。
+        round_success = any(row.get("hitBoss") for row in attributions)
+        if round_success:
+            continue
+        # 第5轮（~99.35s 殁里乌姆档）：双人空射且殁里乌姆已死 → 预期空射，不入板；
+        # 双人空射且殁里乌姆仍存活 → 定罪计数。
+        if is_melurium_arrow_slot(expected_ms, arrow) and not melurium_alive_in_arrow_snapshot(arrow):
+            continue
+        round_counted = bool(attributions)
+        marked_rows = arrow.get("markedPlayerPositions") or [
+            {"player": name, "targetID": None} for name in arrow.get("markedPlayers") or []
+        ]
+        for marked in marked_rows:
+            name = marked.get("player")
+            if not name:
                 continue
-            name = attribution.get("player")
-            marked = marked_by_name.get(name) or {}
             item = p1_arrow_miss_board.setdefault(
                 name,
-                build_board_row(name, "p1SilverArrowMissedFights", "P1 银锋箭未命中Boss场次", role=player_roles.get(marked.get("targetID"), "unknown")),
+                build_board_row(name, "p1SilverArrowMissedFights", "P1 银锋箭射怪失误", role=player_roles.get(marked.get("targetID"), "unknown")),
             )
             item["markedCount"] = int(item.get("markedCount") or 0) + 1
-            item.setdefault("missedRounds", []).append({
+            item["hitCount"] += 1 if round_counted else 0
+            pair_names = [row.get("player") for row in marked_rows if row.get("player")]
+            melurium_alive = melurium_alive_in_arrow_snapshot(arrow) if is_melurium_arrow_slot(expected_ms, arrow) else None
+            count_reason = (
+                "本轮两名银锋箭点名玩家均未命中指定Boss/add，两人各计数1次"
+                if round_counted else "缺少本轮Boss命中归因证据，仅展示不计数"
+            )
+            if round_counted and melurium_alive is True:
+                count_reason = "第5轮双人空射且殁里乌姆仍存活，判定未命中，两人各计数1次"
+            item["events"].append({
+                "fightID": fight["id"],
+                "phase": "P1",
                 "group": arrow.get("index"),
                 "time": arrow.get("time"),
                 "positionMs": arrow.get("timeMs"),
                 "expectedTarget": expected_arrow_target(expected_ms),
+                "meluriumAlive": melurium_alive,
+                "players": pair_names,
+                "counted": round_counted,
+                "verdictCounted": round_counted,
+                "displayOnly": not round_counted,
+                "countReason": count_reason,
+                "text": (
+                    f"Fight{fight['id']} P1 第{arrow.get('index')}轮银锋箭点名{'、'.join(pair_names)}，"
+                    + (
+                        f"两人均未命中{expected_arrow_target(expected_ms)}"
+                        + ("（殁里乌姆仍存活）" if melurium_alive is True else "")
+                        if round_counted else "证据不足，暂不定罪"
+                    )
+                ),
             })
-    for name, item in p1_arrow_miss_board.items():
-        rounds = item.pop("missedRounds", [])
-        item["hitCount"] = 1
-        item["events"].append({
-            "fightID": fight["id"],
-            "phase": "P1",
-            "group": rounds[0].get("group") if rounds else None,
-            "time": rounds[0].get("time") if rounds else None,
-            "positionMs": rounds[0].get("positionMs") if rounds else None,
-            "missedRounds": rounds,
-            "counted": True,
-            "verdictCounted": False,
-            "displayOnly": True,
-            "countReason": "同一玩家同一场战斗无论漏射几轮，只统计1个未命中场次",
-            "text": f"Fight{fight['id']} {name} 在 P1 有 {len(rounds)} 轮银锋箭未命中Boss：" + "、".join(f"#{row['group']} {row['expectedTarget']}" for row in rounds),
-        })
     local_board["p1SilverArrowMissedFights"] = list(p1_arrow_miss_board.values())
 
     shadow_board = {}
@@ -3612,24 +3831,44 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             continue
         marked_names = [player.get("player") for player in bow.get("players") or []]
         for player in bow.get("players") or []:
-            if player.get("diedAtFire"):
+            name = player.get("player")
+            if not name:
+                continue
+            if player.get("diedAtFire") or player.get("deathTriggeredRay"):
+                item = shadow_board.setdefault(
+                    name,
+                    build_board_row(name, "missedShadows", "P2 拉弓未命中幻影", role=player_roles.get(player.get("targetID"), "unknown")),
+                )
+                item["markedCount"] = p2_marked_counts.get(name, 0)
+                item["events"].append({
+                    "fightID": fight["id"], "phase": "P2", "group": bow.get("index"),
+                    "time": player.get("deathTime") or bow.get("fireTime"),
+                    "positionMs": player.get("deathTimeMs") or bow.get("fireTimeMs"),
+                    "players": marked_names, "tag": f"bow:{bow.get('id')}",
+                    "counted": False, "displayOnly": True,
+                    "countReason": player.get("missedPhantomExemptReason")
+                    or "崩裂空无结算期间点名玩家死亡（提前结算），仅展示不计数",
+                })
                 continue
             confirmed_misses = [
                 attr for attr in player.get("shotAttribution") or []
                 if attr.get("confidence") in {"high", "medium"} and "未命中" in str(attr.get("verdict", ""))
             ]
-            if not confirmed_misses or not player.get("missedPhantom"):
+            if not player.get("missedPhantom"):
                 continue
-            name = player.get("player")
             item = shadow_board.setdefault(name, build_board_row(name, "missedShadows", "P2 拉弓未命中幻影", role=player_roles.get(player.get("targetID"), "unknown")))
             item["markedCount"] = p2_marked_counts.get(name, 0)
-            item["hitCount"] += 1
+            counted = bool(confirmed_misses)
+            item["hitCount"] += 1 if counted else 0
             item["events"].append({
                 "fightID": fight["id"], "phase": "P2", "group": bow.get("index"),
                 "time": bow.get("fireTime"), "positionMs": bow.get("fireTimeMs"),
                 "players": marked_names, "tag": f"bow:{bow.get('id')}",
-                "attribution": confirmed_misses, "counted": True,
-                "countReason": "该玩家存在明确的职责归因未命中记录，且责任幻影在后续节点仍存活",
+                "attribution": confirmed_misses, "counted": counted,
+                "countReason": (
+                    "该玩家存在明确的职责归因未命中记录，且责任幻影在后续节点仍存活"
+                    if counted else "检测到疑似未命中，但职责归因证据不足，仅展示不计数"
+                ),
             })
     local_board["missedShadows"] = list(shadow_board.values())
 
@@ -3640,17 +3879,21 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             key=lambda row: int(row.get("order") or 999),
             default=None,
         )
-        if not first_violation or not gravity.get("deathCount") or gravity.get("counted") is False:
+        if not first_violation:
             continue
         name = first_violation.get("player")
         item = gravity_board.setdefault(name, build_board_row(name, "gravityLineViolation", "P3 重力坍缩违规致死", role=player_roles.get(first_violation.get("targetID"), "unknown")))
-        item["hitCount"] += 1
-        item["deathCount"] += int(gravity.get("deathCount") or 0)
+        counted = gravity.get("counted") is True
+        item["hitCount"] += 1 if counted else 0
+        item["deathCount"] += int(gravity.get("deathCount") or 0) if counted else 0
         item["events"].append({
             **first_violation, "fightID": fight["id"], "phase": "P3", "group": gravity.get("index"),
             "players": gravity.get("targets") or [], "deathCount": gravity.get("deathCount"),
-            "deathPlayers": gravity.get("deathPlayers") or [], "counted": True,
-            "countReason": f"首个违规者导致本轮减员{int(gravity.get('deathCount') or 0)}人",
+            "deathPlayers": gravity.get("deathPlayers") or [], "counted": counted,
+            "countReason": (
+                f"首个违规者导致本轮减员{int(gravity.get('deathCount') or 0)}人"
+                if counted else (gravity.get("exemptReason") or "本轮未满足归责计数条件，仅展示不计数")
+            ),
         })
     local_board["gravityLineViolation"] = list(gravity_board.values())
 
@@ -3658,34 +3901,51 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     rift_board = {}
     for slash in rift_slash_rows:
-        if not slash.get("counted") or not slash.get("causedTankDeath"):
+        if not slash.get("offender"):
             continue
         name = slash.get("offender")
         item = rift_board.setdefault(name, build_board_row(name, "tankRiftSlashFailure", "P2 裂隙挥砍换坦失误", role="tank"))
-        item["hitCount"] += 1
-        item["deathCount"] += 1 if slash.get("causedTankDeath") else 0
+        counted = bool(slash.get("counted") and slash.get("causedTankDeath"))
+        item["hitCount"] += 1 if counted else 0
+        item["deathCount"] += 1 if counted else 0
+        slash.setdefault("countReason", "满足换坦失误归责条件" if counted else "未满足完整归责条件，仅展示不计数")
+        slash["counted"] = counted
         item["events"].append({**slash, "fightID": fight["id"]})
     local_board["tankRiftSlashFailure"] = list(rift_board.values())
 
     p15_death_rows = defaultdict(lambda: {"name": "", "hitCount": 0, "deathCount": 0, "totalDamage": 0, "events": []})
-    for death in deaths:
-        if death.get("killingAbilityGameID") in P15_AVOIDABLE_IDS:
-            name = actor(actor_map, death.get("targetID"))
-            role = player_roles.get(death.get("targetID"), "unknown")
+    for death_row in death_timeline:
+        if death_row.get("phase") == "P1.5":
+            name = death_row.get("player")
+            role = death_row.get("role", "unknown")
             row = p15_death_rows[name]
             row["name"] = name
             row["role"] = role
             row["roles"] = [] if role == "unknown" else [role]
             row["spellKey"] = "p15AvoidableDeaths"
-            row["spellName"] = "P1.5 跑位死亡"
+            row["spellName"] = "转阶段死亡"
             row["damageText"] = "-"
             row["hitCount"] += 1
             row["deathCount"] += 1
+            is_abandon_jump = bool(
+                transition_abandoned
+                and death_row.get("abilityID") in {None, 3}
+            )
+            ability_name = death_row.get("ability") or "未知技能"
             row["events"].append({
-                "time": format_time(fight_elapsed(death, fight)),
-                "ability": SPELLS.get(death.get("killingAbilityGameID"), str(death.get("killingAbilityGameID"))),
-                "counted": True,
-                "countReason": "确认死于P1.5可归责机制",
+                **death_row,
+                "positionMs": int(death_row.get("absoluteTime") or 0) - int(fight["startTime"]),
+                "deathCount": 1,
+                "ability": ability_name,
+                "counted": not is_abandon_jump,
+                "countReason": (
+                    "识别为团队主动跳崖重开，仅展示不计数"
+                    if is_abandon_jump else "确认发生于P1.5转阶段，按转阶段死亡计数"
+                ),
+                "text": (
+                    f"{name} 于 {death_row.get('time')} 死于【{ability_name}】"
+                    + ("（主动跳崖重开）" if is_abandon_jump else "（转阶段死亡计数）")
+                ),
             })
     local_board["p15AvoidableDeaths"] = sorted(p15_death_rows.values(), key=lambda item: item["deathCount"], reverse=True)
 
@@ -3693,6 +3953,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         for board_row in board_rows:
             for board_event in board_row.get("events") or []:
                 board_event.setdefault("fightID", fight["id"])
+    global_exemption = apply_global_death_exemption(local_board, deaths, fight)
 
     return {
         "reportID": report_id,
@@ -3717,6 +3978,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         "transitionDetails": transition_details,
         "trialRecords": trial_records,
         "avoidableSummary": local_board,
+        "globalExemption": global_exemption,
         "crownOfTheCosmos": {
             "phaseMarkers": {
                 key: (format_time(value - fight["startTime"]) if isinstance(value, int) else None)
@@ -3741,6 +4003,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "p3PortalSummons": p3_portal_summons,
             "riftSlashTankSwaps": rift_slash_rows,
             "transitionAbandoned": transition_abandoned,
+            "globalExemption": global_exemption,
             "fieldAuditUrl": f"crown-fight-audit.html?source=wcl_hardcore_api.json&report={report_id}&fight={fight['id']}",
             "fieldAudit": field_audit,
         },
@@ -3883,22 +4146,24 @@ def build_aggregated_json(report_ids):
         "code": 200,
         "meta": {
             "analyzedReports": report_id_list,
-            "mechanicVersion": "crown-of-the-cosmos-2026-07-14",
+            "mechanicVersion": "crown-of-the-cosmos-2026-07-15-court-verdict-v2",
             "version": "12.0",
             "raidKey": "void_spire",
             "raidName": "虚影尖塔",
             "bossKey": "crown_of_the_cosmos",
             "bossName": "宇宙之冕",
+            "author": "卫宇珩",
+            "editor": "卫宇珩",
             "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "开庭面板", "transitionDetails": True, "finalVerdict": True},
             "avoidableSpells": {
-                "p15AvoidableDeaths": "P1.5 跑位死亡",
+                "p15AvoidableDeaths": "转阶段死亡",
                 "collapsingVoidSnapAiming": "崩裂空无甩狙",
                 "missedEnergy": "P2消Boss能量失误",
                 "missedShadows": "P2 拉弓未命中幻影",
                 "waterOutliers": "放水未集中",
                 "voidGraspHealingLow": "空虚之握死亡治疗不足",
                 "p1SilverArrowDeaths": "P1 银锋箭高伤致死",
-                "p1SilverArrowMissedFights": "P1 银锋箭未命中Boss场次",
+                "p1SilverArrowMissedFights": "P1 银锋箭射怪失误",
                 **{key: row["name"] for key, row in AVOIDABLE_DAMAGE_SPELLS.items()},
                 "interferenceShockInterrupts": "干扰震荡打断",
                 "gravityLineViolation": "P3 重力坍缩违规致死",
@@ -3907,6 +4172,7 @@ def build_aggregated_json(report_ids):
             "courtConfig": {
                 "waterOutlierYards": 15,
                 "voidGraspHealingThreshold8s": VOID_GRASP_HEALING_MIN,
+                "globalDeathExemptionThreshold": GLOBAL_DEATH_EXEMPT_THRESHOLD,
                 "designatedHealerIDs": sorted(DESIGNATED_HEALER_IDS),
                 "designatedHealerNames": sorted(DESIGNATED_HEALER_NAMES),
                 "verdictPointsPerCount": VERDICT_POINTS_PER_COUNT,
@@ -3924,7 +4190,7 @@ def build_aggregated_json(report_ids):
             cached_root = json.loads(Path(cache_path).read_text(encoding="utf-8"))
             for cached_fight in cached_root.get("data", {}).get("page1_wipeAnalysis", []):
                 audit = (cached_fight.get("crownOfTheCosmos") or {}).get("fieldAudit")
-                if audit and (audit.get("meta") or {}).get("schemaVersion") == "2026-07-14-healing-window-v5":
+                if audit and (audit.get("meta") or {}).get("schemaVersion") == "2026-07-14-global-exemption-v6":
                     field_audit_cache[(str(cached_fight.get("reportID")), int(cached_fight.get("fightID")))] = audit
             progress(f"复用逐技能场地缓存：{len(field_audit_cache)} 场", 1)
         except Exception as error:
@@ -4005,7 +4271,13 @@ def build_aggregated_json(report_ids):
     acquittals = configured_acquittals()
     verdict_players = {}
     for skill_key, rows in final_output["data"]["page3_courtBoard"].items():
-        if skill_key in {"collapsingVoidFriendlyFire", "interferenceShockInterrupts", "voidGraspDeaths", "missedEnergy", "p1SilverArrowMissedFights"} | set(AVOIDABLE_DAMAGE_SPELLS):
+        # 腐化精华 / 消能失误 / 干扰震荡等仅展示项永不进终审。
+        if skill_key in {
+            "collapsingVoidFriendlyFire",
+            "voidGraspDeaths",
+            "missedEnergy",
+            "interferenceShockInterrupts",
+        } | set(AVOIDABLE_DAMAGE_SPELLS):
             continue
         for row in rows:
             name = row.get("name")
