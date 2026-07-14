@@ -662,6 +662,8 @@
     </div>
 </div>
 
+<script src="./assets/vendor/wcl_hardcore_api.js"></script>
+<script src="./assets/vendor/offline-data-loader.js"></script>
 <script>
 const { createApp } = Vue;
 
@@ -951,9 +953,7 @@ createApp({
         },
         async autoLoadJson() {
             try {
-                const response = await fetch(this.jsonSource);
-                if (!response.ok) return;
-                this.bindData(await response.json());
+                this.bindData(await window.OfflineDataLoader.loadJson(this.jsonSource));
             } catch (e) {
                 console.log('请手动上传 JSON');
             }

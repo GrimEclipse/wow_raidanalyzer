@@ -56,6 +56,7 @@
   }
 
   async function loadJson(source) {
+    if (window.__WCL_HARDCORE_DATA__) return window.__WCL_HARDCORE_DATA__;
     if (window.location.protocol === 'file:') return chooseLocalJson(source);
     const response = await fetch(source);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
