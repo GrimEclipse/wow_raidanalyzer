@@ -60,7 +60,8 @@ RIFT_SIMULACRUM_GAME_ID = 254098
 HEALER_SPEC_IDS = {65, 105, 256, 257, 264, 270, 1468}
 WATER_OUTLIER_YARDS = 15.0
 SNAP_MOVEMENT_YARDS = 5.0
-FIELD_AUDIT_VERSION = "2026-07-13-phantom-per-player-v2"
+FIELD_AUDIT_VERSION = "2026-07-14-healing-window-v5"
+COMBAT_RESURRECTION_IDS = {20484, 20608, 20707, 61999, 391054}
 RAY_LENGTH_RAW = 10_000.0
 RAY_WIDTH_RAW = 300.0
 OBELISK_DISTANCE_RAW = 500.0
@@ -789,7 +790,11 @@ def refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments
             if any(item["verdict"] in {"命中", "大概率命中"} for item in attributions):
                 player["missedPhantom"] = False
                 player["actualPhantomHitCount"] = max(player.get("actualPhantomHitCount", 0), 1)
-            elif attributions and all(item["verdict"] == "大概率未命中" for item in attributions):
+            elif any(
+                "未命中" in str(item.get("verdict") or "")
+                and item.get("confidence") in {"high", "medium"}
+                for item in attributions
+            ):
                 player["missedPhantom"] = True
 
 
@@ -990,11 +995,21 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
         phase_name = phase_at(cluster["start"], phase)
         phase_start, _ = phase_window(fight, phase, phase_name)
         active_by_player = {}
+        death_by_player = {}
         active_phantom_map = {}
         for pair in cluster["pairs"]:
+            target_id = pair["targetID"]
+            apply_ts = pair["apply"].get("timestamp", 0)
             fade_ts = pair["remove"].get("timestamp", 0)
-            pair_key = (pair["targetID"], fade_ts)
-            pair_active = active_phantoms_at(phantom_segments, fade_ts)
+            death = next((
+                item for item in events["deaths"]
+                if item.get("targetID") == target_id
+                and apply_ts <= item.get("timestamp", 0) <= fade_ts + 1_000
+            ), None)
+            trigger_ts = death.get("timestamp", 0) if death else fade_ts
+            pair_key = (target_id, fade_ts)
+            death_by_player[pair_key] = death
+            pair_active = active_phantoms_at(phantom_segments, trigger_ts)
             active_by_player[pair_key] = pair_active
             for segment in pair_active:
                 active_phantom_map[(segment.get("sourceID"), segment.get("sourceInstance"))] = segment
@@ -1019,6 +1034,8 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
             target_id = pair["targetID"]
             apply_ts = pair["apply"].get("timestamp", 0)
             fade_ts = pair["remove"].get("timestamp", 0)
+            death = death_by_player.get((target_id, fade_ts))
+            trigger_ts = death.get("timestamp", 0) if death else fade_ts
             player_active_phantoms = active_by_player.get((target_id, fade_ts), [])
             player_active_instances = sorted({
                 segment.get("sourceInstance") for segment in player_active_phantoms
@@ -1027,14 +1044,9 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
             resolved_instance_ids = {
                 segment.get("sourceInstance") for segment in player_active_phantoms
                 if segment.get("sourceInstance") is not None
-                and segment["first"] <= fade_ts
-                and 0 <= fade_ts - segment["last"] <= 2_200
+                and segment["first"] <= trigger_ts
+                and 0 <= trigger_ts - segment["last"] <= 2_200
             }
-            death = next((
-                item for item in events["deaths"]
-                if item.get("targetID") == target_id
-                and apply_ts <= item.get("timestamp", 0) <= fade_ts + 1_000
-            ), None)
             apply_exact = event_point(pair["apply"], "target") or event_point(pair["apply"])
             apply_state = state_at(position_index, target_id, apply_ts, max_gap_ms=12_000)
             if apply_exact:
@@ -1045,7 +1057,14 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                     "facingRaw": event_facing(pair["apply"]),
                     "facingRadians": normalize_facing(event_facing(pair["apply"])),
                 })
-            fade_state = None if death else state_at(position_index, target_id, fade_ts, max_gap_ms=3_000)
+            trigger_exact = (event_point(death, "target") or event_point(death)) if death else None
+            fade_state = state_at(position_index, target_id, trigger_ts, max_gap_ms=3_000)
+            if trigger_exact:
+                fade_state = fade_state or {}
+                fade_state.update({
+                    "x": trigger_exact[0], "y": trigger_exact[1], "point": point_payload(trigger_exact),
+                    "source": "deathEvent", "deltaMs": 0, "confidence": "high",
+                })
             last_second_state = None if death else state_at(position_index, target_id, fade_ts - 1_000, max_gap_ms=3_000)
             last_second_yards = None
             if last_second_state and fade_state:
@@ -1054,11 +1073,12 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                     (fade_state["x"], fade_state["y"]),
                 ) / 100.0
             facing_reliable = bool(apply_state and apply_state.get("facingRadians") is not None and abs(apply_state.get("deltaMs") or 0) <= 1_500)
-            obelisks = make_obelisks(apply_state) if facing_reliable else []
+            facing_available = bool(apply_state and apply_state.get("facingRadians") is not None and abs(apply_state.get("deltaMs") or 0) <= 6_000)
+            obelisks = make_obelisks(apply_state) if facing_available else []
             rays = make_rays(fade_state, obelisks) if fade_state else []
             actual_hits = [
                 event for event in group_hits
-                if abs(event.get("timestamp", 0) - fade_ts) <= 1_500
+                if abs(event.get("timestamp", 0) - trigger_ts) <= 1_500
             ]
             actual_phantom_hits = [
                 event for event in actual_hits
@@ -1068,7 +1088,7 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 death for death in events["deaths"]
                 if death.get("targetID") in {hit.get("targetID") for hit in actual_hits}
                 and death.get("killingAbilityGameID") == SPELL["collapsing_void"]
-                and fade_ts <= death.get("timestamp", 0) <= fade_ts + 2_000
+                and trigger_ts <= death.get("timestamp", 0) <= trigger_ts + 2_000
             ]
             healing_end = death.get("timestamp", 0) if death else fade_ts
             healing_start = max(apply_ts, healing_end - 6_000) if death else apply_ts
@@ -1104,11 +1124,15 @@ def build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase,
                 "applyTime": fmt(rel(fight, apply_ts)),
                 "fadeTimeMs": rel(fight, fade_ts),
                 "fadeTime": fmt(rel(fight, fade_ts)),
+                "triggerTimeMs": rel(fight, trigger_ts),
+                "triggerTime": fmt(rel(fight, trigger_ts)),
+                "deathTriggeredRay": bool(death),
                 "diedAtFire": bool(death),
                 "deathTimeMs": rel(fight, death.get("timestamp")) if death else None,
                 "deathTime": fmt(rel(fight, death.get("timestamp"))) if death else None,
                 "applyState": apply_state,
                 "applyFacingReliable": facing_reliable,
+                "applyFacingEstimated": facing_available and not facing_reliable,
                 "fadeState": fade_state,
                 "lastSecondState": last_second_state,
                 "lastSecondMovementYards": round(last_second_yards, 2) if last_second_yards is not None else None,
@@ -1223,13 +1247,22 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
             for marked in marked_positions:
                 if not marked.get("position"):
                     continue
-                end = (marked["position"]["x"], marked["position"]["y"])
+                through = (marked["position"]["x"], marked["position"]["y"])
+                direction_x = through[0] - start[0]
+                direction_y = through[1] - start[1]
+                direction_length = math.hypot(direction_x, direction_y)
+                if direction_length <= 0:
+                    continue
+                end = (
+                    start[0] + direction_x / direction_length * RAY_LENGTH_RAW,
+                    start[1] + direction_y / direction_length * RAY_LENGTH_RAW,
+                )
                 matched = []
                 for boss_id in removed_ids:
                     boss = boss_by_id.get(boss_id)
                     if boss and boss.get("position") and distance_point_to_segment((boss["position"]["x"], boss["position"]["y"]), start, end) <= 500:
                         matched.append(boss.get("name"))
-                p1_boss_attribution.append({"player": marked["player"], "bosses": matched, "hitBoss": bool(matched)})
+                p1_boss_attribution.append({"targetID": marked.get("targetID"), "player": marked["player"], "bosses": matched, "hitBoss": bool(matched)})
         rows.append({
             "id": f"silver-arrow-{index}", "index": index, "eventType": "silverArrow", "phase": phase_name,
             "spellID": spell_id,
@@ -1312,23 +1345,53 @@ def build_gravity_rounds(fight, actor_map, debuffs, deaths, player_roles):
     return rounds
 
 
-def build_void_death_healing(fight, actor_map, actor_game_id, events, healer_set, phantom_segments):
+def alive_players_at(events, player_set, timestamp):
+    alive = set(player_set)
+    timeline = []
+    for death in events["deaths"]:
+        target_id = death.get("targetID")
+        if target_id in player_set and death.get("timestamp", 0) <= timestamp:
+            timeline.append((death.get("timestamp", 0), 0, "death", target_id))
+    for cast in events["casts"]:
+        cast_type = event_type(cast)
+        if "resurrect" not in cast_type and ability_id(cast) not in COMBAT_RESURRECTION_IDS:
+            continue
+        target_id = cast.get("targetID") or cast.get("sourceID")
+        if target_id in player_set and cast.get("timestamp", 0) <= timestamp:
+            timeline.append((cast.get("timestamp", 0), 1, "resurrect", target_id))
+    for _, _, kind, target_id in sorted(timeline):
+        if kind == "death":
+            alive.discard(target_id)
+        elif target_id not in alive:
+            alive.add(target_id)
+    return alive
+
+
+def build_void_death_healing(fight, actor_map, actor_game_id, events, player_set, healer_set, phantom_segments):
     rows = []
     for death in events["deaths"]:
         if death.get("killingAbilityGameID") not in {SPELL["collapsing_void"], SPELL["void_grasp"]}:
             continue
         target_id = death.get("targetID")
         ts = death.get("timestamp", 0)
-        totals = defaultdict(int)
+        totals6s = defaultdict(int)
+        totals8s = defaultdict(int)
         for event in events["healing"]:
             if event.get("targetID") != target_id:
                 continue
             if event.get("sourceID") not in healer_set:
                 continue
-            if not (ts - 6_000 <= event.get("timestamp", 0) <= ts):
+            event_ts = event.get("timestamp", 0)
+            if not (ts - 8_000 <= event_ts <= ts):
                 continue
-            totals[event.get("sourceID")] += int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
+            amount = int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
+            totals8s[event.get("sourceID")] += amount
+            if ts - 6_000 <= event_ts:
+                totals6s[event.get("sourceID")] += amount
         active_count = len(active_phantoms_at(phantom_segments, ts))
+        alive_players = alive_players_at(events, player_set, ts)
+        alive_healers = healer_set & alive_players
+        dead_players = player_set - alive_players
         rows.append({
             "timeMs": rel(fight, ts),
             "time": fmt(rel(fight, ts)),
@@ -1337,15 +1400,33 @@ def build_void_death_healing(fight, actor_map, actor_game_id, events, healer_set
             "abilityID": death.get("killingAbilityGameID"),
             "activePhantomCount": active_count,
             "exemptByPhantoms": active_count >= 4,
+            "playerRosterCount": len(player_set),
+            "deadPlayerCountAtDeath": len(dead_players),
+            "deadPlayerIDsAtDeath": sorted(dead_players),
+            "healerRosterCount": len(healer_set),
+            "healerRosterIDs": sorted(healer_set),
+            "healerRoster": [
+                {
+                    "healerID": healer_id,
+                    "healer": event_actor_name(actor_map, actor_game_id, healer_id),
+                }
+                for healer_id in sorted(healer_set)
+            ],
+            "aliveHealerCountAtDeath": len(alive_healers),
+            "aliveHealerIDsAtDeath": sorted(alive_healers),
             "healingByHealer": [
                 {
                     "healerID": healer_id,
                     "healer": event_actor_name(actor_map, actor_game_id, healer_id),
-                    "amount": amount,
+                    "amount": totals6s.get(healer_id, 0),
+                    "healing6s": totals6s.get(healer_id, 0),
+                    "healing8s": amount,
                 }
-                for healer_id, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+                for healer_id, amount in sorted(totals8s.items(), key=lambda item: item[1], reverse=True)
             ],
-            "totalHealing": sum(totals.values()),
+            "totalHealing": sum(totals6s.values()),
+            "totalHealing6s": sum(totals6s.values()),
+            "totalHealing8s": sum(totals8s.values()),
         })
     return rows
 
@@ -1489,7 +1570,7 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
     water_events = build_water_events(fight, actor_map, actor_game_id, water_drops, phase, position_index, players, player_roles, events["deaths"])
     silver_arrows = build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, phase, position_index, players, phantom_segments)
     ranger_energy = build_ranger_energy(fight, actor_map, actor_game_id, events, phase)
-    void_deaths = build_void_death_healing(fight, actor_map, actor_game_id, events, healers, phantom_segments)
+    void_deaths = build_void_death_healing(fight, actor_map, actor_game_id, events, players, healers, phantom_segments)
     p3_events, p3_contaminations = build_p3_events(fight, actor_map, actor_game_id, events, phase, position_index, players)
     gravity_rounds = build_gravity_rounds(fight, actor_map, events["debuffs"], events["deaths"], player_roles)
     refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments, player_roles)

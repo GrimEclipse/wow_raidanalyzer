@@ -184,6 +184,7 @@
       <section class="panel stage">
         <div class="legend">
           <span class="chip">橙线：remove 时从玩家当前位置射向固定方尖碑</span>
+          <span class="chip">红线：玩家死亡时提前触发的崩裂空无</span>
           <span class="chip">红点：apply 时固定方尖碑</span>
           <span class="chip">紫点：银色幻影</span>
           <span class="chip">蓝/金：奥蕾莉亚与 add</span>
@@ -232,7 +233,7 @@
     const ROUTE_PHASE = ROUTE.get('phase');
     const ROUTE_TAG = ROUTE.get('tag');
     const ICON_SIZE = 32;
-    const state = { data: null, selectedKey: null, includeExempt: false };
+    const state = { data: null, selectedKey: null, includeExempt: false, pendingRouteScroll: false };
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -338,6 +339,16 @@
           render();
         });
       });
+      if (state.pendingRouteScroll) {
+        state.pendingRouteScroll = false;
+        requestAnimationFrame(() => {
+          const active = holder.querySelector('button.event.active');
+          if (active) {
+            active.scrollIntoView({ block: 'center', inline: 'nearest' });
+            active.focus({ preventScroll: true });
+          }
+        });
+      }
     }
 
     function drawCircle(svg, point, radius, color, opacity, label, title) {
@@ -370,6 +381,7 @@
       node.setAttribute('paint-order', 'stroke');
       node.setAttribute('stroke', '#020617');
       node.setAttribute('stroke-width', '3');
+      node.style.pointerEvents = 'none';
       node.textContent = text;
       svg.appendChild(node);
     }
@@ -406,6 +418,7 @@
       line.setAttribute('stroke-linecap', 'round');
       line.setAttribute('opacity', opacity);
       if (dash) line.setAttribute('stroke-dasharray', dash);
+      line.style.pointerEvents = 'none';
       svg.appendChild(line);
     }
 
@@ -492,13 +505,6 @@
         drawCircle(svg, marked.position, 8, '#d946ef', 0.98, '', `${marked.player} · 银锋箭射出位置`);
       }
 
-      if (event.eventType === 'water') {
-        for (const drop of event.drops || []) {
-          if (!drop.position) continue;
-          drawCircle(svg, drop.position, 7, '#a855f7', 0.95, '', `${drop.player} · 本轮放水落点（下一轮才形成污染圈）`);
-        }
-      }
-
       const icons = state.data.icons || {};
       for (const actor of event.actors || event.snapshot?.bosses || []) {
         if (!actor.position) continue;
@@ -531,17 +537,30 @@
         drawText(svg, pixel.x, pixel.y + 25, location.instances.map(item => `#${item}`).join('/'), '#e9d5ff', 'middle');
       }
 
-      if (event.eventType !== 'bow') return;
+      if (event.eventType !== 'bow') {
+        if (event.eventType === 'water') {
+          for (const drop of event.drops || []) {
+            if (!drop.position) continue;
+            drawCircle(svg, drop.position, 8, '#d946ef', 1, '', `${drop.player} · 本轮放水落点（下一轮才形成污染圈）`);
+          }
+        }
+        return;
+      }
       for (const player of event.players || []) {
         if (player.applyState?.point) drawCircle(svg, player.applyState.point, 5, '#22c55e', 0.9, '', `${player.player} 空虚之握施加`);
-        if (player.fadeState?.point) drawCircle(svg, player.fadeState.point, 5, '#38bdf8', 0.95, '', `${player.player} 崩裂空无发射`);
+        if (player.fadeState?.point) drawCircle(svg, player.fadeState.point, 5, player.deathTriggeredRay ? '#ff1744' : '#38bdf8', 0.98, '', `${player.player} ${player.deathTriggeredRay ? '死亡触发' : ''}崩裂空无发射`);
         for (const obelisk of player.obelisks || []) {
           drawCircle(svg, obelisk.point, 5, '#ef4444', 0.95, '', `${player.player} 方尖碑 ${obelisk.label}`);
         }
         for (const ray of player.rays || []) {
-          if (event.phase === 'P2') drawLine(svg, ray.start, ray.end, '#fde68a', 8, '7 7', 0.38);
-          drawLine(svg, ray.start, ray.end, '#f59e0b', 3);
-          drawLine(svg, ray.start, ray.through, '#ef4444', 1, '4 4');
+          if (player.deathTriggeredRay) {
+            drawLine(svg, ray.start, ray.end, '#7f1d1d', 10, '', 0.62);
+            drawLine(svg, ray.start, ray.end, '#ff1744', 4);
+          } else {
+            if (event.phase === 'P2') drawLine(svg, ray.start, ray.end, '#fde68a', 8, '7 7', 0.38);
+            drawLine(svg, ray.start, ray.end, '#f59e0b', 3);
+            drawLine(svg, ray.start, ray.through, '#ef4444', 1, '4 4');
+          }
         }
       }
     }
@@ -613,7 +632,7 @@
         <tr>
           <td>${escapeHtml(player.player)}</td>
           <td>${player.applyTime}<br><span class="muted">${player.applyState?.confidence || 'unknown'}</span></td>
-          <td>${player.fadeTime}<br><span class="muted">${player.diedAtFire ? '死亡时触发（不模拟射线）' : (player.fadeState?.confidence || 'unknown')}</span></td>
+          <td>${player.triggerTime || player.fadeTime}<br><span class="muted">${player.deathTriggeredRay ? '死亡时提前触发（红色射线）' : (player.fadeState?.confidence || 'unknown')}</span></td>
           <td>${player.actualPhantomHitCount || 0}</td>
           <td>${player.predictedPhantomHits?.length || 0}</td>
           <td>${(player.shotAttribution || []).map(item => `幻影${item.phantom}：${item.verdict}（${item.confidence}，${item.basis}）`).join('<br>') || '-'}</td>
@@ -712,11 +731,7 @@
       renderDeathHealing();
     });
 
-    fetch(DATA_URL)
-      .then(response => {
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json();
-      })
+    window.OfflineDataLoader.loadJson(DATA_URL)
       .then(data => {
         if (data?.data?.page1_wipeAnalysis) {
           const reportID = ROUTE.get('report');
@@ -731,14 +746,17 @@
         }
         state.data = data;
         if (ROUTE_TAG) {
-          state.selectedKey = ROUTE_TAG;
+          const match = auditEvents().find(event => event.key === ROUTE_TAG);
+          state.selectedKey = match?.key || null;
+          state.pendingRouteScroll = Boolean(match);
         } else if (ROUTE_PHASE) {
           state.selectedKey = auditEvents().find(event => event.phase === ROUTE_PHASE)?.key || null;
+          state.pendingRouteScroll = Boolean(state.selectedKey);
         }
         render();
       })
       .catch(error => {
-        document.getElementById('app').innerHTML = `<div class="panel" style="margin:16px;padding:16px;color:#fecaca">读取 ${DATA_URL} 失败：${escapeHtml(error.message)}。请先运行 tools/crown_single_fight_audit.py。</div>`;
+        document.getElementById('app').innerHTML = `<div class="panel" style="margin:16px;padding:16px;color:#fecaca">读取 ${DATA_URL} 失败：${escapeHtml(error.message)}。</div>`;
       });
   </script>
 </body>

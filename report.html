@@ -245,7 +245,7 @@
                     </div>
                 </div>
 
-                <div class="border border-gray-800 rounded bg-gray-950 p-4">
+                <div v-if="avoidableTab !== 'corruptionEssenceDamage'" class="border border-gray-800 rounded bg-gray-950 p-4">
                     <div class="flex items-center justify-between gap-3 mb-3"><h3 class="font-bold text-amber-100">{{ activeAvoidableLabel || '请选择分项' }}</h3><span class="text-xs text-gray-500">逐把分析 {{ activeCourtAnalysisRows().length }} 条</span></div>
                     <div class="space-y-2 max-h-72 overflow-y-auto no-scrollbar">
                         <div v-for="row in activeCourtAnalysisRows()" :key="row.key" class="grid grid-cols-[90px_1fr_72px_90px] gap-3 items-center rounded border border-gray-800 bg-gray-900/60 p-2 text-xs">
@@ -379,11 +379,11 @@
                                 <th class="py-2 px-3 text-center w-16">排名</th>
                                 <th class="py-2 px-3 text-left">玩家</th>
                                 <th class="py-2 px-3 text-center">职责</th>
-                                <th v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-right cursor-pointer select-none" @click="setAvoidableSort('totalDamage')">承受伤害 <span class="text-gray-600">{{ sortIcon('totalDamage') }}</span></th>
+                                <th v-if="!['collapsingVoidSnapAiming','missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="py-2 px-3 text-right cursor-pointer select-none" @click="setAvoidableSort('totalDamage')">承受伤害 <span class="text-gray-600">{{ sortIcon('totalDamage') }}</span></th>
                                 <th v-if="['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('markedCount')">{{ avoidableTab === 'missedShadows' ? 'P2被点名次数' : '被点名次数' }} <span class="text-gray-600">{{ sortIcon('markedCount') }}</span></th>
-                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('hitCount')">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '甩狙次数' : (avoidableTab === 'missedShadows' ? '未命中次数' : '次数') }} <span class="text-gray-600">{{ sortIcon('hitCount') }}</span></th>
-                                <th v-if="avoidableTab !== 'missedShadows'" class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('deathCount')">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '导致队友死亡次数' : '直接死亡' }} <span class="text-gray-600">{{ sortIcon('deathCount') }}</span></th>
-                                <th class="py-2 px-3 text-center">明细</th>
+                                <th class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('hitCount')">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '甩狙次数' : (avoidableTab === 'missedShadows' ? '未命中次数' : (avoidableTab === 'p1SilverArrowMissedFights' ? '未命中场数' : '次数')) }} <span class="text-gray-600">{{ sortIcon('hitCount') }}</span></th>
+                                <th v-if="!['missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="py-2 px-3 text-center cursor-pointer select-none" @click="setAvoidableSort('deathCount')">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '导致队友死亡次数' : '直接死亡' }} <span class="text-gray-600">{{ sortIcon('deathCount') }}</span></th>
+                                <th v-if="avoidableTab !== 'corruptionEssenceDamage'" class="py-2 px-3 text-center">明细</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -391,16 +391,16 @@
                                 <td class="py-2 px-3 text-center text-gray-500 font-bold">{{ index + 1 }}</td>
                                 <td class="py-2 px-3 text-blue-300 font-bold">{{ player.name }}</td>
                                 <td class="py-2 px-3 text-center text-gray-300">{{ roleIcons(player.roles || player.role) }}</td>
-                                <td v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-right font-mono">{{ player.damageText || (Number(player.totalDamage || 0) > 0 ? number(player.totalDamage) : '-') }}</td>
+                                <td v-if="!['collapsingVoidSnapAiming','missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="py-2 px-3 text-right font-mono">{{ player.damageText || (Number(player.totalDamage || 0) > 0 ? number(player.totalDamage) : '-') }}</td>
                                 <td v-if="['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="py-2 px-3 text-center text-blue-200 font-mono">{{ player.markedCount || 0 }}</td>
                                 <td class="py-2 px-3 text-center text-amber-300 font-mono">{{ player.hitCount }}</td>
-                                <td v-if="avoidableTab !== 'missedShadows'" class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
+                                <td v-if="!['missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="py-2 px-3 text-center font-mono" :class="(player.deathCount || player.deathCompensationCount) > 0 ? 'text-red-400 font-bold' : 'text-green-500'">
                                     {{ player.deathCount || 0 }}<span v-if="player.deathCompensationCount" class="text-amber-300">({{ avoidableDeathTotal(player) }})</span>
                                 </td>
-                                <td class="py-2 px-3 text-center"><button v-if="player.events?.length" @click="courtDetailPlayer = player.name" class="px-2 py-1 rounded border border-sky-700 bg-sky-950/70 text-sky-100 hover:bg-sky-900 text-xs">查看明细</button><span v-else class="text-gray-600">-</span></td>
+                                <td v-if="avoidableTab !== 'corruptionEssenceDamage'" class="py-2 px-3 text-center"><button v-if="player.events?.length" @click="courtDetailPlayer = player.name" class="px-2 py-1 rounded border border-sky-700 bg-sky-950/70 text-sky-100 hover:bg-sky-900 text-xs">查看明细</button><span v-else class="text-gray-600">-</span></td>
                             </tr>
                             <tr v-if="activeAvoidableRows.length === 0">
-                                <td colspan="7" class="py-10 text-center text-gray-500">暂无确定归责的玩家；上方仍会展示不计数的分析结果。</td>
+                                <td :colspan="avoidableTab === 'corruptionEssenceDamage' ? 4 : 7" class="py-10 text-center text-gray-500">暂无确定归责的玩家；上方仍会展示不计数的分析结果。</td>
                             </tr>
                             </tbody>
                         </table>
@@ -422,12 +422,12 @@
                         <h3 class="font-bold text-white mb-3">当前汇总</h3>
                         <div class="space-y-3 text-sm border-b border-gray-800 pb-4">
                             <div class="flex justify-between"><span class="text-gray-400">汇总项目</span><span class="font-bold text-amber-400">{{ activeAvoidableLabel }}</span></div>
-                            <div v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="flex justify-between"><span class="text-gray-400">总计伤害</span><span class="font-mono">{{ number(activeAvoidableTotal) }}</span></div>
-                            <div class="flex justify-between"><span class="text-gray-400">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '甩狙次数' : (avoidableTab === 'missedShadows' ? '未命中次数' : '命中次数') }}</span><span class="font-mono">{{ activeAvoidableHits }}</span></div>
-                            <div v-if="avoidableTab !== 'missedShadows'" class="flex justify-between"><span class="text-gray-400">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '导致队友死亡次数' : '直接死亡' }}</span><span class="font-mono text-red-300">{{ activeAvoidableDeaths }}</span></div>
+                            <div v-if="!['collapsingVoidSnapAiming','missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="flex justify-between"><span class="text-gray-400">总计伤害</span><span class="font-mono">{{ number(activeAvoidableTotal) }}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-400">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '甩狙次数' : (avoidableTab === 'missedShadows' ? '未命中次数' : (avoidableTab === 'p1SilverArrowMissedFights' ? '未命中场数' : '命中次数')) }}</span><span class="font-mono">{{ activeAvoidableHits }}</span></div>
+                            <div v-if="!['missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="flex justify-between"><span class="text-gray-400">{{ avoidableTab === 'collapsingVoidSnapAiming' ? '导致队友死亡次数' : '直接死亡' }}</span><span class="font-mono text-red-300">{{ activeAvoidableDeaths }}</span></div>
                         </div>
 
-                        <div v-if="!['collapsingVoidSnapAiming','missedShadows'].includes(avoidableTab)" class="mt-4">
+                        <div v-if="!['collapsingVoidSnapAiming','missedShadows','p1SilverArrowMissedFights','corruptionEssenceDamage'].includes(avoidableTab)" class="mt-4">
                             <div class="flex justify-between items-end mb-2">
                                 <h4 class="text-xs text-gray-500">Details 伤害排行</h4>
                             </div>
@@ -664,6 +664,10 @@
 
 <script>
 const { createApp } = Vue;
+
+// Display-only exclusion. Raw JSON and fight analysis remain untouched.
+const COURT_DISPLAY_EXCLUDED_PLAYERS = new Set(['Jokermeow', '黑心喵', 'Leviac', 'Leviackerman', '茶喵不吃糖']);
+const isCourtDisplayExcluded = name => COURT_DISPLAY_EXCLUDED_PLAYERS.has(String(name || '').trim());
 
 createApp({
     data() {
@@ -1013,7 +1017,7 @@ createApp({
             return sections;
         },
         isSpatialCourtTab() {
-            return ['collapsingVoidSnapAiming','waterOutliers','p1SilverArrowDeaths','missedShadows','voidGraspHealingLow'].includes(this.avoidableTab);
+            return ['collapsingVoidSnapAiming','waterOutliers','p1SilverArrowDeaths','p1SilverArrowMissedFights','missedShadows','voidGraspHealingLow'].includes(this.avoidableTab);
         },
         activeCourtAnalysisRows() {
             const rows = [];
@@ -1043,10 +1047,33 @@ createApp({
                 }));
                 return rows;
             }
+            if (this.avoidableTab === 'waterOutliers') {
+                this.rawWipeAnalysis.forEach(fight => {
+                    const events = fight?.crownOfTheCosmos?.fieldAudit?.waterEvents || [];
+                    const firstP2 = events.find(event => event.phase === 'P2')?.id;
+                    events.forEach(event => {
+                        const outliers = (event.drops || []).filter(drop => drop.isOutlier && drop.applyTimeMs != null);
+                        if (!outliers.length) return;
+                        const counted = event.phase !== 'P1' && event.id !== firstP2;
+                        const labels = outliers.map(drop => `${drop.player}（actor ID ${drop.targetID ?? '-'}，${drop.distanceFromGroupYards ?? '-'}码）`);
+                        rows.push({
+                            key:`water-${fight.fightID}-${event.id}`,
+                            fightID:fight.fightID,
+                            group:event.index,
+                            players:outliers.map(drop => drop.player),
+                            countedPlayers:counted ? outliers.map(drop => drop.player) : [],
+                            counted,
+                            text:`放水离群：${labels.join('、')}；${counted ? '纳入放水未集中统计' : (event.phase === 'P1' ? 'P1仅展示，不统计' : 'P2首轮豁免，仅展示')}`,
+                            link:this.fightAuditLink(fight, event.phase, `water:${event.id}`),
+                        });
+                    });
+                });
+                return rows.sort((a,b) => Number(a.fightID)-Number(b.fightID) || Number(a.group||0)-Number(b.group||0));
+            }
             if (this.avoidableTab === 'tankRiftSlashFailure') {
                 this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.riftSlashTankSwaps || []).forEach((event,index) => rows.push({
                     key:`rift-${fight.fightID}-${index}`, fightID:fight.fightID, group:index+1,
-                    player:event.offender, players:[event.offender], counted:event.counted === true && event.causedTankDeath === true,
+                    player:event.offender, players:[event.offender], counted:event.counted === true,
                     text:event.text + ` ${event.countReason || ''}`, link:this.courtEventLink(fight,event,'tankRiftSlashFailure'),
                 })));
                 return rows;
@@ -1060,7 +1087,7 @@ createApp({
                         player:cast.player,
                         players:[cast.player],
                         counted:true,
-                        text:`${cast.player} 被干扰震荡打断：${cast.spell}（${cast.spellID}），${cast.castStart} 开始读条`,
+                        text:`${cast.player} 被干扰震荡实际打断：${cast.spell}（${cast.spellID}）`,
                         link:this.fightAuditLink(fight),
                     }));
                 }));
@@ -1212,7 +1239,7 @@ createApp({
         courtEventLink(fight, event, skillKey) {
             const audit = fight?.crownOfTheCosmos?.fieldAudit;
             const phase = event.phase
-                || (skillKey === 'p1SilverArrowDeaths' || skillKey === 'corruptionEssenceHits' ? 'P1' : null)
+                || (skillKey === 'p1SilverArrowDeaths' || skillKey === 'p1SilverArrowMissedFights' || skillKey === 'corruptionEssenceHits' ? 'P1' : null)
                 || (skillKey === 'p15AvoidableDeaths' ? 'P1.5' : null)
                 || (skillKey === 'tankRiftSlashFailure' || skillKey === 'missedShadows' || skillKey === 'missedEnergy' ? 'P2' : null)
                 || (skillKey === 'gravityLineViolation' ? 'P3' : null);
@@ -1223,7 +1250,7 @@ createApp({
             const timeMs = event.positionMs ?? event.timeMs ?? this.parseTimeToSeconds(event.time || '') * 1000;
             let type = 'bow'; let candidates = audit.bowGroups || [];
             if (skillKey === 'waterOutliers') { type='water'; candidates=audit.waterEvents || []; }
-            else if (skillKey === 'p1SilverArrowDeaths' || skillKey === 'missedEnergy') { type='silverArrow'; candidates=audit.silverArrows || []; }
+            else if (skillKey === 'p1SilverArrowDeaths' || skillKey === 'p1SilverArrowMissedFights' || skillKey === 'missedEnergy') { type='silverArrow'; candidates=audit.silverArrows || []; }
             candidates = candidates.filter(row => !phase || row.phase === phase);
             const match = candidates.sort((a,b) => Math.abs((a.fireTimeMs ?? a.timeMs ?? 0)-timeMs)-Math.abs((b.fireTimeMs ?? b.timeMs ?? 0)-timeMs))[0];
             return this.fightAuditLink(fight, phase || match?.phase, match ? `${type}:${match.id}` : null);
@@ -1234,13 +1261,13 @@ createApp({
             const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
             if (!fight) return '';
             const audit = fight?.crownOfTheCosmos?.fieldAudit;
-            const phase = event.phase || (this.avoidableTab === 'p1SilverArrowDeaths' ? 'P1' : (['missedShadows'].includes(this.avoidableTab) ? 'P2' : null));
+            const phase = event.phase || (['p1SilverArrowDeaths','p1SilverArrowMissedFights'].includes(this.avoidableTab) ? 'P1' : (['missedShadows'].includes(this.avoidableTab) ? 'P2' : null));
             if (!audit) return this.fightAuditLink(fight, phase);
             const timeMs = event.positionMs ?? this.parseTimeToSeconds(event.time || '') * 1000;
             let type = 'bow';
             let rows = audit.bowGroups || [];
             if (this.avoidableTab === 'waterOutliers') { type = 'water'; rows = audit.waterEvents || []; }
-            if (this.avoidableTab === 'p1SilverArrowDeaths') { type = 'silverArrow'; rows = audit.silverArrows || []; }
+            if (['p1SilverArrowDeaths','p1SilverArrowMissedFights'].includes(this.avoidableTab)) { type = 'silverArrow'; rows = audit.silverArrows || []; }
             const candidates = rows.filter(row => !phase || row.phase === phase);
             const match = candidates.sort((a,b) => Math.abs((a.fireTimeMs ?? a.timeMs ?? 0)-timeMs) - Math.abs((b.fireTimeMs ?? b.timeMs ?? 0)-timeMs))[0];
             return this.fightAuditLink(fight, phase || match?.phase, match ? `${type}:${match.id}` : null);
@@ -1513,24 +1540,33 @@ createApp({
 
             this.glaiveBoard = result.data.page2_glaiveBoard || [];
             this.transitionAnalysis = result.data.page2_transitionAnalysis || { summary: [], fights: [] };
-            this.finalVerdict = (result.data.page4_finalVerdict || []).map(row => ({
-                ...row,
-                initialRecognitionCount: Number(row.recognitionCount || 0),
-                initialPenaltyUnits: Number(row.penaltyUnits ?? 0),
-            }));
+            this.finalVerdict = (result.data.page4_finalVerdict || [])
+                .filter(row => !isCourtDisplayExcluded(row.name))
+                .map(row => ({
+                    ...row,
+                    initialRecognitionCount: Number(row.recognitionCount || 0),
+                    initialPenaltyUnits: Number(row.penaltyUnits ?? 0),
+                }));
             this.verdictDirty = false;
             if (this.isCrownBoss) this.confirmVerdict();
-            this.avoidableBoard = { ...(result.data.page2_avoidableBoard || {}) };
-            this.avoidableFirstDeathBoard = result.data.page2_avoidableFirstDeathBoard || [];
+            this.avoidableBoard = Object.fromEntries(
+                Object.entries(result.data.page2_avoidableBoard || {}).map(([key, rows]) => [
+                    key,
+                    Array.isArray(rows) ? rows.filter(row => !isCourtDisplayExcluded(row.name)) : rows,
+                ])
+            );
+            this.avoidableFirstDeathBoard = (result.data.page2_avoidableFirstDeathBoard || [])
+                .filter(row => !isCourtDisplayExcluded(row.name));
             this.dispelAnalysis = result.data.page3_dispelAnalysis || { enabled: false, logic: '', summary: [], fights: [] };
             if (!this.avoidableBoard.skyGlaive && this.glaiveBoard.length) this.avoidableBoard.skyGlaive = this.glaiveBoard;
 
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
             const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
-            const avoidableDamageOrder = ['dailyAvoidableDamage','devouringAbyss','voidResidue','corruptionEssenceDamage'];
+            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter','p1SilverArrowMissedFights']);
+            const avoidableDamageOrder = ['corruptionEssenceDamage'];
             const skillKeys = Object.keys(this.avoidableBoard)
-                .filter(key => key !== 'total' && Array.isArray(this.avoidableBoard[key]))
+                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && Array.isArray(this.avoidableBoard[key]))
                 .sort((a, b) => {
                     const rankA = avoidableDamageOrder.includes(a) ? avoidableDamageOrder.indexOf(a) : avoidableDamageOrder.length;
                     const rankB = avoidableDamageOrder.includes(b) ? avoidableDamageOrder.indexOf(b) : avoidableDamageOrder.length;
