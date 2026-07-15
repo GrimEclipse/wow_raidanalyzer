@@ -14,7 +14,7 @@ data/wcl_*.json
 data/manifest.json
 !data/.gitkeep
 
-# Codex workspace metadata.
+# Local workspace metadata.
 .agents/
 .codex/
 

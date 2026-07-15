@@ -1,5 +1,5 @@
 ﻿# -*- coding: utf-8 -*-
-"""Bake all WCL JSON files into vendor JS for file:// multi-source load. Author: Wei."""
+"""Bake all WCL JSON files into vendor JS for file:// multi-source load. Author: 卫宇珩."""
 from pathlib import Path
 import json
 import sys
