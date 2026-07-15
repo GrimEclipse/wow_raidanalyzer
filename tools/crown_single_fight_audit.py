@@ -39,6 +39,7 @@ except ModuleNotFoundError:
     group_by_window,
     )
 from boss_plugins.common import build_player_mechanic_roles
+from boss_plugins.void_spire.crown_of_the_cosmos import finalize_p1_boss_attribution
 
 
 FIGHT_ID = 30
@@ -1270,6 +1271,20 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
                     if boss and boss.get("position") and distance_point_to_segment((boss["position"]["x"], boss["position"]["y"]), start, end) <= 500:
                         matched.append(boss.get("name"))
                 p1_boss_attribution.append({"targetID": marked.get("targetID"), "player": marked["player"], "bosses": matched, "hitBoss": bool(matched)})
+        p1_boss_hit_events = [
+            {
+                "targetID": event.get("targetID"),
+                "boss": event_actor_name(actor_map, actor_game_id, event.get("targetID")),
+                "timeMs": rel(fight, event.get("timestamp")),
+            }
+            for event in p1_enemy_removes
+        ]
+        # Ray geometry uses Alleria→markedPlayer segments; stale Alleria coords make
+        # true hits look like misses. Binding/corruption remove is authoritative.
+        if phase_name == "P1":
+            p1_boss_attribution = finalize_p1_boss_attribution(
+                marked_positions, p1_boss_attribution, p1_boss_hit_events
+            )
         rows.append({
             "id": f"silver-arrow-{index}", "index": index, "eventType": "silverArrow", "phase": phase_name,
             "spellID": spell_id,
@@ -1282,9 +1297,11 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
             "snapshot": snapshot_at(effect_ts, player_actor_ids, bosses, position_index, actor_map, actor_game_id, events["deaths"]),
             "sourcePhantoms": [{key: value for key, value in item.items() if key != "castTimeAbsolute"} for item in source_phantoms],
             "sourceAssignments": source_assignments,
-            "p1BossHitEvents": [{"targetID": event.get("targetID"), "boss": event_actor_name(actor_map, actor_game_id, event.get("targetID")), "timeMs": rel(fight, event.get("timestamp"))} for event in p1_enemy_removes],
+            "p1BossHitEvents": p1_boss_hit_events,
             "p1BossAttribution": p1_boss_attribution,
-            "p1AllMissedBoss": phase_name == "P1" and not any(item.get("hitBoss") for item in p1_boss_attribution),
+            "p1AllMissedBoss": phase_name == "P1" and not (
+                any(item.get("hitBoss") for item in p1_boss_attribution) or bool(p1_boss_hit_events)
+            ),
         })
     return rows
 

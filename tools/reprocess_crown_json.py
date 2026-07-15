@@ -3,6 +3,11 @@ import json
 import math
 from pathlib import Path
 
+from boss_plugins.void_spire.crown_of_the_cosmos import (
+    finalize_p1_boss_attribution,
+    p1_silver_arrow_round_succeeded,
+)
+
 
 DESIGNATED_HEALERS = {"旖旎云逸", "暗黑膏药"}
 VOID_GRASP_ID = 1260027
@@ -96,8 +101,37 @@ def event_position_ms(event):
 
 def normalize_transition_deaths(fight):
     per_player = {}
-    transition_abandoned = bool((fight.get("crownOfTheCosmos") or {}).get("transitionAbandoned"))
-    for death in fight.get("deathTimeline") or []:
+    deaths = fight.get("deathTimeline") or []
+    markers = (fight.get("crownOfTheCosmos") or {}).get("phaseMarkers") or {}
+    # Reconstruct abandon cluster from absolute times on death timeline.
+    bridge_rows = [
+        {
+            "timestamp": int(death.get("absoluteTime") or 0),
+            "killingAbilityGameID": death.get("abilityID"),
+            "targetID": death.get("player"),
+            "phase": death.get("phase"),
+        }
+        for death in deaths
+        if death.get("abilityID") in {None, 3}
+    ]
+    abandon_cluster = None
+    bridge_clusters = event_clusters([
+        {"timestamp": row["timestamp"], "killingAbilityGameID": row["killingAbilityGameID"]}
+        for row in bridge_rows
+    ], window_ms=5_000) if bridge_rows else []
+    candidates = [cluster for cluster in bridge_clusters if len(cluster.get("events", [])) >= 3]
+    if candidates:
+        abandon_cluster = max(candidates, key=lambda cluster: (len(cluster.get("events", [])), cluster.get("start", 0)))
+        # Only P1.5-terminal abandons exempt P1.5 cliff deaths.
+        cluster_phase = None
+        for death in deaths:
+            if int(death.get("absoluteTime") or 0) == abandon_cluster["start"]:
+                cluster_phase = death.get("phase")
+                break
+        if cluster_phase != "P1.5":
+            abandon_cluster = None
+
+    for death in deaths:
         if death.get("phase") != "P1.5" or not death.get("player"):
             continue
         name = death["player"]
@@ -107,9 +141,14 @@ def normalize_transition_deaths(fight):
         row["roles"] = [] if role == "unknown" else [role]
         row["hitCount"] += 1
         row["deathCount"] += 1
-        is_abandon_jump = transition_abandoned and death.get("abilityID") in {None, 3}
+        absolute = int(death.get("absoluteTime") or 0)
+        is_abandon_jump = bool(
+            abandon_cluster
+            and death.get("abilityID") in {None, 3}
+            and (abandon_cluster["start"] - 1_000) <= absolute <= (int(abandon_cluster.get("end") or abandon_cluster["start"]) + 8_000)
+        )
         position_ms = (
-            int(death.get("absoluteTime") or 0) - int(fight.get("fightStart") or 0)
+            absolute - int(fight.get("fightStart") or 0)
             if death.get("absoluteTime") is not None else time_to_ms(death.get("time"))
         )
         ability_name = death.get("ability") or "未知技能"
@@ -383,8 +422,13 @@ def repair_p1_arrow_attribution(fight):
                 "bosses": list(dict.fromkeys(name for name in matched if name)),
                 "hitBoss": bool(matched),
             })
+        attribution = finalize_p1_boss_attribution(
+            arrow.get("markedPlayerPositions") or [], attribution, hit_events
+        )
         arrow["p1BossAttribution"] = attribution
-        arrow["p1AllMissedBoss"] = not any(row.get("hitBoss") for row in attribution)
+        arrow["p1AllMissedBoss"] = not (
+            any(row.get("hitBoss") for row in attribution) or bool(hit_events)
+        )
 
     repaired_rows = []
     repaired_issues = []
@@ -457,10 +501,11 @@ def normalize_p1_arrow_misses(fight):
         if not arrow:
             continue
         used_ids.add(arrow.get("id"))
-        attributions = arrow.get("p1BossAttribution") or []
         # 成功处理轮次不进入开庭：既不计也不作为“不计数豁免”展示。
-        if any(row.get("hitBoss") for row in attributions):
+        # 含 binding-remove 硬证据（射线归因失败时仍算成功）。
+        if p1_silver_arrow_round_succeeded(arrow):
             continue
+        attributions = arrow.get("p1BossAttribution") or []
         # 第5轮殁里乌姆档：双人空射且目标已死 → 预期空射，不入板；仍存活 → 定罪。
         if is_melurium_arrow_slot(expected_ms, expected_target, arrow) and not melurium_alive_in_arrow_snapshot(arrow):
             continue

@@ -20,7 +20,7 @@ if (Test-Path -LiteralPath $target) {
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 
 $files = @(
-    "offline_index.html", "report.html", "verdict.html", "verdict_data.json", "crown-fight-audit.html",
+    "offline_index.html", "report.html", "crown-fight-audit.html",
     "boss_catalog.json", "offline_server.py", "start_offline.bat", "README_OFFLINE.txt"
 )
 if (Test-Path -LiteralPath (Join-Path $root "wcl_hardcore_api.json")) { $files += "wcl_hardcore_api.json" }
@@ -37,8 +37,9 @@ New-Item -ItemType Directory -Force -Path (Join-Path $target "boss_plugins") | O
 Copy-Item -LiteralPath (Join-Path $root "boss_plugins\assets") -Destination (Join-Path $target "boss_plugins\assets") -Recurse -Force
 New-Item -ItemType Directory -Force -Path (Join-Path $target "verdicts") | Out-Null
 Set-Content -LiteralPath (Join-Path $target "verdicts\.gitkeep") -Value "" -Encoding utf8
+# Keep previously exported user intellect tables if present.
 if (Test-Path -LiteralPath (Join-Path $root "verdicts")) {
-    Get-ChildItem -LiteralPath (Join-Path $root "verdicts") -Filter "verdict-*.json" -ErrorAction SilentlyContinue |
+    Get-ChildItem -LiteralPath (Join-Path $root "verdicts") -Filter "智力表_*.xlsx" -ErrorAction SilentlyContinue |
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $target "verdicts\$($_.Name)") -Force }
 }
 
@@ -54,7 +55,7 @@ if (Test-Path -LiteralPath (Join-Path $root "data")) {
     }
 }
 
-# Also ship analyzer_core/wcl_paths.py so offline_server can list data files when Python exists.
+# Ship analyzer_core/wcl_paths.py so offline_server can list data files when Python exists.
 New-Item -ItemType Directory -Force -Path (Join-Path $target "analyzer_core") | Out-Null
 Set-Content -LiteralPath (Join-Path $target "analyzer_core\__init__.py") -Value "" -Encoding utf8
 $wclPaths = Join-Path $root "analyzer_core\wcl_paths.py"

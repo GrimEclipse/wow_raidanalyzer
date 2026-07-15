@@ -13,10 +13,9 @@ ROOT = Path(__file__).resolve().parent
 ROUTES = {
     "/": "offline_index.html" if (ROOT / "offline_index.html").exists() else "index.html",
     "/report": "report.html",
+    "/verdict": "verdict.html",
     "/audit": "crown-fight-audit.html",
 }
-VERDICT_DIR = ROOT / "verdicts"
-VERDICT_DIR.mkdir(exist_ok=True)
 
 
 class OfflineHandler(SimpleHTTPRequestHandler):
@@ -79,16 +78,17 @@ def main():
     parser.add_argument("--no-open", action="store_true")
     args = parser.parse_args()
     os.chdir(ROOT)
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), OfflineHandler)
     url = f"http://127.0.0.1:{args.port}/"
-    print(f"Offline server at {url}")
-    print("终审 Excel 由浏览器前端 assets/vendor/verdict-xlsx.js 直接导出，无需 Python。")
     if not args.no_open:
-        threading.Timer(0.6, lambda: webbrowser.open(url)).start()
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    print(f"Offline viewer: {url}")
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), OfflineHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopped.")
+        print("Offline viewer stopped.")
+    finally:
+        server.server_close()
 
 
 if __name__ == "__main__":

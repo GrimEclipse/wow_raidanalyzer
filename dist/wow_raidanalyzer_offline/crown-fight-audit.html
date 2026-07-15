@@ -281,8 +281,10 @@
       const p3Events = (state.data.p3Events || []).map(event => ({
         ...event, key: `${event.eventType}:${event.id}`, sortMs: event.timeMs, displayTime: event.time,
       }));
-      // 重力坍缩属 P3 专属复盘，不进入左侧 Tag 导航。
-      return [...bows, ...waters, ...arrows, ...p3Events].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
+      const gravity = (state.data.gravityRounds || []).map(event => ({
+        ...event, eventType: 'gravity', key: `gravity:${event.index}`, sortMs: event.applyTimeMs, displayTime: event.applyTime,
+      }));
+      return [...bows, ...waters, ...arrows, ...p3Events, ...gravity].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
     }
 
     function selectedEvent() {

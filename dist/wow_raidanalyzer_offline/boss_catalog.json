@@ -1,0 +1,118 @@
+{
+  "versions": [
+    {
+      "version": "12.0",
+      "raids": [
+        {
+          "key": "dream_rift",
+          "name": "梦境裂隙",
+          "bosses": [
+            { "key": "chimaerus", "name": "奇美鲁斯，未梦之神", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] }
+          ]
+        },
+        {
+          "key": "void_spire",
+          "name": "虚影尖塔",
+          "bosses": [
+            { "key": "imperator_averzian", "name": "元首阿福扎恩", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "vorasius", "name": "弗拉希乌斯", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "fallen_king_salhadaar", "name": "陨落之王萨哈达尔", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "vaelgor_ezzorak", "name": "威厄高尔和艾佐拉克", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "lightblinded_vanguard", "name": "光盲先锋军", "supported": true, "disabledReason": "", "configSchema": [] },
+            { "key": "crown_of_the_cosmos", "name": "宇宙之冕", "supported": true, "disabledReason": "", "configSchema": [] }
+          ]
+        },
+        {
+          "key": "march_on_queldanas",
+          "name": "进军奎尔丹纳斯",
+          "bosses": [
+            { "key": "beloren", "name": "贝洛朗，奥的子嗣", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            {
+              "key": "midnight_falls",
+              "name": "至暗之夜降临",
+              "supported": true,
+              "disabledReason": "",
+              "configSchema": [
+                {
+                  "key": "terminalMatrixInterruptGroups",
+                  "type": "interruptGroups",
+                  "label": "终结矩阵打断分配预设（请保证 id 完全一致）",
+                  "groups": [
+                    { "key": "group1", "label": "第一组", "slots": 3 },
+                    { "key": "group2", "label": "第二组", "slots": 3 },
+                    { "key": "group3", "label": "第三组", "slots": 3 },
+                    { "key": "group4", "label": "第四组", "slots": 3 }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "sporefall",
+          "name": "暮孢陨坠",
+          "bosses": [
+            { "key": "rotmire", "name": "腐沼", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] }
+          ]
+        }
+      ]
+    },
+    {
+      "version": "12.1",
+      "raids": [
+        {
+          "key": "dream_rift",
+          "name": "梦境裂隙",
+          "bosses": [
+            { "key": "chimaerus", "name": "奇美鲁斯，未梦之神", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] }
+          ]
+        },
+        {
+          "key": "void_spire",
+          "name": "虚影尖塔",
+          "bosses": [
+            { "key": "imperator_averzian", "name": "元首阿福扎恩", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "vorasius", "name": "弗拉希乌斯", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "fallen_king_salhadaar", "name": "陨落之王萨哈达尔", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "vaelgor_ezzorak", "name": "威厄高尔和艾佐拉克", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            { "key": "lightblinded_vanguard", "name": "光盲先锋军", "supported": true, "disabledReason": "", "configSchema": [] },
+            { "key": "crown_of_the_cosmos", "name": "宇宙之冕", "supported": true, "disabledReason": "", "configSchema": [] }
+          ]
+        },
+        {
+          "key": "march_on_queldanas",
+          "name": "进军奎尔丹纳斯",
+          "bosses": [
+            { "key": "beloren", "name": "贝洛朗，奥的子嗣", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] },
+            {
+              "key": "midnight_falls",
+              "name": "至暗之夜降临",
+              "supported": true,
+              "disabledReason": "",
+              "configSchema": [
+                {
+                  "key": "terminalMatrixInterruptGroups",
+                  "type": "interruptGroups",
+                  "label": "终结矩阵打断分配预设（请保证 id 完全一致）",
+                  "groups": [
+                    { "key": "group1", "label": "第一组", "slots": 3 },
+                    { "key": "group2", "label": "第二组", "slots": 3 },
+                    { "key": "group3", "label": "第三组", "slots": 3 },
+                    { "key": "group4", "label": "第四组", "slots": 3 }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "sporefall",
+          "name": "暮孢陨坠",
+          "bosses": [
+            { "key": "rotmire", "name": "腐沼", "supported": false, "disabledReason": "暂未接入在线分析", "configSchema": [] }
+          ]
+        }
+      ]
+    }
+  ]
+}

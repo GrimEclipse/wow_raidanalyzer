@@ -10,7 +10,7 @@ assets/vendor/wcl_hardcore_api.js，收件人可在报告页下拉切换多天�
 --------
 1. 双击 start_offline.bat（会提示是否已内嵌数据；有 Python 则顺带起本地服务）。
 2. 或直接双击 index.html / report.html。
-3. 主报告：report.html（含开庭/终审 Excel 导出）；逐场场地：crown-fight-audit.html。
+3. 主报告：report.html；终审历史：verdict.html；逐场场地：crown-fight-audit.html。
 
 数据如何自动加载
 ----------------
@@ -40,11 +40,11 @@ URL 书签
 
 终审导出
 --------
-- 在主报告「终审判决」确认后，浏览器直接生成 Excel：
-  智力表_Boss名称_日期.xlsx
-- 工作表名：Boss名字_时间；约定保存到 verdicts/
-- 实现：assets/vendor/verdict-xlsx.js（纯前端 OOXML，无需 Python / openpyxl）
-- file:// 与本地 HTTP 均可下载；建议手动放入 verdicts/ 归档。
+- 在主报告「终审判决」填写开荒日期后点击确认，会下载：
+  verdict-YYYY-MM-DD.json
+- 建议存到文件夹：verdicts/
+- 文件字段仅含：判定次数、判定原因、申诉无罪次数、申诉无罪原因、最终总智力损失。
+- 日期可手动修改；不同开荒日的导入靠 progressDate 区分。
 
 可选本地 HTTP
 -------------
