@@ -17,6 +17,7 @@ from urllib.parse import unquote, urlparse
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
+from analyzer_core.wcl_paths import DATA_DIR, list_wcl_data_files
 
 
 ROOT = Path(__file__).resolve().parent
@@ -24,6 +25,7 @@ JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
 
 FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
@@ -193,6 +195,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
         if path == "/api/catalog":
             return self.send_response_body(*json_bytes(to_frontend_catalog()))
+        if path == "/api/data-files":
+            return self.send_response_body(*json_bytes({
+                "schemaVersion": 1,
+                "files": list_wcl_data_files(),
+            }))
         if path.startswith("/api/jobs/") and path.endswith("/events"):
             return self.handle_events(path)
         if path.startswith("/api/jobs/") and path.endswith("/result"):

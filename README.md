@@ -22,7 +22,13 @@ WCL_REPORT_IDS=your_report_id
 python analyze.py --version 12.0 --raid march_on_queldanas --boss midnight_falls --report your_report_id
 ```
 
-默认会输出 `wcl_hardcore_api.json`，报告页 `/report` 会读取这个本地结果。该文件是本地生成数据，已加入 `.gitignore`，不要提交到仓库。
+默认会输出到 `data/`（分析完成后按结果命名）：
+
+- 单日志：`data/wcl_<reportId>_<bossKey>_<开荒日YYYYMMDD>.json`
+  - 开荒日：本地 01:00 前归属前一天（例 7/12 19:00～7/13 00:59 → `20260712`）
+- 多日志：`data/wcl_multi_<bossKey>_<导出日YYYYMMDD>.json`（同天多次运行覆盖）
+
+仍可用 `--output` 指定路径；根目录 `wcl_hardcore_api.json` 作为兼容默认保留。报告页 `/report` 会从 `data/` 列举已有 JSON，选定后 URL 带上 `?json=...`。生成文件已加入 `.gitignore`，不要提交到仓库。
 
 ## 本地应用入口
 
@@ -43,7 +49,7 @@ python server.py --open
 页面入口：
 
 - `/`：应用首页，选择 JSON 查看、在线分析或大秘境抄轴工具。
-- `/report`：报告查看页，读取默认 `wcl_hardcore_api.json` 或手动上传 JSON。
+- `/report`：报告查看页，从 `data/` 选取或读取 `?json=` 指定的复盘 JSON，也可手动上传。
 - `/online`：在线分析页，选择版本、副本和 Boss 后提交 report id。
 - `/mythic-dungeon`：大秘境抄轴工具，固定读取 `mythic_dungeon_export/wcl_casts_log.json`。
 
@@ -66,6 +72,7 @@ python server.py --open
 
 ## 目录
 
+- `data/`：命令行导出的复盘 JSON（`wcl_<report>_<boss>_<开荒日>.json` / `wcl_multi_<boss>_<导出日>.json`）。
 - `analyzer_core/`：版本、副本、Boss 目录、进度回调、并发工具和插件调度。
 - `boss_plugins/`：按团队副本拆分的 Boss 分析插件。
 - `mythic_dungeon_export/`：大秘境施法导出脚本和固定时间轴 JSON。

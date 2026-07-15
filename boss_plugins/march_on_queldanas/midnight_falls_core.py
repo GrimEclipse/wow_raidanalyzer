@@ -368,6 +368,11 @@ def get_local_datetime(absolute_ms):
     return datetime.fromtimestamp(absolute_ms / 1000.0, CN_TZ)
 
 
+def raid_night_date_str(local_dt):
+    from analyzer_core.wcl_paths import to_raid_night_date
+    return to_raid_night_date(local_dt).isoformat()
+
+
 def canonical_player_name(name):
     normalized = (name or "").lower()
     for canonical, aliases in PLAYER_ALIASES.items():
@@ -483,10 +488,10 @@ def analyze_fight(report_id, fight, raw, global_avoidable):
     interrupts = sorted(raw["interrupts"], key=lambda item: item.get("timestamp", 0))
     p4_stellar_debuffs = raw.get("p4StellarDebuffs", [])
 
-    # 计算中国区真实开打时间。不要按团本日回拨 4 小时，否则凌晨场会显示成前一天。
+    # 开打时钟用真实本地时间；开荒日（date）按 01:00 前归属前一天。
     absolute_ms = fight["reportStartTime"] + fight["startTime"]
     local_start = get_local_datetime(absolute_ms)
-    date_str = local_start.strftime("%Y-%m-%d")
+    date_str = raid_night_date_str(local_start)
     start_clock = local_start.strftime("%H:%M")
     start_datetime = local_start.strftime("%Y-%m-%d %H:%M")
 
@@ -697,8 +702,8 @@ def build_aggregated_json():
 
 
 if __name__ == "__main__":
+    from boss_plugins.common import write_json_result
+
     final_json = build_aggregated_json()
-    out_file = Path(__file__).resolve().with_name("wcl_hardcore_api.json")
-    with open(out_file, "w", encoding="utf-8") as file:
-        json.dump(final_json, file, ensure_ascii=False, indent=2)
+    out_file = write_json_result(final_json, report_ids=globals().get("REPORT_IDS_INPUT") or "", boss_key="midnight_falls")
     progress(f"聚合分析完成：{out_file}")

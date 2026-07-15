@@ -1,4 +1,10 @@
 (function () {
+  function normalizeSource(source) {
+    return String(source || '')
+      .replace(/^\.\//, '')
+      .replace(/\\/g, '/');
+  }
+
   function parseJsonFile(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -55,12 +61,32 @@
     });
   }
 
+  function lookupBakedMap(source) {
+    const map = window.__WCL_DATA_BY_SOURCE__;
+    if (!map || typeof map !== 'object') return null;
+    const key = normalizeSource(source);
+    if (map[key]) return map[key];
+    if (map['./' + key]) return map['./' + key];
+    const base = key.split('/').pop();
+    if (base && map[base]) return map[base];
+    if (base && map['data/' + base]) return map['data/' + base];
+    return null;
+  }
+
   function bakedPayload(source) {
-    const path = String(source || '');
+    const path = normalizeSource(source);
     if (/verdict/i.test(path) && window.__VERDICT_DATA__) return window.__VERDICT_DATA__;
+    const mapped = lookupBakedMap(source);
+    if (mapped) return mapped;
     if (window.__WCL_HARDCORE_DATA__) return window.__WCL_HARDCORE_DATA__;
     if (window.__OFFLINE_DATA__) return window.__OFFLINE_DATA__;
     return null;
+  }
+
+  function bakedSourceList() {
+    const map = window.__WCL_DATA_BY_SOURCE__;
+    if (!map || typeof map !== 'object') return [];
+    return Object.keys(map).sort();
   }
 
   async function loadJson(source) {
@@ -72,5 +98,5 @@
     return response.json();
   }
 
-  window.OfflineDataLoader = { loadJson, bakedPayload };
+  window.OfflineDataLoader = { loadJson, bakedPayload, bakedSourceList, normalizeSource };
 })();

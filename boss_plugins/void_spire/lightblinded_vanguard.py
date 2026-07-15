@@ -435,6 +435,11 @@ def get_local_datetime(absolute_ms):
     return datetime.fromtimestamp(absolute_ms / 1000.0, CN_TZ)
 
 
+def raid_night_date_str(local_dt):
+    from analyzer_core.wcl_paths import to_raid_night_date
+    return to_raid_night_date(local_dt).isoformat()
+
+
 def deep_link(report_id, fight_id, view_type, event_time, before_ms=15_000, after_ms=2_000):
     return (
         f"{WCL_BASE_URL}/reports/{report_id}#fight={fight_id}&type={view_type}"
@@ -1440,7 +1445,7 @@ def analyze_fight(
         "reportID": report_id,
         "fightID": fight["id"],
         "fightName": fight.get("name"),
-        "date": local_start.strftime("%Y-%m-%d"),
+        "date": raid_night_date_str(local_start),
         "startClock": local_start.strftime("%H:%M"),
         "startDateTime": local_start.strftime("%Y-%m-%d %H:%M"),
         "duration": format_time(duration_ms),

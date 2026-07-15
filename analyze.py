@@ -1,6 +1,5 @@
 import argparse
 import os
-from pathlib import Path
 
 
 def main():
@@ -9,15 +8,24 @@ def main():
     parser.add_argument("--version", default="12.0", help="版本号")
     parser.add_argument("--raid", default="march_on_queldanas", help="副本 key")
     parser.add_argument("--boss", default="midnight_falls", help="boss key")
-    parser.add_argument("--output", default=str(Path(__file__).resolve().with_name("wcl_hardcore_api.json")),
-                        help="输出 JSON 路径")
+    parser.add_argument(
+        "--output",
+        default=None,
+        help=(
+            "输出 JSON 路径；默认按分析结果写出到 data/："
+            "单日志 wcl_<report>_<boss>_<开荒日>.json，"
+            "多日志 wcl_multi_<boss>_<导出日>.json"
+        ),
+    )
     parser.add_argument("--include-dispels", action="store_true", help="读取额外驱散数据；当前主要用于光盲先锋军复仇者之盾减员分析")
     args = parser.parse_args()
     if args.include_dispels:
         os.environ["LIGHTBLINDED_VANGUARD_DISPELS"] = "1"
 
     print(
-        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} report={args.report} include_dispels={args.include_dispels}",
+        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} "
+        f"report={args.report} include_dispels={args.include_dispels} "
+        f"output={args.output or '(auto: data/wcl_…_YYYYMMDD.json)'}",
         flush=True,
     )
     from analyzer_core.runner import analyze_report

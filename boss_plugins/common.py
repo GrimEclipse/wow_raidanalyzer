@@ -169,10 +169,22 @@ class BossPluginNotImplemented(NotImplementedError):
     pass
 
 
-def write_json_result(result, output_path=None):
-    output = Path(output_path) if output_path else Path(__file__).resolve().parents[1] / "wcl_hardcore_api.json"
+def write_json_result(result, output_path=None, report_ids=None, boss_key=None):
+    from analyzer_core.wcl_paths import resolve_wcl_output_path, write_data_manifest
+
+    output = resolve_wcl_output_path(
+        result,
+        output_path=output_path,
+        report_ids=report_ids,
+        boss_key=boss_key,
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
     with open(output, "w", encoding="utf-8") as file:
         json.dump(result, file, ensure_ascii=False, indent=2)
+    try:
+        write_data_manifest(extra_path=output)
+    except OSError:
+        pass
     return output
 
 

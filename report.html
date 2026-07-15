@@ -26,12 +26,23 @@
                 <span class="text-white font-semibold">{{ meta?.analyzedReports?.length || 0 }}</span>
                 份
                 <span v-if="activeBossLabel" class="ml-2 text-gray-500">/ {{ activeBossLabel }}</span>
+                <span v-if="jsonSourceLabel" class="ml-2 text-fuchsia-300/90 font-mono text-xs">{{ jsonSourceLabel }}</span>
             </p>
             <p v-else class="text-gray-400 mt-2 text-sm">
-                读取默认报告 JSON，或使用
-                <span class="text-blue-300 font-semibold"> &gt;&gt; JSON 导入窗口 &lt;&lt; </span>
-                手动载入结果。
+                从 <span class="text-fuchsia-300 font-semibold">data/</span> 选取已有 JSON，或手动上传。
             </p>
+            <div v-if="dataFiles.length" class="mt-3 flex flex-wrap items-center gap-2">
+                <label class="text-xs text-gray-500">切换日志</label>
+                <select
+                    :value="normalizedJsonSource"
+                    @change="onDataFileSelect($event)"
+                    class="bg-gray-950 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 max-w-xl"
+                >
+                    <option v-for="file in dataFiles" :key="file.path" :value="file.path">
+                        {{ file.label || file.name }}
+                    </option>
+                </select>
+            </div>
         </div>
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
             <button @click="currentTab='wipe'" :class="tabClass('wipe','red')" class="px-5 py-2 text-sm rounded border font-bold transition">
@@ -60,7 +71,32 @@
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 max-w-3xl w-full shadow-xl">
             <h2 class="text-2xl font-bold mb-3">JSON 导入窗口</h2>
             <div class="bg-gray-950 border border-gray-800 rounded p-4 text-sm text-gray-400 mb-5 leading-6">
-                当前页面负责展示复盘 JSON。你可以读取默认 wcl_hardcore_api.json，也可以手动导入在线分析或命令行生成的结果。
+                优先从 <code class="text-fuchsia-200">data/</code> 选取已导出的
+                <code class="text-fuchsia-200">wcl_&lt;report&gt;_&lt;boss&gt;_&lt;开荒日&gt;.json</code>
+                （多日志为 <code class="text-fuchsia-200">wcl_multi_&lt;boss&gt;_&lt;导出日&gt;.json</code>）。
+                选定后 URL 带上 <code class="text-fuchsia-200">?json=...</code>，方便多天日志切换辨识。
+                仍兼容根目录 <code class="text-fuchsia-200">wcl_hardcore_api.json</code> 与手动上传。
+            </div>
+            <div v-if="dataFiles.length" class="mb-5 space-y-2">
+                <label class="block text-sm text-gray-300 font-bold">已有日志 JSON</label>
+                <select
+                    v-model="jsonSource"
+                    @change="selectDataFile(jsonSource)"
+                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-white"
+                >
+                    <option disabled value="">请选择…</option>
+                    <option v-for="file in dataFiles" :key="file.path" :value="file.path">
+                        {{ file.label || file.name }}
+                    </option>
+                </select>
+                <button
+                    type="button"
+                    @click="selectDataFile(jsonSource)"
+                    class="bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-bold py-2 px-5 rounded text-sm"
+                    :disabled="!jsonSource"
+                >
+                    加载所选 JSON
+                </button>
             </div>
             <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
                 选择 JSON 文件
@@ -960,6 +996,7 @@ createApp({
             glaiveBoard: [],
             errorMsg: '',
             jsonSource: './wcl_hardcore_api.json',
+            dataFiles: [],
             activePanels: [],
             activeDetailPanels: [],
             reportInput: '',
@@ -1233,12 +1270,25 @@ createApp({
             if (!this.dataLoaded) return 'WCL 开荒复盘面板';
             const boss = this.meta?.bossName || this.activeBoss?.name || 'WCL';
             return `${boss}复盘面板`;
+        },
+        normalizedJsonSource() {
+            const src = String(this.jsonSource || '');
+            if (window.OfflineDataLoader?.normalizeSource) {
+                return window.OfflineDataLoader.normalizeSource(src);
+            }
+            return src.replace(/^\.\//, '').replace(/\\/g, '/');
+        },
+        jsonSourceLabel() {
+            const path = this.normalizedJsonSource;
+            const hit = this.dataFiles.find(file => file.path === path);
+            return hit?.label || path || '';
         }
     },
-    mounted() {
+    async mounted() {
         this.applyRouteParams();
         this.loadCatalog();
-        this.autoLoadJson();
+        await this.loadDataFileList();
+        await this.autoLoadJson();
     },
     watch: {
         selectedVersion() {
@@ -1258,6 +1308,76 @@ createApp({
             if (params.get('raid')) this.selectedRaid = params.get('raid');
             if (params.get('boss')) this.selectedBoss = params.get('boss');
             if (params.get('json')) this.jsonSource = params.get('json');
+        },
+        syncJsonQuery(path) {
+            const normalized = window.OfflineDataLoader?.normalizeSource
+                ? window.OfflineDataLoader.normalizeSource(path)
+                : String(path || '').replace(/^\.\//, '');
+            this.jsonSource = normalized;
+            const url = new URL(window.location.href);
+            if (normalized) url.searchParams.set('json', normalized);
+            else url.searchParams.delete('json');
+            window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        },
+        async loadDataFileList() {
+            const files = [];
+            const pushUnique = (row) => {
+                if (!row?.path) return;
+                const path = window.OfflineDataLoader?.normalizeSource
+                    ? window.OfflineDataLoader.normalizeSource(row.path)
+                    : String(row.path).replace(/^\.\//, '');
+                if (files.some(item => item.path === path)) return;
+                files.push({ ...row, path });
+            };
+            try {
+                if (window.location.protocol !== 'file:') {
+                    const response = await fetch('./api/data-files');
+                    if (response.ok) {
+                        const payload = await response.json();
+                        (payload.files || []).forEach(pushUnique);
+                    }
+                }
+            } catch (e) {
+                console.log('data-files API unavailable');
+            }
+            if (!files.length) {
+                try {
+                    const response = await fetch('./data/manifest.json');
+                    if (response.ok) {
+                        const payload = await response.json();
+                        (payload.files || []).forEach(pushUnique);
+                    }
+                } catch (e) {
+                    console.log('data/manifest.json unavailable');
+                }
+            }
+            const baked = window.OfflineDataLoader?.bakedSourceList?.() || [];
+            baked.forEach(path => {
+                const name = path.split('/').pop();
+                pushUnique({ path, name, label: name });
+            });
+            files.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+            this.dataFiles = files;
+            if (!new URLSearchParams(window.location.search).get('json') && files.length) {
+                const preferred = files.find(file => file.path === this.normalizedJsonSource)
+                    || files.find(file => file.name === 'wcl_hardcore_api.json')
+                    || files[0];
+                if (preferred) this.jsonSource = preferred.path;
+            }
+        },
+        onDataFileSelect(event) {
+            this.selectDataFile(event.target.value);
+        },
+        async selectDataFile(path) {
+            if (!path) return;
+            this.errorMsg = '';
+            this.syncJsonQuery(path);
+            try {
+                this.bindData(await window.OfflineDataLoader.loadJson(this.jsonSource));
+            } catch (e) {
+                this.errorMsg = `加载失败：${e.message || e}`;
+                this.dataLoaded = false;
+            }
         },
         async loadCatalog() {
             try {
@@ -1285,6 +1405,7 @@ createApp({
         },
         async autoLoadJson() {
             try {
+                if (this.jsonSource) this.syncJsonQuery(this.jsonSource);
                 this.bindData(await window.OfflineDataLoader.loadJson(this.jsonSource));
             } catch (e) {
                 console.log('请手动上传 JSON');
@@ -1634,7 +1755,12 @@ createApp({
             return `https://cn.warcraftlogs.com/reports/${fight.reportID}#fight=${fight.fightID}&view=replay&position=${Math.max(0, Math.floor(positionMs))}`;
         },
         fightAuditLink(fight, phase = null, tag = null) {
-            const source = encodeURIComponent(this.jsonSource || './wcl_hardcore_api.json');
+            const source = encodeURIComponent(
+                (window.OfflineDataLoader?.normalizeSource
+                    ? window.OfflineDataLoader.normalizeSource(this.jsonSource)
+                    : String(this.jsonSource || 'wcl_hardcore_api.json').replace(/^\.\//, ''))
+                || 'wcl_hardcore_api.json'
+            );
             const params = [`source=${source}`, `report=${encodeURIComponent(fight.reportID || '')}`, `fight=${encodeURIComponent(fight.fightID || '')}`];
             if (phase) params.push(`phase=${encodeURIComponent(phase)}`);
             if (tag) params.push(`tag=${encodeURIComponent(tag)}`);

@@ -10,6 +10,9 @@ tools/tmp/
 # Local generated WCL output and private report snapshots.
 .analysis_jobs/
 wcl_hardcore_api.json
+data/wcl_*.json
+data/manifest.json
+!data/.gitkeep
 
 # Codex workspace metadata.
 .agents/
