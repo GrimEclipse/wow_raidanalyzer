@@ -29,7 +29,7 @@
                 <span v-if="jsonSourceLabel" class="ml-2 text-fuchsia-300/90 font-mono text-xs">{{ jsonSourceLabel }}</span>
             </p>
             <p v-else class="text-gray-400 mt-2 text-sm">
-                从 <span class="text-fuchsia-300 font-semibold">data/</span> 选取已有 JSON，或手动上传。
+                从 <span class="text-fuchsia-300 font-semibold">data/</span> 选择分析 JSON，或手动上传。
             </p>
             <div v-if="dataFiles.length" class="mt-3 flex flex-wrap items-center gap-2">
                 <label class="text-xs text-gray-500">切换日志</label>
@@ -42,6 +42,11 @@
                         {{ file.label || file.name }}
                     </option>
                 </select>
+                <label class="cursor-pointer rounded border border-blue-700 bg-blue-950/60 px-3 py-1 text-xs font-bold text-blue-200 hover:bg-blue-900">
+                    导入 JSON
+                    <input type="file" accept=".json,application/json" multiple class="hidden" @change="importDataFiles">
+                </label>
+                <a href="scoreboard.html" class="rounded border border-fuchsia-800 bg-gray-950 px-3 py-1 text-xs font-bold text-fuchsia-200 hover:bg-fuchsia-950">智商记事本</a>
             </div>
         </div>
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
@@ -57,7 +62,7 @@
             <button v-if="isCrownBoss" @click="currentTab='verdict'" :class="tabClass('verdict','red')" class="px-5 py-2 text-sm rounded border border-fuchsia-500 bg-fuchsia-950/70 text-fuchsia-100 font-black transition hover:bg-fuchsia-900">
                 终审判决
             </button>
-            <a v-if="isCrownBoss" href="verdict.html" class="px-4 py-2 text-sm rounded border border-fuchsia-800 bg-gray-950 text-fuchsia-200 font-bold hover:bg-fuchsia-950">终审历史</a>
+            <a v-if="isCrownBoss" href="scoreboard.html" class="px-4 py-2 text-sm rounded border border-fuchsia-800 bg-gray-950 text-fuchsia-200 font-bold hover:bg-fuchsia-950">智商记事本</a>
             <button v-if="showInterruptTab" @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 漏断统计
             </button>
@@ -69,39 +74,37 @@
 
     <section v-if="!dataLoaded" class="flex justify-center py-28 fade-in">
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 max-w-3xl w-full shadow-xl">
-            <h2 class="text-2xl font-bold mb-3">JSON 导入窗口</h2>
+            <h2 class="text-2xl font-bold mb-3">选择分析数据</h2>
             <div class="bg-gray-950 border border-gray-800 rounded p-4 text-sm text-gray-400 mb-5 leading-6">
-                优先从 <code class="text-fuchsia-200">data/</code> 选取已导出的
-                <code class="text-fuchsia-200">wcl_&lt;report&gt;_&lt;boss&gt;_&lt;开荒日&gt;.json</code>
-                （多日志为 <code class="text-fuchsia-200">wcl_multi_&lt;boss&gt;_&lt;导出日&gt;.json</code>）。
-                选定后 URL 带上 <code class="text-fuchsia-200">?json=...</code>，方便多天日志切换辨识。
-                仍兼容根目录 <code class="text-fuchsia-200">wcl_hardcore_api.json</code> 与手动上传。
+                优先从 <code class="text-fuchsia-300">data/</code> 读取多份日志并快速切换；也可以手动导入文件。
             </div>
             <div v-if="dataFiles.length" class="mb-5 space-y-2">
-                <label class="block text-sm text-gray-300 font-bold">已有日志 JSON</label>
+                <label class="text-xs text-gray-500">可用日志</label>
                 <select
                     v-model="jsonSource"
                     @change="selectDataFile(jsonSource)"
-                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-white"
+                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm"
                 >
-                    <option disabled value="">请选择…</option>
                     <option v-for="file in dataFiles" :key="file.path" :value="file.path">
                         {{ file.label || file.name }}
                     </option>
                 </select>
                 <button
-                    type="button"
+                    class="mt-2 px-4 py-2 rounded border border-emerald-700 bg-emerald-950/60 text-emerald-100 font-bold hover:bg-emerald-900"
                     @click="selectDataFile(jsonSource)"
-                    class="bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-bold py-2 px-5 rounded text-sm"
                     :disabled="!jsonSource"
-                >
-                    加载所选 JSON
-                </button>
+                >加载所选日志</button>
             </div>
-            <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
-                选择 JSON 文件
-                <input type="file" accept=".json" class="hidden" @change="handleFileUpload">
-            </label>
+            <div class="flex flex-wrap gap-3">
+                <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
+                    选择 JSON 文件
+                    <input type="file" accept=".json,application/json" multiple class="hidden" @change="importDataFiles">
+                </label>
+                <label class="cursor-pointer rounded border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-gray-300 hover:bg-gray-900">
+                    选择目录
+                    <input type="file" accept=".json,application/json" multiple webkitdirectory directory class="hidden" @change="importDataFiles">
+                </label>
+            </div>
             <p v-if="errorMsg" class="text-red-400 mt-4 text-sm font-bold">{{ errorMsg }}</p>
         </div>
     </section>
@@ -637,11 +640,12 @@
                 <tr v-if="!finalVerdict.length"><td colspan="7" class="p-12 text-center text-gray-500">暂无判决记录。</td></tr></tbody>
             </table>
             <div class="p-4 border-t border-fuchsia-900 flex flex-wrap items-center justify-between gap-3">
-                <div class="text-xs text-gray-500">保存约定目录：<span class="font-mono text-fuchsia-200">verdicts/verdict-开荒日期.json</span></div>
+                <div class="text-xs text-gray-500">正式计分留痕请用独立「智商计分板」；本页可快速同步开庭结果。</div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <span v-if="verdictSavedDate" class="text-xs text-emerald-300">已导出 {{ verdictSavedDate }}</span>
-                    <a href="verdict.html" class="text-xs text-fuchsia-200">打开历史页</a>
-                    <button @click="confirmVerdict" class="px-5 py-2 rounded border border-fuchsia-500 bg-fuchsia-800 text-white font-bold hover:bg-fuchsia-700">确认申诉并导出终审 JSON<span v-if="verdictDirty"> *</span></button>
+                    <span v-if="verdictSavedDate" class="text-xs text-emerald-300">{{ verdictSavedDate }}</span>
+                    <a href="scoreboard.html" class="text-xs text-fuchsia-200">打开计分板</a>
+                    <button @click="syncToScoreboard" class="px-5 py-2 rounded border border-fuchsia-500 bg-fuchsia-800 text-white font-bold hover:bg-fuchsia-700">同步到记事本<span v-if="verdictDirty"> *</span></button>
+                    <button @click="confirmVerdict(true)" class="px-3 py-2 rounded border border-gray-700 bg-gray-950 text-gray-300 text-xs hover:bg-gray-800">仅导出 JSON</button>
                 </div>
             </div>
         </section>
@@ -861,6 +865,10 @@ const COURT_SKILL_RULES = {
         count: '确认发生于 P1.5 转阶段窗口内的玩家死亡，按次计入转阶段死亡。',
         exempt: '识别为团队主动跳崖重开（放弃/大规模跳崖）时仅展示不计数；本场第 8 次死亡之后发生的死亡强制不计数。',
     },
+    passageCliffMistakes: {
+        count: 'P2/P3（非转阶段窗口）、不在密集跳崖放弃波内、且本场死亡仍未满 8 次时，玩家莫名死于坠崖，按次计入过场失误（必扣）。',
+        exempt: 'P1 坠崖一律视为放弃（P1 无场地缝隙）；P1.5/P2.5 转阶段窗口内坠崖不记；约 8 秒内连续 ≥4 人坠崖的密集簇整簇豁免（覆盖进阶段后大团放弃，如 Fight18）；第 8 次及之后死亡强制不计数。',
+    },
     collapsingVoidSnapAiming: {
         count: '拉弓结算点名玩家在释放前最后 1 秒位移 >5 码判定为甩狙，且因此导致队友死于崩裂空无时，对甩狙者按次计数（计入导致队友死亡次数）。',
         exempt: '崩裂空无结算期间点名玩家已死亡（提前结算）仅展示不计数；判定甩狙但未导致队友死亡则不进入终审计数；第 8 死后强制不计数。',
@@ -894,9 +902,13 @@ const COURT_SKILL_RULES = {
         exempt: '伤害 ≤275000 或非银锋箭致死不入本项；第 8 死后强制不计数。',
     },
     p1SilverArrowMissedFights: {
-        count: 'P1 一轮银锋箭两名点名玩家均未命中指定 Boss/add 时，两人各计数 1 次；第 5 轮（殁里乌姆档）双人空射且殁里乌姆仍存活时同样定罪计数。',
-        exempt: '缺少 Boss 命中归因证据时仅展示不计数；第 8 死后强制不计数。',
-        boardExclude: '任一人正确命中目标 → 本轮机制成功，成功银锋箭不入板；第 5 轮双人空射但殁里乌姆已死 → 预期空射，不入板。',
+        count: 'P1 一轮银锋箭两名点名玩家均未命中指定 Boss/add 时，两人各计数 1 次；第 5 轮（殁里乌姆档）双人空射且殁里乌姆仍存活时同样定罪计数。场地审计已确认 Boss/add 幽影束缚被移除时，视为本轮成功（不以几何归因丢失误杀）。',
+        exempt: '缺少 Boss 命中归因证据且亦无束缚移除证据时仅展示不计数；第 8 死后强制不计数。',
+        boardExclude: '任一人正确命中目标，或本轮存在 Boss 束缚移除证据 → 本轮机制成功，不入板；第 5 轮双人空射但殁里乌姆已死 → 预期空射，不入板。',
+    },
+    voreluthVulnerabilityFade: {
+        count: '龌勒卢斯首次腐化精华 apply 之后、幽影束缚消失之前，每一次完整 faded 计 1 次；当场两名坦克各计同等 fade 次数（不展示名单中的坦克仍写入但不显示）。',
+        exempt: '第 8 死后强制不计数；无完整 faded 或窗口外不记；无坦克职责信息时退回按场行。',
     },
     corruptionEssenceDamage: {
         count: '永不计数、不进入终审；命中次数仅作统计展示。',
@@ -995,8 +1007,9 @@ createApp({
             dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
             errorMsg: '',
-            jsonSource: './wcl_hardcore_api.json',
+            jsonSource: '',
             dataFiles: [],
+            dataFilesRefreshTimer: null,
             activePanels: [],
             activeDetailPanels: [],
             reportInput: '',
@@ -1121,6 +1134,7 @@ createApp({
                 if (skillKey === 'total' || !Array.isArray(rows)) return;
                 rows.forEach(row => {
                     if (!row?.name || isCourtDisplayExcluded(row.name)) return;
+                    if (row.excludeFromCourtPlayers || row.isNpc) return;
                     const item = players[row.name] || (players[row.name] = {
                         name: row.name, roles: [], countedCount: 0, uncountedCount: 0, categories: new Set(), events: []
                     });
@@ -1147,7 +1161,8 @@ createApp({
                 .sort((a, b) => b.countedCount - a.countedCount || b.uncountedCount - a.uncountedCount || a.name.localeCompare(b.name));
         },
         courtDeductionTabs() {
-            const order = ['p15AvoidableDeaths','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','missedShadows','gravityLineViolation','tankRiftSlashFailure'];
+            // 重力坍缩仅 P3 且单场 Tag 地图为空，开庭分项不展示入口
+            const order = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure'];
             return order.map(key => this.avoidableTabs.find(tab => tab.key === key)).filter(Boolean);
         },
         courtDisplayOnlyTabs() {
@@ -1273,22 +1288,25 @@ createApp({
         },
         normalizedJsonSource() {
             const src = String(this.jsonSource || '');
-            if (window.OfflineDataLoader?.normalizeSource) {
-                return window.OfflineDataLoader.normalizeSource(src);
-            }
-            return src.replace(/^\.\//, '').replace(/\\/g, '/');
+            return window.OfflineDataLoader?.normalizeSource
+                ? window.OfflineDataLoader.normalizeSource(src)
+                : src.replace(/^\.\//, '');
         },
         jsonSourceLabel() {
             const path = this.normalizedJsonSource;
             const hit = this.dataFiles.find(file => file.path === path);
-            return hit?.label || path || '';
-        }
+            return hit?.label || hit?.name || path || '';
+        },
     },
     async mounted() {
         this.applyRouteParams();
-        this.loadCatalog();
+        await this.loadCatalog();
         await this.loadDataFileList();
+        this.dataFilesRefreshTimer = window.setInterval(() => this.loadDataFileList(), 15000);
         await this.autoLoadJson();
+    },
+    beforeUnmount() {
+        if (this.dataFilesRefreshTimer) window.clearInterval(this.dataFilesRefreshTimer);
     },
     watch: {
         selectedVersion() {
@@ -1317,7 +1335,7 @@ createApp({
             const url = new URL(window.location.href);
             if (normalized) url.searchParams.set('json', normalized);
             else url.searchParams.delete('json');
-            window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+            window.history.replaceState({}, '', url);
         },
         async loadDataFileList() {
             const files = [];
@@ -1326,12 +1344,13 @@ createApp({
                 const path = window.OfflineDataLoader?.normalizeSource
                     ? window.OfflineDataLoader.normalizeSource(row.path)
                     : String(row.path).replace(/^\.\//, '');
-                if (files.some(item => item.path === path)) return;
-                files.push({ ...row, path });
+                const index = files.findIndex(item => item.path === path);
+                if (index >= 0) files[index] = { ...files[index], ...row, path };
+                else files.push({ ...row, path });
             };
             try {
                 if (window.location.protocol !== 'file:') {
-                    const response = await fetch('./api/data-files');
+                    const response = await fetch('./api/data-files', { cache: 'no-store' });
                     if (response.ok) {
                         const payload = await response.json();
                         (payload.files || []).forEach(pushUnique);
@@ -1340,28 +1359,23 @@ createApp({
             } catch (e) {
                 console.log('data-files API unavailable');
             }
-            if (!files.length) {
-                try {
-                    const response = await fetch('./data/manifest.json');
-                    if (response.ok) {
-                        const payload = await response.json();
-                        (payload.files || []).forEach(pushUnique);
-                    }
-                } catch (e) {
-                    console.log('data/manifest.json unavailable');
+            try {
+                const response = await fetch('./data/manifest.json', { cache: 'no-store' });
+                if (response.ok) {
+                    const payload = await response.json();
+                    (payload.files || []).forEach(pushUnique);
                 }
+            } catch (e) {
+                console.log('data/manifest.json unavailable');
             }
-            const baked = window.OfflineDataLoader?.bakedSourceList?.() || [];
-            baked.forEach(path => {
-                const name = path.split('/').pop();
-                pushUnique({ path, name, label: name });
-            });
+            const baked = window.OfflineDataLoader?.bakedSourceFiles?.() || [];
+            baked.forEach(pushUnique);
+            const local = window.OfflineDataLoader?.localSourceFiles?.() || [];
+            local.forEach(pushUnique);
             files.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
             this.dataFiles = files;
             if (!new URLSearchParams(window.location.search).get('json') && files.length) {
-                const preferred = files.find(file => file.path === this.normalizedJsonSource)
-                    || files.find(file => file.name === 'wcl_hardcore_api.json')
-                    || files[0];
+                const preferred = files.find(file => file.path === this.normalizedJsonSource) || files[0];
                 if (preferred) this.jsonSource = preferred.path;
             }
         },
@@ -1405,24 +1419,26 @@ createApp({
         },
         async autoLoadJson() {
             try {
-                if (this.jsonSource) this.syncJsonQuery(this.jsonSource);
+                if (!this.jsonSource) return;
+                this.syncJsonQuery(this.jsonSource);
                 this.bindData(await window.OfflineDataLoader.loadJson(this.jsonSource));
             } catch (e) {
                 console.log('请手动上传 JSON');
             }
         },
+        async importDataFiles(event) {
+            this.errorMsg = '';
+            const rows = window.OfflineDataLoader?.registerLocalFiles?.(event.target.files) || [];
+            event.target.value = '';
+            if (!rows.length) {
+                this.errorMsg = '未在选择结果中找到 JSON 文件。';
+                return;
+            }
+            await this.loadDataFileList();
+            await this.selectDataFile(rows[0].path);
+        },
         handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                try {
-                    this.bindData(JSON.parse(e.target.result));
-                } catch (err) {
-                    this.errorMsg = '解析失败，请确认 JSON 文件格式。';
-                }
-            };
-            reader.readAsText(file);
+            return this.importDataFiles(event);
         },
         parseTimeToSeconds(timeStr) {
             if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -1560,28 +1576,27 @@ createApp({
                 }));
                 return rows;
             }
-            if (this.avoidableTab === 'gravityLineViolation') {
-                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.fieldAudit?.gravityRounds || []).forEach((event, index) => {
-                    const first = event.firstViolation || (event.violations || []).slice().sort((a,b) => Number(a.order || 99) - Number(b.order || 99))[0];
-                    const deathCount = Number(event.deathCount || 0);
-                    const deathText = deathCount && first ? `是（${first.player}·${deathCount}人）` : '否';
-                    const attribution = first
-                        ? `归因：${first.player}为第一个违规者（${first.rule}，${(Number(first.delayMs || 0) / 1000).toFixed(3)}秒）`
-                        : '归因：本轮没有发现违反时序的玩家';
-                    const exemption = event.exemptReason ? `；豁免：${event.exemptReason}` : '';
-                    rows.push({
-                        key:`gravity-${fight.fightID}-${event.index || index}`,
-                        fightID:fight.fightID,
-                        group:event.index || index + 1,
-                        positionMs:event.applyTimeMs ?? first?.positionMs,
-                        player:first?.player,
-                        players:event.targets || [],
-                        counted:event.counted === true,
-                        text:`${event.applyTime || ''} 本轮是否减员：${deathText}；${attribution}${exemption}`,
-                        link:this.fightAuditLink(fight, 'P3'),
+            if (this.avoidableTab === 'voreluthVulnerabilityFade') {
+                (this.activeAvoidableRows || []).forEach(player => {
+                    if (isCourtDisplayExcluded(player.name)) return;
+                    (player.events || []).forEach((event, index) => {
+                        const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
+                        rows.push({
+                            key: `voreluth-${event.fightID}-${player.name}-${index}`,
+                            fightID: event.fightID,
+                            group: index + 1,
+                            positionMs: event.positionMs,
+                            player: player.name,
+                            players: [player.name],
+                            counted: event.counted !== false,
+                            text: event.text || event.countReason || '',
+                            stackSummary: event.stack != null ? `${event.stack}层` : '',
+                            fades: event.fades || [],
+                            link: this.fightAuditLink(fight),
+                        });
                     });
-                }));
-                return rows;
+                });
+                return rows.sort((a, b) => Number(a.fightID) - Number(b.fightID) || String(a.player).localeCompare(String(b.player)));
             }
             (this.activeAvoidableRows || []).forEach(player => (player.events || []).forEach((event,index) => {
                 const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
@@ -1755,12 +1770,7 @@ createApp({
             return `https://cn.warcraftlogs.com/reports/${fight.reportID}#fight=${fight.fightID}&view=replay&position=${Math.max(0, Math.floor(positionMs))}`;
         },
         fightAuditLink(fight, phase = null, tag = null) {
-            const source = encodeURIComponent(
-                (window.OfflineDataLoader?.normalizeSource
-                    ? window.OfflineDataLoader.normalizeSource(this.jsonSource)
-                    : String(this.jsonSource || 'wcl_hardcore_api.json').replace(/^\.\//, ''))
-                || 'wcl_hardcore_api.json'
-            );
+            const source = encodeURIComponent(this.jsonSource || './wcl_hardcore_api.json');
             const params = [`source=${source}`, `report=${encodeURIComponent(fight.reportID || '')}`, `fight=${encodeURIComponent(fight.fightID || '')}`];
             if (phase) params.push(`phase=${encodeURIComponent(phase)}`);
             if (tag) params.push(`tag=${encodeURIComponent(tag)}`);
@@ -1851,6 +1861,80 @@ createApp({
             this.finalVerdict.sort((a,b) => b.iqLoss - a.iqLoss || b.recognitionCount - a.recognitionCount || a.name.localeCompare(b.name));
             this.verdictDirty = false;
             if (persist) this.persistVerdictDay();
+        },
+        buildScoreboardSyncDay() {
+            const MECHANICS = [
+                'waterOutliers', 'voidGraspHealingLow', 'p15AvoidableDeaths', 'passageCliffMistakes', 'p1SilverArrowDeaths',
+                'p1SilverArrowMissedFights', 'voreluthVulnerabilityFade', 'missedShadows', 'collapsingVoidSnapAiming',
+                'gravityLineViolation', 'tankRiftSlashFailure',
+            ];
+            let date = this.verdictProgressDate || this.rawWipeAnalysis.find(row => row.date)?.date || '';
+            if (!date) {
+                const m = String(this.jsonSource || '').match(/_(\d{8})(?:\.json)?$/i);
+                if (m) date = `${m[1].slice(0, 4)}-${m[1].slice(4, 6)}-${m[1].slice(6, 8)}`;
+            }
+            if (!date) {
+                date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+            }
+            const board = this.avoidableBoard || {};
+            const players = {};
+            const emptyMech = () => Object.fromEntries(MECHANICS.map(k => [k, { count: 0, incidents: [] }]));
+            MECHANICS.forEach(key => {
+                (board[key] || []).forEach(row => {
+                    if (!row?.name || isCourtDisplayExcluded(row.name)) return;
+                    if (row.isSystem || row.excludeFromCourtPlayers || /^Fight\d+$/i.test(String(row.name))) return;
+                    const p = players[row.name] || (players[row.name] = {
+                        name: row.name,
+                        roles: row.roles || (row.role ? [row.role] : []),
+                        mechanics: emptyMech(),
+                        extraDeductions: [],
+                        appealLog: [],
+                    });
+                    (row.events || []).forEach((ev, idx) => {
+                        if (ev.counted === false || ev.verdictCounted === false) return;
+                        const fades = Array.isArray(ev.fades) && ev.fades.length
+                            ? ev.fades
+                            : [{ time: ev.time, text: ev.text || ev.countReason || key, stack: null }];
+                        fades.forEach((fade, fadeIdx) => {
+                            p.mechanics[key].incidents.push({
+                                id: [key, ev.fightID, fade.time || ev.tag || ev.time || idx, fadeIdx, row.name].join(':'),
+                                fightID: ev.fightID,
+                                tag: ev.tag || '',
+                                time: fade.time || ev.time || '',
+                                text: fade.text || ev.text || ev.countReason || key,
+                                appealed: false,
+                                appealNote: '',
+                            });
+                        });
+                    });
+                });
+            });
+            Object.values(players).forEach(p => {
+                MECHANICS.forEach(key => {
+                    p.mechanics[key].count = (p.mechanics[key].incidents || []).filter(i => !i.appealed).length;
+                });
+            });
+            return {
+                date,
+                sourceReports: this.meta?.analyzedReports || [],
+                sourceFile: this.jsonSource || '',
+                pointsPerCount: Number(this.meta?.courtConfig?.verdictPointsPerCount || 10),
+                tankMultiplier: Number(this.meta?.courtConfig?.verdictTankMultiplier || 0.5),
+                updatedAt: new Date().toISOString(),
+                players: Object.values(players),
+            };
+        },
+        syncToScoreboard() {
+            this.confirmVerdict(false);
+            const day = this.buildScoreboardSyncDay();
+            try {
+                sessionStorage.setItem('scoreboardSyncPayload', JSON.stringify(day));
+            } catch (error) {
+                alert('无法写入同步载荷：' + error.message);
+                return;
+            }
+            this.verdictSavedDate = `已准备同步 ${day.date}（${day.players.length} 人）`;
+            window.location.href = 'scoreboard.html?import=1';
         },
         buildVerdictExportPayload() {
             const date = this.verdictProgressDate || this.rawWipeAnalysis.find(row => row.date)?.date || new Date().toISOString().slice(0,10);
@@ -2180,10 +2264,11 @@ createApp({
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
             const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
-            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter']);
-            const courtOrder = ['p15AvoidableDeaths','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','missedShadows','gravityLineViolation','tankRiftSlashFailure','corruptionEssenceDamage','missedEnergy','interferenceShockInterrupts'];
+            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter','gravityLineViolation']);
+            const courtOrder = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure','corruptionEssenceDamage','missedEnergy','interferenceShockInterrupts'];
+            const hiddenCourtKeys = new Set(['gravityLineViolation']);
             const skillKeys = Object.keys(this.avoidableBoard)
-                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && Array.isArray(this.avoidableBoard[key]))
+                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && key !== 'gravityLineViolation' && Array.isArray(this.avoidableBoard[key]))
                 .sort((a, b) => {
                     const rankA = courtOrder.includes(a) ? courtOrder.indexOf(a) : courtOrder.length;
                     const rankB = courtOrder.includes(b) ? courtOrder.indexOf(b) : courtOrder.length;
@@ -2217,7 +2302,13 @@ createApp({
                 ...(showAvoidableTotal ? [{ key: 'total', label: '全项合计' }] : []),
                 ...skillKeys.map(key => ({
                     key,
-                    label: key === 'p1SilverArrowMissedFights' ? 'P1银锋箭射怪失误' : (key === 'p15AvoidableDeaths' ? '转阶段死亡' : (key === 'missedEnergy' ? 'P2消Boss能量失误' : (key === 'waterOutliers' ? '放水未集中' : (spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key))))
+                    label: key === 'p1SilverArrowMissedFights' ? 'P1银锋箭射怪失误'
+                        : (key === 'p15AvoidableDeaths' ? '转阶段死亡'
+                        : (key === 'passageCliffMistakes' ? '过场失误'
+                        : (key === 'missedEnergy' ? 'P2消Boss能量失误'
+                        : (key === 'waterOutliers' ? '放水未集中'
+                        : (key === 'voreluthVulnerabilityFade' ? 'P1龌勒卢斯易伤异常'
+                        : (spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key))))))
                 }))
             ];
             if (!this.avoidableTabs.some(tab => tab.key === this.avoidableTab)) {
@@ -2244,6 +2335,7 @@ createApp({
                 if (skillKey === 'total' || VERDICT_EXCLUDED_SKILLS.has(skillKey) || !Array.isArray(rows)) return;
                 rows.forEach(row => {
                     if (!row?.name || isCourtDisplayExcluded(row.name)) return;
+                    if (row.excludeFromCourtPlayers || row.isNpc) return;
                     const item = players[row.name] || (players[row.name] = {
                         name: row.name,
                         roles: [],

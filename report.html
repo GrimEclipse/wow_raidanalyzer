@@ -6,7 +6,6 @@
     <title>WCL 开荒复盘</title>
     <script src="./assets/vendor/vue.global.prod.js"></script>
     <script src="./assets/vendor/tailwindcss.js"></script>
-    <script src="./assets/vendor/verdict-xlsx.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -30,7 +29,7 @@
                 <span v-if="jsonSourceLabel" class="ml-2 text-fuchsia-300/90 font-mono text-xs">{{ jsonSourceLabel }}</span>
             </p>
             <p v-else class="text-gray-400 mt-2 text-sm">
-                从 <span class="text-fuchsia-300 font-semibold">data/</span> 选取已有 JSON，或手动上传。
+                从 <span class="text-fuchsia-300 font-semibold">data/</span> 选择分析 JSON，或手动上传。
             </p>
             <div v-if="dataFiles.length" class="mt-3 flex flex-wrap items-center gap-2">
                 <label class="text-xs text-gray-500">切换日志</label>
@@ -43,6 +42,11 @@
                         {{ file.label || file.name }}
                     </option>
                 </select>
+                <label class="cursor-pointer rounded border border-blue-700 bg-blue-950/60 px-3 py-1 text-xs font-bold text-blue-200 hover:bg-blue-900">
+                    导入 JSON
+                    <input type="file" accept=".json,application/json" multiple class="hidden" @change="importDataFiles">
+                </label>
+                <a href="scoreboard.html" class="rounded border border-fuchsia-800 bg-gray-950 px-3 py-1 text-xs font-bold text-fuchsia-200 hover:bg-fuchsia-950">智商记事本</a>
             </div>
         </div>
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
@@ -58,6 +62,7 @@
             <button v-if="isCrownBoss" @click="currentTab='verdict'" :class="tabClass('verdict','red')" class="px-5 py-2 text-sm rounded border border-fuchsia-500 bg-fuchsia-950/70 text-fuchsia-100 font-black transition hover:bg-fuchsia-900">
                 终审判决
             </button>
+            <a v-if="isCrownBoss" href="scoreboard.html" class="px-4 py-2 text-sm rounded border border-fuchsia-800 bg-gray-950 text-fuchsia-200 font-bold hover:bg-fuchsia-950">智商记事本</a>
             <button v-if="showInterruptTab" @click="currentTab='interrupt'" :class="tabClass('interrupt','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 漏断统计
             </button>
@@ -69,39 +74,37 @@
 
     <section v-if="!dataLoaded" class="flex justify-center py-28 fade-in">
         <div class="bg-gray-900 border border-gray-800 rounded-lg p-8 max-w-3xl w-full shadow-xl">
-            <h2 class="text-2xl font-bold mb-3">JSON 导入窗口</h2>
+            <h2 class="text-2xl font-bold mb-3">选择分析数据</h2>
             <div class="bg-gray-950 border border-gray-800 rounded p-4 text-sm text-gray-400 mb-5 leading-6">
-                优先从 <code class="text-fuchsia-200">data/</code> 选取已导出的
-                <code class="text-fuchsia-200">wcl_&lt;report&gt;_&lt;boss&gt;_&lt;开荒日&gt;.json</code>
-                （多日志为 <code class="text-fuchsia-200">wcl_multi_&lt;boss&gt;_&lt;导出日&gt;.json</code>）。
-                选定后 URL 带上 <code class="text-fuchsia-200">?json=...</code>，方便多天日志切换辨识。
-                仍兼容根目录 <code class="text-fuchsia-200">wcl_hardcore_api.json</code> 与手动上传。
+                优先从 <code class="text-fuchsia-300">data/</code> 读取多份日志并快速切换；也可以手动导入文件。
             </div>
             <div v-if="dataFiles.length" class="mb-5 space-y-2">
-                <label class="block text-sm text-gray-300 font-bold">已有日志 JSON</label>
+                <label class="text-xs text-gray-500">可用日志</label>
                 <select
                     v-model="jsonSource"
                     @change="selectDataFile(jsonSource)"
-                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-white"
+                    class="w-full bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm"
                 >
-                    <option disabled value="">请选择…</option>
                     <option v-for="file in dataFiles" :key="file.path" :value="file.path">
                         {{ file.label || file.name }}
                     </option>
                 </select>
                 <button
-                    type="button"
+                    class="mt-2 px-4 py-2 rounded border border-emerald-700 bg-emerald-950/60 text-emerald-100 font-bold hover:bg-emerald-900"
                     @click="selectDataFile(jsonSource)"
-                    class="bg-fuchsia-700 hover:bg-fuchsia-600 text-white font-bold py-2 px-5 rounded text-sm"
                     :disabled="!jsonSource"
-                >
-                    加载所选 JSON
-                </button>
+                >加载所选日志</button>
             </div>
-            <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
-                选择 JSON 文件
-                <input type="file" accept=".json" class="hidden" @change="handleFileUpload">
-            </label>
+            <div class="flex flex-wrap gap-3">
+                <label class="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded transition inline-block">
+                    选择 JSON 文件
+                    <input type="file" accept=".json,application/json" multiple class="hidden" @change="importDataFiles">
+                </label>
+                <label class="cursor-pointer rounded border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-gray-300 hover:bg-gray-900">
+                    选择目录
+                    <input type="file" accept=".json,application/json" multiple webkitdirectory directory class="hidden" @change="importDataFiles">
+                </label>
+            </div>
             <p v-if="errorMsg" class="text-red-400 mt-4 text-sm font-bold">{{ errorMsg }}</p>
         </div>
     </section>
@@ -288,7 +291,7 @@
                 <div class="px-5 py-4 border-b border-sky-900/70 bg-sky-950/20 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 class="text-xl font-black text-sky-100">玩家全局开庭汇总</h2>
-                        <p class="text-xs text-gray-500 mt-1">仅列出参与本 Boss 战斗的成员（含换人）；0 即为 0。每位玩家均可「查看明细」填写申诉无罪原因。</p>
+                        <p class="text-xs text-gray-500 mt-1">按计数次数排序；查看明细会同时返回该玩家全部计数与不计数证据。</p>
                     </div>
                     <div class="text-xs text-gray-500">死亡达到 8 次后，后续失误统一进入“不计数”</div>
                 </div>
@@ -311,29 +314,16 @@
                         </tbody>
                     </table>
                 </div>
-                <div v-if="courtDetailPlayer" class="p-5 border-t border-sky-900/70 bg-gray-950 space-y-4">
-                    <div class="flex flex-wrap justify-between items-center gap-3">
-                        <h3 class="font-black text-sky-200">{{ courtDetailPlayer }} · 全部判定明细</h3>
-                        <button @click="courtDetailPlayer=''" class="text-xs text-gray-400 hover:text-white">关闭</button>
-                    </div>
-                    <label class="block w-full">
-                        <span class="text-[11px] text-gray-400">申诉无罪原因</span>
-                        <textarea
-                            v-model="courtAppealNotes[courtDetailPlayer]"
-                            @input="syncCourtAppealNote(courtDetailPlayer)"
-                            class="mt-1 w-full min-h-[6rem] rounded border border-sky-800 bg-gray-900 px-3 py-2 text-sm text-gray-100 leading-6"
-                            rows="4"
-                            placeholder="填写该玩家的申诉无罪原因（全宽，不挤压）"
-                        ></textarea>
-                    </label>
-                    <div class="flex flex-wrap gap-2">
+                <div v-if="courtDetailPlayer" class="p-5 border-t border-sky-900/70 bg-gray-950">
+                    <div class="flex justify-between items-center gap-3 mb-4"><h3 class="font-black text-sky-200">{{ courtDetailPlayer }} · 全部判定明细</h3><button @click="courtDetailPlayer=''" class="text-xs text-gray-400 hover:text-white">关闭</button></div>
+                    <div class="flex flex-wrap gap-2 mb-4">
                         <span v-for="stat in courtPlayerDetailSummary()" :key="stat.key" class="px-3 py-1.5 rounded border border-sky-900 bg-sky-950/40 text-xs text-sky-100">
                             <template v-if="stat.hitStatOnly">{{ stat.label }} {{ stat.hitCount }}次（永不计数）</template>
                             <template v-else>{{ stat.label }} 计数{{ stat.counted }}次 不计数{{ stat.uncounted }}次</template>
                         </span>
-                        <span v-if="!courtPlayerDetailSummary().length" class="text-xs text-gray-500">暂无分项汇总（可在上方填写备注）</span>
+                        <span v-if="!courtPlayerDetailSummary().length" class="text-xs text-gray-500">暂无分项汇总</span>
                     </div>
-                    <div v-if="courtPlayerDetailRuleCards().length" class="space-y-2">
+                    <div v-if="courtPlayerDetailRuleCards().length" class="mb-4 space-y-2">
                         <details v-for="card in courtPlayerDetailRuleCards()" :key="'rule-'+card.key" class="rounded-lg border border-amber-900/50 bg-amber-950/15 px-3 py-2 text-xs">
                             <summary class="cursor-pointer font-bold text-amber-200 select-none">{{ card.label }} · 判定 / 豁免逻辑</summary>
                             <div class="mt-2 space-y-1.5 leading-5">
@@ -353,7 +343,6 @@
                             <p v-if="card.countReason && card.countReason !== card.text" class="mt-1 text-xs" :class="card.hitStatOnly ? 'text-slate-400' : (card.counted !== false ? 'text-red-300' : 'text-emerald-300')">{{ card.countReason }}</p>
                             <a v-if="card.link" :href="card.link" target="_blank" class="inline-block mt-2 px-2 py-1 rounded border border-purple-700 bg-purple-950/60 text-purple-200 text-xs">定位 Tag</a>
                         </article>
-                        <div v-if="!courtPlayerDetailCards().length" class="lg:col-span-2 py-8 text-center text-gray-500 border border-dashed border-gray-800 rounded">暂无证据卡；仍可填写申诉无罪原因。</div>
                     </div>
                 </div>
             </div>
@@ -647,39 +636,16 @@
                 </label>
             </div>
             <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排行</th><th class="p-3 text-left">玩家名称</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">判定次数</th><th class="p-3 text-center">申诉无罪次数</th><th class="p-3 text-right">最终总智力损失</th><th class="p-3 text-center w-40">明细</th></tr></thead>
-                <tbody>
-                    <template v-for="(row,index) in finalVerdict" :key="row.name">
-                        <tr class="border-t border-gray-800 hover:bg-fuchsia-950/20">
-                            <td class="p-3 text-center text-gray-500 font-mono">{{ index + 1 }}</td>
-                            <td class="p-3 text-blue-300 font-bold">{{ row.name }}</td>
-                            <td class="p-3 text-center">{{ roleIcons(row.roles) }}</td>
-                            <td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustRecognition(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-amber-300">{{ row.recognitionCount }}</span><button @click="adjustRecognition(row,1)" class="w-7 h-7 rounded border border-amber-800 bg-amber-950/60 hover:bg-amber-900">＋</button></div></td>
-                            <td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustAcquittal(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-emerald-300">{{ row.appealAcquittalCount }}</span><button @click="adjustAcquittal(row,1)" class="w-7 h-7 rounded border border-emerald-800 bg-emerald-950/60 hover:bg-emerald-900">＋</button></div></td>
-                            <td class="p-3 text-right font-mono font-black text-fuchsia-300">{{ row.iqLoss }}</td>
-                            <td class="p-3 text-center"><button @click="verdictDetailPlayer = verdictDetailPlayer === row.name ? '' : row.name" class="px-2 py-1 rounded border border-fuchsia-700 bg-fuchsia-950/70 text-fuchsia-100 hover:bg-fuchsia-900 text-xs whitespace-nowrap">{{ verdictDetailPlayer === row.name ? '收起' : '查看明细' }}</button></td>
-                        </tr>
-                        <tr v-if="verdictDetailPlayer === row.name" class="border-t border-fuchsia-950 bg-gray-950/80">
-                            <td colspan="7" class="p-4">
-                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                    <div class="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar">
-                                        <div v-for="item in verdictBreakdownRows(row)" :key="item.key" class="flex justify-between gap-3 rounded border border-gray-800 bg-gray-900 px-2.5 py-1.5 text-xs"><span class="text-gray-300">{{ item.label }}</span><span class="font-mono font-bold text-amber-300 shrink-0">{{ item.count }} 次</span></div>
-                                        <div v-if="!verdictBreakdownRows(row).length" class="text-xs text-gray-500 py-2 text-center">暂无明细</div>
-                                    </div>
-                                    <label class="block w-full">
-                                        <span class="text-[11px] text-gray-500">申诉无罪原因</span>
-                                        <textarea v-model="row.appealAcquittalReasons" @input="verdictDirty=true; courtAppealNotes[row.name]=row.appealAcquittalReasons" class="mt-1 w-full min-h-[6rem] rounded border border-fuchsia-800 bg-gray-900 px-3 py-2 text-sm text-gray-200 leading-6" rows="4" placeholder="填写申诉无罪原因"></textarea>
-                                    </label>
-                                </div>
-                            </td>
-                        </tr>
-                    </template>
+                <tbody><tr v-for="(row,index) in finalVerdict" :key="row.name" class="border-t border-gray-800 hover:bg-fuchsia-950/20 relative"><td class="p-3 text-center text-gray-500 font-mono">{{ index + 1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustRecognition(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-amber-300">{{ row.recognitionCount }}</span><button @click="adjustRecognition(row,1)" class="w-7 h-7 rounded border border-amber-800 bg-amber-950/60 hover:bg-amber-900">＋</button></div></td><td class="p-3 text-center"><div class="inline-flex items-center gap-2"><button @click="adjustAcquittal(row,-1)" class="w-7 h-7 rounded border border-gray-700 bg-gray-900 hover:bg-gray-800">−</button><span class="min-w-6 font-mono text-emerald-300">{{ row.appealAcquittalCount }}</span><button @click="adjustAcquittal(row,1)" class="w-7 h-7 rounded border border-emerald-800 bg-emerald-950/60 hover:bg-emerald-900">＋</button></div></td><td class="p-3 text-right font-mono font-black text-fuchsia-300">{{ row.iqLoss }}</td><td class="p-3 text-center"><div class="relative inline-block"><button @click="verdictDetailPlayer = verdictDetailPlayer === row.name ? '' : row.name" class="px-2 py-1 rounded border border-fuchsia-700 bg-fuchsia-950/70 text-fuchsia-100 hover:bg-fuchsia-900 text-xs whitespace-nowrap">{{ verdictDetailPlayer === row.name ? '收起' : '查看明细' }}</button><div v-if="verdictDetailPlayer === row.name" class="absolute right-0 top-full mt-2 z-30 w-80 rounded border border-fuchsia-900 bg-gray-950 shadow-2xl p-3 text-left"><div class="flex items-center justify-between gap-2 mb-2"><h3 class="text-sm font-bold text-fuchsia-200 truncate">{{ row.name }}</h3><button @click.stop="verdictDetailPlayer=''" class="text-xs text-gray-400 hover:text-white shrink-0">×</button></div><div class="space-y-1.5 max-h-56 overflow-y-auto no-scrollbar"><div v-for="item in verdictBreakdownRows(row)" :key="item.key" class="flex justify-between gap-3 rounded border border-gray-800 bg-gray-900 px-2.5 py-1.5 text-xs"><span class="text-gray-300">{{ item.label }}</span><span class="font-mono font-bold text-amber-300 shrink-0">{{ item.count }} 次</span></div><div v-if="!verdictBreakdownRows(row).length" class="text-xs text-gray-500 py-2 text-center">暂无明细</div></div><label class="block mt-3 text-[11px] text-gray-500">申诉无罪原因<textarea v-model="row.appealAcquittalReasons" @input="verdictDirty=true" class="mt-1 w-full rounded border border-gray-700 bg-gray-900 px-2 py-1.5 text-xs text-gray-200" rows="2" placeholder="填写申诉无罪原因"></textarea></label></div></div></td></tr>
                 <tr v-if="!finalVerdict.length"><td colspan="7" class="p-12 text-center text-gray-500">暂无判决记录。</td></tr></tbody>
             </table>
             <div class="p-4 border-t border-fuchsia-900 flex flex-wrap items-center justify-between gap-3">
-                <div class="text-xs text-gray-500">导出约定：<span class="font-mono text-fuchsia-200">verdicts/智力表_Boss名称_日期.xlsx</span></div>
+                <div class="text-xs text-gray-500">正式计分留痕请用独立「智商计分板」；本页可快速同步开庭结果。</div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <span v-if="verdictSavedDate" class="text-xs text-emerald-300">已导出 {{ verdictSavedDate }}</span>
-                    <button @click="confirmVerdict" class="px-5 py-2 rounded border border-fuchsia-500 bg-fuchsia-800 text-white font-bold hover:bg-fuchsia-700">确认申诉并导出 Excel<span v-if="verdictDirty"> *</span></button>
+                    <span v-if="verdictSavedDate" class="text-xs text-emerald-300">{{ verdictSavedDate }}</span>
+                    <a href="scoreboard.html" class="text-xs text-fuchsia-200">打开计分板</a>
+                    <button @click="syncToScoreboard" class="px-5 py-2 rounded border border-fuchsia-500 bg-fuchsia-800 text-white font-bold hover:bg-fuchsia-700">同步到记事本<span v-if="verdictDirty"> *</span></button>
+                    <button @click="confirmVerdict(true)" class="px-3 py-2 rounded border border-gray-700 bg-gray-950 text-gray-300 text-xs hover:bg-gray-800">仅导出 JSON</button>
                 </div>
             </div>
         </section>
@@ -897,8 +863,11 @@ const VERDICT_EXCLUDED_SKILLS = new Set([
 const COURT_SKILL_RULES = {
     p15AvoidableDeaths: {
         count: '确认发生于 P1.5 转阶段窗口内的玩家死亡，按次计入转阶段死亡。',
-        exempt: '识别为团队主动跳崖重开（仅终局跳楼死亡簇内的 P1.5 坠崖）时仅展示不计数；本场第 8 次死亡之后发生的死亡强制不计数。',
-        boardExclude: 'Boss 获得狂暴（ENRAGE）后的坦克相关死亡不入板、不归责倒T；P1.5 永不按倒T 归因。',
+        exempt: '识别为团队主动跳崖重开（放弃/大规模跳崖）时仅展示不计数；本场第 8 次死亡之后发生的死亡强制不计数。',
+    },
+    passageCliffMistakes: {
+        count: 'P2/P3（非转阶段窗口）、不在密集跳崖放弃波内、且本场死亡仍未满 8 次时，玩家莫名死于坠崖，按次计入过场失误（必扣）。',
+        exempt: 'P1 坠崖一律视为放弃（P1 无场地缝隙）；P1.5/P2.5 转阶段窗口内坠崖不记；约 8 秒内连续 ≥4 人坠崖的密集簇整簇豁免（覆盖进阶段后大团放弃，如 Fight18）；第 8 次及之后死亡强制不计数。',
     },
     collapsingVoidSnapAiming: {
         count: '拉弓结算点名玩家在释放前最后 1 秒位移 >5 码判定为甩狙，且因此导致队友死于崩裂空无时，对甩狙者按次计数（计入导致队友死亡次数）。',
@@ -933,9 +902,13 @@ const COURT_SKILL_RULES = {
         exempt: '伤害 ≤275000 或非银锋箭致死不入本项；第 8 死后强制不计数。',
     },
     p1SilverArrowMissedFights: {
-        count: 'P1 一轮银锋箭两名点名玩家均未命中指定 Boss/add 时，两人各计数 1 次；第 5 轮（殁里乌姆档）双人空射且殁里乌姆仍存活时同样定罪计数。',
-        exempt: '缺少 Boss 命中归因证据时仅展示不计数；第 8 死后强制不计数。',
-        boardExclude: '任一人正确命中目标 → 本轮机制成功，成功银锋箭不入板；第 5 轮双人空射但殁里乌姆已死 → 预期空射，不入板。',
+        count: 'P1 一轮银锋箭两名点名玩家均未命中指定 Boss/add 时，两人各计数 1 次；第 5 轮（殁里乌姆档）双人空射且殁里乌姆仍存活时同样定罪计数。场地审计已确认 Boss/add 幽影束缚被移除时，视为本轮成功（不以几何归因丢失误杀）。',
+        exempt: '缺少 Boss 命中归因证据且亦无束缚移除证据时仅展示不计数；第 8 死后强制不计数。',
+        boardExclude: '任一人正确命中目标，或本轮存在 Boss 束缚移除证据 → 本轮机制成功，不入板；第 5 轮双人空射但殁里乌姆已死 → 预期空射，不入板。',
+    },
+    voreluthVulnerabilityFade: {
+        count: '龌勒卢斯首次腐化精华 apply 之后、幽影束缚消失之前，每一次完整 faded 计 1 次；当场两名坦克各计同等 fade 次数（不展示名单中的坦克仍写入但不显示）。',
+        exempt: '第 8 死后强制不计数；无完整 faded 或窗口外不记；无坦克职责信息时退回按场行。',
     },
     corruptionEssenceDamage: {
         count: '永不计数、不进入终审；命中次数仅作统计展示。',
@@ -1028,15 +1001,15 @@ createApp({
             verdictDetailPlayer: '',
             verdictProgressDate: '',
             courtDetailPlayer: '',
-            courtAppealNotes: {},
             courtCountFilter: 'counted',
             courtWaterPhaseFilter: 'all',
             avoidableFirstDeathBoard: [],
             dispelAnalysis: { enabled: false, logic: '', summary: [], fights: [] },
             glaiveBoard: [],
             errorMsg: '',
-            jsonSource: './wcl_hardcore_api.json',
+            jsonSource: '',
             dataFiles: [],
+            dataFilesRefreshTimer: null,
             activePanels: [],
             activeDetailPanels: [],
             reportInput: '',
@@ -1107,27 +1080,6 @@ createApp({
         isCrownBoss() {
             return this.meta?.bossKey === 'crown_of_the_cosmos';
         },
-        /** Prefer per-fight combatants; fall back to meta.combatantRoster (must be boss-fight scoped). */
-        courtCombatantRoster() {
-            const byName = {};
-            const merge = (name, roles = []) => {
-                if (!name || isCourtDisplayExcluded(name)) return;
-                byName[name] = [...new Set([...(byName[name] || []), ...(roles || [])].filter(role => role && role !== 'unknown'))];
-            };
-            let fromFights = 0;
-            (this.rawWipeAnalysis || []).forEach(fight => {
-                (fight.combatants || []).forEach(row => {
-                    if (!row?.name) return;
-                    fromFights += 1;
-                    merge(row.name, row.roles || []);
-                });
-            });
-            if (fromFights) {
-                return Object.entries(byName).map(([name, roles]) => ({ name, roles }));
-            }
-            (this.meta?.combatantRoster || []).forEach(row => merge(row.name, row.roles || []));
-            return Object.entries(byName).map(([name, roles]) => ({ name, roles }));
-        },
         verdictDetailRow() {
             return this.finalVerdict.find(row => row.name === this.verdictDetailPlayer) || null;
         },
@@ -1178,30 +1130,16 @@ createApp({
         courtPlayerSummary() {
             const hitStatOnlyKeys = new Set(['corruptionEssenceDamage']);
             const players = {};
-            const ensurePlayer = (name, roles = []) => {
-                if (!name || isCourtDisplayExcluded(name)) return null;
-                const item = players[name] || (players[name] = {
-                    name, roles: [], countedCount: 0, uncountedCount: 0, categories: new Set(), events: []
-                });
-                item.roles = [...new Set([...item.roles, ...roles].filter(role => role && role !== 'unknown'))];
-                return item;
-            };
-            (this.courtCombatantRoster || []).forEach(row => ensurePlayer(row.name, row.roles || []));
-            // Seed zero-count players from wipe death timelines / finalVerdict when roster meta is absent.
-            (this.rawWipeAnalysis || []).forEach(fight => {
-                (fight.deathTimeline || []).forEach(death => ensurePlayer(death.player, death.role ? [death.role] : []));
-                Object.values(fight.avoidableSummary || {}).forEach(rows => {
-                    (rows || []).forEach(row => ensurePlayer(row.name, row.roles || (row.role ? [row.role] : [])));
-                });
-            });
-            (this.finalVerdict || []).forEach(row => ensurePlayer(row.name, row.roles || []));
             Object.entries(this.avoidableBoard || {}).forEach(([skillKey, rows]) => {
                 if (skillKey === 'total' || !Array.isArray(rows)) return;
                 rows.forEach(row => {
                     if (!row?.name || isCourtDisplayExcluded(row.name)) return;
+                    if (row.excludeFromCourtPlayers || row.isNpc) return;
+                    const item = players[row.name] || (players[row.name] = {
+                        name: row.name, roles: [], countedCount: 0, uncountedCount: 0, categories: new Set(), events: []
+                    });
                     const roles = Array.isArray(row.roles) ? row.roles : (row.role ? [row.role] : []);
-                    const item = ensurePlayer(row.name, roles);
-                    if (!item) return;
+                    item.roles = [...new Set([...item.roles, ...roles].filter(role => role && role !== 'unknown'))];
                     const events = (row.events || [])
                         .filter(event => !isSuccessfulMechanicNoise(skillKey, event))
                         .map((event, index) => ({
@@ -1223,7 +1161,8 @@ createApp({
                 .sort((a, b) => b.countedCount - a.countedCount || b.uncountedCount - a.uncountedCount || a.name.localeCompare(b.name));
         },
         courtDeductionTabs() {
-            const order = ['p15AvoidableDeaths','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','missedShadows','gravityLineViolation','tankRiftSlashFailure'];
+            // 重力坍缩仅 P3 且单场 Tag 地图为空，开庭分项不展示入口
+            const order = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure'];
             return order.map(key => this.avoidableTabs.find(tab => tab.key === key)).filter(Boolean);
         },
         courtDisplayOnlyTabs() {
@@ -1349,22 +1288,25 @@ createApp({
         },
         normalizedJsonSource() {
             const src = String(this.jsonSource || '');
-            if (window.OfflineDataLoader?.normalizeSource) {
-                return window.OfflineDataLoader.normalizeSource(src);
-            }
-            return src.replace(/^\.\//, '').replace(/\\/g, '/');
+            return window.OfflineDataLoader?.normalizeSource
+                ? window.OfflineDataLoader.normalizeSource(src)
+                : src.replace(/^\.\//, '');
         },
         jsonSourceLabel() {
             const path = this.normalizedJsonSource;
             const hit = this.dataFiles.find(file => file.path === path);
-            return hit?.label || path || '';
-        }
+            return hit?.label || hit?.name || path || '';
+        },
     },
     async mounted() {
         this.applyRouteParams();
-        this.loadCatalog();
+        await this.loadCatalog();
         await this.loadDataFileList();
+        this.dataFilesRefreshTimer = window.setInterval(() => this.loadDataFileList(), 15000);
         await this.autoLoadJson();
+    },
+    beforeUnmount() {
+        if (this.dataFilesRefreshTimer) window.clearInterval(this.dataFilesRefreshTimer);
     },
     watch: {
         selectedVersion() {
@@ -1393,7 +1335,7 @@ createApp({
             const url = new URL(window.location.href);
             if (normalized) url.searchParams.set('json', normalized);
             else url.searchParams.delete('json');
-            window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+            window.history.replaceState({}, '', url);
         },
         async loadDataFileList() {
             const files = [];
@@ -1402,12 +1344,13 @@ createApp({
                 const path = window.OfflineDataLoader?.normalizeSource
                     ? window.OfflineDataLoader.normalizeSource(row.path)
                     : String(row.path).replace(/^\.\//, '');
-                if (files.some(item => item.path === path)) return;
-                files.push({ ...row, path });
+                const index = files.findIndex(item => item.path === path);
+                if (index >= 0) files[index] = { ...files[index], ...row, path };
+                else files.push({ ...row, path });
             };
             try {
                 if (window.location.protocol !== 'file:') {
-                    const response = await fetch('./api/data-files');
+                    const response = await fetch('./api/data-files', { cache: 'no-store' });
                     if (response.ok) {
                         const payload = await response.json();
                         (payload.files || []).forEach(pushUnique);
@@ -1416,28 +1359,23 @@ createApp({
             } catch (e) {
                 console.log('data-files API unavailable');
             }
-            if (!files.length) {
-                try {
-                    const response = await fetch('./data/manifest.json');
-                    if (response.ok) {
-                        const payload = await response.json();
-                        (payload.files || []).forEach(pushUnique);
-                    }
-                } catch (e) {
-                    console.log('data/manifest.json unavailable');
+            try {
+                const response = await fetch('./data/manifest.json', { cache: 'no-store' });
+                if (response.ok) {
+                    const payload = await response.json();
+                    (payload.files || []).forEach(pushUnique);
                 }
+            } catch (e) {
+                console.log('data/manifest.json unavailable');
             }
-            const baked = window.OfflineDataLoader?.bakedSourceList?.() || [];
-            baked.forEach(path => {
-                const name = path.split('/').pop();
-                pushUnique({ path, name, label: name });
-            });
+            const baked = window.OfflineDataLoader?.bakedSourceFiles?.() || [];
+            baked.forEach(pushUnique);
+            const local = window.OfflineDataLoader?.localSourceFiles?.() || [];
+            local.forEach(pushUnique);
             files.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
             this.dataFiles = files;
             if (!new URLSearchParams(window.location.search).get('json') && files.length) {
-                const preferred = files.find(file => file.path === this.normalizedJsonSource)
-                    || files.find(file => file.name === 'wcl_hardcore_api.json')
-                    || files[0];
+                const preferred = files.find(file => file.path === this.normalizedJsonSource) || files[0];
                 if (preferred) this.jsonSource = preferred.path;
             }
         },
@@ -1481,24 +1419,26 @@ createApp({
         },
         async autoLoadJson() {
             try {
-                if (this.jsonSource) this.syncJsonQuery(this.jsonSource);
+                if (!this.jsonSource) return;
+                this.syncJsonQuery(this.jsonSource);
                 this.bindData(await window.OfflineDataLoader.loadJson(this.jsonSource));
             } catch (e) {
                 console.log('请手动上传 JSON');
             }
         },
+        async importDataFiles(event) {
+            this.errorMsg = '';
+            const rows = window.OfflineDataLoader?.registerLocalFiles?.(event.target.files) || [];
+            event.target.value = '';
+            if (!rows.length) {
+                this.errorMsg = '未在选择结果中找到 JSON 文件。';
+                return;
+            }
+            await this.loadDataFileList();
+            await this.selectDataFile(rows[0].path);
+        },
         handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                try {
-                    this.bindData(JSON.parse(e.target.result));
-                } catch (err) {
-                    this.errorMsg = '解析失败，请确认 JSON 文件格式。';
-                }
-            };
-            reader.readAsText(file);
+            return this.importDataFiles(event);
         },
         parseTimeToSeconds(timeStr) {
             if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -1636,28 +1576,27 @@ createApp({
                 }));
                 return rows;
             }
-            if (this.avoidableTab === 'gravityLineViolation') {
-                this.rawWipeAnalysis.forEach(fight => (fight?.crownOfTheCosmos?.fieldAudit?.gravityRounds || []).forEach((event, index) => {
-                    const first = event.firstViolation || (event.violations || []).slice().sort((a,b) => Number(a.order || 99) - Number(b.order || 99))[0];
-                    const deathCount = Number(event.deathCount || 0);
-                    const deathText = deathCount && first ? `是（${first.player}·${deathCount}人）` : '否';
-                    const attribution = first
-                        ? `归因：${first.player}为第一个违规者（${first.rule}，${(Number(first.delayMs || 0) / 1000).toFixed(3)}秒）`
-                        : '归因：本轮没有发现违反时序的玩家';
-                    const exemption = event.exemptReason ? `；豁免：${event.exemptReason}` : '';
-                    rows.push({
-                        key:`gravity-${fight.fightID}-${event.index || index}`,
-                        fightID:fight.fightID,
-                        group:event.index || index + 1,
-                        positionMs:event.applyTimeMs ?? first?.positionMs,
-                        player:first?.player,
-                        players:event.targets || [],
-                        counted:event.counted === true,
-                        text:`${event.applyTime || ''} 本轮是否减员：${deathText}；${attribution}${exemption}`,
-                        link:this.fightAuditLink(fight, 'P3'),
+            if (this.avoidableTab === 'voreluthVulnerabilityFade') {
+                (this.activeAvoidableRows || []).forEach(player => {
+                    if (isCourtDisplayExcluded(player.name)) return;
+                    (player.events || []).forEach((event, index) => {
+                        const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
+                        rows.push({
+                            key: `voreluth-${event.fightID}-${player.name}-${index}`,
+                            fightID: event.fightID,
+                            group: index + 1,
+                            positionMs: event.positionMs,
+                            player: player.name,
+                            players: [player.name],
+                            counted: event.counted !== false,
+                            text: event.text || event.countReason || '',
+                            stackSummary: event.stack != null ? `${event.stack}层` : '',
+                            fades: event.fades || [],
+                            link: this.fightAuditLink(fight),
+                        });
                     });
-                }));
-                return rows;
+                });
+                return rows.sort((a, b) => Number(a.fightID) - Number(b.fightID) || String(a.player).localeCompare(String(b.player)));
             }
             (this.activeAvoidableRows || []).forEach(player => (player.events || []).forEach((event,index) => {
                 const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
@@ -1831,12 +1770,7 @@ createApp({
             return `https://cn.warcraftlogs.com/reports/${fight.reportID}#fight=${fight.fightID}&view=replay&position=${Math.max(0, Math.floor(positionMs))}`;
         },
         fightAuditLink(fight, phase = null, tag = null) {
-            const source = encodeURIComponent(
-                (window.OfflineDataLoader?.normalizeSource
-                    ? window.OfflineDataLoader.normalizeSource(this.jsonSource)
-                    : String(this.jsonSource || 'wcl_hardcore_api.json').replace(/^\.\//, ''))
-                || 'wcl_hardcore_api.json'
-            );
+            const source = encodeURIComponent(this.jsonSource || './wcl_hardcore_api.json');
             const params = [`source=${source}`, `report=${encodeURIComponent(fight.reportID || '')}`, `fight=${encodeURIComponent(fight.fightID || '')}`];
             if (phase) params.push(`phase=${encodeURIComponent(phase)}`);
             if (tag) params.push(`tag=${encodeURIComponent(tag)}`);
@@ -1900,14 +1834,6 @@ createApp({
             const compensation = Number(row?.compensationCount || 0);
             return compensation ? `${deaths} (${deaths + compensation})` : String(deaths);
         },
-        syncCourtAppealNote(name) {
-            const note = this.courtAppealNotes[name] || '';
-            const row = this.finalVerdict.find(item => item.name === name);
-            if (row) {
-                row.appealAcquittalReasons = note;
-                this.verdictDirty = true;
-            }
-        },
         adjustAcquittal(row, delta) {
             const current = Number(row.appealAcquittalCount || 0);
             row.appealAcquittalCount = Math.max(0, Math.min(Number(row.recognitionCount || 0), current + delta));
@@ -1936,48 +1862,149 @@ createApp({
             this.verdictDirty = false;
             if (persist) this.persistVerdictDay();
         },
+        buildScoreboardSyncDay() {
+            const MECHANICS = [
+                'waterOutliers', 'voidGraspHealingLow', 'p15AvoidableDeaths', 'passageCliffMistakes', 'p1SilverArrowDeaths',
+                'p1SilverArrowMissedFights', 'voreluthVulnerabilityFade', 'missedShadows', 'collapsingVoidSnapAiming',
+                'gravityLineViolation', 'tankRiftSlashFailure',
+            ];
+            let date = this.verdictProgressDate || this.rawWipeAnalysis.find(row => row.date)?.date || '';
+            if (!date) {
+                const m = String(this.jsonSource || '').match(/_(\d{8})(?:\.json)?$/i);
+                if (m) date = `${m[1].slice(0, 4)}-${m[1].slice(4, 6)}-${m[1].slice(6, 8)}`;
+            }
+            if (!date) {
+                date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date());
+            }
+            const board = this.avoidableBoard || {};
+            const players = {};
+            const emptyMech = () => Object.fromEntries(MECHANICS.map(k => [k, { count: 0, incidents: [] }]));
+            MECHANICS.forEach(key => {
+                (board[key] || []).forEach(row => {
+                    if (!row?.name || isCourtDisplayExcluded(row.name)) return;
+                    if (row.isSystem || row.excludeFromCourtPlayers || /^Fight\d+$/i.test(String(row.name))) return;
+                    const p = players[row.name] || (players[row.name] = {
+                        name: row.name,
+                        roles: row.roles || (row.role ? [row.role] : []),
+                        mechanics: emptyMech(),
+                        extraDeductions: [],
+                        appealLog: [],
+                    });
+                    (row.events || []).forEach((ev, idx) => {
+                        if (ev.counted === false || ev.verdictCounted === false) return;
+                        const fades = Array.isArray(ev.fades) && ev.fades.length
+                            ? ev.fades
+                            : [{ time: ev.time, text: ev.text || ev.countReason || key, stack: null }];
+                        fades.forEach((fade, fadeIdx) => {
+                            p.mechanics[key].incidents.push({
+                                id: [key, ev.fightID, fade.time || ev.tag || ev.time || idx, fadeIdx, row.name].join(':'),
+                                fightID: ev.fightID,
+                                tag: ev.tag || '',
+                                time: fade.time || ev.time || '',
+                                text: fade.text || ev.text || ev.countReason || key,
+                                appealed: false,
+                                appealNote: '',
+                            });
+                        });
+                    });
+                });
+            });
+            Object.values(players).forEach(p => {
+                MECHANICS.forEach(key => {
+                    p.mechanics[key].count = (p.mechanics[key].incidents || []).filter(i => !i.appealed).length;
+                });
+            });
+            return {
+                date,
+                sourceReports: this.meta?.analyzedReports || [],
+                sourceFile: this.jsonSource || '',
+                pointsPerCount: Number(this.meta?.courtConfig?.verdictPointsPerCount || 10),
+                tankMultiplier: Number(this.meta?.courtConfig?.verdictTankMultiplier || 0.5),
+                updatedAt: new Date().toISOString(),
+                players: Object.values(players),
+            };
+        },
+        syncToScoreboard() {
+            this.confirmVerdict(false);
+            const day = this.buildScoreboardSyncDay();
+            try {
+                sessionStorage.setItem('scoreboardSyncPayload', JSON.stringify(day));
+            } catch (error) {
+                alert('无法写入同步载荷：' + error.message);
+                return;
+            }
+            this.verdictSavedDate = `已准备同步 ${day.date}（${day.players.length} 人）`;
+            window.location.href = 'scoreboard.html?import=1';
+        },
         buildVerdictExportPayload() {
             const date = this.verdictProgressDate || this.rawWipeAnalysis.find(row => row.date)?.date || new Date().toISOString().slice(0,10);
-            const bossName = this.meta?.bossName || '宇宙之冕';
-            const clock = (this.rawWipeAnalysis.find(row => row.startClock)?.startClock || new Date().toISOString().slice(11,16)).replace(':', '');
             return {
-                schemaVersion: 3,
-                module: 'final_verdict_excel',
+                schemaVersion: 2,
+                module: 'final_verdict',
                 progressDate: date,
                 date,
-                bossName,
-                bossKey: this.meta?.bossKey || 'crown_of_the_cosmos',
-                sheetName: `${bossName}_${clock || date}`,
                 sourceReports: this.meta?.analyzedReports || [],
                 sourceFile: this.jsonSource || 'wcl_hardcore_api.json',
                 pointsPerCount: Number(this.meta?.courtConfig?.verdictPointsPerCount || 10),
                 updatedAt: new Date().toISOString(),
-                folderConvention: 'verdicts/智力表_Boss名称_日期.xlsx',
+                folderConvention: 'verdicts/verdict-YYYY-MM-DD.json',
                 players: this.finalVerdict.map(row => ({
                     name: row.name,
-                    roles: row.roles || [],
                     recognitionCount: Number(row.recognitionCount || 0),
                     recognitionReasons: row.recognitionReasons || this.verdictBreakdownRows(row).map(item => `${item.label}×${item.count}`).join('；'),
-                    breakdown: row.breakdown || {},
                     appealAcquittalCount: Number(row.appealAcquittalCount || 0),
-                    appealAcquittalReasons: row.appealAcquittalReasons || this.courtAppealNotes[row.name] || row.appealNote || row.note || '',
+                    appealAcquittalReasons: row.appealAcquittalReasons || row.appealNote || row.note || '',
                     iqLoss: Number(row.iqLoss || 0),
                 })),
             };
         },
+        downloadJson(filename, payload) {
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        },
         async persistVerdictDay() {
             const payload = this.buildVerdictExportPayload();
             const date = payload.progressDate;
-            const spellLabels = this.meta?.avoidableSpells || {};
+            const filename = `verdict-${date}.json`;
+            const storageKey = 'wowRaidFinalVerdictHistory';
+            let store = { schemaVersion: 2, days: [] };
+            try { store = JSON.parse(localStorage.getItem(storageKey) || 'null') || store; } catch (error) { /* 使用空存档 */ }
+            if (!Array.isArray(store.days)) store.days = [];
+            const day = {
+                date,
+                progressDate: date,
+                sourceReports: payload.sourceReports,
+                sourceFile: payload.sourceFile,
+                pointsPerCount: payload.pointsPerCount,
+                updatedAt: payload.updatedAt,
+                players: this.finalVerdict.map(row => ({
+                    ...row,
+                    note: row.appealAcquittalReasons || row.note || row.appealNote || '',
+                })),
+            };
+            const index = store.days.findIndex(row => row.date === date || row.progressDate === date);
+            if (index >= 0) store.days[index] = day; else store.days.push(day);
+            store.days.sort((a,b) => String(a.date || a.progressDate).localeCompare(String(b.date || b.progressDate)));
+            localStorage.setItem(storageKey, JSON.stringify(store));
+            this.verdictSavedDate = date;
+            this.downloadJson(filename, payload);
             try {
-                if (!window.VerdictXlsx?.downloadWorkbook) {
-                    throw new Error('缺少 assets/vendor/verdict-xlsx.js');
+                const response = await fetch('/api/verdicts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result?.path) this.verdictSavedDate = `${date} → ${result.path}`;
                 }
-                const result = window.VerdictXlsx.downloadWorkbook(payload, spellLabels);
-                this.verdictSavedDate = `${date} → verdicts/${result.filename}`;
             } catch (error) {
-                console.error(error);
-                alert(`Excel 导出失败：${error?.message || error}`);
+                // 离线 / file:// 环境没有服务端 API 时改为本地下载
             }
         },
         voidRecords(fight) {
@@ -2227,12 +2254,6 @@ createApp({
                 ])
             );
             this.finalVerdict = this.rebuildFinalVerdictFromBoard(result.data.page4_finalVerdict || []);
-            this.courtAppealNotes = Object.fromEntries(
-                this.finalVerdict.map(row => [row.name, row.appealAcquittalReasons || row.note || ''])
-            );
-            (this.courtCombatantRoster || []).forEach(row => {
-                if (!(row.name in this.courtAppealNotes)) this.courtAppealNotes[row.name] = '';
-            });
             this.verdictDirty = false;
             if (this.isCrownBoss) this.confirmVerdict(false);
             this.avoidableFirstDeathBoard = (result.data.page2_avoidableFirstDeathBoard || [])
@@ -2243,10 +2264,11 @@ createApp({
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
             const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
-            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter']);
-            const courtOrder = ['p15AvoidableDeaths','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','missedShadows','gravityLineViolation','tankRiftSlashFailure','corruptionEssenceDamage','missedEnergy','interferenceShockInterrupts'];
+            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter','gravityLineViolation']);
+            const courtOrder = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure','corruptionEssenceDamage','missedEnergy','interferenceShockInterrupts'];
+            const hiddenCourtKeys = new Set(['gravityLineViolation']);
             const skillKeys = Object.keys(this.avoidableBoard)
-                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && Array.isArray(this.avoidableBoard[key]))
+                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && key !== 'gravityLineViolation' && Array.isArray(this.avoidableBoard[key]))
                 .sort((a, b) => {
                     const rankA = courtOrder.includes(a) ? courtOrder.indexOf(a) : courtOrder.length;
                     const rankB = courtOrder.includes(b) ? courtOrder.indexOf(b) : courtOrder.length;
@@ -2280,7 +2302,13 @@ createApp({
                 ...(showAvoidableTotal ? [{ key: 'total', label: '全项合计' }] : []),
                 ...skillKeys.map(key => ({
                     key,
-                    label: key === 'p1SilverArrowMissedFights' ? 'P1银锋箭射怪失误' : (key === 'p15AvoidableDeaths' ? '转阶段死亡' : (key === 'missedEnergy' ? 'P2消Boss能量失误' : (key === 'waterOutliers' ? '放水未集中' : (spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key))))
+                    label: key === 'p1SilverArrowMissedFights' ? 'P1银锋箭射怪失误'
+                        : (key === 'p15AvoidableDeaths' ? '转阶段死亡'
+                        : (key === 'passageCliffMistakes' ? '过场失误'
+                        : (key === 'missedEnergy' ? 'P2消Boss能量失误'
+                        : (key === 'waterOutliers' ? '放水未集中'
+                        : (key === 'voreluthVulnerabilityFade' ? 'P1龌勒卢斯易伤异常'
+                        : (spellLabels[key] || this.avoidableBoard[key]?.[0]?.spellName || key))))))
                 }))
             ];
             if (!this.avoidableTabs.some(tab => tab.key === this.avoidableTab)) {
@@ -2303,29 +2331,22 @@ createApp({
             const points = Number(this.meta?.courtConfig?.verdictPointsPerCount || 10);
             const seed = Object.fromEntries((seedRows || []).map(row => [row.name, row]));
             const players = {};
-            const ensure = (name, roles = []) => {
-                if (!name || isCourtDisplayExcluded(name)) return null;
-                const item = players[name] || (players[name] = {
-                    name,
-                    roles: [],
-                    recognitionCount: 0,
-                    appealAcquittalCount: Number(seed[name]?.appealAcquittalCount || 0),
-                    appealAcquittalReasons: seed[name]?.appealAcquittalReasons || seed[name]?.note || this.courtAppealNotes?.[name] || '',
-                    breakdown: {},
-                    penaltyUnits: 0,
-                });
-                item.roles = [...new Set([...item.roles, ...roles].filter(role => role && role !== 'unknown'))];
-                return item;
-            };
-            (this.courtCombatantRoster || []).forEach(row => ensure(row.name, row.roles || []));
-            (seedRows || []).forEach(row => ensure(row.name, row.roles || []));
             Object.entries(this.avoidableBoard || {}).forEach(([skillKey, rows]) => {
                 if (skillKey === 'total' || VERDICT_EXCLUDED_SKILLS.has(skillKey) || !Array.isArray(rows)) return;
                 rows.forEach(row => {
                     if (!row?.name || isCourtDisplayExcluded(row.name)) return;
+                    if (row.excludeFromCourtPlayers || row.isNpc) return;
+                    const item = players[row.name] || (players[row.name] = {
+                        name: row.name,
+                        roles: [],
+                        recognitionCount: 0,
+                        appealAcquittalCount: Number(seed[row.name]?.appealAcquittalCount || 0),
+                        appealAcquittalReasons: seed[row.name]?.appealAcquittalReasons || seed[row.name]?.note || '',
+                        breakdown: {},
+                        penaltyUnits: 0,
+                    });
                     const roles = Array.isArray(row.roles) ? row.roles : (row.role ? [row.role] : []);
-                    const item = ensure(row.name, roles);
-                    if (!item) return;
+                    item.roles = [...new Set([...item.roles, ...roles].filter(role => role && role !== 'unknown'))];
                     let count;
                     if (skillKey === 'collapsingVoidSnapAiming') count = Number(row.deathCount || 0);
                     else count = (row.events || []).filter(event => event.counted !== false && !event.hitStatOnly).length;

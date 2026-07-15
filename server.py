@@ -17,7 +17,7 @@ from urllib.parse import unquote, urlparse
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
-from analyzer_core.wcl_paths import DATA_DIR, list_wcl_data_files
+import notebook_db
 
 
 ROOT = Path(__file__).resolve().parent
@@ -25,6 +25,9 @@ JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
+SCOREBOARD_DIR = ROOT / "scoreboard"
+SCOREBOARD_DIR.mkdir(exist_ok=True)
+DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
@@ -195,25 +198,81 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
         if path == "/api/catalog":
             return self.send_response_body(*json_bytes(to_frontend_catalog()))
-        if path == "/api/data-files":
-            return self.send_response_body(*json_bytes({
-                "schemaVersion": 1,
-                "files": list_wcl_data_files(),
-            }))
         if path.startswith("/api/jobs/") and path.endswith("/events"):
             return self.handle_events(path)
         if path.startswith("/api/jobs/") and path.endswith("/result"):
             return self.handle_result(path)
+        if path in {"/api/notebook", "/api/scoreboard"}:
+            return self.send_response_body(*json_bytes(notebook_db.load_store()))
+        if path in {"/api/data/list", "/api/data-files"}:
+            files = notebook_db.list_data_files()
+            if path == "/api/data-files":
+                return self.send_response_body(*json_bytes({"schemaVersion": 1, "files": files}))
+            return self.send_response_body(*json_bytes(files))
+        if path in {"/api/data/latest"}:
+            data = notebook_db.read_latest_data()
+            if data is None:
+                return self.send_response_body(*json_bytes({"error": "no data json"}, HTTPStatus.NOT_FOUND))
+            return self.send_response_body(*json_bytes(data))
+        data_file = re.fullmatch(r"/api/data/([^/]+\.json)", path)
+        if data_file:
+            name = data_file.group(1)
+            path_obj = DATA_DIR / name
+            if not path_obj.is_file():
+                path_obj = ROOT / name
+            if not path_obj.is_file():
+                return self.send_response_body(*json_bytes({"error": "not found"}, HTTPStatus.NOT_FOUND))
+            raw = path_obj.read_bytes()
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return None
+        day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
+        if day_match:
+            day = notebook_db.get_day(day_match.group(1))
+            if day is None:
+                return self.send_response_body(*json_bytes({"error": "day not found"}, HTTPStatus.NOT_FOUND))
+            return self.send_response_body(*json_bytes(day))
         return self.handle_static(path)
 
     def do_POST(self):
-        parsed = urlparse(self.path)
-        if parsed.path != "/api/analyze":
-            return self.send_error(HTTPStatus.NOT_FOUND)
+        return self.handle_write()
 
+    def do_PUT(self):
+        return self.handle_write()
+
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
+        if day_match:
+            return self.send_response_body(*json_bytes(notebook_db.delete_day(day_match.group(1))))
+        return self.send_error(HTTPStatus.NOT_FOUND)
+
+    def read_json_body(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+        return json.loads(raw or "{}")
+
+    def handle_write(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
         try:
-            length = int(self.headers.get("Content-Length", "0"))
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            if path == "/api/verdicts":
+                return self.handle_save_verdict()
+            if path in {"/api/notebook", "/api/scoreboard", "/api/notebook/store", "/api/scoreboard/store"}:
+                payload = self.read_json_body()
+                return self.send_response_body(*json_bytes(notebook_db.save_store(payload)))
+            day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
+            if day_match:
+                payload = self.read_json_body()
+                return self.send_response_body(*json_bytes(notebook_db.put_day(day_match.group(1), payload)))
+            if path != "/api/analyze":
+                return self.send_error(HTTPStatus.NOT_FOUND)
+
+            payload = self.read_json_body()
             version = str(payload.get("version") or "").strip()
             raid = str(payload.get("raid") or "").strip()
             boss = str(payload.get("boss") or "").strip()
@@ -235,6 +294,52 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "eventsUrl": f"/api/jobs/{job.id}/events",
                 "resultUrl": f"/api/jobs/{job.id}/result",
             }, HTTPStatus.ACCEPTED))
+        except Exception as exc:
+            return self.send_response_body(*json_bytes({"error": str(exc)}, HTTPStatus.BAD_REQUEST))
+
+    def handle_save_verdict(self):
+        try:
+            payload = self.read_json_body()
+            date = str(payload.get("progressDate") or payload.get("date") or "").strip()
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+                raise ValueError("progressDate 必须是 YYYY-MM-DD")
+            # Prefer notebook DB day upsert when payload looks like scoreboard day
+            if payload.get("players") and any(isinstance(p, dict) and p.get("mechanics") for p in payload.get("players") or []):
+                return self.send_response_body(*json_bytes(notebook_db.put_day(date, payload)))
+            slim = {
+                "schemaVersion": 2,
+                "module": "final_verdict",
+                "progressDate": date,
+                "date": date,
+                "sourceReports": payload.get("sourceReports") or [],
+                "sourceFile": payload.get("sourceFile") or "",
+                "pointsPerCount": payload.get("pointsPerCount") or 10,
+                "updatedAt": payload.get("updatedAt") or time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "players": [
+                    {
+                        "name": row.get("name"),
+                        "recognitionCount": row.get("recognitionCount") or 0,
+                        "recognitionReasons": row.get("recognitionReasons") or "",
+                        "appealAcquittalCount": row.get("appealAcquittalCount") or 0,
+                        "appealAcquittalReasons": row.get("appealAcquittalReasons") or "",
+                        "iqLoss": row.get("iqLoss") or 0,
+                    }
+                    for row in (payload.get("players") or [])
+                    if row.get("name")
+                ],
+            }
+            path = VERDICT_DIR / f"verdict-{date}.json"
+            path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
+            notebook_db.put_day(date, {
+                "date": date,
+                "sourceReports": slim["sourceReports"],
+                "pointsPerCount": slim["pointsPerCount"],
+                "tankMultiplier": 0.5,
+                "updatedAt": slim["updatedAt"],
+                "players": [],
+                "legacyVerdict": slim["players"],
+            })
+            return self.send_response_body(*json_bytes({"ok": True, "path": str(path.relative_to(ROOT)).replace("\\", "/")}))
         except Exception as exc:
             return self.send_response_body(*json_bytes({"error": str(exc)}, HTTPStatus.BAD_REQUEST))
 
@@ -291,7 +396,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/": "/index.html",
             "/online": "/online.html",
             "/report": "/report.html",
-            "/mythic-dungeon": "/mythic-dungeon.html",
+            "/scoreboard": "/scoreboard.html",
+            "/verdict": "/scoreboard.html",
             "/LuraJudgement.html": "/report.html",
         }
         path = route_map.get(path, path)

@@ -1,53 +1,19 @@
-WoW Raid Analyzer 离线包（无需 Python）
-====================================
-编者：卫宇珩
+离线包使用说明（无需安装 Python）
+================================
 
-本离线包是纯静态文件。构建时会把 data/ 下全部 wcl_*.json（以及根目录
-兼容文件 wcl_hardcore_api.json、若存在的 verdict_data.json）完整映射烘焙进
-assets/vendor/wcl_hardcore_api.js，收件人可在报告页下拉切换多天日志。
+1. 运行仓库内 build_offline_package.bat（或 .ps1）生成：
+   - dist\wow_raidanalyzer_offline\
+   - dist\wow_raidanalyzer_offline.zip
+2. 打包脚本会复制：前端 HTML、assets、Boss 图标、data\wcl_*.json，并编译 RaidAnalyzer.exe
+3. 解压/进入 dist\wow_raidanalyzer_offline\ 后双击 start.bat
+4. 浏览器打开后：
+   - report.html：场面分析 / 开庭（顶部可切换 data\ 多份日志）
+     · P1 龌勒卢斯易伤异常在「扣分项目」；按场计数，不进个人终审
+   - scoreboard.html：智商记事本
+     · 10 项扣分始终展示；「团队」行收录龌勒易伤等机制计数
+     · 上一天/下一天按日历移动，空日也可进入
+     · 选中某份分析 JSON「导入到该开荒日」会跳到日志日期
+     · 时间显示为中国时间（UTC+8）
+     · 改动自动存本机；有宿主时顺带写本地库
 
-快速开始
---------
-1. 双击 start_offline.bat（会提示是否已内嵌数据；有 Python 则顺带起本地服务）。
-2. 或直接双击 index.html / report.html。
-3. 主报告：report.html（含开庭/终审 Excel 导出）；逐场场地：crown-fight-audit.html。
-
-数据如何自动加载
-----------------
-- 打包脚本会把 JSON 写成：
-    window.__WCL_DATA_BY_SOURCE__ = { "data/wcl_....json": {...}, ... }
-    window.__WCL_HARDCORE_DATA__ = <默认/兼容主源>
-    window.__VERDICT_DATA__ = {...}   （若构建时有 verdict_data.json）
-- 页面通过 offline-data-loader.js 按 URL 的 ?json= 路径取对应内嵌对象，
-  因此 file:// 也能切换多份日志。
-- 若未烘焙成功，file:// 下仍会弹出「选择复盘 JSON」作为兜底。
-
-更换 / 追加日志数据
-------------------
-1. 把新的导出放进工程 data/（命名：
-   单日志 wcl_<reportId>_<boss>_<开荒日YYYYMMDD>.json；
-   多日志 wcl_multi_<boss>_<导出日YYYYMMDD>.json）。兼容旧文件仍可放根目录
-   wcl_hardcore_api.json。
-2. 重新运行 build_offline_package.bat / .ps1，再分发新的 zip。
-3. 也可把 JSON 直接覆盖离线包 data/ 中的同名文件；有本地 HTTP 时可 fetch，
-   纯 file:// 仍建议重新烘焙以更新完整映射。
-
-URL 书签
---------
-报告页支持：
-  report.html?json=data/wcl_mH8AFN1xXq94J2kW_crown_of_the_cosmos.json
-便于多天日志快速辨识与分享。
-
-终审导出
---------
-- 在主报告「终审判决」确认后，浏览器直接生成 Excel：
-  智力表_Boss名称_日期.xlsx
-- 工作表名：Boss名字_时间；约定保存到 verdicts/
-- 实现：assets/vendor/verdict-xlsx.js（纯前端 OOXML，无需 Python / openpyxl）
-- file:// 与本地 HTTP 均可下载；建议手动放入 verdicts/ 归档。
-
-可选本地 HTTP
--------------
-双击 start_offline.bat 时若本机有 Python，会启动 offline_server.py
-（默认 http://127.0.0.1:8765/），并提供 /api/data-files 列举 data/。
-没有 Python 时直接打开 HTML，内嵌完整映射下功能完整可用。
+关闭 exe 黑窗口即停止本地服务。

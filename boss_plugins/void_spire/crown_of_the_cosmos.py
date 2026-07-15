@@ -190,6 +190,11 @@ P3_ADD_NAMES = {
     254173: "殆米阿尔",
     254174: "殁里乌姆",
 }
+VORELUTH_GAME_IDS = {254172, 243811}  # 实战日志中可见 243811
+VORELUTH_VULN_SKILL_KEY = "voreluthVulnerabilityFade"
+VORELUTH_VULN_SKILL_NAME = "P1 龌勒卢斯易伤异常"
+PASSAGE_CLIFF_SKILL_KEY = "passageCliffMistakes"
+PASSAGE_CLIFF_SKILL_NAME = "过场失误"
 DESIGNATED_HEALER_IDS = {
     int(value) for value in os.getenv("CROWN_DESIGNATED_HEALER_IDS", "").split(",")
     if value.strip().isdigit()
@@ -559,27 +564,6 @@ def merge_roles(existing_roles, new_roles):
     return sorted(roles, key=lambda role: order.get(role, 99))
 
 
-def build_fight_combatants(fight, actor_map, player_roles, actor_type=None):
-    """Players who participated in this crown fight (not whole-report friendlies).
-
-    Prefer WCL ``friendlyPlayers`` for the fight; also include CombatantInfo
-    role mapping. Falls back to combatant IDs when friendlyPlayers is unavailable.
-    """
-    player_roles = player_roles or {}
-    names = {}
-    candidate_ids = set(fight.get("friendlyPlayers") or []) | set(player_roles.keys())
-    for actor_id in candidate_ids:
-        kind = (actor_type or {}).get(actor_id)
-        if kind and kind != "Player":
-            continue
-        name = actor(actor_map, actor_id)
-        if not name or str(name).startswith("未知"):
-            continue
-        role = player_roles.get(actor_id, "unknown")
-        names[name] = merge_roles(names.get(name) or [], [role] if role and role != "unknown" else [])
-    return [{"name": name, "roles": roles} for name, roles in sorted(names.items(), key=lambda item: item[0])]
-
-
 def event_amount(event):
     return int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
 
@@ -594,17 +578,6 @@ def format_time(ms):
 
 def get_local_datetime(absolute_ms):
     return datetime.fromtimestamp(absolute_ms / 1000.0, CN_TZ)
-
-
-def raid_night_date_str(local_dt):
-    from analyzer_core.wcl_paths import to_raid_night_date
-    return to_raid_night_date(local_dt).isoformat()
-
-
-def raid_night_date_str(local_dt):
-    from analyzer_core.wcl_paths import to_raid_night_date
-    return to_raid_night_date(local_dt).isoformat()
-
 
 
 def deep_link(report_id, fight_id, view_type, event_time, before_ms=15_000, after_ms=2_000):
@@ -632,6 +605,308 @@ def event_is_apply(event):
 
 def event_is_remove(event):
     return str(event.get("type", "")).lower() in {"removebuff", "removedebuff"}
+
+
+def event_is_full_debuff_fade(event):
+    """Debuff 因层数/持续时间正常完整消失（非 removedebuffstack 的单层衰减事件）。"""
+    return str(event.get("type", "")).lower() == "removedebuff"
+
+
+def corruption_stack_at(debuffs, target_id, at_ts):
+    """还原目标在 at_ts 时刻腐化精华层数；完整 removedebuff 取断前层数。"""
+    stack = 0
+    for event in sorted((debuffs or []), key=lambda row: (row.get("timestamp", 0), str(row.get("type") or ""))):
+        if ability_id(event) != CORRUPTION_ID or event.get("targetID") != target_id:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if ts > at_ts:
+            break
+        etype = str(event.get("type") or "").lower()
+        if etype in {"applydebuff", "applydebuffstack", "refreshdebuff"}:
+            stack = int(event.get("stack") or stack or 1)
+        elif etype == "removedebuffstack":
+            if event.get("stack") is not None:
+                stack = int(event.get("stack") or 0)
+            else:
+                stack = max(0, stack - 1)
+        elif etype == "removedebuff":
+            if ts == at_ts:
+                if event.get("stack") is not None:
+                    return max(1, int(event.get("stack") or 1))
+                return max(1, stack) if stack else 1
+            stack = 0
+    return stack
+
+
+def is_voreluth_actor(actor_map, actor_game_id, actor_id):
+    if actor_id is None:
+        return False
+    game_id = (actor_game_id or {}).get(actor_id)
+    try:
+        if game_id is not None and int(game_id) in VORELUTH_GAME_IDS:
+            return True
+    except (TypeError, ValueError):
+        pass
+    name = str(actor(actor_map, actor_id) or "")
+    return "龌勒卢斯" in name or "Voreluth" in name or "Vorelus" in name
+
+
+
+def cliff_abandon_clusters(deaths, window_ms=8_000, min_size=4):
+    """短窗口内连续多起坠崖 → 视为跳崖放弃波（含灭团末尾大团放弃）。
+
+    注意：不能只取 first_bridge_cluster——前面若有零星坠崖，会把真正的放弃波漏掉（如 Fight18）。
+    """
+    return [
+        cluster
+        for cluster in cluster_events(bridge_deaths(deaths), window_ms=window_ms)
+        if len(cluster.get("events") or []) >= min_size
+    ]
+
+
+def timestamp_in_cliff_abandon_cluster(timestamp, clusters, pad_before_ms=1_000, pad_after_ms=2_000):
+    ts = int(timestamp or 0)
+    for cluster in clusters or []:
+        if int(cluster["start"]) - pad_before_ms <= ts <= int(cluster["end"]) + pad_after_ms:
+            return True
+    return False
+
+
+def build_passage_cliff_board(fight, deaths, markers, death_timeline, player_roles, reason_key):
+    """P2/P3 非转阶段窗口、非放弃跳崖波、且死亡序号仍 <8 的莫名坠崖 → 过场失误（必扣）。
+
+    P1 无场地缝隙：掉下去即视为放弃跳崖，一律不记本项；P1.5/P2.5 仍归属转阶段项。
+    密集坠崖簇（≥4 人 / 约 8s）整簇豁免，覆盖「进本阶段后大团放弃」误判。
+    """
+    ordered = sorted(deaths or [], key=lambda death: death.get("timestamp", 0))
+    # 约 8s 内 ≥4 人坠崖 = 跳崖放弃波；不依赖 classification，避免 first_bridge_cluster 被零星坠崖占坑
+    abandon_clusters = cliff_abandon_clusters(ordered)
+    timeline = list(death_timeline or [])
+    board = {}
+    for index, death in enumerate(ordered):
+        if index >= GLOBAL_DEATH_EXEMPT_THRESHOLD:
+            continue
+        if not is_bridge_death(death):
+            continue
+        phase = phase_at(death.get("timestamp", 0), markers, fight)
+        # P1 无缝隙；P1.5/P2.5 为转阶段窗口
+        if phase in {"P1", "P1.5", "P2.5"}:
+            continue
+        ts = int(death.get("timestamp") or 0)
+        if timestamp_in_cliff_abandon_cluster(ts, abandon_clusters):
+            continue
+        match = min(
+            (row for row in timeline if abs(int(row.get("absoluteTime") or 0) - ts) <= 20),
+            key=lambda row: abs(int(row.get("absoluteTime") or 0) - ts),
+            default=None,
+        )
+        if match and match.get("ability") == "转阶段击飞":
+            continue
+        name = (match or {}).get("player")
+        if not name:
+            continue
+        role = (match or {}).get("role") or (player_roles or {}).get(death.get("targetID"), "unknown")
+        position_ms = ts - int(fight["startTime"])
+        time_text = (match or {}).get("time") or format_time(position_ms)
+        item = board.setdefault(name, build_board_row(name, PASSAGE_CLIFF_SKILL_KEY, PASSAGE_CLIFF_SKILL_NAME, role=role))
+        item["hitCount"] += 1
+        item["deathCount"] += 1
+        item["events"].append({
+            "fightID": fight.get("id"),
+            "player": name,
+            "role": role,
+            "phase": phase,
+            "time": time_text,
+            "positionMs": position_ms,
+            "ability": "坠崖",
+            "abilityID": death.get("killingAbilityGameID"),
+            "counted": True,
+            "verdictCounted": True,
+            "displayOnly": False,
+            "countReason": (
+                f"{phase} 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第"
+                f"{GLOBAL_DEATH_EXEMPT_THRESHOLD}次内，按过场失误计数"
+            ),
+            "text": f"Fight{fight.get('id')} {name} 于 {time_text}（{phase}）死于坠崖 · 过场失误",
+        })
+    return sorted(board.values(), key=lambda row: row.get("deathCount", 0), reverse=True)
+
+
+def fight_tank_players(actor_map, player_roles):
+    """Return [(actor_id, name), ...] for players with tank role."""
+    tanks = []
+    for actor_id, role in (player_roles or {}).items():
+        if role != "tank":
+            continue
+        tanks.append((actor_id, actor(actor_map, actor_id)))
+    tanks.sort(key=lambda item: (item[1] or "", item[0] or 0))
+    return tanks
+
+
+def analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs):
+    """P1 龌勒卢斯易伤异常（按场计数，归因坦克）。
+
+    窗口：龌勒卢斯第一次被施加腐化精华 → 其幽影束缚消失之前。
+    同场多次完整 faded：每名坦克各计 fade 次数（不展示名单中的坦克仍写入 JSON，前端过滤）。
+    """
+    voreluth_ids = {
+        actor_id for actor_id in set(actor_map) | set(actor_game_id or {})
+        if is_voreluth_actor(actor_map, actor_game_id, actor_id)
+    }
+    if not voreluth_ids:
+        return None
+
+    fades = []
+    first_apply_ms = None
+    binding_gone_ms = None
+    for target_id in sorted(voreluth_ids):
+        corruption_applies = sorted(
+            (
+                event for event in debuffs or []
+                if ability_id(event) == CORRUPTION_ID
+                and event_is_apply(event)
+                and event.get("targetID") == target_id
+            ),
+            key=lambda event: event.get("timestamp", 0),
+        )
+        if not corruption_applies:
+            continue
+        first_apply = corruption_applies[0]
+        apply_ts = int(first_apply.get("timestamp") or 0)
+        apply_ms = apply_ts - int(fight["startTime"])
+        first_apply_ms = apply_ms if first_apply_ms is None else min(first_apply_ms, apply_ms)
+        binding_end = next(
+            (
+                event for event in sorted(
+                    (
+                        event for event in debuffs or []
+                        if ability_id(event) == P1_SHADOW_BINDING_ID
+                        and event_is_remove(event)
+                        and event.get("targetID") == target_id
+                    ),
+                    key=lambda event: event.get("timestamp", 0),
+                )
+                if int(event.get("timestamp") or 0) >= apply_ts
+            ),
+            None,
+        )
+        window_end = int(binding_end.get("timestamp") or 0) if binding_end else int(fight.get("endTime") or apply_ts)
+        if binding_end:
+            gone_ms = window_end - int(fight["startTime"])
+            binding_gone_ms = gone_ms if binding_gone_ms is None else max(binding_gone_ms, gone_ms)
+        for fade in sorted(
+            (
+                event for event in debuffs or []
+                if ability_id(event) == CORRUPTION_ID
+                and event_is_full_debuff_fade(event)
+                and event.get("targetID") == target_id
+            ),
+            key=lambda event: event.get("timestamp", 0),
+        ):
+            fade_ts = int(fade.get("timestamp") or 0)
+            if not (apply_ts < fade_ts < window_end):
+                continue
+            position_ms = fade_ts - int(fight["startTime"])
+            stack = corruption_stack_at(debuffs, target_id, fade_ts)
+            fades.append({
+                "time": format_time(position_ms),
+                "positionMs": position_ms,
+                "stack": stack,
+                "targetID": target_id,
+                "target": actor(actor_map, target_id),
+                "text": f"{format_time(position_ms)} 完整 faded，断时约 {stack} 层",
+            })
+
+    if not fades:
+        return None
+
+    fades.sort(key=lambda row: int(row.get("positionMs") or 0))
+    stack_parts = [f"{int(row.get('stack') or 0)}层@{row.get('time')}" for row in fades]
+    first_fade_ms = int(fades[0].get("positionMs") or 0)
+    stack_label = "、".join(f"{int(row.get('stack') or 0)}层" for row in fades)
+    return {
+        "fightID": fight.get("id"),
+        "fadeCount": len(fades),
+        "fades": fades,
+        "stacks": [int(row.get("stack") or 0) for row in fades],
+        "stackSummary": "、".join(stack_parts),
+        "applyTime": format_time(first_apply_ms) if first_apply_ms is not None else None,
+        "bindingGoneTime": format_time(binding_gone_ms) if binding_gone_ms is not None else None,
+        "bindingRemoved": binding_gone_ms is not None,
+        "time": format_time(first_fade_ms),
+        "positionMs": first_fade_ms,
+        "counted": True,
+        "verdictCounted": True,
+        "displayOnly": False,
+        "excludeFromCourtPlayers": False,
+        "isSystem": False,
+        "countReason": "腐化精华在幽影束缚仍存在期间因层数/时间完整消失，记为龌勒卢斯易伤异常（当场坦克各计 fade 次；受第8死豁免）",
+        "text": (
+            f"Fight{fight.get('id')} 龌勒卢斯腐化精华完整 faded ×{len(fades)}"
+            f"（断层：{stack_label}；首次 apply {format_time(first_apply_ms) if first_apply_ms is not None else '-'}"
+            + (
+                f"，束缚移除 {format_time(binding_gone_ms)}"
+                if binding_gone_ms is not None else "，束缚至灭团未移除"
+            )
+            + "）"
+        ),
+    }
+
+
+def build_voreluth_vulnerability_board(fight, actor_map, actor_game_id, debuffs, player_roles=None):
+    summary = analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs)
+    if not summary:
+        return [], None
+    tanks = fight_tank_players(actor_map, player_roles)
+    if not tanks:
+        row = build_board_row(f"Fight{fight.get('id')}", VORELUTH_VULN_SKILL_KEY, VORELUTH_VULN_SKILL_NAME, role="unknown")
+        row["hitCount"] = int(summary.get("fadeCount") or 0)
+        row["isSystem"] = True
+        row["excludeFromCourtPlayers"] = True
+        row["events"] = [summary]
+        return [row], summary
+
+    rows = []
+    for actor_id, name in tanks:
+        if not name:
+            continue
+        row = build_board_row(name, VORELUTH_VULN_SKILL_KEY, VORELUTH_VULN_SKILL_NAME, role="tank")
+        tank_events = []
+        for fade in summary.get("fades") or []:
+            stack = int(fade.get("stack") or 0)
+            tank_events.append({
+                "fightID": fight.get("id"),
+                "player": name,
+                "targetID": actor_id,
+                "role": "tank",
+                "time": fade.get("time"),
+                "positionMs": fade.get("positionMs"),
+                "stack": stack,
+                "fadeCount": 1,
+                "fades": [fade],
+                "counted": True,
+                "verdictCounted": True,
+                "displayOnly": False,
+                "excludeFromCourtPlayers": False,
+                "isSystem": False,
+                "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，当场坦克计数",
+                "text": (
+                    f"Fight{fight.get('id')} {name}（坦克）· {fade.get('time')} "
+                    f"龌勒卢斯腐化精华完整 faded（断时约 {stack} 层）"
+                ),
+            })
+        row["hitCount"] = len(tank_events)
+        row["events"] = tank_events
+        rows.append(row)
+    tank_names = "、".join(name for _, name in tanks if name)
+    summary = {
+        **summary,
+        "attributedTanks": [name for _, name in tanks if name],
+        "text": f"{summary.get('text')}；归因坦克：{tank_names or '无'}",
+    }
+    return rows, summary
+
+
 
 
 def cluster_events(events, window_ms=3_000):
@@ -910,66 +1185,9 @@ def is_bridge_cluster_significant(cluster):
 
 
 def first_bridge_cluster(deaths):
-    """Largest significant bridge cluster (prefer terminal mass-jump over early lone falls)."""
     bridge_rows = bridge_deaths(deaths)
     clusters = cluster_events(bridge_rows, window_ms=5_000)
-    if not clusters:
-        return None
-    significant = [cluster for cluster in clusters if len(cluster.get("events", [])) >= 2]
-    pool = significant or clusters
-    return max(pool, key=lambda cluster: (len(cluster.get("events", [])), cluster.get("start", 0)))
-
-
-def first_enrage_timestamp(buffs):
-    """Earliest Boss 狂暴 / enrage apply among ENRAGE_IDS (27680/26662/1239672)."""
-    stamps = [
-        int(event.get("timestamp") or 0)
-        for event in (buffs or [])
-        if ability_id(event) in ENRAGE_IDS and event_is_apply(event)
-    ]
-    return min(stamps) if stamps else None
-
-
-def death_after_boss_enrage(death, enrage_at):
-    if enrage_at is None or not death:
-        return False
-    return int(death.get("timestamp") or 0) >= int(enrage_at)
-
-
-def is_enrage_tank_death(death, enrage_at):
-    """Tank-signal death after Boss enrage — not the tank's fault (不入板)."""
-    if not death_after_boss_enrage(death, enrage_at):
-        return False
-    return death.get("killingAbilityGameID") in TANK_DEATH_IDS
-
-
-def terminal_abandon_bridge_cluster(deaths):
-    """Mass-jump cluster used for跳楼豁免; ignores early lone 坠崖."""
-    bridge_rows = bridge_deaths(deaths)
-    if not bridge_rows:
-        return None
-    clusters = cluster_events(bridge_rows, window_ms=5_000)
-    candidates = [cluster for cluster in clusters if len(cluster.get("events", [])) >= 3]
-    if not candidates and is_mass_abandon(deaths, bridge_rows):
-        candidates = [cluster for cluster in clusters if len(cluster.get("events", [])) >= 2]
-    if not candidates:
-        return None
-    return max(candidates, key=lambda cluster: (len(cluster.get("events", [])), cluster.get("start", 0)))
-
-
-def is_p15_abandon_jump(death_row, abandon_cluster, markers, fight):
-    """Only P1.5 cliff deaths inside the terminal abandon cluster are 跳楼豁免."""
-    if not abandon_cluster or death_row.get("abilityID") not in {None, 3}:
-        return False
-    start = int(abandon_cluster.get("start") or 0)
-    end = int(abandon_cluster.get("end") or start)
-    if phase_at(start, markers, fight) != "P1.5":
-        return False
-    absolute = death_row.get("absoluteTime")
-    if absolute is None:
-        absolute = int(fight["startTime"]) + display_time_to_ms(death_row.get("time"))
-    absolute = int(absolute)
-    return (start - 1_000) <= absolute <= (end + 8_000)
+    return clusters[0] if clusters else None
 
 
 def has_prior_real_death(deaths, timestamp):
@@ -1022,24 +1240,16 @@ def classify_fight(fight, deaths, markers, buffs):
         pull_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in PULL_DEATH_IDS]
     shadow_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") in SHADOW_AOE_IDS]
     tank_deaths = [death for death in phase_deaths[:3] if death.get("killingAbilityGameID") in TANK_DEATH_IDS]
-    enrage_at = first_enrage_timestamp(buffs)
-    enrage_events = [event for event in buffs if ability_id(event) in ENRAGE_IDS and event_is_apply(event)]
-    enrage_tank_deaths = [death for death in tank_deaths if is_enrage_tank_death(death, enrage_at)]
-    # 狂暴后的坦克死亡不归责；也不在 P1.5 使用倒T 归因。
-    actionable_tank_deaths = [
-        death for death in tank_deaths
-        if not is_enrage_tank_death(death, enrage_at)
-    ] if phase != "P1.5" else []
     phase_bridge_deaths = bridge_deaths(phase_deaths)
     bridge_cluster = first_bridge_cluster(deaths)
     bridge_cluster_phase = phase_at(bridge_cluster["start"], markers, fight) if bridge_cluster else phase
+    enrage_events = [event for event in buffs if ability_id(event) in ENRAGE_IDS and event_is_apply(event)]
     rage_events = [event for event in buffs if ability_id(event) == RAGE_STACK_ID and event_is_apply(event)]
     gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == P3_LINE_DEATH_ID]
     cosmic_barrier_deaths = [death for death in phase_deaths if death.get("killingAbilityGameID") == COSMIC_BARRIER_ID]
     decisive_cluster = decisive_death_cluster(deaths)
     prior_unique_deaths = unique_player_death_count_before(deaths, decisive_cluster["start"]) if decisive_cluster else 0
     gravity_cluster = first_gravity_collapse_cluster(deaths)
-    reached_p15 = bool(markers.get("p15Start") and fight["endTime"] > markers["p15Start"])
 
     if fight.get("kill"):
         return {"key": "kill", "phase": "已击杀", "label": "已击杀"}
@@ -1056,34 +1266,13 @@ def classify_fight(fight, deaths, markers, buffs):
             return {"key": "phase_abandon", "phase": "P1", "label": "P1 放弃/add"}
         if rage_events and duration < P1_RAGE_LIMIT_MS:
             return {"key": "p1_add_rage", "phase": "P1", "label": "P1 大怪狂暴"}
-        if enrage_tank_deaths:
-            # Boss 狂暴后砸坦：不入板、不归责倒T；若已硬推入 P1.5 仍按狂暴结果标注。
-            label = "P1 Boss狂暴后坦死（不入板）"
-            if reached_p15:
-                label = "P1 Boss狂暴后硬推 P1.5（坦死不入板）"
-            return {"key": "p1_boss_enrage", "phase": "P1", "label": label, "boardExclude": True}
-        if actionable_tank_deaths:
+        if tank_deaths:
             return {"key": "tank_death", "phase": "P1", "label": "P1 倒坦"}
         return {"key": "p1_team_collapse", "phase": "P1", "label": "P1 团队减员过多"}
 
     if phase == "P1.5":
-        # P1.5 永不走倒T / tank_death 归责。
-        if enrage_tank_deaths and is_mass_abandon(deaths, phase_bridge_deaths):
-            return {
-                "key": "phase_abandon",
-                "phase": "P1.5",
-                "label": "P1.5 坠崖（Boss狂暴后坦死不入板）",
-                "boardExclude": True,
-            }
         if is_mass_abandon(deaths, phase_bridge_deaths):
             return {"key": "phase_abandon", "phase": "P1.5", "label": "P1.5 坠崖"}
-        if enrage_tank_deaths:
-            return {
-                "key": "p15_team_collapse",
-                "phase": "P1.5",
-                "label": "P1.5 减员过多（Boss狂暴后坦死不入板）",
-                "boardExclude": True,
-            }
         if len(pull_deaths) >= 2:
             return {"key": "p15_pull_deaths", "phase": "P1.5", "label": "P1.5 过多玩家死于拉弓 / 跑位"}
         return {"key": "p15_team_collapse", "phase": "P1.5", "label": "P1.5 减员过多"}
@@ -1117,7 +1306,7 @@ def classify_fight(fight, deaths, markers, buffs):
             return {"key": "p2_pull_deaths", "phase": phase, "label": f"{phase} 过多玩家死于拉弓"}
         if shadow_deaths:
             return {"key": "p2_shadow_aoe", "phase": phase, "label": "银色幻影过多团血崩溃"}
-        if actionable_tank_deaths:
+        if tank_deaths:
             return {"key": "tank_death", "phase": phase, "label": f"{phase} 倒坦"}
         return {"key": "p2_aoe_collapse", "phase": phase, "label": f"{phase} 常规 AoE 团血崩溃"}
 
@@ -1253,6 +1442,28 @@ def is_melurium_arrow_slot(expected_ms, arrow=None):
     return False
 
 
+def p1_arrow_rows_confirm_hit(p1_arrow_rows, expected_target, arrow=None):
+    """True when analyze_p1_arrows already recorded a successful clear for this expected slot.
+
+    Used as a court fallback when fieldAudit geometric / ±2.5s-around-mark-remove evidence
+    is empty (binding often drops near mark apply, seconds before mark remove).
+    """
+    if not expected_target:
+        return False
+    marked = {name for name in (arrow or {}).get("markedPlayers") or [] if name}
+    for row in p1_arrow_rows or []:
+        if row.get("kind") not in {"binding_removed", "silver_residue", "field_audit_boss_hit"}:
+            continue
+        target = str(row.get("target") or "")
+        if expected_target not in target and target not in expected_target:
+            continue
+        row_players = {player.get("name") for player in (row.get("markedPlayers") or []) if player.get("name")}
+        if marked and row_players and marked.isdisjoint(row_players):
+            continue
+        return True
+    return False
+
+
 def event_target_name(actor_map, event):
     return actor(actor_map, event.get("targetID"))
 
@@ -1266,47 +1477,6 @@ def event_hits_expected_target(actor_map, event, expected):
 def is_boss_binding_target(actor_map, event):
     target_name = event_target_name(actor_map, event)
     return any(name in target_name or target_name in name for name in P1_ARROW_TARGETS.values())
-
-
-def finalize_p1_boss_attribution(marked_positions, attribution, boss_hit_events):
-    """Fill hitBoss from binding-remove evidence when ray geometry fails.
-
-    Silver-arrow success is proven by P1 binding/corruption remove on an add.
-    Per-player ray attribution can falsely miss when Alleria's snapshot position
-    is stale (low confidence / multi-second delta), leaving hitBoss=false even
-    though p1BossHitEvents already recorded the remove.
-    """
-    hit_boss_names = list(dict.fromkeys(
-        event.get("boss") for event in boss_hit_events or [] if event.get("boss")
-    ))
-    attrs = [dict(row) for row in attribution or []]
-    if not hit_boss_names:
-        return attrs
-    if any(row.get("hitBoss") for row in attrs):
-        return attrs
-    if attrs:
-        for row in attrs:
-            row["bosses"] = list(hit_boss_names)
-            row["hitBoss"] = True
-            row["attributionSource"] = "binding_remove_fallback"
-        return attrs
-    for marked in marked_positions or []:
-        attrs.append({
-            "targetID": marked.get("targetID"),
-            "player": marked.get("player"),
-            "bosses": list(hit_boss_names),
-            "hitBoss": True,
-            "attributionSource": "binding_remove_fallback",
-        })
-    return attrs
-
-
-def p1_silver_arrow_round_succeeded(arrow):
-    """Round succeeds if any attributed player hit, or binding-remove events exist."""
-    attributions = (arrow or {}).get("p1BossAttribution") or []
-    if any(row.get("hitBoss") for row in attributions):
-        return True
-    return bool((arrow or {}).get("p1BossHitEvents"))
 
 
 def silver_arrow_mark_clusters(fight, actor_map, debuffs, markers):
@@ -1410,6 +1580,7 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
     ]
     issues = []
     rows = []
+    claimed_binding_removes = set()
     duration = fight["endTime"] - fight["startTime"]
     for expected in P1_EXPECTED_ARROW_MS:
         if duration < expected - P1_EXPECTED_TOLERANCE_MS:
@@ -1530,6 +1701,7 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
                 ),
                 default=0,
             )
+        claimed_binding_removes.add(id(hit))
         rows.append({
             "time": format_time(fight_elapsed(hit, fight)),
             "kind": "binding_removed",
@@ -1540,6 +1712,8 @@ def analyze_p1_arrows(fight, actor_map, buffs, debuffs, damage_events, markers):
             "text": f"{target} 银锋箭判定成功：{evidence_label}，本轮点名为 {arrow_mark_names(mark_cluster)}，腐化精华约 {stack} 层",
         })
     for hit in binding_removes:
+        if id(hit) in claimed_binding_removes:
+            continue
         elapsed = fight_elapsed(hit, fight)
         expected = nearest_expected_arrow(elapsed)
         if abs(elapsed - expected) > P1_EXPECTED_TOLERANCE_MS:
@@ -2168,11 +2342,25 @@ def apply_global_death_exemption(local_board, deaths, fight):
                 row["hitCount"] = len(counted_events)
                 row["countedCount"] = len(counted_events)
                 row["uncountedCount"] = len(events) - len(counted_events)
-                if skill_key == "collapsingVoidSnapAiming":
+                if skill_key == VORELUTH_VULN_SKILL_KEY:
+                    # 每条 event 可能是「一次 fade」或旧版「同场汇总」
+                    def _fade_n(event):
+                        n = int(event.get("fadeCount") or 0)
+                        if n:
+                            return n
+                        fades = event.get("fades")
+                        return len(fades) if isinstance(fades, list) and fades else 1
+
+                    row["hitCount"] = sum(_fade_n(event) for event in counted_events)
+                    row["countedCount"] = row["hitCount"]
+                    row["uncountedCount"] = sum(
+                        _fade_n(event) for event in events if event.get("counted") is False
+                    )
+                elif skill_key == "collapsingVoidSnapAiming":
                     row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted_events)
                 elif skill_key == "gravityLineViolation":
                     row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted_events)
-                elif skill_key in {"p1SilverArrowDeaths", "p15AvoidableDeaths"}:
+                elif skill_key in {"p1SilverArrowDeaths", "p15AvoidableDeaths", PASSAGE_CLIFF_SKILL_KEY}:
                     row["deathCount"] = len(counted_events)
                 elif skill_key == "tankRiftSlashFailure":
                     row["deathCount"] = sum(1 for event in counted_events if event.get("causedTankDeath"))
@@ -2308,7 +2496,13 @@ def merge_board(global_board, local_board):
                 "totalDamage": 0,
                 "damageText": row.get("damageText"),
                 "events": [],
+                "isNpc": bool(row.get("isNpc")),
+                "excludeFromCourtPlayers": bool(row.get("excludeFromCourtPlayers") or row.get("isNpc")),
             })
+            merged["isNpc"] = bool(merged.get("isNpc") or row.get("isNpc"))
+            merged["excludeFromCourtPlayers"] = bool(
+                merged.get("excludeFromCourtPlayers") or row.get("excludeFromCourtPlayers") or row.get("isNpc")
+            )
             merged["roles"] = merge_roles(merged.get("roles"), row.get("roles") or ([] if row.get("role") in {None, "", "unknown"} else [row.get("role")]))
             merged["role"] = merged["roles"][0] if merged["roles"] else (row.get("role") or merged.get("role") or "unknown")
             merged["hitCount"] += row.get("hitCount", 0)
@@ -3589,15 +3783,6 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             max_stack = max((int(event.get("stack") or event.get("stacks") or 0) for event in rage_rows), default=0)
             investigation = f"P1 龌勒卢斯出现回响黑暗叠层，最高约 {max_stack} 层，且灭团时间早于 2:45，判定为 P1 大怪狂暴。"
             wcl_link = deep_link(report_id, fight["id"], "buffs", rage_rows[-1]["timestamp"], 20_000, 5_000) if rage_rows else ""
-        elif reason_key == "p1_boss_enrage":
-            enrage_at = first_enrage_timestamp(detail_buffs)
-            enrage_text = format_time(enrage_at - fight["startTime"]) if enrage_at else "未知"
-            investigation = (
-                f"Boss 已于 {enrage_text} 获得狂暴；随后出现的坦克相关死亡归因为狂暴，不入开庭板、不归责倒T。"
-            )
-            if markers.get("p15Start") and fight["endTime"] > markers["p15Start"]:
-                investigation += " 团队硬推进入 P1.5 后的死亡同样不按倒T 计。"
-            wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
         elif reason_key in {"p1_team_collapse", "tank_death"}:
             if p1_arrow_issues:
                 wipe_reason = "P1 银锋箭处理异常"
@@ -3684,6 +3869,12 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             ranger_text = f" P2 消能异常：{'; '.join(row['text'] for row in energy_misses[:4])}。" if energy_misses else " 请同步检查 P2 游侠队长印记连线是否按时消到 Boss 能量。"
             investigation = f"玩家陆续死于噬灭宇宙，判定为奥蕾莉亚狂暴；请同步检查 P2 是否提前结束。{ranger_text}"
             wcl_link = deaths_link(report_id, fight["id"]) if deaths else ""
+        elif reason_key == "tank_death":
+            first_death_ts = deaths[0]["timestamp"] if deaths else fight["endTime"]
+            echo_stack = max_buff_stack_before(detail_buffs, RAGE_STACK_ID, first_death_ts)
+            stack_text = f"死亡前回响黑暗最高约 {echo_stack} 层。" if echo_stack else ""
+            investigation = f"最早 3 个死亡中出现坦克相关死亡，判定为倒坦。{stack_text}"
+            wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
         else:
             investigation = f"{phase} 阶段死亡总人数 {len(deaths)}，未命中更具体机制，归因为常规 AoE/团队减员崩溃。"
             wcl_link = deep_link(report_id, fight["id"], "damage-taken", deaths[0]["timestamp"], 20_000, 5_000) if deaths else ""
@@ -3785,6 +3976,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     local_board = {
         "p15AvoidableDeaths": [],
+        PASSAGE_CLIFF_SKILL_KEY: [],
         "collapsingVoidSnapAiming": snap_aiming_rows,
         "missedEnergy": list(missed_energy_board.values()),
         "interferenceShockInterrupts": [],
@@ -3795,10 +3987,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         "missedShadows": [],
         "gravityLineViolation": [],
         "tankRiftSlashFailure": [],
+        VORELUTH_VULN_SKILL_KEY: [],
     }
     local_board.update(analyze_avoidable_damage(
         fight, actor_map, actor_type, player_roles, detail_damage, deaths, markers,
     ))
+    voreluth_rows, voreluth_summary = build_voreluth_vulnerability_board(
+        fight, actor_map, actor_game_id, detail_debuffs, player_roles=player_roles,
+    )
+    local_board[VORELUTH_VULN_SKILL_KEY] = voreluth_rows
 
     shock_board = {}
     for shock in interference_rows:
@@ -3924,11 +4121,17 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             continue
         used_arrow_ids.add(arrow.get("id"))
         attributions = arrow.get("p1BossAttribution") or []
+        expected_target = expected_arrow_target(expected_ms)
         # 一轮银锋箭由两名玩家共同完成：任一人正确命中目标 Boss/add，
-        # 视为本轮机制成功完成，不进入开庭（既不计也不展示为“不计数豁免”）。
-        # 只有两人均未命中时，两人才各计 1 次失误。
-        # 另：幽影束缚/腐化精华移除事件是硬证据；射线归因失败时不应定罪。
-        if p1_silver_arrow_round_succeeded(arrow):
+        # 或场地审计已确认 Boss/add 幽影束缚被移除，均视为本轮机制成功完成。
+        # （几何归因偶发丢射线时，以 p1BossHitEvents 为准；若场地窗口漏掉束缚移除，
+        #  则以 analyze_p1_arrows 成功行兜底，避免「已射死目标仍记双人空射」。）
+        round_success = (
+            any(row.get("hitBoss") for row in attributions)
+            or bool(arrow.get("p1BossHitEvents"))
+            or p1_arrow_rows_confirm_hit(p1_arrow_rows, expected_target, arrow)
+        )
+        if round_success:
             continue
         # 第5轮（~99.35s 殁里乌姆档）：双人空射且殁里乌姆已死 → 预期空射，不入板；
         # 双人空射且殁里乌姆仍存活 → 定罪计数。
@@ -4059,16 +4262,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         })
     local_board["gravityLineViolation"] = list(gravity_board.values())
 
-    abandon_cluster = terminal_abandon_bridge_cluster(deaths)
-    transition_abandoned = bool(
-        (reason_key == "phase_abandon" and phase == "P1.5" and abandon_cluster)
-        or (
-            abandon_cluster
-            and phase_at(abandon_cluster["start"], markers, fight) == "P1.5"
-            and is_mass_abandon(deaths, bridge_deaths(deaths))
-        )
-    )
-    enrage_at = first_enrage_timestamp(detail_buffs)
+    transition_abandoned = reason_key == "phase_abandon" or is_mass_abandon(deaths, bridge_deaths(deaths))
 
     rift_board = {}
     for slash in rift_slash_rows:
@@ -4096,38 +4290,31 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             row["spellKey"] = "p15AvoidableDeaths"
             row["spellName"] = "转阶段死亡"
             row["damageText"] = "-"
-            ability_name = death_row.get("ability") or "未知技能"
-            absolute = int(death_row.get("absoluteTime") or (fight["startTime"] + display_time_to_ms(death_row.get("time"))))
-            is_abandon_jump = is_p15_abandon_jump(death_row, abandon_cluster, markers, fight)
-            is_enrage_exclude = bool(
-                death_row.get("abilityID") in TANK_DEATH_IDS
-                and enrage_at is not None
-                and absolute >= int(enrage_at)
-            )
-            # 狂暴后坦死：完全不入开庭板（非“不计数展示”）。
-            if is_enrage_exclude:
-                continue
-            counted = not is_abandon_jump
-            count_reason = (
-                "识别为团队主动跳崖重开，仅展示不计数"
-                if is_abandon_jump else "确认发生于P1.5转阶段，按转阶段死亡计数"
-            )
-            text_suffix = "（主动跳崖重开）" if is_abandon_jump else "（转阶段死亡计数）"
             row["hitCount"] += 1
             row["deathCount"] += 1
+            is_abandon_jump = bool(
+                transition_abandoned
+                and death_row.get("abilityID") in {None, 3}
+            )
+            ability_name = death_row.get("ability") or "未知技能"
             row["events"].append({
                 **death_row,
-                "positionMs": absolute - int(fight["startTime"]),
+                "positionMs": int(death_row.get("absoluteTime") or 0) - int(fight["startTime"]),
                 "deathCount": 1,
                 "ability": ability_name,
-                "counted": counted,
-                "countReason": count_reason,
-                "text": f"{name} 于 {death_row.get('time')} 死于【{ability_name}】{text_suffix}",
+                "counted": not is_abandon_jump,
+                "countReason": (
+                    "识别为团队主动跳崖重开，仅展示不计数"
+                    if is_abandon_jump else "确认发生于P1.5转阶段，按转阶段死亡计数"
+                ),
+                "text": (
+                    f"{name} 于 {death_row.get('time')} 死于【{ability_name}】"
+                    + ("（主动跳崖重开）" if is_abandon_jump else "（转阶段死亡计数）")
+                ),
             })
-    local_board["p15AvoidableDeaths"] = sorted(
-        (row for row in p15_death_rows.values() if row.get("events")),
-        key=lambda item: item["deathCount"],
-        reverse=True,
+    local_board["p15AvoidableDeaths"] = sorted(p15_death_rows.values(), key=lambda item: item["deathCount"], reverse=True)
+    local_board[PASSAGE_CLIFF_SKILL_KEY] = build_passage_cliff_board(
+        fight, deaths, markers, death_timeline, player_roles, reason_key,
     )
 
     for board_rows in local_board.values():
@@ -4136,13 +4323,11 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 board_event.setdefault("fightID", fight["id"])
     global_exemption = apply_global_death_exemption(local_board, deaths, fight)
 
-    combatants = build_fight_combatants(fight, actor_map, player_roles, actor_type)
-
     return {
         "reportID": report_id,
         "fightID": fight["id"],
         "fightName": fight.get("name"),
-        "date": raid_night_date_str(local_start),
+        "date": local_start.strftime("%Y-%m-%d"),
         "startClock": local_start.strftime("%H:%M"),
         "startDateTime": local_start.strftime("%Y-%m-%d %H:%M"),
         "duration": format_time(duration_ms),
@@ -4157,7 +4342,6 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         "wipeReason": wipe_reason,
         "investigation": investigation,
         "wclDeepLink": wcl_link,
-        "combatants": combatants,
         "deathTimeline": death_timeline,
         "transitionDetails": transition_details,
         "trialRecords": trial_records,
@@ -4184,11 +4368,12 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "voidRepulsionRecords": void_repulsion_records,
             "voidGraspHealing": void_grasp_healing,
             "interferenceShockRows": interference_rows,
+            "voreluthVulnerabilityFade": voreluth_summary,
             "p3PortalSummons": p3_portal_summons,
             "riftSlashTankSwaps": rift_slash_rows,
             "transitionAbandoned": transition_abandoned,
             "globalExemption": global_exemption,
-            "fieldAuditUrl": f"crown-fight-audit.html?report={report_id}&fight={fight['id']}",
+            "fieldAuditUrl": f"crown-fight-audit.html?source=wcl_hardcore_api.json&report={report_id}&fight={fight['id']}",
             "fieldAudit": field_audit,
         },
     }
@@ -4336,8 +4521,6 @@ def build_aggregated_json(report_ids):
             "raidName": "虚影尖塔",
             "bossKey": "crown_of_the_cosmos",
             "bossName": "宇宙之冕",
-            "author": "卫宇珩",
-            "editor": "卫宇珩",
             "features": {"interrupts": False, "avoidableTotal": False, "avoidableLabel": "开庭面板", "transitionDetails": True, "finalVerdict": True},
             "avoidableSpells": {
                 "p15AvoidableDeaths": "转阶段死亡",
@@ -4350,6 +4533,8 @@ def build_aggregated_json(report_ids):
                 "p1SilverArrowMissedFights": "P1 银锋箭射怪失误",
                 **{key: row["name"] for key, row in AVOIDABLE_DAMAGE_SPELLS.items()},
                 "interferenceShockInterrupts": "干扰震荡打断",
+                VORELUTH_VULN_SKILL_KEY: VORELUTH_VULN_SKILL_NAME,
+                PASSAGE_CLIFF_SKILL_KEY: PASSAGE_CLIFF_SKILL_NAME,
                 "gravityLineViolation": "P3 重力坍缩违规致死",
                 "tankRiftSlashFailure": "P2 裂隙挥砍换坦失误",
             },
@@ -4368,7 +4553,6 @@ def build_aggregated_json(report_ids):
     }
 
     field_audit_cache = {}
-    roster = {}
     cache_path = os.getenv("CROWN_FIELD_AUDIT_CACHE", "").strip()
     if cache_path and Path(cache_path).exists():
         try:
@@ -4424,31 +4608,6 @@ def build_aggregated_json(report_ids):
             merge_board(global_board, fight_result["avoidableSummary"])
             final_output["data"]["page1_wipeAnalysis"].append(fight_result)
 
-    # Roster = union of players who entered crown fights only (not whole-report actors).
-    for fight_result in final_output["data"]["page1_wipeAnalysis"]:
-        for combatant in fight_result.get("combatants") or []:
-            name = combatant.get("name")
-            if not name or str(name).startswith("未知"):
-                continue
-            roster[name] = merge_roles(roster.get(name) or [], combatant.get("roles") or [])
-        for death in fight_result.get("deathTimeline") or []:
-            name = death.get("player")
-            if not name:
-                continue
-            role = death.get("role")
-            roster[name] = merge_roles(roster.get(name) or [], [role] if role else [])
-        for board_rows in (fight_result.get("avoidableSummary") or {}).values():
-            for row in board_rows or []:
-                name = row.get("name")
-                if not name:
-                    continue
-                roster[name] = merge_roles(roster.get(name) or [], row.get("roles") or ([row.get("role")] if row.get("role") else []))
-
-    final_output["meta"]["combatantRoster"] = [
-        {"name": name, "roles": roles}
-        for name, roles in sorted(roster.items(), key=lambda item: item[0])
-    ]
-
     final_output["data"]["page2_avoidableBoard"] = {
         key: sorted(rows.values(), key=lambda item: (item["deathCount"], item["hitCount"], item["totalDamage"]), reverse=True)
         for key, rows in global_board.items()
@@ -4491,7 +4650,7 @@ def build_aggregated_json(report_ids):
             continue
         for row in rows:
             name = row.get("name")
-            if not name:
+            if not name or row.get("isSystem") or row.get("excludeFromCourtPlayers"):
                 continue
             item = verdict_players.setdefault(name, {"name": name, "roles": [], "recognitionCount": 0, "appealAcquittalCount": acquittals.get(name, 0), "breakdown": {}, "penaltyUnits": 0.0})
             item["roles"] = merge_roles(item["roles"], row.get("roles") or [row.get("role", "unknown")])

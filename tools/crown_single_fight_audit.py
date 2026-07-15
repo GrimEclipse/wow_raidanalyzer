@@ -39,7 +39,6 @@ except ModuleNotFoundError:
     group_by_window,
     )
 from boss_plugins.common import build_player_mechanic_roles
-from boss_plugins.void_spire.crown_of_the_cosmos import finalize_p1_boss_attribution
 
 
 FIGHT_ID = 30
@@ -1241,15 +1240,28 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
                     "players": [event_actor_name(actor_map, actor_game_id, event.get("targetID")) for event in assigned],
                     "bossEnergyDrained": bool(drains),
                 })
+        # P1 银锋箭：Boss 束缚/腐化常在「点名 apply」附近被清掉，而 effect_ts 取的是点名
+        # remove（箭实际射出感）。实战中两者可相差 >2.5s（如 Fight21 #2：apply/束缚≈00:40，
+        # remove≈00:43.5）。窗口需覆盖 apply→remove，与 analyze_p1_arrows 一致。
         p1_enemy_removes = [
             event for event in events.get("enemyDebuffs", [])
             if ability_id(event) in P1_BINDING_IDS and "remove" in event_type(event)
-            and abs(event.get("timestamp", 0) - effect_ts) <= 2_500
+            and group["start"] - 1_000 <= event.get("timestamp", 0) <= effect_ts + 2_500
         ] if phase_name == "P1" else []
-        boss_by_id = {row.get("id"): row for row in snapshot_at(effect_ts, [], bosses, position_index, actor_map, actor_game_id)["bosses"]}
+        # 几何归因：优先用束缚移除时刻的 Boss 快照（目标死后 effect_ts 快照里会缺席）
+        geometry_ts = min((event.get("timestamp", 0) for event in p1_enemy_removes), default=effect_ts)
+        boss_by_id = {row.get("id"): row for row in snapshot_at(geometry_ts, [], bosses, position_index, actor_map, actor_game_id)["bosses"]}
         alleria = next((row for row in boss_by_id.values() if row.get("gameID") == ALLERIA_GAME_ID and row.get("position")), None)
+        if not alleria:
+            alleria = next(
+                (
+                    row for row in snapshot_at(effect_ts, [], bosses, position_index, actor_map, actor_game_id)["bosses"]
+                    if row.get("gameID") == ALLERIA_GAME_ID and row.get("position")
+                ),
+                None,
+            )
         p1_boss_attribution = []
-        if alleria:
+        if alleria and alleria.get("position"):
             start = (alleria["position"]["x"], alleria["position"]["y"])
             removed_ids = {event.get("targetID") for event in p1_enemy_removes}
             for marked in marked_positions:
@@ -1271,7 +1283,7 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
                     if boss and boss.get("position") and distance_point_to_segment((boss["position"]["x"], boss["position"]["y"]), start, end) <= 500:
                         matched.append(boss.get("name"))
                 p1_boss_attribution.append({"targetID": marked.get("targetID"), "player": marked["player"], "bosses": matched, "hitBoss": bool(matched)})
-        p1_boss_hit_events = [
+        p1_hit_events = [
             {
                 "targetID": event.get("targetID"),
                 "boss": event_actor_name(actor_map, actor_game_id, event.get("targetID")),
@@ -1279,12 +1291,6 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
             }
             for event in p1_enemy_removes
         ]
-        # Ray geometry uses Alleria→markedPlayer segments; stale Alleria coords make
-        # true hits look like misses. Binding/corruption remove is authoritative.
-        if phase_name == "P1":
-            p1_boss_attribution = finalize_p1_boss_attribution(
-                marked_positions, p1_boss_attribution, p1_boss_hit_events
-            )
         rows.append({
             "id": f"silver-arrow-{index}", "index": index, "eventType": "silverArrow", "phase": phase_name,
             "spellID": spell_id,
@@ -1297,11 +1303,9 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
             "snapshot": snapshot_at(effect_ts, player_actor_ids, bosses, position_index, actor_map, actor_game_id, events["deaths"]),
             "sourcePhantoms": [{key: value for key, value in item.items() if key != "castTimeAbsolute"} for item in source_phantoms],
             "sourceAssignments": source_assignments,
-            "p1BossHitEvents": p1_boss_hit_events,
+            "p1BossHitEvents": p1_hit_events,
             "p1BossAttribution": p1_boss_attribution,
-            "p1AllMissedBoss": phase_name == "P1" and not (
-                any(item.get("hitBoss") for item in p1_boss_attribution) or bool(p1_boss_hit_events)
-            ),
+            "p1AllMissedBoss": phase_name == "P1" and not any(item.get("hitBoss") for item in p1_boss_attribution) and not p1_hit_events,
         })
     return rows
 

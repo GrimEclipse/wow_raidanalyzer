@@ -3,11 +3,6 @@ import json
 import math
 from pathlib import Path
 
-from boss_plugins.void_spire.crown_of_the_cosmos import (
-    finalize_p1_boss_attribution,
-    p1_silver_arrow_round_succeeded,
-)
-
 
 DESIGNATED_HEALERS = {"旖旎云逸", "暗黑膏药"}
 VOID_GRASP_ID = 1260027
@@ -27,6 +22,8 @@ FINAL_VERDICT_EXCLUDED = {
     "interferenceShockInterrupts",
     "dailyAvoidableDamage",
 } | set(AVOIDABLE_DAMAGE_LABELS)
+VORELUTH_VULN_SKILL_KEY = "voreluthVulnerabilityFade"
+VORELUTH_VULN_SKILL_NAME = "P1 龌勒卢斯易伤异常"
 PLAYER_CAST_NAMES = {
     116: "Frostbolt",
     596: "Prayer of Healing",
@@ -101,37 +98,8 @@ def event_position_ms(event):
 
 def normalize_transition_deaths(fight):
     per_player = {}
-    deaths = fight.get("deathTimeline") or []
-    markers = (fight.get("crownOfTheCosmos") or {}).get("phaseMarkers") or {}
-    # Reconstruct abandon cluster from absolute times on death timeline.
-    bridge_rows = [
-        {
-            "timestamp": int(death.get("absoluteTime") or 0),
-            "killingAbilityGameID": death.get("abilityID"),
-            "targetID": death.get("player"),
-            "phase": death.get("phase"),
-        }
-        for death in deaths
-        if death.get("abilityID") in {None, 3}
-    ]
-    abandon_cluster = None
-    bridge_clusters = event_clusters([
-        {"timestamp": row["timestamp"], "killingAbilityGameID": row["killingAbilityGameID"]}
-        for row in bridge_rows
-    ], window_ms=5_000) if bridge_rows else []
-    candidates = [cluster for cluster in bridge_clusters if len(cluster.get("events", [])) >= 3]
-    if candidates:
-        abandon_cluster = max(candidates, key=lambda cluster: (len(cluster.get("events", [])), cluster.get("start", 0)))
-        # Only P1.5-terminal abandons exempt P1.5 cliff deaths.
-        cluster_phase = None
-        for death in deaths:
-            if int(death.get("absoluteTime") or 0) == abandon_cluster["start"]:
-                cluster_phase = death.get("phase")
-                break
-        if cluster_phase != "P1.5":
-            abandon_cluster = None
-
-    for death in deaths:
+    transition_abandoned = bool((fight.get("crownOfTheCosmos") or {}).get("transitionAbandoned"))
+    for death in fight.get("deathTimeline") or []:
         if death.get("phase") != "P1.5" or not death.get("player"):
             continue
         name = death["player"]
@@ -141,14 +109,9 @@ def normalize_transition_deaths(fight):
         row["roles"] = [] if role == "unknown" else [role]
         row["hitCount"] += 1
         row["deathCount"] += 1
-        absolute = int(death.get("absoluteTime") or 0)
-        is_abandon_jump = bool(
-            abandon_cluster
-            and death.get("abilityID") in {None, 3}
-            and (abandon_cluster["start"] - 1_000) <= absolute <= (int(abandon_cluster.get("end") or abandon_cluster["start"]) + 8_000)
-        )
+        is_abandon_jump = transition_abandoned and death.get("abilityID") in {None, 3}
         position_ms = (
-            absolute - int(fight.get("fightStart") or 0)
+            int(death.get("absoluteTime") or 0) - int(fight.get("fightStart") or 0)
             if death.get("absoluteTime") is not None else time_to_ms(death.get("time"))
         )
         ability_name = death.get("ability") or "未知技能"
@@ -400,6 +363,47 @@ def repair_p1_arrow_attribution(fight):
     crown = fight.get("crownOfTheCosmos") or {}
     audit = crown.get("fieldAudit") or {}
     arrows = [row for row in audit.get("silverArrows") or [] if row.get("phase") == "P1"]
+    # 旧场地审计把 Boss 束缚 remove 绑在 mark remove ±2.5s；实战常在 mark apply 附近清除，
+    # 导致 p1BossHitEvents 为空。用 analyze_p1_arrows 成功行回填命中证据，供开庭兜底。
+    for expected_ms, expected_target in P1_EXPECTED_ARROW_TARGETS.items():
+        arrow = min(
+            (
+                row for row in arrows
+                if abs(int(row.get("timeMs") or 0) - expected_ms) <= P1_ARROW_TOLERANCE_MS
+            ),
+            key=lambda row: abs(int(row.get("timeMs") or 0) - expected_ms),
+            default=None,
+        )
+        if not arrow:
+            continue
+        hit_events = list(arrow.get("p1BossHitEvents") or [])
+        if any(expected_target in str(hit.get("boss") or "") for hit in hit_events):
+            continue
+        success = next(
+            (
+                row for row in (crown.get("p1ArrowRows") or [])
+                if row.get("kind") in {"binding_removed", "silver_residue", "field_audit_boss_hit"}
+                and expected_target in str(row.get("target") or "")
+                and (
+                    not set(arrow.get("markedPlayers") or [])
+                    or set(arrow.get("markedPlayers") or []).intersection(
+                        {player.get("name") for player in (row.get("markedPlayers") or []) if player.get("name")}
+                    )
+                )
+            ),
+            None,
+        )
+        if not success:
+            continue
+        hit_events.append({
+            "targetID": None,
+            "boss": expected_target,
+            "timeMs": time_to_ms(success.get("time")),
+            "source": "p1ArrowRows",
+        })
+        arrow["p1BossHitEvents"] = hit_events
+        arrow["p1AllMissedBoss"] = False
+
     for arrow in arrows:
         bosses = (arrow.get("snapshot") or {}).get("bosses") or []
         boss_by_id = {row.get("id"): row for row in bosses}
@@ -422,9 +426,6 @@ def repair_p1_arrow_attribution(fight):
                 "bosses": list(dict.fromkeys(name for name in matched if name)),
                 "hitBoss": bool(matched),
             })
-        attribution = finalize_p1_boss_attribution(
-            arrow.get("markedPlayerPositions") or [], attribution, hit_events
-        )
         arrow["p1BossAttribution"] = attribution
         arrow["p1AllMissedBoss"] = not (
             any(row.get("hitBoss") for row in attribution) or bool(hit_events)
@@ -484,9 +485,27 @@ def is_melurium_arrow_slot(expected_ms, expected_target=None, arrow=None):
     return False
 
 
+def p1_arrow_rows_confirm_hit(p1_arrow_rows, expected_target, arrow=None):
+    if not expected_target:
+        return False
+    marked = {name for name in (arrow or {}).get("markedPlayers") or [] if name}
+    for row in p1_arrow_rows or []:
+        if row.get("kind") not in {"binding_removed", "silver_residue", "field_audit_boss_hit"}:
+            continue
+        target = str(row.get("target") or "")
+        if expected_target not in target and target not in expected_target:
+            continue
+        row_players = {player.get("name") for player in (row.get("markedPlayers") or []) if player.get("name")}
+        if marked and row_players and marked.isdisjoint(row_players):
+            continue
+        return True
+    return False
+
+
 def normalize_p1_arrow_misses(fight):
     crown = fight.get("crownOfTheCosmos") or {}
     arrows = [row for row in ((crown.get("fieldAudit") or {}).get("silverArrows") or []) if row.get("phase") == "P1"]
+    p1_arrow_rows = crown.get("p1ArrowRows") or []
     missed = {}
     used_ids = set()
     for expected_ms, expected_target in P1_EXPECTED_ARROW_TARGETS.items():
@@ -501,11 +520,14 @@ def normalize_p1_arrow_misses(fight):
         if not arrow:
             continue
         used_ids.add(arrow.get("id"))
-        # 成功处理轮次不进入开庭：既不计也不作为“不计数豁免”展示。
-        # 含 binding-remove 硬证据（射线归因失败时仍算成功）。
-        if p1_silver_arrow_round_succeeded(arrow):
-            continue
         attributions = arrow.get("p1BossAttribution") or []
+        # 成功处理轮次不进入开庭：既不计也不作为“不计数豁免”展示。
+        if (
+            any(row.get("hitBoss") for row in attributions)
+            or bool(arrow.get("p1BossHitEvents"))
+            or p1_arrow_rows_confirm_hit(p1_arrow_rows, expected_target, arrow)
+        ):
+            continue
         # 第5轮殁里乌姆档：双人空射且目标已死 → 预期空射，不入板；仍存活 → 定罪。
         if is_melurium_arrow_slot(expected_ms, expected_target, arrow) and not melurium_alive_in_arrow_snapshot(arrow):
             continue
@@ -1502,9 +1524,15 @@ def merge_boards(fights):
                     "deathCount": 0,
                     "totalDamage": 0,
                     "damageText": row.get("damageText"),
+                    "isSystem": bool(row.get("isSystem")),
+                    "excludeFromCourtPlayers": bool(row.get("excludeFromCourtPlayers") or row.get("isSystem")),
                     "events": [],
                 })
                 item["roles"] = list(dict.fromkeys(item["roles"] + list(row.get("roles") or [])))
+                item["isSystem"] = bool(item.get("isSystem") or row.get("isSystem"))
+                item["excludeFromCourtPlayers"] = bool(
+                    item.get("excludeFromCourtPlayers") or row.get("excludeFromCourtPlayers") or row.get("isSystem")
+                )
                 item["hitCount"] += int(row.get("hitCount") or 0)
                 item["countedCount"] += int(row.get("countedCount", row.get("hitCount") or 0))
                 item["uncountedCount"] += int(row.get("uncountedCount") or 0)
@@ -1518,6 +1546,53 @@ def merge_boards(fights):
     }
 
 
+def normalize_voreluth_vulnerability(fight):
+    crown = fight.setdefault("crownOfTheCosmos", {})
+    summary = crown.get("voreluthVulnerabilityFade")
+    rows = fight.setdefault("avoidableSummary", {}).setdefault(VORELUTH_VULN_SKILL_KEY, [])
+    for row in rows:
+        name = str(row.get("name") or "")
+        is_fight_row = name.startswith("Fight") or bool(row.get("isSystem") and "tank" not in (row.get("roles") or [row.get("role")]))
+        is_tank_row = (row.get("role") == "tank") or ("tank" in (row.get("roles") or []))
+        row["spellKey"] = VORELUTH_VULN_SKILL_KEY
+        row["spellName"] = VORELUTH_VULN_SKILL_NAME
+        if is_tank_row and not name.startswith("Fight"):
+            row["isSystem"] = False
+            row["excludeFromCourtPlayers"] = False
+            row["role"] = "tank"
+            row["roles"] = ["tank"]
+        else:
+            row["isSystem"] = True
+            row["excludeFromCourtPlayers"] = True
+        for event in row.get("events") or []:
+            if not isinstance(event, dict):
+                continue
+            if event.get("counted") is False:
+                event["verdictCounted"] = False
+                event["displayOnly"] = True
+                continue
+            event["counted"] = True
+            event["verdictCounted"] = True
+            event["displayOnly"] = False
+            if is_tank_row and not name.startswith("Fight"):
+                event["excludeFromCourtPlayers"] = False
+                event["isSystem"] = False
+                event["role"] = "tank"
+                event["countReason"] = "P1 龌勒卢斯易伤异常：腐化精华完整 faded，当场坦克计数"
+            else:
+                event["excludeFromCourtPlayers"] = True
+                event["isSystem"] = True
+                event["countReason"] = (
+                    "腐化精华在幽影束缚仍存在期间因层数/时间完整消失，记为龌勒卢斯易伤异常"
+                    "（按场汇总；受第8死豁免）"
+                )
+        if is_tank_row:
+            counted = [e for e in (row.get("events") or []) if isinstance(e, dict) and e.get("counted") is not False]
+            row["hitCount"] = sum(int(e.get("fadeCount") or 1) for e in counted)
+        elif isinstance(summary, dict) and not row.get("hitCount"):
+            row["hitCount"] = int(summary.get("fadeCount") or 0)
+
+
 def rebuild_verdict(board, config):
     players = {}
     tank_multiplier = float(config.get("verdictTankMultiplier") or 1)
@@ -1527,7 +1602,7 @@ def rebuild_verdict(board, config):
             continue
         for row in rows:
             name = row.get("name")
-            if not name:
+            if not name or row.get("isSystem") or row.get("excludeFromCourtPlayers"):
                 continue
             item = players.setdefault(name, {"name": name, "roles": [], "recognitionCount": 0, "appealAcquittalCount": 0, "breakdown": {}, "penaltyUnits": 0.0})
             roles = list(row.get("roles") or ([row.get("role")] if row.get("role") else []))
@@ -1629,6 +1704,7 @@ def reprocess(root):
         normalize_void_healing(fight, threshold)
         normalize_water_outliers(fight)
         normalize_transition_deaths(fight)
+        normalize_voreluth_vulnerability(fight)
         apply_global_death_exemption(fight)
     board = merge_boards(fights)
     data["page2_avoidableBoard"] = board
@@ -1637,6 +1713,7 @@ def reprocess(root):
     data["page3_courtBoard"] = court_board
     data["page4_finalVerdict"] = rebuild_verdict(court_board, (root.get("meta") or {}).get("courtConfig") or {})
     root["meta"]["localReprocess"] = {"bowRepair": repair_stats}
+    spell_labels[VORELUTH_VULN_SKILL_KEY] = VORELUTH_VULN_SKILL_NAME
     return root
 
 

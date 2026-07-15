@@ -1,21 +1,18 @@
 import argparse
 import os
+from pathlib import Path
 
 
 def main():
     parser = argparse.ArgumentParser(description="WCL boss wipe analyzer")
     parser.add_argument("--report", required=True, help="WCL report id，多个用逗号分隔")
     parser.add_argument("--version", default="12.0", help="版本号")
-    parser.add_argument("--raid", default="march_on_queldanas", help="副本 key")
-    parser.add_argument("--boss", default="midnight_falls", help="boss key")
+    parser.add_argument("--raid", default="void_spire", help="副本 key")
+    parser.add_argument("--boss", default="crown_of_the_cosmos", help="boss key")
     parser.add_argument(
         "--output",
         default=None,
-        help=(
-            "输出 JSON 路径；默认按分析结果写出到 data/："
-            "单日志 wcl_<report>_<boss>_<开荒日>.json，"
-            "多日志 wcl_multi_<boss>_<导出日>.json"
-        ),
+        help="输出 JSON 路径；默认写入 data/wcl_<report>_<boss>_<开荒日>.json 并更新 manifest",
     )
     parser.add_argument("--include-dispels", action="store_true", help="读取额外驱散数据；当前主要用于光盲先锋军复仇者之盾减员分析")
     args = parser.parse_args()
@@ -23,20 +20,19 @@ def main():
         os.environ["LIGHTBLINDED_VANGUARD_DISPELS"] = "1"
 
     print(
-        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} "
-        f"report={args.report} include_dispels={args.include_dispels} "
-        f"output={args.output or '(auto: data/wcl_…_YYYYMMDD.json)'}",
+        f"[analyze] version={args.version} raid={args.raid} boss={args.boss} report={args.report} include_dispels={args.include_dispels}",
         flush=True,
     )
     from analyzer_core.runner import analyze_report
 
-    analyze_report(
+    output = analyze_report(
         version=args.version,
         raid_key=args.raid,
         boss_key=args.boss,
         report_ids=args.report,
         output_path=args.output,
     )
+    print(f"[analyze] wrote {output}", flush=True)
 
 
 if __name__ == "__main__":

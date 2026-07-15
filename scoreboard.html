@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开荒智商记事本</title>
+    <style>
+        :root { color-scheme: dark; --bg:#0b1220; --panel:#111827; --line:#1f2937; --muted:#9ca3af; --ink:#e5e7eb; --blue:#60a5fa; --pink:#f472b6; --amber:#fbbf24; --green:#34d399; --red:#f87171; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: radial-gradient(1200px 600px at 20% -10%, #1e1b4b 0%, transparent 50%), var(--bg); color: var(--ink); font: 13px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+        a { color: var(--blue); text-decoration: none; }
+        button, input, select, textarea { font: inherit; color: inherit; }
+        button { cursor: pointer; }
+        .wrap { max-width: 1600px; margin: 0 auto; padding: 20px; }
+        .panel { background: rgba(17,24,39,.92); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+        .head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 18px; border-bottom: 1px solid var(--line); background: linear-gradient(90deg, rgba(76,29,149,.35), transparent); }
+        h1 { margin: 0; font-size: 22px; color: #f5d0fe; }
+        h2 { margin: 0; font-size: 16px; }
+        .muted { color: var(--muted); font-size: 12px; margin-top: 4px; }
+        .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .btn { border: 1px solid #4b5563; background: #0f172a; border-radius: 8px; padding: 7px 12px; }
+        .btn:hover { background: #1f2937; }
+        .btn.primary { border-color: #a21caf; background: #86198f; font-weight: 700; }
+        .btn.green { border-color: #059669; background: #065f46; }
+        .btn.danger { border-color: #b91c1c; background: #7f1d1d; }
+        .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+        .date-nav { justify-content: center; padding: 14px 18px; }
+        .date-label { min-width: 140px; text-align: center; font-size: 18px; font-weight: 800; color: #f0abfc; }
+        .table-wrap { overflow: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 1480px; }
+        th, td { padding: 8px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+        th { position: sticky; top: 0; background: #030712; color: var(--muted); font-size: 10px; font-weight: 700; white-space: nowrap; text-align: center; z-index: 1; }
+        th.left, td.left { text-align: left; }
+        .player { color: var(--blue); font-weight: 800; white-space: nowrap; }
+        .player.team { color: #fbbf24; }
+        tr.team-row { background: rgba(120, 53, 15, 0.18); }
+        tr.team-row:hover { background: rgba(120, 53, 15, 0.28); }
+        .num { text-align: center; font-variant-numeric: tabular-nums; }
+        .role-emoji { font-size: 16px; letter-spacing: 2px; white-space: nowrap; }
+        .total { color: var(--pink); font-weight: 900; font-size: 15px; }
+        .mech { min-width: 58px; }
+        th.mech, td.mech {
+            transition: max-width .28s ease, padding .28s ease, opacity .22s ease, border-color .22s ease;
+            max-width: 90px;
+            opacity: 1;
+            overflow: hidden;
+        }
+        table.details-collapsed th.mech,
+        table.details-collapsed td.mech {
+            max-width: 0 !important;
+            min-width: 0 !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            opacity: 0;
+            border-color: transparent;
+            pointer-events: none;
+        }
+        .details-toggle { display:inline-flex; align-items:center; gap:8px; }
+
+        th.mech { max-width: 76px; white-space: normal; line-height: 1.25; padding-left: 4px; padding-right: 4px; }
+        .zero { color: #4b5563; }
+        .status { min-height: 20px; font-size: 12px; color: var(--green); }
+        .status.err { color: var(--red); }
+        .status.warn { color: var(--amber); }
+        .drawer { border-top: 1px solid var(--line); background: #030712; padding: 12px 14px; }
+        .incident { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px dashed #1f2937; font-size: 12px; }
+        .chip { display: inline-block; border: 1px solid #374151; border-radius: 999px; padding: 1px 8px; font-size: 11px; margin-right: 4px; }
+        textarea, input[type=text], input[type=number], input[type=date], select { background: #030712; border: 1px solid #374151; border-radius: 6px; padding: 6px 8px; }
+        .empty { padding: 48px; text-align: center; color: #6b7280; }
+        .summary-bar { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+        .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 50; }
+        .modal { width: min(520px, 92vw); background: #111827; border: 1px solid #4c1d95; border-radius: 12px; padding: 18px; }
+        .modal h3 { margin: 0 0 8px; color: #f5d0fe; }
+        .hidden { display: none !important; }
+        .advanced { border-top: 1px dashed #1f2937; margin-top: 8px; padding-top: 10px; }
+        .advanced summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #4b5563; }
+        .dot.on { background: var(--green); }
+        select.data-select { min-width: min(420px, 70vw); max-width: 640px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <section class="panel">
+        <div class="head">
+            <div>
+                <h1>开荒智商记事本</h1>
+                <p class="muted">按开荒日翻页记事。从分析 JSON 导入时，自动跳到日志里的开荒日；空日可直接浏览，改动自动保存。</p>
+            </div>
+            <div class="row">
+                <a class="btn" href="index.html">首页</a>
+                <a class="btn" href="report.html">分析报告</a>
+            </div>
+        </div>
+        <div class="content" style="padding:12px 18px;border-bottom:1px solid var(--line)">
+            <div class="row">
+                <label class="muted">分析源</label>
+                <select id="dataSelect" class="data-select"></select>
+                <button class="btn" id="btnRefreshData">刷新列表</button>
+                <button class="btn primary" id="btnImportSource">导入到该开荒日</button>
+            </div>
+            <p class="muted" id="sourceHint">选择 data/ 中的某个 JSON，导入后会跳到文件对应的开荒日。</p>
+        </div>
+        <div class="row date-nav">
+            <button class="btn" id="btnPrev">← 上一天</button>
+            <div class="date-label" id="dateLabel">—</div>
+            <button class="btn" id="btnNext">下一天 →</button>
+            <input type="date" id="datePicker">
+            <span class="chip" id="dayBadge"><span class="dot" id="dayDot"></span> <span id="dayBadgeText">空日</span></span>
+            <button class="btn danger" id="btnDeleteDay">清空本日</button>
+        </div>
+        <div class="summary-bar">
+            <span id="dayMeta">—</span>
+            <span class="status" id="status"></span>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="head">
+            <div>
+                <h2>本日记分</h2>
+                <p class="muted">点玩家行展开申诉 / 追加扣分。不展示名单与开庭一致。判定明细默认收起。</p>
+            </div>
+            <div class="row details-toggle">
+                <button class="btn primary" id="btnToggleDetails" type="button">展示明细</button>
+            </div>
+            <details class="advanced">
+                <summary>高级 · 备份 / 导入</summary>
+                <div class="row" style="margin-top:8px">
+                    <label class="btn">导入备份<input type="file" id="fileImport" accept=".json" hidden></label>
+                    <button class="btn" id="btnExport">导出备份</button>
+                    <button class="btn ghost" id="btnForceHost">强制写到服务端库</button>
+                </div>
+            </details>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr></tr></thead>
+                <tbody id="tbody"></tbody>
+            </table>
+            <div class="empty" id="empty">本日还没有判定内容。可从上方选择分析源导入，或从分析报告页「同步到记事本」。</div>
+        </div>
+    </section>
+</div>
+
+<div class="modal-mask hidden" id="overwriteModal">
+    <div class="modal">
+        <h3>本日已有记事内容</h3>
+        <p class="muted" id="overwriteText">是否覆盖？</p>
+        <div class="row" style="justify-content:flex-end;margin-top:14px">
+            <button class="btn" id="overwriteCancel">取消</button>
+            <button class="btn" id="overwriteKeepManual">仅覆盖判定，保留申诉与追加</button>
+            <button class="btn primary" id="overwriteYes">覆盖</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const MECHANICS = [
+        { key: 'waterOutliers', label: '放水未集中' },
+        { key: 'voidGraspHealingLow', label: '空虚之握治疗不足' },
+        { key: 'p15AvoidableDeaths', label: '转阶段死亡' },
+        { key: 'passageCliffMistakes', label: '过场失误' },
+        { key: 'p1SilverArrowDeaths', label: '银锋高伤致死' },
+        { key: 'p1SilverArrowMissedFights', label: '银锋射怪失误' },
+        { key: 'voreluthVulnerabilityFade', label: 'P1龌勒易伤' },
+        { key: 'missedShadows', label: '拉弓未中幻影' },
+        { key: 'collapsingVoidSnapAiming', label: '崩裂甩狙' },
+        { key: 'gravityLineViolation', label: '重力违规致死' },
+        { key: 'tankRiftSlashFailure', label: '裂隙换坦失误' },
+    ];
+    // 与 report.html 开庭面板保持一致
+    const COURT_DISPLAY_EXCLUDED_PLAYERS = new Set(['Jokermeow', '黑心喵', 'Leviac', 'Leviackerman', '茶喵不吃糖']);
+    const isCourtDisplayExcluded = name => COURT_DISPLAY_EXCLUDED_PLAYERS.has(String(name || '').trim());
+    const TEAM_PLAYER_NAME = '团队';
+    const ROLE_ICONS = {
+        tank: '🛡️', healer: '✚', dps: '⚔️',
+        'melee-dps': '🗡️', 'melee-healer': '✚',
+        'range-dps': '🏹', 'range-healer': '✚',
+        team: '⌖',
+    };
+    const IDB_NAME = 'wow_raid_notebook';
+    const IDB_STORE = 'notebook';
+    const IDB_KEY = 'store';
+
+    const store = { schemaVersion: 2, days: [] };
+    let viewDate = todayCN();
+    let expanded = null;
+    let pendingSync = null;
+    let pointsPerCount = 10;
+    let tankMultiplier = 0.5;
+    let saveTimer = null;
+    let dirty = false;
+    let hostOk = false;
+    let dataFiles = [];
+    let selectedSource = '';
+    let detailsExpanded = false;
+
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const n = v => Number.isFinite(Number(v)) ? Number(v) : 0;
+
+    function todayCN() {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    }
+
+    function shiftDate(iso, delta) {
+        const [y, m, d] = iso.split('-').map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        dt.setUTCDate(dt.getUTCDate() + delta);
+        return dt.toISOString().slice(0, 10);
+    }
+
+    function formatCN(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso);
+        return new Intl.DateTimeFormat('zh-CN', {
+            timeZone: 'Asia/Shanghai',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+        }).format(d).replace(/\//g, '-') + ' (UTC+8)';
+    }
+
+    function emptyMechanics() {
+        const m = {};
+        MECHANICS.forEach(row => { m[row.key] = { count: 0, incidents: [] }; });
+        return m;
+    }
+
+    function ensurePlayerShape(p) {
+        p.roles = Array.isArray(p.roles) ? p.roles : [];
+        p.isTeam = Boolean(p.isTeam || p.name === TEAM_PLAYER_NAME);
+        p.mechanics = p.mechanics || emptyMechanics();
+        MECHANICS.forEach(m => {
+            if (!p.mechanics[m.key]) p.mechanics[m.key] = { count: 0, incidents: [] };
+            p.mechanics[m.key].incidents = p.mechanics[m.key].incidents || [];
+        });
+        p.extraDeductions = Array.isArray(p.extraDeductions) ? p.extraDeductions : [];
+        p.appealLog = Array.isArray(p.appealLog) ? p.appealLog : [];
+        return p;
+    }
+
+    function ensureShapeDay(day) {
+        day.players = (day.players || []).map(ensurePlayerShape);
+        day.pointsPerCount = n(day.pointsPerCount) || 10;
+        day.tankMultiplier = n(day.tankMultiplier) || 0.5;
+        return day;
+    }
+
+    function dayHasContent(day) {
+        if (!day) return false;
+        return (day.players || []).some(p => {
+            if ((p.extraDeductions || []).length || (p.appealLog || []).length) return true;
+            return MECHANICS.some(m => (p.mechanics?.[m.key]?.incidents || []).length > 0);
+        });
+    }
+
+    function findDay(date) {
+        return store.days.find(d => d.date === date) || null;
+    }
+
+    function currentDay() {
+        return findDay(viewDate);
+    }
+
+    function ensureDayShell(date) {
+        let day = findDay(date);
+        if (day) return day;
+        day = {
+            date,
+            sourceReports: [],
+            sourceFile: '',
+            pointsPerCount: 10,
+            tankMultiplier: 0.5,
+            updatedAt: new Date().toISOString(),
+            players: [],
+        };
+        store.days.push(day);
+        store.days.sort((a, b) => a.date.localeCompare(b.date));
+        return day;
+    }
+
+    function activeCount(player, key) {
+        return (player.mechanics[key]?.incidents || []).filter(i => !i.appealed).length;
+    }
+
+    function judgmentTotal(player) {
+        return MECHANICS.reduce((sum, m) => sum + activeCount(player, m.key), 0);
+    }
+
+    function iqTotal(player) {
+        const isTank = (player.roles || []).includes('tank');
+        const mult = isTank ? tankMultiplier : 1;
+        let units = 0;
+        MECHANICS.forEach(m => { units += activeCount(player, m.key) * mult; });
+        const extra = (player.extraDeductions || []).reduce((s, row) => s + n(row.points), 0);
+        return Math.round(units * pointsPerCount + extra);
+    }
+
+    function roleIcons(roles) {
+        const unique = [...new Set((roles || []).filter(Boolean))];
+        return unique.length ? unique.map(r => ROLE_ICONS[r] || '?').join(' ') : '?';
+    }
+
+    function setStatus(msg, kind) {
+        const el = $('status');
+        el.textContent = msg || '';
+        el.className = 'status' + (kind === 'err' ? ' err' : kind === 'warn' ? ' warn' : '');
+    }
+
+    function openIdb() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(IDB_NAME, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function idbLoad() {
+        const db = await openIdb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function idbSave(payload) {
+        const db = await openIdb();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put(payload, IDB_KEY);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function api(url, opts) {
+        const res = await fetch(url, opts);
+        if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+        return res.status === 204 ? null : res.json();
+    }
+
+    async function persistNow(forceHost) {
+        const day = currentDay();
+        if (day) {
+            day.updatedAt = new Date().toISOString();
+            day.players.forEach(p => MECHANICS.forEach(m => { p.mechanics[m.key].count = activeCount(p, m.key); }));
+        }
+        // Drop empty shells so empty calendar days don't pollute store forever
+        store.days = store.days.filter(d => dayHasContent(d) || d.date === viewDate);
+        try {
+            await idbSave(store);
+            dirty = false;
+        } catch (e) {
+            setStatus('浏览器本地库写入失败：' + e.message, 'err');
+            return;
+        }
+        if (!hostOk && !forceHost) {
+            setStatus(`已自动保存 · 本机记事本 · ${formatCN(day?.updatedAt || new Date().toISOString())}`);
+            return;
+        }
+        try {
+            if (day && dayHasContent(day)) {
+                await api('/api/notebook/' + day.date, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(day),
+                });
+            } else if (forceHost) {
+                await api('/api/notebook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(store),
+                });
+            }
+            hostOk = true;
+            setStatus(`已自动保存 · 本机 + 服务端库 · ${formatCN(day?.updatedAt || new Date().toISOString())}`);
+        } catch (e) {
+            hostOk = false;
+            setStatus(`已自动保存到本机 · 服务端暂不可用 · ${formatCN(new Date().toISOString())}`, forceHost ? 'warn' : '');
+        }
+    }
+
+    function schedulePersist() {
+        dirty = true;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => persistNow(false), 400);
+    }
+
+    function inferDateFromPath(path) {
+        const m = String(path || '').match(/_(\d{8})(?:\.json)?$/i);
+        if (!m) return null;
+        const s = m[1];
+        return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+    }
+
+    function inferDateFromPayload(payload, sourcePath) {
+        const fights = payload?.data?.page1_wipeAnalysis || [];
+        const dates = fights.map(f => String(f.date || '').trim()).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d));
+        if (dates.length) return dates.sort()[0];
+        return inferDateFromPath(sourcePath) || todayCN();
+    }
+
+    function dayFromAnalysis(payload, date, sourcePath) {
+        const board = payload?.data?.page3_courtBoard || payload?.data?.page2_avoidableBoard || {};
+        const players = {};
+        MECHANICS.forEach(m => {
+            (board[m.key] || []).forEach(row => {
+                const rawName = row.name;
+                if (!rawName || isCourtDisplayExcluded(rawName)) return;
+                // 不展示 FightN / 系统行；龌勒易伤应挂坦克人名
+                if (row.isSystem || row.excludeFromCourtPlayers || /^Fight\d+$/i.test(String(rawName))) return;
+                if (rawName === TEAM_PLAYER_NAME) return;
+                const name = rawName;
+                const p = players[name] || (players[name] = ensurePlayerShape({
+                    name,
+                    isTeam: false,
+                    roles: row.roles || (row.role ? [row.role] : []),
+                    mechanics: emptyMechanics(),
+                    extraDeductions: [],
+                    appealLog: [],
+                }));
+                (row.roles || []).forEach(r => { if (r && !p.roles.includes(r)) p.roles.push(r); });
+                (row.events || []).forEach((ev, idx) => {
+                    if (ev.counted === false || ev.verdictCounted === false) return;
+                    const fades = Array.isArray(ev.fades) && ev.fades.length
+                        ? ev.fades
+                        : null;
+                    if (m.key === 'voreluthVulnerabilityFade' && fades) {
+                        fades.forEach((fade, fadeIdx) => {
+                            p.mechanics[m.key].incidents.push({
+                                id: [m.key, ev.fightID, fade.time || ev.time || idx, fadeIdx, name].join(':'),
+                                fightID: ev.fightID,
+                                tag: ev.tag || '',
+                                time: fade.time || ev.time || '',
+                                text: fade.text || ev.text || ev.countReason || m.label,
+                                appealed: false,
+                                appealNote: '',
+                            });
+                        });
+                        return;
+                    }
+                    p.mechanics[m.key].incidents.push({
+                        id: [m.key, ev.fightID, ev.tag || ev.time || idx, ev.player || name].join(':'),
+                        fightID: ev.fightID,
+                        tag: ev.tag || '',
+                        time: ev.time || '',
+                        text: ev.countReason || ev.text || ev.ability || m.label,
+                        appealed: false,
+                        appealNote: '',
+                    });
+                });
+                if (m.key === 'collapsingVoidSnapAiming' && !p.mechanics[m.key].incidents.length && n(row.deathCount) > 0) {
+                    for (let i = 0; i < n(row.deathCount); i++) {
+                        p.mechanics[m.key].incidents.push({
+                            id: `${m.key}:${name}:legacy:${i}`,
+                            fightID: row.events?.[i]?.fightID,
+                            tag: '', time: '', text: '崩裂空无甩狙致死',
+                            appealed: false, appealNote: '',
+                        });
+                    }
+                }
+            });
+        });
+        Object.values(players).forEach(p => {
+            MECHANICS.forEach(m => { p.mechanics[m.key].count = activeCount(p, m.key); });
+        });
+        return {
+            date,
+            sourceReports: payload?.meta?.analyzedReports || [],
+            sourceFile: sourcePath || '',
+            pointsPerCount: n(payload?.meta?.courtConfig?.verdictPointsPerCount) || 10,
+            tankMultiplier: n(payload?.meta?.courtConfig?.verdictTankMultiplier) || 0.5,
+            updatedAt: new Date().toISOString(),
+            players: Object.values(players),
+        };
+    }
+
+    function upsertDay(day, mode) {
+        ensureShapeDay(day);
+        viewDate = day.date;
+        const idx = store.days.findIndex(d => d.date === day.date);
+        if (idx < 0) {
+            store.days.push(day);
+        } else if (mode === 'mergeKeepManual') {
+            const old = store.days[idx];
+            const oldMap = Object.fromEntries((old.players || []).map(p => [p.name, p]));
+            day.players.forEach(p => {
+                const prev = oldMap[p.name];
+                if (!prev) return;
+                MECHANICS.forEach(m => {
+                    const prevInc = Object.fromEntries((prev.mechanics?.[m.key]?.incidents || []).map(i => [i.id, i]));
+                    p.mechanics[m.key].incidents.forEach(inc => {
+                        const hit = prevInc[inc.id];
+                        if (hit?.appealed) {
+                            inc.appealed = true;
+                            inc.appealNote = hit.appealNote || '';
+                        }
+                    });
+                });
+                p.extraDeductions = prev.extraDeductions || [];
+                p.appealLog = prev.appealLog || [];
+            });
+            store.days[idx] = day;
+        } else {
+            store.days[idx] = day;
+        }
+        store.days.sort((a, b) => a.date.localeCompare(b.date));
+        touchAndRender();
+    }
+
+    function requestSync(day) {
+        const existing = findDay(day.date);
+        viewDate = day.date;
+        if (!dayHasContent(existing)) {
+            upsertDay(day, 'replace');
+            setStatus(`已写入 ${day.date}（${day.players.length} 人）· ${formatCN(day.updatedAt)}`);
+            return;
+        }
+        pendingSync = day;
+        $('overwriteText').textContent = `${day.date} 已有判定/申诉/追加内容。覆盖会重置本日；也可仅覆盖判定并保留申诉与追加。`;
+        $('overwriteModal').classList.remove('hidden');
+        render();
+    }
+
+    function buildHeader() {
+        document.querySelector('thead tr').innerHTML = [
+            '<th class="left">玩家</th>', '<th>职责</th>', '<th>判定次数</th>',
+            ...MECHANICS.map(m => `<th class="mech">${esc(m.label)}</th>`),
+            '<th>申诉次数</th>', '<th class="left">申诉留痕</th>',
+            '<th>追加扣分</th>', '<th class="left">追加备注</th>', '<th>总计</th>',
+        ].join('');
+    }
+
+    function render() {
+        buildHeader();
+        const day = currentDay();
+        $('dateLabel').textContent = viewDate;
+        $('datePicker').value = viewDate;
+        const has = dayHasContent(day);
+        $('dayDot').className = 'dot' + (has ? ' on' : '');
+        $('dayBadgeText').textContent = has ? '有内容' : '空日（可浏览 / 可导入）';
+        $('dayMeta').textContent = day
+            ? `来源：${(day.sourceReports || []).join('、') || day.sourceFile || '手动'} · 点数 ${day.pointsPerCount || pointsPerCount}/次 · 更新 ${formatCN(day.updatedAt)}`
+            : `开荒日 ${viewDate} · 尚无记事条目`;
+        pointsPerCount = n(day?.pointsPerCount) || 10;
+        tankMultiplier = n(day?.tankMultiplier) || 0.5;
+
+        const tbody = $('tbody');
+        tbody.innerHTML = '';
+        if (!has) {
+            $('empty').style.display = 'block';
+            return;
+        }
+        $('empty').style.display = 'none';
+        // 过滤不展示名单与遗留「团队」行（旧版龌勒易伤误归）
+        day.players = (day.players || []).filter(p => {
+            if (!p?.name) return false;
+            if (isCourtDisplayExcluded(p.name)) return false;
+            if (p.name === TEAM_PLAYER_NAME || p.isTeam) return false;
+            return true;
+        });
+        const table = document.querySelector('.table-wrap table');
+        if (table) table.classList.toggle('details-collapsed', !detailsExpanded);
+        const toggleBtn = $('btnToggleDetails');
+        if (toggleBtn) toggleBtn.textContent = detailsExpanded ? '收起明细' : '展示明细';
+        const players = day.players.map(ensurePlayerShape).sort((a, b) => {
+            return iqTotal(b) - iqTotal(a) || judgmentTotal(b) - judgmentTotal(a) || a.name.localeCompare(b.name);
+        });
+        day.players = players;
+        players.forEach(player => {
+            const tr = document.createElement('tr');
+            if (player.isTeam) tr.classList.add('team-row');
+            const appealCount = (player.appealLog || []).length;
+            const appealPreview = (player.appealLog || []).slice(-2).map(a => a.note || a.incidentId).filter(Boolean).join('；') || '—';
+            const extraPts = (player.extraDeductions || []).reduce((s, r) => s + n(r.points), 0);
+            const extraNotes = (player.extraDeductions || []).map(r => r.note).filter(Boolean).join('；') || '—';
+            const cells = MECHANICS.map(m => {
+                const c = activeCount(player, m.key);
+                return `<td class="num mech ${c ? '' : 'zero'}">${c}</td>`;
+            }).join('');
+            tr.innerHTML = `
+                <td class="left player ${player.isTeam ? 'team' : ''}">${esc(player.name)}${player.isTeam ? ' · 机制' : ''}</td>
+                <td class="num role-emoji" title="${esc((player.roles || []).join(' / ') || '?')}">${player.isTeam ? (ROLE_ICONS.team || '⌖') : roleIcons(player.roles)}</td>
+                <td class="num">${judgmentTotal(player)}</td>
+                ${cells}
+                <td class="num">${appealCount}</td>
+                <td class="left" style="max-width:220px;font-size:11px;color:#9ca3af">${esc(appealPreview)}</td>
+                <td class="num">${extraPts}</td>
+                <td class="left" style="max-width:180px;font-size:11px;color:#9ca3af">${esc(extraNotes)}</td>
+                <td class="num total">${iqTotal(player)}</td>`;
+            tr.style.cursor = 'pointer';
+            tr.onclick = () => { expanded = expanded === player.name ? null : player.name; render(); };
+            tbody.appendChild(tr);
+            if (expanded === player.name) {
+                const detail = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 3 + MECHANICS.length + 5;
+                td.innerHTML = renderDetail(player);
+                detail.appendChild(td);
+                tbody.appendChild(detail);
+                bindDetail(player);
+            }
+        });
+    }
+
+    function renderDetail(player) {
+        const blocks = MECHANICS.map(m => {
+            const incidents = player.mechanics[m.key].incidents || [];
+            if (!incidents.length) return `<div style="margin-bottom:10px"><strong>${esc(m.label)}</strong> <span class="muted">无记录</span></div>`;
+            const rows = incidents.map((inc, i) => `
+                <div class="incident" data-m="${esc(m.key)}" data-i="${i}">
+                    <div><span class="chip">Fight ${esc(inc.fightID ?? '-')}</span><div class="muted">${esc(inc.time || '')}</div></div>
+                    <div>
+                        <div>${esc(inc.text || '')}</div>
+                        <div class="muted">tag: ${esc(inc.tag || inc.id || '-')}</div>
+                        ${inc.appealed ? `<div style="margin-top:4px;color:var(--green)">已申诉：${esc(inc.appealNote || '')}</div>` : ''}
+                    </div>
+                    <div class="row">
+                        ${inc.appealed
+                            ? `<button class="btn" data-act="unappeal">撤销申诉</button>`
+                            : `<button class="btn green" data-act="appeal">申诉此次</button>`}
+                    </div>
+                </div>`).join('');
+            return `<div style="margin-bottom:12px"><strong>${esc(m.label)}</strong>${rows}</div>`;
+        }).join('');
+        const extras = (player.extraDeductions || []).map((row, i) => `
+            <div class="incident" data-extra="${i}">
+                <div class="num total">${esc(row.points)}</div>
+                <div>${esc(row.note || '')}<div class="muted">${esc(formatCN(row.at))}</div></div>
+                <button class="btn danger" data-act="rm-extra">删除</button>
+            </div>`).join('') || '<div class="muted">暂无追加扣分</div>';
+        return `<div class="drawer">
+            <div class="row" style="margin-bottom:8px"><strong>${esc(player.name)} · 明细</strong><span class="muted">改动自动保存</span></div>
+            ${blocks}
+            <div style="margin-top:14px;border-top:1px solid #1f2937;padding-top:10px">
+                <strong>追加扣分</strong>
+                <div class="row" style="margin:8px 0">
+                    <input type="number" id="extraPts" style="width:90px" value="10">
+                    <input type="text" id="extraNote" placeholder="备注（必填）" style="flex:1;min-width:200px">
+                    <button class="btn primary" id="btnAddExtra">追加</button>
+                </div>
+                ${extras}
+            </div>
+            <div style="margin-top:12px"><strong>申诉历史留痕</strong>
+                <div class="muted" style="margin-top:6px">${(player.appealLog || []).map(a => `${esc(formatCN(a.at))} · ${esc(a.mechanicLabel || a.mechanicKey)} · ${esc(a.note)}`).join('<br>') || '无'}</div>
+            </div>
+        </div>`;
+    }
+
+    function touchAndRender() {
+        render();
+        schedulePersist();
+    }
+
+    function bindDetail(player) {
+        ensureDayShell(viewDate);
+        document.querySelectorAll('.incident[data-m]').forEach(el => {
+            const key = el.getAttribute('data-m');
+            const i = Number(el.getAttribute('data-i'));
+            const inc = player.mechanics[key].incidents[i];
+            el.querySelector('[data-act="appeal"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                const note = prompt('申诉原因：', inc.appealNote || '');
+                if (note == null || !String(note).trim()) return;
+                inc.appealed = true;
+                inc.appealNote = String(note).trim();
+                player.appealLog.push({
+                    at: new Date().toISOString(),
+                    mechanicKey: key,
+                    mechanicLabel: MECHANICS.find(m => m.key === key)?.label || key,
+                    incidentId: inc.id || inc.tag,
+                    fightID: inc.fightID,
+                    note: inc.appealNote,
+                });
+                touchAndRender();
+            });
+            el.querySelector('[data-act="unappeal"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                const note = inc.appealNote;
+                inc.appealed = false;
+                inc.appealNote = '';
+                player.appealLog.push({ at: new Date().toISOString(), mechanicKey: key, incidentId: inc.id, note: `撤销申诉：${note || ''}`, revoked: true });
+                touchAndRender();
+            });
+        });
+        document.querySelectorAll('.incident[data-extra]').forEach(el => {
+            const i = Number(el.getAttribute('data-extra'));
+            el.querySelector('[data-act="rm-extra"]')?.addEventListener('click', e => {
+                e.stopPropagation();
+                player.extraDeductions.splice(i, 1);
+                touchAndRender();
+            });
+        });
+        $('btnAddExtra')?.addEventListener('click', e => {
+            e.stopPropagation();
+            const pts = n($('extraPts').value);
+            const note = String($('extraNote').value || '').trim();
+            if (!pts || !note) { alert('请填写分数与备注'); return; }
+            player.extraDeductions.push({ points: pts, note, at: new Date().toISOString() });
+            touchAndRender();
+        });
+    }
+
+    function renderDataSelect() {
+        const sel = $('dataSelect');
+        sel.innerHTML = dataFiles.length
+            ? dataFiles.map(f => `<option value="${esc(f.path)}" ${f.path === selectedSource ? 'selected' : ''}>${esc(f.label || f.name)}</option>`).join('')
+            : '<option value="">（未发现 data/ 下的分析 JSON）</option>';
+        if (!selectedSource && dataFiles[0]) selectedSource = dataFiles[0].path;
+        sel.value = selectedSource;
+        const hit = dataFiles.find(f => f.path === selectedSource);
+        const inferred = inferDateFromPath(selectedSource);
+        $('sourceHint').textContent = hit
+            ? `将导入「${hit.label || hit.name}」→ 开荒日 ${inferred || '（从内容推断）'}`
+            : '把分析结果放到 data/（命名含 YYYYMMDD），这里可快速切换并导入记事本。';
+    }
+
+    async function refreshDataFiles() {
+        dataFiles = [];
+        try {
+            const payload = await api('/api/data-files');
+            dataFiles = payload.files || payload || [];
+        } catch {
+            try {
+                const list = await api('/api/data/list');
+                dataFiles = (list || []).map(row => ({
+                    path: row.path || `data/${row.name}`,
+                    name: row.name,
+                    label: row.label || row.name,
+                    mtime: row.mtime,
+                }));
+            } catch {
+                try {
+                    const man = await fetch('./data/manifest.json', { cache: 'no-store' });
+                    if (man.ok) dataFiles = ((await man.json()).files) || [];
+                } catch {}
+            }
+        }
+        dataFiles.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
+        if (!selectedSource && dataFiles[0]) selectedSource = dataFiles[0].path;
+        renderDataSelect();
+    }
+
+    async function loadPayload(path) {
+        if (!path) throw new Error('未选择分析源');
+        if (path.startsWith('data/') || path.endsWith('.json')) {
+            try {
+                return await api('/' + path.replace(/^\.\//, ''));
+            } catch {
+                // fallthrough
+            }
+        }
+        const name = path.split('/').pop();
+        try {
+            return await api('/api/data/' + name);
+        } catch {
+            const res = await fetch('./' + path.replace(/^\.\//, ''));
+            if (!res.ok) throw new Error(`无法读取 ${path}`);
+            return res.json();
+        }
+    }
+
+    async function importSelectedSource() {
+        selectedSource = $('dataSelect').value || selectedSource;
+        if (!selectedSource) { setStatus('没有可导入的分析源', 'err'); return; }
+        try {
+            const payload = await loadPayload(selectedSource);
+            const date = inferDateFromPayload(payload, selectedSource);
+            requestSync(dayFromAnalysis(payload, date, selectedSource));
+        } catch (e) {
+            setStatus('导入失败：' + e.message, 'err');
+        }
+    }
+
+    async function loadFromHost() {
+        try {
+            const data = await api('/api/notebook');
+            if (data?.days) {
+                store.days = data.days.map(ensureShapeDay);
+                hostOk = true;
+                const last = store.days.filter(dayHasContent).slice(-1)[0];
+                viewDate = last?.date || todayCN();
+                await idbSave(store);
+                setStatus(`已从服务端库加载 · ${formatCN(new Date().toISOString())}`);
+                return true;
+            }
+        } catch { hostOk = false; }
+        return false;
+    }
+
+    async function loadFromIdb() {
+        try {
+            const data = await idbLoad();
+            if (data?.days) {
+                store.days = data.days.map(ensureShapeDay);
+                const last = store.days.filter(dayHasContent).slice(-1)[0];
+                viewDate = last?.date || todayCN();
+                setStatus(`已打开本机记事本 · ${formatCN(new Date().toISOString())}`);
+                return true;
+            }
+        } catch (e) {
+            setStatus('本机记事本读取失败：' + e.message, 'err');
+        }
+        return false;
+    }
+
+    function consumeSessionSync() {
+        const raw = sessionStorage.getItem('scoreboardSyncPayload');
+        if (!raw) return;
+        sessionStorage.removeItem('scoreboardSyncPayload');
+        try {
+            const day = ensureShapeDay(JSON.parse(raw));
+            if (!day.date) day.date = todayCN();
+            requestSync(day);
+        } catch (e) {
+            setStatus('同步载荷解析失败：' + e.message, 'err');
+        }
+    }
+
+    $('btnPrev').onclick = () => { viewDate = shiftDate(viewDate, -1); render(); };
+    $('btnNext').onclick = () => { viewDate = shiftDate(viewDate, 1); render(); };
+    $('datePicker').onchange = e => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(e.target.value)) {
+            viewDate = e.target.value;
+            render();
+        }
+    };
+    $('btnDeleteDay').onclick = async () => {
+        const day = currentDay();
+        if (!day || !dayHasContent(day)) { setStatus(`${viewDate} 本就没有内容`); return; }
+        if (!confirm(`清空 ${viewDate} 的记事内容？`)) return;
+        store.days = store.days.filter(d => d.date !== viewDate);
+        try { await api('/api/notebook/' + viewDate, { method: 'DELETE' }); } catch {}
+        touchAndRender();
+        setStatus(`已清空 ${viewDate}`);
+    };
+    const detailsBtn = $('btnToggleDetails');
+    if (detailsBtn) {
+        detailsBtn.onclick = () => {
+            detailsExpanded = !detailsExpanded;
+            render();
+        };
+    }
+    $('btnRefreshData').onclick = () => refreshDataFiles();
+    $('btnImportSource').onclick = () => importSelectedSource();
+    $('dataSelect').onchange = e => {
+        selectedSource = e.target.value;
+        renderDataSelect();
+    };
+    $('overwriteCancel').onclick = () => { pendingSync = null; $('overwriteModal').classList.add('hidden'); };
+    $('overwriteYes').onclick = () => {
+        if (pendingSync) upsertDay(pendingSync, 'replace');
+        pendingSync = null;
+        $('overwriteModal').classList.add('hidden');
+        setStatus('已覆盖本日 · ' + formatCN(new Date().toISOString()));
+    };
+    $('overwriteKeepManual').onclick = () => {
+        if (pendingSync) upsertDay(pendingSync, 'mergeKeepManual');
+        pendingSync = null;
+        $('overwriteModal').classList.add('hidden');
+        setStatus('已覆盖判定并保留申诉/追加 · ' + formatCN(new Date().toISOString()));
+    };
+    $('btnExport').onclick = () => {
+        const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'notebook-backup.json';
+        a.click();
+    };
+    $('btnForceHost').onclick = () => persistNow(true);
+    $('fileImport').onchange = async e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const data = JSON.parse(await file.text());
+            if (Array.isArray(data.days)) {
+                store.days = data.days.map(ensureShapeDay);
+                viewDate = store.days.filter(dayHasContent).slice(-1)[0]?.date || todayCN();
+                touchAndRender();
+                setStatus(`已导入备份 ${store.days.length} 天 · ${formatCN(new Date().toISOString())}`);
+            } else if (data.date && data.players) {
+                requestSync(ensureShapeDay(data));
+            } else if (data.data?.page3_courtBoard || data.data?.page2_avoidableBoard) {
+                const date = inferDateFromPayload(data, file.name);
+                requestSync(dayFromAnalysis(data, date, file.name));
+            } else throw new Error('无法识别格式');
+        } catch (err) {
+            setStatus(err.message, 'err');
+        }
+    };
+
+    (async function init() {
+        buildHeader();
+        const local = await loadFromIdb();
+        if (!local) await loadFromHost();
+        else {
+            try { await api('/api/notebook'); hostOk = true; } catch { hostOk = false; }
+        }
+        await refreshDataFiles();
+        consumeSessionSync();
+        render();
+    })();
+})();
+</script>
+</body>
+</html>

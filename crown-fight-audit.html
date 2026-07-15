@@ -116,6 +116,9 @@
       padding: 3px 8px;
       background: #0b1220;
     }
+    .skill-focus { display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px 4px; }
+    .skill-focus button { border:1px solid var(--line); background:#0b1220; color:var(--muted); border-radius:999px; padding:4px 10px; font-size:12px; cursor:pointer; }
+    .skill-focus button.active { border-color:var(--amber); color:#fde68a; background:#1a2333; font-weight:700; }
     .details {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -178,6 +181,12 @@
     <section class="layout">
       <aside class="panel">
         <h2>技能入口</h2>
+        <div class="skill-focus" id="skillFocus">
+          <button type="button" data-focus="all" class="active">全部</button>
+          <button type="button" data-focus="water">放水</button>
+          <button type="button" data-focus="p1Silver">P1银锋箭</button>
+          <button type="button" data-focus="bow">拉弓</button>
+        </div>
         <div id="eventList" class="event-list"></div>
       </aside>
 
@@ -233,7 +242,7 @@
     const ROUTE_PHASE = ROUTE.get('phase');
     const ROUTE_TAG = ROUTE.get('tag');
     const ICON_SIZE = 32;
-    const state = { data: null, selectedKey: null, includeExempt: false, pendingRouteScroll: false };
+    const state = { data: null, selectedKey: null, includeExempt: false, pendingRouteScroll: false, skillFocus: 'all' };
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -281,13 +290,27 @@
       const p3Events = (state.data.p3Events || []).map(event => ({
         ...event, key: `${event.eventType}:${event.id}`, sortMs: event.timeMs, displayTime: event.time,
       }));
-      // 重力坍缩属 P3 专属复盘，不进入左侧 Tag 导航。
+      // 重力坍缩地图无事件点，不进左侧技能入口（统计区仍可在底部查看）
       return [...bows, ...waters, ...arrows, ...p3Events].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
     }
 
+    function eventMatchesFocus(event, focus) {
+      if (!focus || focus === 'all') return true;
+      if (focus === 'water') return event.eventType === 'water';
+      if (focus === 'bow') return event.eventType === 'bow';
+      if (focus === 'p1Silver') return event.eventType === 'silverArrow' && event.phase === 'P1';
+      return true;
+    }
+
+    function focusedEvents() {
+      return auditEvents().filter(event => eventMatchesFocus(event, state.skillFocus));
+    }
+
     function selectedEvent() {
-      const events = auditEvents();
-      return events.find(event => event.key === state.selectedKey) || events[0];
+      const all = auditEvents();
+      const focused = focusedEvents();
+      const pool = focused.length ? focused : all;
+      return all.find(event => event.key === state.selectedKey) || pool[0] || all[0];
     }
 
     function renderStats() {
@@ -301,7 +324,7 @@
 
     function renderEventList() {
       const holder = document.getElementById('eventList');
-      holder.innerHTML = auditEvents().map(event => {
+      holder.innerHTML = focusedEvents().map(event => {
         const isBow = event.eventType === 'bow';
         const isWater = event.eventType === 'water';
         const isArrow = event.eventType === 'silverArrow';
@@ -710,9 +733,22 @@
       }).join('')}</tbody></table>`;
     }
 
+    function renderSkillFocus() {
+      document.querySelectorAll('#skillFocus button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.focus === state.skillFocus);
+      });
+    }
+
     function render() {
-      const events = auditEvents();
+      const events = focusedEvents();
+      const all = auditEvents();
       if (!state.selectedKey && events.length) state.selectedKey = events[0].key;
+      if (state.selectedKey && events.length && !events.some(e => e.key === state.selectedKey)) {
+        // 切换筛选后若当前选中不在列表，切到该筛选项第一条；定位 Tag 路由选中不受影响（路由完成后再改筛选）
+        if (!state.pendingRouteScroll) state.selectedKey = events[0].key;
+      }
+      if (!events.length && all.length && !state.selectedKey) state.selectedKey = all[0].key;
+      renderSkillFocus();
       renderStats();
       renderEventList();
       renderMap();
@@ -723,6 +759,15 @@
       renderPhaseStats();
       renderGravityStats();
     }
+
+
+    document.getElementById('skillFocus')?.addEventListener('click', event => {
+      const btn = event.target.closest('button[data-focus]');
+      if (!btn) return;
+      state.skillFocus = btn.dataset.focus || 'all';
+      state.pendingRouteScroll = false;
+      render();
+    });
 
     document.getElementById('includeExempt').addEventListener('change', event => {
       state.includeExempt = event.target.checked;

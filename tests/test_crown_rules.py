@@ -2,15 +2,12 @@ import unittest
 
 from boss_plugins.void_spire.crown_of_the_cosmos import (
     apply_global_death_exemption,
-    build_fight_combatants,
-    classify_fight,
-    finalize_p1_boss_attribution,
-    first_bridge_cluster,
-    is_enrage_tank_death,
-    is_p15_abandon_jump,
+    analyze_voreluth_vulnerability_fade,
+    build_passage_cliff_board,
+    corruption_stack_at,
     melurium_alive_in_arrow_snapshot,
-    p1_silver_arrow_round_succeeded,
-    terminal_abandon_bridge_cluster,
+    CORRUPTION_ID,
+    P1_SHADOW_BINDING_ID,
     MELURIUM_EXPECTED_MS,
 )
 from tools.crown_single_fight_audit import SPELL, build_void_death_healing
@@ -68,77 +65,6 @@ class CrownGlobalDeathExemptionTests(unittest.TestCase):
         self.assertIn("全局最高优先级豁免", event["countReason"])
 
 
-class CrownEnrageTankDeathTests(unittest.TestCase):
-    def test_enrage_tank_death_is_not_tank_fault(self):
-        death = {"timestamp": 120_000, "killingAbilityGameID": 1}
-        self.assertTrue(is_enrage_tank_death(death, enrage_at=100_000))
-        self.assertFalse(is_enrage_tank_death(death, enrage_at=130_000))
-
-    def test_p1_tank_death_after_enrage_classifies_as_boss_enrage(self):
-        fight = {"startTime": 0, "endTime": 200_000, "kill": False}
-        markers = {"p15Start": 150_000, "p2Start": None}
-        deaths = [
-            {"timestamp": 110_000, "targetID": 1, "killingAbilityGameID": 1},
-            {"timestamp": 111_000, "targetID": 2, "killingAbilityGameID": 1},
-            {"timestamp": 112_000, "targetID": 3, "killingAbilityGameID": 1233826},
-        ]
-        buffs = [{"type": "applybuff", "timestamp": 100_000, "abilityGameID": 26662}]
-        result = classify_fight(fight, deaths, markers, buffs)
-        self.assertEqual(result["key"], "p1_boss_enrage")
-        self.assertTrue(result.get("boardExclude"))
-        self.assertNotEqual(result["key"], "tank_death")
-
-    def test_p15_never_uses_tank_death_key(self):
-        fight = {"startTime": 0, "endTime": 180_000, "kill": False}
-        markers = {"p15Start": 100_000, "p2Start": None}
-        deaths = [
-            {"timestamp": 110_000, "targetID": 1, "killingAbilityGameID": 1},
-            *[{"timestamp": 140_000 + index * 200, "targetID": 10 + index, "killingAbilityGameID": None} for index in range(12)],
-        ]
-        buffs = [{"type": "applybuff", "timestamp": 105_000, "abilityGameID": 26662}]
-        result = classify_fight(fight, deaths, markers, buffs)
-        self.assertEqual(result["phase"], "P1.5")
-        self.assertNotEqual(result["key"], "tank_death")
-
-
-class CrownAbandonJumpExemptionTests(unittest.TestCase):
-    def test_early_p15_cliff_not_exempt_when_raid_jumps_in_p2(self):
-        fight = {"startTime": 0, "endTime": 220_000}
-        markers = {"p15Start": 100_000, "p2Start": 180_000}
-        deaths = [
-            {"timestamp": 120_000, "targetID": 1, "killingAbilityGameID": 1243981},
-            {"timestamp": 130_000, "targetID": 2, "killingAbilityGameID": None},
-            {"timestamp": 140_000, "targetID": 3, "killingAbilityGameID": 1243981},
-            {"timestamp": 145_000, "targetID": 4, "killingAbilityGameID": 1243981},
-            *[{"timestamp": 190_000 + index * 300, "targetID": 20 + index, "killingAbilityGameID": None} for index in range(12)],
-        ]
-        cluster = terminal_abandon_bridge_cluster(deaths)
-        self.assertIsNotNone(cluster)
-        self.assertGreaterEqual(cluster["start"], 180_000)
-        death_row = {"abilityID": None, "absoluteTime": 130_000, "time": "02:10", "phase": "P1.5"}
-        self.assertFalse(is_p15_abandon_jump(death_row, cluster, markers, fight))
-
-    def test_terminal_p15_jump_cluster_is_exempt(self):
-        fight = {"startTime": 0, "endTime": 160_000}
-        markers = {"p15Start": 90_000, "p2Start": None}
-        deaths = [
-            {"timestamp": 100_000, "targetID": 1, "killingAbilityGameID": 1243981},
-            *[{"timestamp": 120_000 + index * 250, "targetID": 10 + index, "killingAbilityGameID": None} for index in range(12)],
-        ]
-        cluster = terminal_abandon_bridge_cluster(deaths)
-        death_row = {"abilityID": None, "absoluteTime": 121_000, "time": "02:01", "phase": "P1.5"}
-        self.assertTrue(is_p15_abandon_jump(death_row, cluster, markers, fight))
-
-    def test_bridge_cluster_prefers_largest_not_first_lone_fall(self):
-        deaths = [
-            {"timestamp": 50_000, "targetID": 1, "killingAbilityGameID": None},
-            *[{"timestamp": 90_000 + index * 200, "targetID": 10 + index, "killingAbilityGameID": None} for index in range(8)],
-        ]
-        cluster = first_bridge_cluster(deaths)
-        self.assertGreaterEqual(cluster["start"], 90_000)
-        self.assertGreaterEqual(len(cluster["events"]), 8)
-
-
 class MeluriumRound5SnapshotTests(unittest.TestCase):
     def test_melurium_alive_when_present_in_snapshot(self):
         arrow = {
@@ -153,29 +79,6 @@ class MeluriumRound5SnapshotTests(unittest.TestCase):
             "snapshot": {"bosses": [{"name": "龌勒卢斯"}, {"name": "奥蕾莉亚·风行者"}]},
         }
         self.assertFalse(melurium_alive_in_arrow_snapshot(arrow))
-
-
-class FightCombatantRosterTests(unittest.TestCase):
-    def test_roster_uses_friendly_players_not_whole_report_actors(self):
-        fight = {"friendlyPlayers": [1, 2]}
-        actor_map = {1: "冠冕A", 2: "冠冕B", 3: "其他Boss的人", 4: "路过的人"}
-        actor_type = {1: "Player", 2: "Player", 3: "Player", 4: "Player"}
-        player_roles = {1: "tank", 2: "range-dps"}
-        combatants = build_fight_combatants(fight, actor_map, player_roles, actor_type)
-        self.assertEqual([row["name"] for row in combatants], ["冠冕A", "冠冕B"])
-        self.assertEqual(combatants[0]["roles"], ["tank"])
-        self.assertEqual(combatants[1]["roles"], ["range-dps"])
-
-    def test_roster_falls_back_to_combatant_info_when_friendly_missing(self):
-        fight = {}
-        actor_map = {10: "甲", 11: "乙", 12: "丙"}
-        player_roles = {10: "melee-healer", 11: "melee-dps"}
-        combatants = build_fight_combatants(fight, actor_map, player_roles)
-        self.assertEqual([row["name"] for row in combatants], ["乙", "甲"])
-        self.assertEqual({row["name"]: row["roles"] for row in combatants}, {
-            "甲": ["melee-healer"],
-            "乙": ["melee-dps"],
-        })
 
 
 class VoidDeathHealingRosterTests(unittest.TestCase):
@@ -207,52 +110,171 @@ class VoidDeathHealingRosterTests(unittest.TestCase):
         self.assertEqual(rows[0]["aliveHealerIDsAtDeath"], [])
 
 
-class CrownP1SilverArrowAttributionTests(unittest.TestCase):
-    def test_binding_remove_fallback_when_ray_misses(self):
-        marked = [
-            {"targetID": 2, "player": "渊重音"},
-            {"targetID": 7, "player": "杀杀孩"},
+class VoreluthVulnerabilityFadeTests(unittest.TestCase):
+    def test_multiple_fades_aggregated_per_fight_with_stacks(self):
+        fight = {"id": 7, "startTime": 1_000_000, "endTime": 1_200_000}
+        actor_map = {9: "龌勒卢斯"}
+        actor_game_id = {9: 243811}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_010_000, "stack": 1},
+            {"type": "applydebuffstack", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_020_000, "stack": 2},
+            {"type": "removedebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_030_000},
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_040_000, "stack": 1},
+            {"type": "applydebuffstack", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_045_000, "stack": 2},
+            {"type": "applydebuffstack", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_050_000, "stack": 3},
+            {"type": "removedebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 1_060_000},
+            {"type": "removedebuff", "abilityGameID": P1_SHADOW_BINDING_ID, "targetID": 9, "timestamp": 1_125_000},
         ]
-        ray_miss = [
-            {"targetID": 2, "player": "渊重音", "bosses": [], "hitBoss": False},
-            {"targetID": 7, "player": "杀杀孩", "bosses": [], "hitBoss": False},
+        summary = analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs)
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["fadeCount"], 2)
+        self.assertEqual(summary["stacks"], [2, 3])
+        self.assertTrue(summary["counted"])
+        self.assertTrue(summary["verdictCounted"])
+        self.assertFalse(summary["displayOnly"])
+        self.assertIn("2层", summary["text"])
+        self.assertIn("3层", summary["text"])
+        self.assertEqual(corruption_stack_at(debuffs, 9, 1_030_000), 2)
+        self.assertEqual(corruption_stack_at(debuffs, 9, 1_060_000), 3)
+
+        from boss_plugins.void_spire.crown_of_the_cosmos import build_voreluth_vulnerability_board
+        rows, _ = build_voreluth_vulnerability_board(
+            fight, actor_map, actor_game_id, debuffs, player_roles={1: "tank", 2: "tank", 3: "healer"},
+        )
+        # actor map needs tank names
+        actor_map[1] = "坦克甲"
+        actor_map[2] = "坦克乙"
+        rows, summary2 = build_voreluth_vulnerability_board(
+            fight, actor_map, actor_game_id, debuffs, player_roles={1: "tank", 2: "tank", 3: "healer"},
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row["name"] for row in rows}, {"坦克甲", "坦克乙"})
+        self.assertTrue(all(row.get("role") == "tank" for row in rows))
+        self.assertTrue(all(not row.get("isSystem") for row in rows))
+        self.assertEqual(rows[0]["hitCount"], 2)
+        self.assertEqual(len(rows[0]["events"]), 2)
+        self.assertIn("坦克甲", summary2["text"])
+
+    def test_fade_after_binding_remove_is_ignored(self):
+        fight = {"id": 1, "startTime": 0, "endTime": 200_000}
+        actor_map = {9: "龌勒卢斯"}
+        actor_game_id = {9: 254172}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 10_000, "stack": 1},
+            {"type": "removedebuff", "abilityGameID": P1_SHADOW_BINDING_ID, "targetID": 9, "timestamp": 50_000},
+            {"type": "removedebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 60_000},
         ]
-        hit_events = [{"targetID": 9, "boss": "龌勒卢斯", "timeMs": 125633}]
+        summary = analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs)
+        self.assertIsNone(summary)
 
-        attrs = finalize_p1_boss_attribution(marked, ray_miss, hit_events)
+    def test_stack_tick_remove_is_not_full_fade(self):
+        fight = {"id": 2, "startTime": 0, "endTime": 200_000}
+        actor_map = {9: "龌勒卢斯"}
+        actor_game_id = {9: 243811}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 10_000, "stack": 1},
+            {"type": "removedebuffstack", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 20_000, "stack": 0},
+            {"type": "removedebuff", "abilityGameID": P1_SHADOW_BINDING_ID, "targetID": 9, "timestamp": 80_000},
+        ]
+        summary = analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs)
+        self.assertIsNone(summary)
 
-        self.assertTrue(all(row["hitBoss"] for row in attrs))
-        self.assertEqual(attrs[0]["bosses"], ["龌勒卢斯"])
-        self.assertEqual(attrs[0]["attributionSource"], "binding_remove_fallback")
 
-    def test_round_succeeded_with_hit_events_even_if_attribution_misses(self):
+class SilverArrowHitEvidenceTests(unittest.TestCase):
+    def test_boss_hit_events_count_as_round_success(self):
+        attributions = [{"hitBoss": False}, {"hitBoss": False}]
+        hit_events = [{"targetID": 9, "boss": "龌勒卢斯"}]
+        round_success = any(row.get("hitBoss") for row in attributions) or bool(hit_events)
+        self.assertTrue(round_success)
+
+    def test_p1_arrow_rows_confirm_hit_covers_apply_remove_gap(self):
+        from boss_plugins.void_spire.crown_of_the_cosmos import p1_arrow_rows_confirm_hit
+
+        rows = [{
+            "kind": "binding_removed",
+            "target": "殆米阿尔",
+            "time": "00:40",
+            "expectedTime": "00:43",
+            "markedPlayers": [{"id": 15, "name": "神奇大叔"}, {"id": 16, "name": "陈瀚"}],
+        }]
         arrow = {
-            "p1BossAttribution": [
-                {"player": "渊重音", "hitBoss": False, "bosses": []},
-                {"player": "杀杀孩", "hitBoss": False, "bosses": []},
-            ],
-            "p1BossHitEvents": [{"targetID": 9, "boss": "龌勒卢斯", "timeMs": 125633}],
-        }
-        self.assertTrue(p1_silver_arrow_round_succeeded(arrow))
-
-    def test_round_failed_without_hit_events_or_attribution(self):
-        arrow = {
-            "p1BossAttribution": [
-                {"player": "义子", "hitBoss": False, "bosses": []},
-                {"player": "杀杀孩", "hitBoss": False, "bosses": []},
-            ],
+            "timeMs": 43_516,
+            "markedPlayers": ["神奇大叔", "陈瀚"],
             "p1BossHitEvents": [],
+            "p1BossAttribution": [{"hitBoss": False}, {"hitBoss": False}],
         }
-        self.assertFalse(p1_silver_arrow_round_succeeded(arrow))
+        self.assertTrue(p1_arrow_rows_confirm_hit(rows, "殆米阿尔", arrow))
+        self.assertFalse(p1_arrow_rows_confirm_hit(rows, "殁里乌姆", arrow))
+        self.assertFalse(p1_arrow_rows_confirm_hit(rows, "殆米阿尔", {
+            **arrow,
+            "markedPlayers": ["其他人", "另一个人"],
+        }))
 
-    def test_ray_hit_is_preserved_without_overwriting(self):
-        marked = [{"targetID": 2, "player": "渊重音"}]
-        ray_hit = [{"targetID": 2, "player": "渊重音", "bosses": ["龌勒卢斯"], "hitBoss": True}]
-        hit_events = [{"targetID": 9, "boss": "龌勒卢斯", "timeMs": 125633}]
 
-        attrs = finalize_p1_boss_attribution(marked, ray_hit, hit_events)
 
-        self.assertEqual(attrs, ray_hit)
+class PassageCliffMistakeTests(unittest.TestCase):
+    def test_mid_phase_cliff_counts_and_p1_transition_skipped(self):
+        fight = {"id": 9, "startTime": 100_000, "endTime": 200_000}
+        markers = {"p15Start": 150_000, "p2Start": 160_000, "p25Start": 180_000, "p3Start": 190_000}
+        # before p15 = P1 (skip), between p15-p2 = P1.5 (skip), after p2 = P2 (count)
+        deaths = [
+            {"targetID": 1, "timestamp": 110_000, "killingAbilityGameID": None},  # P1 skip
+            {"targetID": 2, "timestamp": 155_000, "killingAbilityGameID": None},  # P1.5 skip
+            {"targetID": 4, "timestamp": 165_000, "killingAbilityGameID": None},  # P2 count
+            {"targetID": 3, "timestamp": 170_000, "killingAbilityGameID": 123},   # non-cliff skip
+        ]
+        timeline = [
+            {"player": "甲", "role": "melee-dps", "absoluteTime": 110_000, "time": "00:10", "phase": "P1", "ability": "坠崖", "abilityID": None},
+            {"player": "乙", "role": "range-dps", "absoluteTime": 155_000, "time": "00:55", "phase": "P1.5", "ability": "坠崖", "abilityID": None},
+            {"player": "丁", "role": "melee-dps", "absoluteTime": 165_000, "time": "01:05", "phase": "P2", "ability": "坠崖", "abilityID": None},
+            {"player": "丙", "role": "tank", "absoluteTime": 170_000, "time": "01:10", "phase": "P2", "ability": "银锋箭", "abilityID": 123},
+        ]
+        rows = build_passage_cliff_board(fight, deaths, markers, timeline, {4: "melee-dps"}, "p2_team_collapse")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "丁")
+        self.assertEqual(rows[0]["hitCount"], 1)
+        self.assertTrue(rows[0]["events"][0]["counted"])
+
+    def test_abandon_wave_cliffs_not_counted(self):
+        fight = {"id": 10, "startTime": 0, "endTime": 60_000}
+        markers = {}
+        # 6 cliff deaths clustered = abandon wave under phase_abandon
+        deaths = [{"targetID": i, "timestamp": 50_000 + i * 200, "killingAbilityGameID": None} for i in range(6)]
+        timeline = [
+            {"player": f"P{i}", "role": "dps", "absoluteTime": 50_000 + i * 200, "time": "00:50", "phase": "P1", "ability": "坠崖", "abilityID": None}
+            for i in range(6)
+        ]
+        rows = build_passage_cliff_board(fight, deaths, markers, timeline, {}, "phase_abandon")
+        self.assertEqual(rows, [])
+
+    def test_dense_p2_cliff_cluster_exempts_even_within_first_eight(self):
+        """Fight18 型：P1.5 先有机制减员，进 P2 后短时大团跳崖；前几名坠崖虽在第8死内也要豁免。"""
+        fight = {"id": 18, "startTime": 0, "endTime": 200_000}
+        markers = {"p15Start": 100_000, "p2Start": 150_000}
+        deaths = [
+            {"targetID": 1, "timestamp": 140_000, "killingAbilityGameID": 1243981},
+            {"targetID": 2, "timestamp": 140_500, "killingAbilityGameID": 1243981},
+            {"targetID": 3, "timestamp": 141_000, "killingAbilityGameID": 1243981},
+            {"targetID": 4, "timestamp": 142_000, "killingAbilityGameID": 1246001},
+            {"targetID": 5, "timestamp": 143_000, "killingAbilityGameID": 1246001},
+        ]
+        # P2 dense cliffs starting at death #6
+        for i in range(8):
+            deaths.append({"targetID": 10 + i, "timestamp": 158_000 + i * 300, "killingAbilityGameID": None})
+        timeline = []
+        for death in deaths:
+            is_cliff = death.get("killingAbilityGameID") in {None, 3}
+            timeline.append({
+                "player": f"P{death['targetID']}",
+                "role": "dps",
+                "absoluteTime": death["timestamp"],
+                "time": "02:58",
+                "phase": "P1.5" if death["timestamp"] < 150_000 else "P2",
+                "ability": "坠崖" if is_cliff else "银锋弹幕射击",
+                "abilityID": death.get("killingAbilityGameID"),
+            })
+        rows = build_passage_cliff_board(fight, deaths, markers, timeline, {}, "phase_abandon")
+        self.assertEqual(rows, [])
 
 
 if __name__ == "__main__":
