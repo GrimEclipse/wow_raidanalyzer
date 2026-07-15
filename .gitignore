@@ -16,7 +16,6 @@ data/manifest.json
 
 # Local workspace metadata.
 .agents/
-.codex/
 
 # Local IDE metadata.
 .idea/
