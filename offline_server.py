@@ -18,8 +18,44 @@ ROUTES = {
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
 
+# 按用户提供的样板路径输出
+DEFAULT_EXPORT_EXCEL_DIR = Path(
+    r"C:\Users\卫宇珩\xwechat_files\wxid_clfikfy24o4422_444a\msg\file\2026-07"
+)
+
 
 class OfflineHandler(SimpleHTTPRequestHandler):
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/export-verdict-excel":
+            try:
+                content_len = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(content_len) if content_len > 0 else b"{}"
+                payload = json.loads(raw.decode("utf-8"))
+                from tools.export_verdict_excel import export_verdict_excel
+
+                out_path = export_verdict_excel(payload, DEFAULT_EXPORT_EXCEL_DIR, boss_name="宇宙之冕")
+                body = out_path.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header(
+                    "Content-Type",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                self.send_header("Content-Disposition", f"attachment; filename=\"{out_path.name}\"")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except Exception as e:
+                msg = json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8")
+                self.send_response(HTTPStatus.INTERNAL_SERVER_ERROR)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+                return
+        return super().do_POST()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         if parsed.path == "/api/data-files":

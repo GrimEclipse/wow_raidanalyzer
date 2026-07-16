@@ -28,10 +28,10 @@
       "p1SilverArrowMissedFights": "P1 银锋箭射怪失误",
       "corruptionEssenceDamage": "腐化精华",
       "interferenceShockInterrupts": "干扰震荡打断",
-      "gravityLineViolation": "P3 重力坍缩违规致死",
-      "tankRiftSlashFailure": "P2 裂隙挥砍换坦失误",
       "voreluthVulnerabilityFade": "P1 龌勒卢斯易伤异常",
-      "passageCliffMistakes": "过场失误"
+      "passageCliffMistakes": "过场失误",
+      "gravityLineViolation": "P3 重力坍缩违规致死",
+      "tankRiftSlashFailure": "P2 裂隙挥砍换坦失误"
     },
     "courtConfig": {
       "waterOutlierYards": 15,
@@ -96,7 +96,7 @@
     },
     "performance": {
       "fightCount": 4,
-      "elapsedSeconds": 146.033,
+      "elapsedSeconds": 131.42,
       "logicalGraphQLRequests": 212,
       "maxFightThreads": 4,
       "maxRequestThreads": 6,
@@ -2984,6 +2984,41 @@
               "uncountedCount": 0
             }
           ],
+          "passageCliffMistakes": [
+            {
+              "name": "三坑不二",
+              "role": "range-dps",
+              "roles": [
+                "range-dps"
+              ],
+              "spellKey": "passageCliffMistakes",
+              "spellName": "过场失误",
+              "hitCount": 1,
+              "deathCount": 1,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "fightID": 27,
+                  "player": "三坑不二",
+                  "role": "range-dps",
+                  "phase": "P2",
+                  "time": "03:37",
+                  "positionMs": 217453,
+                  "ability": "坠崖",
+                  "abilityID": null,
+                  "counted": true,
+                  "verdictCounted": true,
+                  "displayOnly": false,
+                  "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+                  "text": "Fight27 三坑不二 于 03:37（P2）死于坠崖 · 过场失误"
+                }
+              ],
+              "observedHitCount": 1,
+              "observedDeathCount": 1,
+              "countedCount": 1,
+              "uncountedCount": 0
+            }
+          ],
           "collapsingVoidSnapAiming": [
             {
               "name": "Polonaise",
@@ -3931,6 +3966,7 @@
           ],
           "gravityLineViolation": [],
           "tankRiftSlashFailure": [],
+          "voreluthVulnerabilityFade": [],
           "corruptionEssenceDamage": [
             {
               "name": "Jokermeow",
@@ -4207,42 +4243,6 @@
               "observedDeathCount": 0,
               "countedCount": 0,
               "uncountedCount": 1
-            }
-          ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": [
-            {
-              "name": "三坑不二",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 27,
-                  "player": "三坑不二",
-                  "role": "range-dps",
-                  "phase": "P2",
-                  "time": "03:37",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight27 三坑不二 于 03:37（P2）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
             }
           ]
         },
@@ -7772,6 +7772,7 @@
               "text": "00:30 干扰震荡实际打断 3 人：八妖灵九琦舞：Spell 740（740）；Loveating：Hand of Gul'dan（105174）；叶问：Spell 116670（116670）"
             }
           ],
+          "voreluthVulnerabilityFade": null,
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
           "transitionAbandoned": false,
@@ -7789,7 +7790,7 @@
               "fightID": 27,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/PAMtmJz8rNywYVQT?fight=27",
-              "generatedAt": "2026-07-15T15:56:39.696322+00:00",
+              "generatedAt": "2026-07-16T02:47:18.306155+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -26904,6 +26905,7 @@
         ],
         "avoidableSummary": {
           "p15AvoidableDeaths": [],
+          "passageCliffMistakes": [],
           "collapsingVoidSnapAiming": [
             {
               "name": "叮咚好烦",
@@ -26987,8 +26989,6 @@
               "events": [
                 {
                   "healer": "旖旎云逸",
-                  "healerID": null,
-                  "healerIDs": [],
                   "healing6s": 0,
                   "healing8s": 0,
                   "insufficient": true,
@@ -27027,8 +27027,6 @@
               "events": [
                 {
                   "healer": "暗黑膏药",
-                  "healerID": null,
-                  "healerIDs": [],
                   "healing6s": 0,
                   "healing8s": 0,
                   "insufficient": true,
@@ -27061,9 +27059,8 @@
           "missedShadows": [],
           "gravityLineViolation": [],
           "tankRiftSlashFailure": [],
-          "corruptionEssenceDamage": [],
           "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "corruptionEssenceDamage": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -27390,16 +27387,12 @@
               "healers": [
                 {
                   "healer": "旖旎云逸",
-                  "healerID": null,
-                  "healerIDs": [],
                   "healing6s": 0,
                   "healing8s": 0,
                   "insufficient": true
                 },
                 {
                   "healer": "暗黑膏药",
-                  "healerID": null,
-                  "healerIDs": [],
                   "healing6s": 0,
                   "healing8s": 0,
                   "insufficient": true
@@ -27442,6 +27435,7 @@
               "text": "00:09 干扰震荡没有明确 Interrupts 记录"
             }
           ],
+          "voreluthVulnerabilityFade": null,
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
           "transitionAbandoned": true,
@@ -27459,7 +27453,7 @@
               "fightID": 28,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/PAMtmJz8rNywYVQT?fight=28",
-              "generatedAt": "2026-07-15T15:56:28.001967+00:00",
+              "generatedAt": "2026-07-16T02:47:02.740645+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -30882,6 +30876,74 @@
               "uncountedCount": 0
             }
           ],
+          "passageCliffMistakes": [
+            {
+              "name": "叶问",
+              "role": "melee-healer",
+              "roles": [
+                "melee-healer"
+              ],
+              "spellKey": "passageCliffMistakes",
+              "spellName": "过场失误",
+              "hitCount": 1,
+              "deathCount": 1,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "fightID": 29,
+                  "player": "叶问",
+                  "role": "melee-healer",
+                  "phase": "P3",
+                  "time": "05:46",
+                  "positionMs": 346842,
+                  "ability": "坠崖",
+                  "abilityID": null,
+                  "counted": true,
+                  "verdictCounted": true,
+                  "displayOnly": false,
+                  "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+                  "text": "Fight29 叶问 于 05:46（P3）死于坠崖 · 过场失误"
+                }
+              ],
+              "observedHitCount": 1,
+              "observedDeathCount": 1,
+              "countedCount": 1,
+              "uncountedCount": 0
+            },
+            {
+              "name": "小楚唯",
+              "role": "melee-dps",
+              "roles": [
+                "melee-dps"
+              ],
+              "spellKey": "passageCliffMistakes",
+              "spellName": "过场失误",
+              "hitCount": 1,
+              "deathCount": 1,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "fightID": 29,
+                  "player": "小楚唯",
+                  "role": "melee-dps",
+                  "phase": "P3",
+                  "time": "05:47",
+                  "positionMs": 347245,
+                  "ability": "坠崖",
+                  "abilityID": null,
+                  "counted": true,
+                  "verdictCounted": true,
+                  "displayOnly": false,
+                  "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+                  "text": "Fight29 小楚唯 于 05:47（P3）死于坠崖 · 过场失误"
+                }
+              ],
+              "observedHitCount": 1,
+              "observedDeathCount": 1,
+              "countedCount": 1,
+              "uncountedCount": 0
+            }
+          ],
           "collapsingVoidSnapAiming": [
             {
               "name": "茶喵不吃糖",
@@ -31356,6 +31418,42 @@
           ],
           "interferenceShockInterrupts": [
             {
+              "name": "茶喵不吃糖",
+              "role": "range-dps",
+              "roles": [
+                "range-dps"
+              ],
+              "spellKey": "interferenceShockInterrupts",
+              "spellName": "干扰震荡打断",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "playerID": 1,
+                  "player": "茶喵不吃糖",
+                  "spellID": 116858,
+                  "spell": "Chaos Bolt",
+                  "count": 1,
+                  "tableTimestamp": 8971883,
+                  "role": "unknown",
+                  "castStart": "00:08",
+                  "evidence": "wcl_interrupt_table",
+                  "fightID": 29,
+                  "time": "00:09",
+                  "positionMs": 9467,
+                  "counted": false,
+                  "verdictCounted": false,
+                  "displayOnly": true,
+                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
+                }
+              ],
+              "countedCount": 0,
+              "uncountedCount": 1,
+              "observedHitCount": 1,
+              "observedDeathCount": 0
+            },
+            {
               "name": "Loveating",
               "role": "range-dps",
               "roles": [
@@ -31407,42 +31505,6 @@
               "countedCount": 0,
               "uncountedCount": 2,
               "observedHitCount": 2,
-              "observedDeathCount": 0
-            },
-            {
-              "name": "茶喵不吃糖",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "interferenceShockInterrupts",
-              "spellName": "干扰震荡打断",
-              "hitCount": 1,
-              "deathCount": 0,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "playerID": 1,
-                  "player": "茶喵不吃糖",
-                  "spellID": 116858,
-                  "spell": "Chaos Bolt",
-                  "count": 1,
-                  "tableTimestamp": 8971883,
-                  "role": "unknown",
-                  "castStart": "00:08",
-                  "evidence": "wcl_interrupt_table",
-                  "fightID": 29,
-                  "time": "00:09",
-                  "positionMs": 9467,
-                  "counted": false,
-                  "verdictCounted": false,
-                  "displayOnly": true,
-                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
-                }
-              ],
-              "countedCount": 0,
-              "uncountedCount": 1,
-              "observedHitCount": 1,
               "observedDeathCount": 0
             },
             {
@@ -31957,6 +32019,7 @@
             }
           ],
           "tankRiftSlashFailure": [],
+          "voreluthVulnerabilityFade": [],
           "corruptionEssenceDamage": [
             {
               "name": "Breezeluck",
@@ -32176,75 +32239,6 @@
               "observedDeathCount": 0,
               "countedCount": 0,
               "uncountedCount": 1
-            }
-          ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": [
-            {
-              "name": "叶问",
-              "role": "melee-healer",
-              "roles": [
-                "melee-healer"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 29,
-                  "player": "叶问",
-                  "role": "melee-healer",
-                  "phase": "P3",
-                  "time": "05:46",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight29 叶问 于 05:46（P3）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
-            },
-            {
-              "name": "小楚唯",
-              "role": "melee-dps",
-              "roles": [
-                "melee-dps"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 29,
-                  "player": "小楚唯",
-                  "role": "melee-dps",
-                  "phase": "P3",
-                  "time": "05:47",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight29 小楚唯 于 05:47（P3）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
             }
           ]
         },
@@ -35387,17 +35381,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 2,
-                  "player": "Loveating",
-                  "spellID": 105174,
-                  "spell": "Hand of Gul'dan",
-                  "count": 2,
-                  "tableTimestamp": 8971882,
-                  "role": "unknown",
-                  "castStart": "00:08",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 1,
                   "player": "茶喵不吃糖",
                   "spellID": 116858,
@@ -35407,11 +35390,22 @@
                   "role": "unknown",
                   "castStart": "00:08",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 2,
+                  "player": "Loveating",
+                  "spellID": 105174,
+                  "spell": "Hand of Gul'dan",
+                  "count": 2,
+                  "tableTimestamp": 8971882,
+                  "role": "unknown",
+                  "castStart": "00:08",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 2,
               "confidence": "wcl_interrupt_table",
-              "text": "00:09 干扰震荡实际打断 2 人：Loveating：Hand of Gul'dan（105174）；茶喵不吃糖：Chaos Bolt（116858）"
+              "text": "00:09 干扰震荡实际打断 2 人：茶喵不吃糖：Chaos Bolt（116858）；Loveating：Hand of Gul'dan（105174）"
             },
             {
               "index": 2,
@@ -35448,6 +35442,7 @@
               "text": "00:30 干扰震荡实际打断 2 人：八妖灵九琦舞：Spell 740（740）；Loveating：Hand of Gul'dan（105174）"
             }
           ],
+          "voreluthVulnerabilityFade": null,
           "p3PortalSummons": [
             {
               "portalIndex": 1,
@@ -35478,7 +35473,7 @@
               "fightID": 29,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/PAMtmJz8rNywYVQT?fight=29",
-              "generatedAt": "2026-07-15T15:56:58.950392+00:00",
+              "generatedAt": "2026-07-16T02:47:33.913224+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -62743,6 +62738,41 @@
         ],
         "avoidableSummary": {
           "p15AvoidableDeaths": [],
+          "passageCliffMistakes": [
+            {
+              "name": "Loveating",
+              "role": "range-dps",
+              "roles": [
+                "range-dps"
+              ],
+              "spellKey": "passageCliffMistakes",
+              "spellName": "过场失误",
+              "hitCount": 1,
+              "deathCount": 1,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "fightID": 30,
+                  "player": "Loveating",
+                  "role": "range-dps",
+                  "phase": "P3",
+                  "time": "06:41",
+                  "positionMs": 401927,
+                  "ability": "坠崖",
+                  "abilityID": null,
+                  "counted": true,
+                  "verdictCounted": true,
+                  "displayOnly": false,
+                  "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+                  "text": "Fight30 Loveating 于 06:41（P3）死于坠崖 · 过场失误"
+                }
+              ],
+              "observedHitCount": 1,
+              "observedDeathCount": 1,
+              "countedCount": 1,
+              "uncountedCount": 0
+            }
+          ],
           "collapsingVoidSnapAiming": [
             {
               "name": "叶问",
@@ -63259,42 +63289,6 @@
               "observedDeathCount": 0
             },
             {
-              "name": "Loveating",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "interferenceShockInterrupts",
-              "spellName": "干扰震荡打断",
-              "hitCount": 1,
-              "deathCount": 0,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "playerID": 2,
-                  "player": "Loveating",
-                  "spellID": 105174,
-                  "spell": "Hand of Gul'dan",
-                  "count": 1,
-                  "tableTimestamp": 9559520,
-                  "role": "unknown",
-                  "castStart": "00:50",
-                  "evidence": "wcl_interrupt_table",
-                  "fightID": 30,
-                  "time": "00:51",
-                  "positionMs": 51031,
-                  "counted": false,
-                  "verdictCounted": false,
-                  "displayOnly": true,
-                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
-                }
-              ],
-              "countedCount": 0,
-              "uncountedCount": 1,
-              "observedHitCount": 1,
-              "observedDeathCount": 0
-            },
-            {
               "name": "爱音",
               "role": "range-dps",
               "roles": [
@@ -63347,6 +63341,42 @@
                   "player": "Polonaise",
                   "spellID": 1217610,
                   "spell": "Spell 1217610",
+                  "count": 1,
+                  "tableTimestamp": 9559520,
+                  "role": "unknown",
+                  "castStart": "00:50",
+                  "evidence": "wcl_interrupt_table",
+                  "fightID": 30,
+                  "time": "00:51",
+                  "positionMs": 51031,
+                  "counted": false,
+                  "verdictCounted": false,
+                  "displayOnly": true,
+                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
+                }
+              ],
+              "countedCount": 0,
+              "uncountedCount": 1,
+              "observedHitCount": 1,
+              "observedDeathCount": 0
+            },
+            {
+              "name": "Loveating",
+              "role": "range-dps",
+              "roles": [
+                "range-dps"
+              ],
+              "spellKey": "interferenceShockInterrupts",
+              "spellName": "干扰震荡打断",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "playerID": 2,
+                  "player": "Loveating",
+                  "spellID": 105174,
+                  "spell": "Hand of Gul'dan",
                   "count": 1,
                   "tableTimestamp": 9559520,
                   "role": "unknown",
@@ -63876,6 +63906,134 @@
             }
           ],
           "tankRiftSlashFailure": [],
+          "voreluthVulnerabilityFade": [
+            {
+              "name": "Jokermeow",
+              "role": "tank",
+              "roles": [
+                "tank"
+              ],
+              "spellKey": "voreluthVulnerabilityFade",
+              "spellName": "P1 龌勒卢斯易伤异常",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "fightID": 30,
+                  "player": "Jokermeow",
+                  "targetID": 25,
+                  "role": "tank",
+                  "counted": true,
+                  "verdictCounted": true,
+                  "displayOnly": false,
+                  "excludeFromCourtPlayers": false,
+                  "isSystem": false,
+                  "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，同场仅计 1 次",
+                  "time": "02:09",
+                  "positionMs": 129564,
+                  "stack": 1,
+                  "fadeCount": 3,
+                  "fades": [
+                    {
+                      "time": "02:05",
+                      "positionMs": 125572,
+                      "stack": 17,
+                      "targetID": 359,
+                      "target": "龌勒卢斯",
+                      "text": "02:05 完整 faded，断时约 17 层"
+                    },
+                    {
+                      "time": "02:08",
+                      "positionMs": 128565,
+                      "stack": 1,
+                      "targetID": 359,
+                      "target": "龌勒卢斯",
+                      "text": "02:08 完整 faded，断时约 1 层"
+                    },
+                    {
+                      "time": "02:09",
+                      "positionMs": 129564,
+                      "stack": 1,
+                      "targetID": 359,
+                      "target": "龌勒卢斯",
+                      "text": "02:09 完整 faded，断时约 1 层"
+                    }
+                  ],
+                  "text": "Fight30 Jokermeow（坦克）· 02:05 龌勒卢斯腐化精华完整 faded（断时约 17 层）"
+                }
+              ],
+              "observedHitCount": 1,
+              "observedDeathCount": 0,
+              "countedCount": 1,
+              "uncountedCount": 0,
+              "isSystem": false,
+              "excludeFromCourtPlayers": false
+            },
+            {
+              "name": "毛绒微醺爬爬",
+              "role": "tank",
+              "roles": [
+                "tank"
+              ],
+              "spellKey": "voreluthVulnerabilityFade",
+              "spellName": "P1 龌勒卢斯易伤异常",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "fightID": 30,
+                  "player": "毛绒微醺爬爬",
+                  "targetID": 355,
+                  "role": "tank",
+                  "counted": true,
+                  "verdictCounted": true,
+                  "displayOnly": false,
+                  "excludeFromCourtPlayers": false,
+                  "isSystem": false,
+                  "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，同场仅计 1 次",
+                  "time": "02:09",
+                  "positionMs": 129564,
+                  "stack": 1,
+                  "fadeCount": 3,
+                  "fades": [
+                    {
+                      "time": "02:05",
+                      "positionMs": 125572,
+                      "stack": 17,
+                      "targetID": 359,
+                      "target": "龌勒卢斯",
+                      "text": "02:05 完整 faded，断时约 17 层"
+                    },
+                    {
+                      "time": "02:08",
+                      "positionMs": 128565,
+                      "stack": 1,
+                      "targetID": 359,
+                      "target": "龌勒卢斯",
+                      "text": "02:08 完整 faded，断时约 1 层"
+                    },
+                    {
+                      "time": "02:09",
+                      "positionMs": 129564,
+                      "stack": 1,
+                      "targetID": 359,
+                      "target": "龌勒卢斯",
+                      "text": "02:09 完整 faded，断时约 1 层"
+                    }
+                  ],
+                  "text": "Fight30 毛绒微醺爬爬（坦克）· 02:05 龌勒卢斯腐化精华完整 faded（断时约 17 层）"
+                }
+              ],
+              "observedHitCount": 1,
+              "observedDeathCount": 0,
+              "countedCount": 1,
+              "uncountedCount": 0,
+              "isSystem": false,
+              "excludeFromCourtPlayers": false
+            }
+          ],
           "corruptionEssenceDamage": [
             {
               "name": "Jokermeow",
@@ -64069,42 +64227,6 @@
               "observedDeathCount": 0,
               "countedCount": 0,
               "uncountedCount": 1
-            }
-          ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": [
-            {
-              "name": "Loveating",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 30,
-                  "player": "Loveating",
-                  "role": "range-dps",
-                  "phase": "P3",
-                  "time": "06:41",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight30 Loveating 于 06:41（P3）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
             }
           ]
         },
@@ -69328,17 +69450,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 2,
-                  "player": "Loveating",
-                  "spellID": 105174,
-                  "spell": "Hand of Gul'dan",
-                  "count": 1,
-                  "tableTimestamp": 9559520,
-                  "role": "unknown",
-                  "castStart": "00:50",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 12,
                   "player": "爱音",
                   "spellID": 51505,
@@ -69359,11 +69470,22 @@
                   "role": "unknown",
                   "castStart": "00:50",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 2,
+                  "player": "Loveating",
+                  "spellID": 105174,
+                  "spell": "Hand of Gul'dan",
+                  "count": 1,
+                  "tableTimestamp": 9559520,
+                  "role": "unknown",
+                  "castStart": "00:50",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 3,
               "confidence": "wcl_interrupt_table",
-              "text": "00:51 干扰震荡实际打断 3 人：Loveating：Hand of Gul'dan（105174）；爱音：Spell 51505（51505）；Polonaise：Spell 1217610（1217610）"
+              "text": "00:51 干扰震荡实际打断 3 人：爱音：Spell 51505（51505）；Polonaise：Spell 1217610（1217610）；Loveating：Hand of Gul'dan（105174）"
             },
             {
               "index": 4,
@@ -69377,6 +69499,58 @@
               "text": "06:57 干扰震荡没有明确 Interrupts 记录"
             }
           ],
+          "voreluthVulnerabilityFade": {
+            "fightID": 30,
+            "fadeCount": 3,
+            "fades": [
+              {
+                "time": "02:05",
+                "positionMs": 125572,
+                "stack": 17,
+                "targetID": 359,
+                "target": "龌勒卢斯",
+                "text": "02:05 完整 faded，断时约 17 层"
+              },
+              {
+                "time": "02:08",
+                "positionMs": 128565,
+                "stack": 1,
+                "targetID": 359,
+                "target": "龌勒卢斯",
+                "text": "02:08 完整 faded，断时约 1 层"
+              },
+              {
+                "time": "02:09",
+                "positionMs": 129564,
+                "stack": 1,
+                "targetID": 359,
+                "target": "龌勒卢斯",
+                "text": "02:09 完整 faded，断时约 1 层"
+              }
+            ],
+            "stacks": [
+              17,
+              1,
+              1
+            ],
+            "stackSummary": "17层@02:05、1层@02:08、1层@02:09",
+            "applyTime": "01:34",
+            "bindingGoneTime": null,
+            "bindingRemoved": false,
+            "time": "02:05",
+            "positionMs": 125572,
+            "counted": true,
+            "verdictCounted": true,
+            "displayOnly": false,
+            "excludeFromCourtPlayers": false,
+            "isSystem": false,
+            "countReason": "腐化精华在幽影束缚仍存在期间因层数/时间完整消失，记为龌勒卢斯易伤异常（当场坦克各计 fade 次；受第8死豁免）",
+            "text": "Fight30 龌勒卢斯腐化精华完整 faded ×3（断层：17层、1层、1层；首次 apply 01:34，束缚至灭团未移除）；归因坦克：Jokermeow、毛绒微醺爬爬",
+            "attributedTanks": [
+              "Jokermeow",
+              "毛绒微醺爬爬"
+            ]
+          },
           "p3PortalSummons": [
             {
               "portalIndex": 1,
@@ -69419,7 +69593,7 @@
               "fightID": 30,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/PAMtmJz8rNywYVQT?fight=30",
-              "generatedAt": "2026-07-15T15:57:19.184686+00:00",
+              "generatedAt": "2026-07-16T02:47:45.647588+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -98852,6 +99026,148 @@
           ]
         }
       ],
+      "passageCliffMistakes": [
+        {
+          "name": "三坑不二",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "range-dps",
+          "roles": [
+            "range-dps"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 27,
+              "player": "三坑不二",
+              "role": "range-dps",
+              "phase": "P2",
+              "time": "03:37",
+              "positionMs": 217453,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight27 三坑不二 于 03:37（P2）死于坠崖 · 过场失误"
+            }
+          ]
+        },
+        {
+          "name": "叶问",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "melee-healer",
+          "roles": [
+            "melee-healer"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 29,
+              "player": "叶问",
+              "role": "melee-healer",
+              "phase": "P3",
+              "time": "05:46",
+              "positionMs": 346842,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight29 叶问 于 05:46（P3）死于坠崖 · 过场失误"
+            }
+          ]
+        },
+        {
+          "name": "小楚唯",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "melee-dps",
+          "roles": [
+            "melee-dps"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 29,
+              "player": "小楚唯",
+              "role": "melee-dps",
+              "phase": "P3",
+              "time": "05:47",
+              "positionMs": 347245,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight29 小楚唯 于 05:47（P3）死于坠崖 · 过场失误"
+            }
+          ]
+        },
+        {
+          "name": "Loveating",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "range-dps",
+          "roles": [
+            "range-dps"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 30,
+              "player": "Loveating",
+              "role": "range-dps",
+              "phase": "P3",
+              "time": "06:41",
+              "positionMs": 401927,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight30 Loveating 于 06:41（P3）死于坠崖 · 过场失误"
+            }
+          ]
+        }
+      ],
       "collapsingVoidSnapAiming": [
         {
           "name": "Polonaise",
@@ -101155,8 +101471,6 @@
           "events": [
             {
               "healer": "旖旎云逸",
-              "healerID": null,
-              "healerIDs": [],
               "healing6s": 0,
               "healing8s": 0,
               "insufficient": true,
@@ -101197,8 +101511,6 @@
           "events": [
             {
               "healer": "暗黑膏药",
-              "healerID": null,
-              "healerIDs": [],
               "healing6s": 0,
               "healing8s": 0,
               "insufficient": true,
@@ -101606,6 +101918,134 @@
         }
       ],
       "tankRiftSlashFailure": [],
+      "voreluthVulnerabilityFade": [
+        {
+          "name": "Jokermeow",
+          "spellKey": "voreluthVulnerabilityFade",
+          "spellName": "P1 龌勒卢斯易伤异常",
+          "role": "tank",
+          "roles": [
+            "tank"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 0,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 30,
+              "player": "Jokermeow",
+              "targetID": 25,
+              "role": "tank",
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "excludeFromCourtPlayers": false,
+              "isSystem": false,
+              "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，同场仅计 1 次",
+              "time": "02:09",
+              "positionMs": 129564,
+              "stack": 1,
+              "fadeCount": 3,
+              "fades": [
+                {
+                  "time": "02:05",
+                  "positionMs": 125572,
+                  "stack": 17,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:05 完整 faded，断时约 17 层"
+                },
+                {
+                  "time": "02:08",
+                  "positionMs": 128565,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:08 完整 faded，断时约 1 层"
+                },
+                {
+                  "time": "02:09",
+                  "positionMs": 129564,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:09 完整 faded，断时约 1 层"
+                }
+              ],
+              "text": "Fight30 Jokermeow（坦克）· 02:05 龌勒卢斯腐化精华完整 faded（断时约 17 层）"
+            }
+          ]
+        },
+        {
+          "name": "毛绒微醺爬爬",
+          "spellKey": "voreluthVulnerabilityFade",
+          "spellName": "P1 龌勒卢斯易伤异常",
+          "role": "tank",
+          "roles": [
+            "tank"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 0,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 30,
+              "player": "毛绒微醺爬爬",
+              "targetID": 355,
+              "role": "tank",
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "excludeFromCourtPlayers": false,
+              "isSystem": false,
+              "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，同场仅计 1 次",
+              "time": "02:09",
+              "positionMs": 129564,
+              "stack": 1,
+              "fadeCount": 3,
+              "fades": [
+                {
+                  "time": "02:05",
+                  "positionMs": 125572,
+                  "stack": 17,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:05 完整 faded，断时约 17 层"
+                },
+                {
+                  "time": "02:08",
+                  "positionMs": 128565,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:08 完整 faded，断时约 1 层"
+                },
+                {
+                  "time": "02:09",
+                  "positionMs": 129564,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:09 完整 faded，断时约 1 层"
+                }
+              ],
+              "text": "Fight30 毛绒微醺爬爬（坦克）· 02:05 龌勒卢斯腐化精华完整 faded（断时约 17 层）"
+            }
+          ]
+        }
+      ],
       "corruptionEssenceDamage": [
         {
           "name": "Jokermeow",
@@ -102190,149 +102630,6 @@
             }
           ]
         }
-      ],
-      "voreluthVulnerabilityFade": [],
-      "passageCliffMistakes": [
-        {
-          "name": "三坑不二",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-dps",
-          "roles": [
-            "range-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 27,
-              "player": "三坑不二",
-              "role": "range-dps",
-              "phase": "P2",
-              "time": "03:37",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight27 三坑不二 于 03:37（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "叶问",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "melee-healer",
-          "roles": [
-            "melee-healer"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 29,
-              "player": "叶问",
-              "role": "melee-healer",
-              "phase": "P3",
-              "time": "05:46",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight29 叶问 于 05:46（P3）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "小楚唯",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "melee-dps",
-          "roles": [
-            "melee-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 29,
-              "player": "小楚唯",
-              "role": "melee-dps",
-              "phase": "P3",
-              "time": "05:47",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight29 小楚唯 于 05:47（P3）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "Loveating",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-dps",
-          "roles": [
-            "range-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 30,
-              "player": "Loveating",
-              "role": "range-dps",
-              "phase": "P3",
-              "time": "06:41",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight30 Loveating 于 06:41（P3）死于坠崖 · 过场失误"
-            }
-          ]
-        }
       ]
     },
     "page4_finalVerdict": [
@@ -102362,9 +102659,9 @@
         "recognitionCount": 2,
         "appealAcquittalCount": 0,
         "breakdown": {
+          "passageCliffMistakes": 1,
           "collapsingVoidSnapAiming": 0,
-          "waterOutliers": 1,
-          "passageCliffMistakes": 1
+          "waterOutliers": 1
         },
         "penaltyUnits": 2.0,
         "scoreMultiplier": 1.0,
@@ -102383,6 +102680,58 @@
           "collapsingVoidSnapAiming": 0,
           "waterOutliers": 0,
           "gravityLineViolation": 0
+        },
+        "penaltyUnits": 1.0,
+        "scoreMultiplier": 1.0,
+        "appealUnitMultiplier": 1.0,
+        "iqLoss": 10
+      },
+      {
+        "name": "叶问",
+        "roles": [
+          "melee-healer"
+        ],
+        "recognitionCount": 1,
+        "appealAcquittalCount": 0,
+        "breakdown": {
+          "passageCliffMistakes": 1,
+          "collapsingVoidSnapAiming": 0,
+          "waterOutliers": 0
+        },
+        "penaltyUnits": 1.0,
+        "scoreMultiplier": 1.0,
+        "appealUnitMultiplier": 1.0,
+        "iqLoss": 10
+      },
+      {
+        "name": "小楚唯",
+        "roles": [
+          "melee-dps"
+        ],
+        "recognitionCount": 1,
+        "appealAcquittalCount": 0,
+        "breakdown": {
+          "passageCliffMistakes": 1,
+          "collapsingVoidSnapAiming": 0,
+          "waterOutliers": 0,
+          "gravityLineViolation": 0
+        },
+        "penaltyUnits": 1.0,
+        "scoreMultiplier": 1.0,
+        "appealUnitMultiplier": 1.0,
+        "iqLoss": 10
+      },
+      {
+        "name": "Loveating",
+        "roles": [
+          "range-dps"
+        ],
+        "recognitionCount": 1,
+        "appealAcquittalCount": 0,
+        "breakdown": {
+          "passageCliffMistakes": 1,
+          "collapsingVoidSnapAiming": 0,
+          "waterOutliers": 0
         },
         "penaltyUnits": 1.0,
         "scoreMultiplier": 1.0,
@@ -102438,23 +102787,6 @@
         "iqLoss": 10
       },
       {
-        "name": "叶问",
-        "roles": [
-          "melee-healer"
-        ],
-        "recognitionCount": 1,
-        "appealAcquittalCount": 0,
-        "breakdown": {
-          "collapsingVoidSnapAiming": 0,
-          "waterOutliers": 0,
-          "passageCliffMistakes": 1
-        },
-        "penaltyUnits": 1.0,
-        "scoreMultiplier": 1.0,
-        "appealUnitMultiplier": 1.0,
-        "iqLoss": 10
-      },
-      {
         "name": "Oogi",
         "roles": [
           "range-dps"
@@ -102472,17 +102804,15 @@
         "iqLoss": 10
       },
       {
-        "name": "小楚唯",
+        "name": "Jokermeow",
         "roles": [
-          "melee-dps"
+          "tank"
         ],
         "recognitionCount": 1,
         "appealAcquittalCount": 0,
         "breakdown": {
-          "collapsingVoidSnapAiming": 0,
-          "waterOutliers": 0,
           "gravityLineViolation": 0,
-          "passageCliffMistakes": 1
+          "voreluthVulnerabilityFade": 1
         },
         "penaltyUnits": 1.0,
         "scoreMultiplier": 1.0,
@@ -102490,16 +102820,14 @@
         "iqLoss": 10
       },
       {
-        "name": "Loveating",
+        "name": "毛绒微醺爬爬",
         "roles": [
-          "range-dps"
+          "tank"
         ],
         "recognitionCount": 1,
         "appealAcquittalCount": 0,
         "breakdown": {
-          "collapsingVoidSnapAiming": 0,
-          "waterOutliers": 0,
-          "passageCliffMistakes": 1
+          "voreluthVulnerabilityFade": 1
         },
         "penaltyUnits": 1.0,
         "scoreMultiplier": 1.0,
@@ -102662,21 +102990,6 @@
         "scoreMultiplier": 1.0,
         "appealUnitMultiplier": 1.0,
         "iqLoss": 0
-      },
-      {
-        "name": "Jokermeow",
-        "roles": [
-          "tank"
-        ],
-        "recognitionCount": 0,
-        "appealAcquittalCount": 0,
-        "breakdown": {
-          "gravityLineViolation": 0
-        },
-        "penaltyUnits": 0.0,
-        "scoreMultiplier": 1.0,
-        "appealUnitMultiplier": 1.0,
-        "iqLoss": 0
       }
     ],
     "page2_avoidableBoard": {
@@ -102750,6 +103063,148 @@
               "counted": true,
               "countReason": "确认发生于P1.5转阶段，按转阶段死亡计数",
               "text": "八妖灵九琦舞 于 02:46 死于【坠崖】（转阶段死亡计数）"
+            }
+          ]
+        }
+      ],
+      "passageCliffMistakes": [
+        {
+          "name": "三坑不二",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "range-dps",
+          "roles": [
+            "range-dps"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 27,
+              "player": "三坑不二",
+              "role": "range-dps",
+              "phase": "P2",
+              "time": "03:37",
+              "positionMs": 217453,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight27 三坑不二 于 03:37（P2）死于坠崖 · 过场失误"
+            }
+          ]
+        },
+        {
+          "name": "叶问",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "melee-healer",
+          "roles": [
+            "melee-healer"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 29,
+              "player": "叶问",
+              "role": "melee-healer",
+              "phase": "P3",
+              "time": "05:46",
+              "positionMs": 346842,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight29 叶问 于 05:46（P3）死于坠崖 · 过场失误"
+            }
+          ]
+        },
+        {
+          "name": "小楚唯",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "melee-dps",
+          "roles": [
+            "melee-dps"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 29,
+              "player": "小楚唯",
+              "role": "melee-dps",
+              "phase": "P3",
+              "time": "05:47",
+              "positionMs": 347245,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight29 小楚唯 于 05:47（P3）死于坠崖 · 过场失误"
+            }
+          ]
+        },
+        {
+          "name": "Loveating",
+          "spellKey": "passageCliffMistakes",
+          "spellName": "过场失误",
+          "role": "range-dps",
+          "roles": [
+            "range-dps"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 1,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 30,
+              "player": "Loveating",
+              "role": "range-dps",
+              "phase": "P3",
+              "time": "06:41",
+              "positionMs": 401927,
+              "ability": "坠崖",
+              "abilityID": null,
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
+              "text": "Fight30 Loveating 于 06:41（P3）死于坠崖 · 过场失误"
             }
           ]
         }
@@ -105057,8 +105512,6 @@
           "events": [
             {
               "healer": "旖旎云逸",
-              "healerID": null,
-              "healerIDs": [],
               "healing6s": 0,
               "healing8s": 0,
               "insufficient": true,
@@ -105099,8 +105552,6 @@
           "events": [
             {
               "healer": "暗黑膏药",
-              "healerID": null,
-              "healerIDs": [],
               "healing6s": 0,
               "healing8s": 0,
               "insufficient": true,
@@ -105508,6 +105959,134 @@
         }
       ],
       "tankRiftSlashFailure": [],
+      "voreluthVulnerabilityFade": [
+        {
+          "name": "Jokermeow",
+          "spellKey": "voreluthVulnerabilityFade",
+          "spellName": "P1 龌勒卢斯易伤异常",
+          "role": "tank",
+          "roles": [
+            "tank"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 0,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 30,
+              "player": "Jokermeow",
+              "targetID": 25,
+              "role": "tank",
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "excludeFromCourtPlayers": false,
+              "isSystem": false,
+              "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，同场仅计 1 次",
+              "time": "02:09",
+              "positionMs": 129564,
+              "stack": 1,
+              "fadeCount": 3,
+              "fades": [
+                {
+                  "time": "02:05",
+                  "positionMs": 125572,
+                  "stack": 17,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:05 完整 faded，断时约 17 层"
+                },
+                {
+                  "time": "02:08",
+                  "positionMs": 128565,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:08 完整 faded，断时约 1 层"
+                },
+                {
+                  "time": "02:09",
+                  "positionMs": 129564,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:09 完整 faded，断时约 1 层"
+                }
+              ],
+              "text": "Fight30 Jokermeow（坦克）· 02:05 龌勒卢斯腐化精华完整 faded（断时约 17 层）"
+            }
+          ]
+        },
+        {
+          "name": "毛绒微醺爬爬",
+          "spellKey": "voreluthVulnerabilityFade",
+          "spellName": "P1 龌勒卢斯易伤异常",
+          "role": "tank",
+          "roles": [
+            "tank"
+          ],
+          "hitCount": 1,
+          "countedCount": 1,
+          "uncountedCount": 0,
+          "markedCount": 0,
+          "deathCount": 0,
+          "totalDamage": 0,
+          "damageText": null,
+          "isSystem": false,
+          "excludeFromCourtPlayers": false,
+          "events": [
+            {
+              "fightID": 30,
+              "player": "毛绒微醺爬爬",
+              "targetID": 355,
+              "role": "tank",
+              "counted": true,
+              "verdictCounted": true,
+              "displayOnly": false,
+              "excludeFromCourtPlayers": false,
+              "isSystem": false,
+              "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，同场仅计 1 次",
+              "time": "02:09",
+              "positionMs": 129564,
+              "stack": 1,
+              "fadeCount": 3,
+              "fades": [
+                {
+                  "time": "02:05",
+                  "positionMs": 125572,
+                  "stack": 17,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:05 完整 faded，断时约 17 层"
+                },
+                {
+                  "time": "02:08",
+                  "positionMs": 128565,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:08 完整 faded，断时约 1 层"
+                },
+                {
+                  "time": "02:09",
+                  "positionMs": 129564,
+                  "stack": 1,
+                  "targetID": 359,
+                  "target": "龌勒卢斯",
+                  "text": "02:09 完整 faded，断时约 1 层"
+                }
+              ],
+              "text": "Fight30 毛绒微醺爬爬（坦克）· 02:05 龌勒卢斯腐化精华完整 faded（断时约 17 层）"
+            }
+          ]
+        }
+      ],
       "corruptionEssenceDamage": [
         {
           "name": "Jokermeow",
@@ -106089,149 +106668,6 @@
               "hitStatOnly": true,
               "countReason": "腐化精华仅作命中统计，永远不计数、不进入终审",
               "fightID": 29
-            }
-          ]
-        }
-      ],
-      "voreluthVulnerabilityFade": [],
-      "passageCliffMistakes": [
-        {
-          "name": "三坑不二",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-dps",
-          "roles": [
-            "range-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 27,
-              "player": "三坑不二",
-              "role": "range-dps",
-              "phase": "P2",
-              "time": "03:37",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight27 三坑不二 于 03:37（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "叶问",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "melee-healer",
-          "roles": [
-            "melee-healer"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 29,
-              "player": "叶问",
-              "role": "melee-healer",
-              "phase": "P3",
-              "time": "05:46",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight29 叶问 于 05:46（P3）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "小楚唯",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "melee-dps",
-          "roles": [
-            "melee-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 29,
-              "player": "小楚唯",
-              "role": "melee-dps",
-              "phase": "P3",
-              "time": "05:47",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight29 小楚唯 于 05:47（P3）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "Loveating",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-dps",
-          "roles": [
-            "range-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 30,
-              "player": "Loveating",
-              "role": "range-dps",
-              "phase": "P3",
-              "time": "06:41",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P3 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight30 Loveating 于 06:41（P3）死于坠崖 · 过场失误"
             }
           ]
         }

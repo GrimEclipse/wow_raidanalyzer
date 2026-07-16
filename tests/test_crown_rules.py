@@ -151,8 +151,9 @@ class VoreluthVulnerabilityFadeTests(unittest.TestCase):
         self.assertEqual({row["name"] for row in rows}, {"坦克甲", "坦克乙"})
         self.assertTrue(all(row.get("role") == "tank" for row in rows))
         self.assertTrue(all(not row.get("isSystem") for row in rows))
-        self.assertEqual(rows[0]["hitCount"], 2)
-        self.assertEqual(len(rows[0]["events"]), 2)
+        self.assertEqual(rows[0]["hitCount"], 1)
+        self.assertEqual(len(rows[0]["events"]), 1)
+        self.assertEqual(len(rows[0]["events"][0]["fades"]), 2)
         self.assertIn("坦克甲", summary2["text"])
 
     def test_fade_after_binding_remove_is_ignored(self):
@@ -178,6 +179,30 @@ class VoreluthVulnerabilityFadeTests(unittest.TestCase):
         ]
         summary = analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs)
         self.assertIsNone(summary)
+
+    def test_fade_after_first_silver_arrow_mark_is_ignored(self):
+        fight = {"id": 23, "startTime": 0, "endTime": 220_000}
+        actor_map = {9: "龌勒卢斯"}
+        actor_game_id = {9: 243811}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 90_000, "stack": 3},
+            {"type": "applydebuff", "abilityGameID": 1233602, "targetID": 101, "timestamp": 26_000},
+            {"type": "applydebuff", "abilityGameID": 1233602, "targetID": 102, "timestamp": 43_000},
+            {"type": "applydebuff", "abilityGameID": 1233602, "targetID": 103, "timestamp": 62_000},
+            {"type": "applydebuff", "abilityGameID": 1233602, "targetID": 104, "timestamp": 81_000},
+            {"type": "applydebuff", "abilityGameID": 1233602, "targetID": 105, "timestamp": 99_000},
+            {"type": "applydebuff", "abilityGameID": 1233602, "targetID": 106, "timestamp": 130_000},
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 105_000, "stack": 1},
+            {"type": "removedebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 124_000, "stack": 1},  # should count
+            {"type": "applydebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 130_100, "stack": 2},
+            {"type": "removedebuff", "abilityGameID": CORRUPTION_ID, "targetID": 9, "timestamp": 130_500, "stack": 2},  # should be ignored (near 6th silver arrow)
+            {"type": "removedebuff", "abilityGameID": P1_SHADOW_BINDING_ID, "targetID": 9, "timestamp": 150_000},
+        ]
+        summary = analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs)
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary["fadeCount"], 1)
+        self.assertEqual(summary["firstFadeTime"], "02:04")
+        self.assertEqual(summary["firstFadeStack"], 1)
 
 
 class SilverArrowHitEvidenceTests(unittest.TestCase):

@@ -10,6 +10,8 @@
     "raidName": "虚影尖塔",
     "bossKey": "crown_of_the_cosmos",
     "bossName": "宇宙之冕",
+    "author": "卫宇珩",
+    "editor": "卫宇珩",
     "features": {
       "interrupts": false,
       "avoidableTotal": false,
@@ -30,8 +32,7 @@
       "interferenceShockInterrupts": "干扰震荡打断",
       "gravityLineViolation": "P3 重力坍缩违规致死",
       "tankRiftSlashFailure": "P2 裂隙挥砍换坦失误",
-      "voreluthVulnerabilityFade": "P1 龌勒卢斯易伤异常",
-      "passageCliffMistakes": "过场失误"
+      "voreluthVulnerabilityFade": "P1 龌勒卢斯易伤异常"
     },
     "courtConfig": {
       "waterOutlierYards": 15,
@@ -94,16 +95,136 @@
       "1281707": "回响黑暗",
       "1283236": "虚空斥力"
     },
+    "combatantRoster": [
+      {
+        "name": "Jokermeow",
+        "roles": [
+          "tank"
+        ]
+      },
+      {
+        "name": "Leviac",
+        "roles": [
+          "range-healer"
+        ]
+      },
+      {
+        "name": "Zeta",
+        "roles": [
+          "melee-dps"
+        ]
+      },
+      {
+        "name": "义子",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "小落",
+        "roles": [
+          "melee-dps"
+        ]
+      },
+      {
+        "name": "微光一刀炼狱",
+        "roles": [
+          "melee-dps"
+        ]
+      },
+      {
+        "name": "旖旎云逸",
+        "roles": [
+          "melee-healer"
+        ]
+      },
+      {
+        "name": "暗黑膏药",
+        "roles": [
+          "range-healer"
+        ]
+      },
+      {
+        "name": "杀杀孩",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "梨梨圆上脯",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "渊重音",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "潘哒林熊猫",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "皇丨额娘",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "神奇大叔",
+        "roles": [
+          "melee-dps"
+        ]
+      },
+      {
+        "name": "福乐真牛",
+        "roles": [
+          "tank"
+        ]
+      },
+      {
+        "name": "网管",
+        "roles": [
+          "melee-dps"
+        ]
+      },
+      {
+        "name": "脆皮麦克思",
+        "roles": [
+          "range-dps"
+        ]
+      },
+      {
+        "name": "见见女土",
+        "roles": [
+          "melee-dps"
+        ]
+      },
+      {
+        "name": "郁闷的灵灵",
+        "roles": [
+          "range-healer"
+        ]
+      },
+      {
+        "name": "锦礼",
+        "roles": [
+          "melee-dps"
+        ]
+      }
+    ],
     "performance": {
       "fightCount": 14,
-      "elapsedSeconds": 357.096,
-      "logicalGraphQLRequests": 668,
+      "elapsedSeconds": 318.15,
+      "logicalGraphQLRequests": 661,
       "maxFightThreads": 4,
       "maxRequestThreads": 6,
       "note": "并发只缩短墙钟时间，不减少 WCL GraphQL 请求数或配额消耗。"
     },
-    "author": "卫宇珩",
-    "editor": "卫宇珩",
     "localReprocess": {
       "bowRepair": {
         "fights": 0,
@@ -135,6 +256,122 @@
         "wipeReason": "P1 放弃/add",
         "investigation": "P1 起手后团队快速放弃。在选择重开前已有0人死亡。 疑似引怪玩家：【杀杀孩】（最先受到敌方伤害）。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=16&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "00:02",
@@ -732,8 +969,7 @@
           "gravityLineViolation": [],
           "tankRiftSlashFailure": [],
           "corruptionEssenceDamage": [],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -1144,7 +1380,7 @@
           "interferenceShockRows": [],
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
-          "transitionAbandoned": true,
+          "transitionAbandoned": false,
           "globalExemption": {
             "deathThreshold": 8,
             "deathCount": 18,
@@ -1152,14 +1388,14 @@
             "cutoffTime": "00:11.936",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=16",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=16",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 16,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=16",
-              "generatedAt": "2026-07-15T15:50:11.215486+00:00",
+              "generatedAt": "2026-07-15T09:23:38.504818+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -2589,6 +2825,128 @@
         "wipeReason": "P1 大怪狂暴",
         "investigation": "P1 龌勒卢斯出现回响黑暗叠层，最高约 19 层，且灭团时间早于 2:45，判定为 P1 大怪狂暴。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=17&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "01:51",
@@ -4405,6 +4763,42 @@
           "missedEnergy": [],
           "interferenceShockInterrupts": [
             {
+              "name": "渊重音",
+              "role": "range-dps",
+              "roles": [
+                "range-dps"
+              ],
+              "spellKey": "interferenceShockInterrupts",
+              "spellName": "干扰震荡打断",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "playerID": 3,
+                  "player": "渊重音",
+                  "spellID": 205021,
+                  "spell": "Spell 205021",
+                  "count": 1,
+                  "tableTimestamp": 8494807,
+                  "role": "unknown",
+                  "castStart": "00:07",
+                  "evidence": "wcl_interrupt_table",
+                  "fightID": 17,
+                  "time": "00:10",
+                  "positionMs": 10202,
+                  "counted": false,
+                  "verdictCounted": false,
+                  "displayOnly": true,
+                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
+                }
+              ],
+              "countedCount": 0,
+              "uncountedCount": 1,
+              "observedHitCount": 1,
+              "observedDeathCount": 0
+            },
+            {
               "name": "杀杀孩",
               "role": "range-dps",
               "roles": [
@@ -4515,42 +4909,6 @@
                   "tableTimestamp": 8494806,
                   "role": "unknown",
                   "castStart": "00:08",
-                  "evidence": "wcl_interrupt_table",
-                  "fightID": 17,
-                  "time": "00:10",
-                  "positionMs": 10202,
-                  "counted": false,
-                  "verdictCounted": false,
-                  "displayOnly": true,
-                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
-                }
-              ],
-              "countedCount": 0,
-              "uncountedCount": 1,
-              "observedHitCount": 1,
-              "observedDeathCount": 0
-            },
-            {
-              "name": "渊重音",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "interferenceShockInterrupts",
-              "spellName": "干扰震荡打断",
-              "hitCount": 1,
-              "deathCount": 0,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "playerID": 3,
-                  "player": "渊重音",
-                  "spellID": 205021,
-                  "spell": "Spell 205021",
-                  "count": 1,
-                  "tableTimestamp": 8494807,
-                  "role": "unknown",
-                  "castStart": "00:07",
                   "evidence": "wcl_interrupt_table",
                   "fightID": 17,
                   "time": "00:10",
@@ -5079,8 +5437,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -7036,6 +7393,17 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
+                  "playerID": 3,
+                  "player": "渊重音",
+                  "spellID": 205021,
+                  "spell": "Spell 205021",
+                  "count": 1,
+                  "tableTimestamp": 8494807,
+                  "role": "unknown",
+                  "castStart": "00:07",
+                  "evidence": "wcl_interrupt_table"
+                },
+                {
                   "playerID": 22,
                   "player": "杀杀孩",
                   "spellID": 686,
@@ -7067,22 +7435,11 @@
                   "role": "unknown",
                   "castStart": "00:08",
                   "evidence": "wcl_interrupt_table"
-                },
-                {
-                  "playerID": 3,
-                  "player": "渊重音",
-                  "spellID": 205021,
-                  "spell": "Spell 205021",
-                  "count": 1,
-                  "tableTimestamp": 8494807,
-                  "role": "unknown",
-                  "castStart": "00:07",
-                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 4,
               "confidence": "wcl_interrupt_table",
-              "text": "00:10 干扰震荡实际打断 4 人：杀杀孩：Shadow Bolt（686）；皇丨额娘：Frostbolt（116）；梨梨圆上脯：Chaos Bolt（116858）；渊重音：Spell 205021（205021）"
+              "text": "00:10 干扰震荡实际打断 4 人：渊重音：Spell 205021（205021）；杀杀孩：Shadow Bolt（686）；皇丨额娘：Frostbolt（116）；梨梨圆上脯：Chaos Bolt（116858）"
             },
             {
               "index": 2,
@@ -7118,14 +7475,14 @@
             "cutoffTime": "02:17.245",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=17",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=17",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 17,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=17",
-              "generatedAt": "2026-07-15T15:50:18.382717+00:00",
+              "generatedAt": "2026-07-15T09:23:54.044872+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -18750,6 +19107,128 @@
         "wipeReason": "P1.5 减员过多，进入 P2 后放弃",
         "investigation": "P1.5 已出现 8 人次减员；进入 P2 后团队集中跳崖重开。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=18&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "01:21",
@@ -19300,935 +19779,6 @@
                 "text": "P1 第 6 轮银锋箭：点名 微光一刀炼狱,见见女土，命中 Boss/add 0 次，误伤点名玩家 2 次。"
               }
             ]
-          },
-          {
-            "type": "void_grasp_rays",
-            "title": "Collapsing Void ray simulation",
-            "summary": "11 void grasp casts",
-            "rows": [
-              {
-                "index": 1,
-                "phase": "P1",
-                "player": "暗黑膏药",
-                "targetID": 13,
-                "applyTime": "00:04",
-                "fireTime": "00:14",
-                "positionMs": 14967,
-                "durationMs": 10007,
-                "state": {
-                  "time": null,
-                  "deltaMs": null,
-                  "confidence": "unknown",
-                  "sourceRule": "missing",
-                  "point": null,
-                  "facingRaw": null,
-                  "facingRadians": null
-                },
-                "rays": [],
-                "hits": [
-                  {
-                    "time": "00:15",
-                    "positionMs": 15002,
-                    "target": "福乐真牛",
-                    "targetID": 12,
-                    "targetType": "player",
-                    "amount": 241784,
-                    "point": {
-                      "x": -35882.0,
-                      "y": 475395.0,
-                      "yardX": -358.82,
-                      "yardY": 4753.95
-                    },
-                    "nearestRay": null
-                  }
-                ],
-                "phantomHits": 0,
-                "playerHits": 1,
-                "status": "friendly_fire",
-                "text": "00:14 暗黑膏药 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 unknown。"
-              },
-              {
-                "index": 2,
-                "phase": "P1",
-                "player": "Zeta",
-                "targetID": 15,
-                "applyTime": "00:06",
-                "fireTime": "00:16",
-                "positionMs": 16959,
-                "durationMs": 9981,
-                "state": {
-                  "time": "00:07",
-                  "deltaMs": 130,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -33493.0,
-                    "y": 479839.0,
-                    "yardX": -334.93,
-                    "yardY": 4798.39
-                  },
-                  "facingRaw": -213.0,
-                  "facingRadians": -2.13
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 1.0116,
-                    "startX": -33493.0,
-                    "startY": 479839.0,
-                    "endX": -28187.89,
-                    "endY": 488315.78,
-                    "obeliskX": -33227.74,
-                    "obeliskY": 480262.84
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": -1.0828,
-                    "startX": -33493.0,
-                    "startY": 479839.0,
-                    "endX": -28804.45,
-                    "endY": 471006.25,
-                    "obeliskX": -33258.57,
-                    "obeliskY": 479397.36
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -3.1772,
-                    "startX": -33493.0,
-                    "startY": 479839.0,
-                    "endX": -43486.66,
-                    "endY": 480194.97,
-                    "obeliskX": -33992.68,
-                    "obeliskY": 479856.8
-                  }
-                ],
-                "hits": [],
-                "phantomHits": 0,
-                "playerHits": 0,
-                "status": "no_hit",
-                "text": "00:16 Zeta 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 high。"
-              },
-              {
-                "index": 3,
-                "phase": "P1",
-                "player": "梨梨圆上脯",
-                "targetID": 17,
-                "applyTime": "00:28",
-                "fireTime": "00:38",
-                "positionMs": 38310,
-                "durationMs": 10011,
-                "state": {
-                  "time": "00:27",
-                  "deltaMs": -1231,
-                  "confidence": "medium",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -33728.0,
-                    "y": 481733.0,
-                    "yardX": -337.28,
-                    "yardY": 4817.33
-                  },
-                  "facingRaw": -481.0,
-                  "facingRadians": 1.4732
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 4.6148,
-                    "startX": -33728.0,
-                    "startY": 481733.0,
-                    "endX": -34702.56,
-                    "endY": 471780.6,
-                    "obeliskX": -33776.73,
-                    "obeliskY": 481235.38
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": 2.5204,
-                    "startX": -33728.0,
-                    "startY": 481733.0,
-                    "endX": -41859.75,
-                    "endY": 487553.19,
-                    "obeliskX": -34134.59,
-                    "obeliskY": 482024.01
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": 0.426,
-                    "startX": -33728.0,
-                    "startY": 481733.0,
-                    "endX": -24621.69,
-                    "endY": 485865.2,
-                    "obeliskX": -33272.68,
-                    "obeliskY": 481939.61
-                  }
-                ],
-                "hits": [],
-                "phantomHits": 0,
-                "playerHits": 0,
-                "status": "no_hit",
-                "text": "00:38 梨梨圆上脯 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 medium。"
-              },
-              {
-                "index": 4,
-                "phase": "P1",
-                "player": "神奇大叔",
-                "targetID": 194,
-                "applyTime": "00:30",
-                "fireTime": "00:40",
-                "positionMs": 40307,
-                "durationMs": 10018,
-                "state": {
-                  "time": "00:30",
-                  "deltaMs": 81,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -33652.0,
-                    "y": 479417.0,
-                    "yardX": -336.52,
-                    "yardY": 4794.17
-                  },
-                  "facingRaw": -251.0,
-                  "facingRadians": -2.51
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 0.6316,
-                    "startX": -33652.0,
-                    "startY": 479417.0,
-                    "endX": -25581.12,
-                    "endY": 485321.31,
-                    "obeliskX": -33248.46,
-                    "obeliskY": 479712.22
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": -1.4628,
-                    "startX": -33652.0,
-                    "startY": 479417.0,
-                    "endX": -32574.16,
-                    "endY": 469475.26,
-                    "obeliskX": -33598.11,
-                    "obeliskY": 478919.91
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -3.5572,
-                    "startX": -33652.0,
-                    "startY": 479417.0,
-                    "endX": -42800.72,
-                    "endY": 483454.43,
-                    "obeliskX": -34109.44,
-                    "obeliskY": 479618.87
-                  }
-                ],
-                "hits": [],
-                "phantomHits": 0,
-                "playerHits": 0,
-                "status": "no_hit",
-                "text": "00:40 神奇大叔 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 high。"
-              },
-              {
-                "index": 5,
-                "phase": "P1",
-                "player": "潘哒林熊猫",
-                "targetID": 197,
-                "applyTime": "00:54",
-                "fireTime": "01:04",
-                "positionMs": 64964,
-                "durationMs": 10016,
-                "state": {
-                  "time": "00:54",
-                  "deltaMs": -494,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -34922.0,
-                    "y": 475535.0,
-                    "yardX": -349.22,
-                    "yardY": 4755.35
-                  },
-                  "facingRaw": -332.0,
-                  "facingRadians": 2.9632
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 6.1048,
-                    "startX": -34922.0,
-                    "startY": 475535.0,
-                    "endX": -25080.72,
-                    "endY": 473760.38,
-                    "obeliskX": -34429.94,
-                    "obeliskY": 475446.27
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": 4.0104,
-                    "startX": -34922.0,
-                    "startY": 475535.0,
-                    "endX": -41379.51,
-                    "endY": 467899.52,
-                    "obeliskX": -35244.88,
-                    "obeliskY": 475153.23
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": 1.916,
-                    "startX": -34922.0,
-                    "startY": 475535.0,
-                    "endX": -38305.77,
-                    "endY": 484945.11,
-                    "obeliskX": -35091.19,
-                    "obeliskY": 476005.51
-                  }
-                ],
-                "hits": [
-                  {
-                    "time": "01:04",
-                    "positionMs": 64968,
-                    "target": "义子",
-                    "targetID": 27,
-                    "targetType": "player",
-                    "amount": 248173,
-                    "point": {
-                      "x": -34570.0,
-                      "y": 477024.0,
-                      "yardX": -345.7,
-                      "yardY": 4770.24
-                    },
-                    "nearestRay": {
-                      "label": "leftBack",
-                      "distanceYards": 8.4
-                    }
-                  },
-                  {
-                    "time": "01:04",
-                    "positionMs": 64968,
-                    "target": "梨梨圆上脯",
-                    "targetID": 17,
-                    "targetType": "player",
-                    "amount": 310363,
-                    "point": {
-                      "x": -34298.0,
-                      "y": 477507.0,
-                      "yardX": -342.98,
-                      "yardY": 4775.07
-                    },
-                    "nearestRay": {
-                      "label": "leftBack",
-                      "distanceYards": 12.5
-                    }
-                  },
-                  {
-                    "time": "01:04",
-                    "positionMs": 64968,
-                    "target": "渊重音",
-                    "targetID": 3,
-                    "targetType": "player",
-                    "amount": 282589,
-                    "point": {
-                      "x": -34211.0,
-                      "y": 476406.0,
-                      "yardX": -342.11,
-                      "yardY": 4764.06
-                    },
-                    "nearestRay": {
-                      "label": "leftBack",
-                      "distanceYards": 9.6
-                    }
-                  },
-                  {
-                    "time": "01:06",
-                    "positionMs": 66964,
-                    "target": "渊重音",
-                    "targetID": 3,
-                    "targetType": "player",
-                    "amount": 282590,
-                    "point": {
-                      "x": -34218.0,
-                      "y": 476314.0,
-                      "yardX": -342.18,
-                      "yardY": 4763.14
-                    },
-                    "nearestRay": {
-                      "label": "back",
-                      "distanceYards": 8.9
-                    }
-                  }
-                ],
-                "phantomHits": 0,
-                "playerHits": 4,
-                "status": "friendly_fire",
-                "text": "01:04 潘哒林熊猫 崩裂空无：命中幻影 0 次，误伤玩家 4 次，坐标置信度 high。"
-              },
-              {
-                "index": 6,
-                "phase": "P1",
-                "player": "小落",
-                "targetID": 29,
-                "applyTime": "00:56",
-                "fireTime": "01:06",
-                "positionMs": 66961,
-                "durationMs": 9998,
-                "state": {
-                  "time": "00:56",
-                  "deltaMs": -497,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -35775.0,
-                    "y": 476088.0,
-                    "yardX": -357.75,
-                    "yardY": 4760.88
-                  },
-                  "facingRaw": -369.0,
-                  "facingRadians": 2.5932
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 5.7348,
-                    "startX": -35775.0,
-                    "startY": 476088.0,
-                    "endX": -27241.44,
-                    "endY": 470874.71,
-                    "obeliskX": -35348.32,
-                    "obeliskY": 475827.34
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": 3.6404,
-                    "startX": -35775.0,
-                    "startY": 476088.0,
-                    "endX": -44556.62,
-                    "endY": 471304.37,
-                    "obeliskX": -36214.08,
-                    "obeliskY": 475848.82
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": 1.546,
-                    "startX": -35775.0,
-                    "startY": 476088.0,
-                    "endX": -35526.94,
-                    "endY": 486084.92,
-                    "obeliskX": -35762.6,
-                    "obeliskY": 476587.85
-                  }
-                ],
-                "hits": [
-                  {
-                    "time": "01:06",
-                    "positionMs": 66964,
-                    "target": "渊重音",
-                    "targetID": 3,
-                    "targetType": "player",
-                    "amount": 282590,
-                    "point": {
-                      "x": -34218.0,
-                      "y": 476314.0,
-                      "yardX": -342.18,
-                      "yardY": 4763.14
-                    },
-                    "nearestRay": {
-                      "label": "back",
-                      "distanceYards": 10.0
-                    }
-                  }
-                ],
-                "phantomHits": 0,
-                "playerHits": 1,
-                "status": "friendly_fire",
-                "text": "01:06 小落 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 high。"
-              },
-              {
-                "index": 7,
-                "phase": "P1",
-                "player": "暗黑膏药",
-                "targetID": 13,
-                "applyTime": "01:21",
-                "fireTime": "01:31",
-                "positionMs": 91229,
-                "durationMs": 10008,
-                "state": {
-                  "time": "01:20",
-                  "deltaMs": -329,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -37489.0,
-                    "y": 475768.0,
-                    "yardX": -374.89,
-                    "yardY": 4757.68
-                  },
-                  "facingRaw": -656.0,
-                  "facingRadians": -0.2768
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 2.8648,
-                    "startX": -37489.0,
-                    "startY": 475768.0,
-                    "endX": -47108.31,
-                    "endY": 478500.93,
-                    "obeliskX": -37969.97,
-                    "obeliskY": 475904.65
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": 0.7704,
-                    "startX": -37489.0,
-                    "startY": 475768.0,
-                    "endX": -30312.56,
-                    "endY": 482732.1,
-                    "obeliskX": -37130.18,
-                    "obeliskY": 476116.21
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -1.324,
-                    "startX": -37489.0,
-                    "startY": 475768.0,
-                    "endX": -35046.13,
-                    "endY": 466070.97,
-                    "obeliskX": -37366.86,
-                    "obeliskY": 475283.15
-                  }
-                ],
-                "hits": [],
-                "phantomHits": 0,
-                "playerHits": 0,
-                "status": "no_hit",
-                "text": "01:31 暗黑膏药 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 high。"
-              },
-              {
-                "index": 8,
-                "phase": "P1",
-                "player": "小落",
-                "targetID": 29,
-                "applyTime": "01:23",
-                "fireTime": "01:33",
-                "positionMs": 93235,
-                "durationMs": 10020,
-                "state": {
-                  "time": "01:21",
-                  "deltaMs": -2054,
-                  "confidence": "low",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -37923.0,
-                    "y": 476453.0,
-                    "yardX": -379.23,
-                    "yardY": 4764.53
-                  },
-                  "facingRaw": -248.0,
-                  "facingRadians": -2.48
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 0.6616,
-                    "startX": -37923.0,
-                    "startY": 476453.0,
-                    "endX": -30032.85,
-                    "endY": 482596.74,
-                    "obeliskX": -37528.49,
-                    "obeliskY": 476760.19
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": -1.4328,
-                    "startX": -37923.0,
-                    "startY": 476453.0,
-                    "endX": -36547.44,
-                    "endY": 466548.06,
-                    "obeliskX": -37854.22,
-                    "obeliskY": 475957.75
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -3.5272,
-                    "startX": -37923.0,
-                    "startY": 476453.0,
-                    "endX": -47188.71,
-                    "endY": 480214.2,
-                    "obeliskX": -38386.29,
-                    "obeliskY": 476641.06
-                  }
-                ],
-                "hits": [
-                  {
-                    "time": "01:33",
-                    "positionMs": 93236,
-                    "target": "Jokermeow",
-                    "targetID": 185,
-                    "targetType": "player",
-                    "amount": 315566,
-                    "point": {
-                      "x": -36891.0,
-                      "y": 481364.0,
-                      "yardX": -368.91,
-                      "yardY": 4813.64
-                    },
-                    "nearestRay": {
-                      "label": "back",
-                      "distanceYards": 32.4
-                    }
-                  }
-                ],
-                "phantomHits": 0,
-                "playerHits": 1,
-                "status": "friendly_fire",
-                "text": "01:33 小落 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 low。"
-              },
-              {
-                "index": 9,
-                "phase": "P1",
-                "player": "Leviac",
-                "targetID": 11,
-                "applyTime": "01:44",
-                "fireTime": "01:54",
-                "positionMs": 114584,
-                "durationMs": 10015,
-                "state": {
-                  "time": "01:44",
-                  "deltaMs": -29,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -40279.0,
-                    "y": 479716.0,
-                    "yardX": -402.79,
-                    "yardY": 4797.16
-                  },
-                  "facingRaw": -176.0,
-                  "facingRadians": -1.76
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 1.3816,
-                    "startX": -40279.0,
-                    "startY": 479716.0,
-                    "endX": -38398.23,
-                    "endY": 489537.54,
-                    "obeliskX": -40184.96,
-                    "obeliskY": 480207.08
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": -0.7128,
-                    "startX": -40279.0,
-                    "startY": 479716.0,
-                    "endX": -32713.68,
-                    "endY": 473176.44,
-                    "obeliskX": -39900.73,
-                    "obeliskY": 479389.02
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -2.8072,
-                    "startX": -40279.0,
-                    "startY": 479716.0,
-                    "endX": -49725.09,
-                    "endY": 476434.02,
-                    "obeliskX": -40751.3,
-                    "obeliskY": 479551.9
-                  }
-                ],
-                "hits": [
-                  {
-                    "time": "01:56",
-                    "positionMs": 116574,
-                    "target": "郁闷的灵灵",
-                    "targetID": 10,
-                    "targetType": "player",
-                    "amount": 327606,
-                    "point": {
-                      "x": -38126.0,
-                      "y": 480164.0,
-                      "yardX": -381.26,
-                      "yardY": 4801.64
-                    },
-                    "nearestRay": {
-                      "label": "leftFront",
-                      "distanceYards": 17.5
-                    }
-                  }
-                ],
-                "phantomHits": 0,
-                "playerHits": 1,
-                "status": "friendly_fire",
-                "text": "01:54 Leviac 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 high。"
-              },
-              {
-                "index": 10,
-                "phase": "P1",
-                "player": "小落",
-                "targetID": 29,
-                "applyTime": "01:46",
-                "fireTime": "01:56",
-                "positionMs": 116571,
-                "durationMs": 10023,
-                "state": {
-                  "time": "01:46",
-                  "deltaMs": 349,
-                  "confidence": "high",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -39136.0,
-                    "y": 481896.0,
-                    "yardX": -391.36,
-                    "yardY": 4818.96
-                  },
-                  "facingRaw": -638.0,
-                  "facingRadians": -0.0968
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 3.0448,
-                    "startX": -39136.0,
-                    "startY": 481896.0,
-                    "endX": -49089.17,
-                    "endY": 482862.64,
-                    "obeliskX": -39633.66,
-                    "obeliskY": 481944.33
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": 0.9504,
-                    "startX": -39136.0,
-                    "startY": 481896.0,
-                    "endX": -33322.28,
-                    "endY": 490032.38,
-                    "obeliskX": -38845.31,
-                    "obeliskY": 482302.82
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -1.144,
-                    "startX": -39136.0,
-                    "startY": 481896.0,
-                    "endX": -34996.55,
-                    "endY": 472792.98,
-                    "obeliskX": -38929.03,
-                    "obeliskY": 481440.85
-                  }
-                ],
-                "hits": [
-                  {
-                    "time": "01:56",
-                    "positionMs": 116574,
-                    "target": "郁闷的灵灵",
-                    "targetID": 10,
-                    "targetType": "player",
-                    "amount": 327606,
-                    "point": {
-                      "x": -38126.0,
-                      "y": 480164.0,
-                      "yardX": -381.26,
-                      "yardY": 4801.64
-                    },
-                    "nearestRay": {
-                      "label": "leftBack",
-                      "distanceYards": 2.0
-                    }
-                  }
-                ],
-                "phantomHits": 0,
-                "playerHits": 1,
-                "status": "friendly_fire",
-                "text": "01:56 小落 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 high。"
-              },
-              {
-                "index": 11,
-                "phase": "P2",
-                "player": "义子",
-                "targetID": 27,
-                "applyTime": "03:06",
-                "fireTime": "03:09",
-                "positionMs": 189061,
-                "durationMs": 2267,
-                "state": {
-                  "time": "03:05",
-                  "deltaMs": -1050,
-                  "confidence": "medium",
-                  "sourceRule": "nearestEventWithFacing",
-                  "point": {
-                    "x": -30206.0,
-                    "y": 474504.0,
-                    "yardX": -302.06,
-                    "yardY": 4745.04
-                  },
-                  "facingRaw": -629.0,
-                  "facingRadians": -0.0068
-                },
-                "rays": [
-                  {
-                    "label": "back",
-                    "angleRadians": 3.1348,
-                    "startX": -30206.0,
-                    "startY": 474504.0,
-                    "endX": -40205.77,
-                    "endY": 474572.15,
-                    "obeliskX": -30705.99,
-                    "obeliskY": 474507.41
-                  },
-                  {
-                    "label": "leftFront",
-                    "angleRadians": 1.0404,
-                    "startX": -30206.0,
-                    "startY": 474504.0,
-                    "endX": -25147.1,
-                    "endY": 483129.98,
-                    "obeliskX": -29953.05,
-                    "obeliskY": 474935.3
-                  },
-                  {
-                    "label": "leftBack",
-                    "angleRadians": -1.054,
-                    "startX": -30206.0,
-                    "startY": 474504.0,
-                    "endX": -25265.13,
-                    "endY": 465809.87,
-                    "obeliskX": -29958.96,
-                    "obeliskY": 474069.29
-                  }
-                ],
-                "hits": [],
-                "phantomHits": 0,
-                "playerHits": 0,
-                "status": "no_hit",
-                "text": "03:09 义子 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 medium。"
-              }
-            ]
-          },
-          {
-            "type": "void_repulsion_placement",
-            "title": "虚空斥力放水位置",
-            "summary": "16 个放水点",
-            "rows": [
-              {
-                "time": "01:58",
-                "phase": "P1",
-                "type": "void_repulsion_scattered",
-                "severity": "warning",
-                "details": [
-                  {
-                    "time": "01:58",
-                    "positionMs": 118628,
-                    "phase": "P1",
-                    "player": "杀杀孩",
-                    "targetID": 22,
-                    "hasPosition": true,
-                    "x": -4702.69,
-                    "y": 1444.36,
-                    "rawX": -40584.69,
-                    "rawY": 476839.36,
-                    "originX": -35882.0,
-                    "originY": 475395.0,
-                    "originPlayer": "奥蕾莉亚",
-                    "waterRadiusYards": 15,
-                    "positionSourceTime": "01:58",
-                    "positionSourceDeltaMs": 0,
-                    "positionSourceRule": "resourceInterpolated",
-                    "beforeDeltaMs": -4534,
-                    "afterDeltaMs": 2015,
-                    "sourcePositionTime": "01:56",
-                    "markTime": "01:52",
-                    "markPositionMs": 112647,
-                    "distanceFromCenter": 48.3,
-                    "distanceFromCenterRaw": 4829.1,
-                    "status": "偏散"
-                  },
-                  {
-                    "time": "01:58",
-                    "positionMs": 118629,
-                    "phase": "P1",
-                    "player": "旖旎云逸",
-                    "targetID": 196,
-                    "hasPosition": true,
-                    "x": -8.57,
-                    "y": 6041.85,
-                    "rawX": -35890.57,
-                    "rawY": 481436.85,
-                    "originX": -35882.0,
-                    "originY": 475395.0,
-                    "originPlayer": "奥蕾莉亚",
-                    "waterRadiusYards": 15,
-                    "positionSourceTime": "01:58",
-                    "positionSourceDeltaMs": 0,
-                    "positionSourceRule": "resourceInterpolated",
-                    "beforeDeltaMs": -3560,
-                    "afterDeltaMs": 922,
-                    "sourcePositionTime": "01:56",
-                    "markTime": "01:52",
-                    "markPositionMs": 112647,
-                    "distanceFromCenter": 17.7,
-                    "distanceFromCenterRaw": 1770.4,
-                    "status": "正常"
-                  },
-                  {
-                    "time": "01:58",
-                    "positionMs": 118629,
-                    "phase": "P1",
-                    "player": "郁闷的灵灵",
-                    "targetID": 10,
-                    "hasPosition": true,
-                    "x": -1805.23,
-                    "y": 4752.34,
-                    "rawX": -37687.23,
-                    "rawY": 480147.34,
-                    "originX": -35882.0,
-                    "originY": 475395.0,
-                    "originPlayer": "奥蕾莉亚",
-                    "waterRadiusYards": 15,
-                    "positionSourceTime": "01:58",
-                    "positionSourceDeltaMs": 0,
-                    "positionSourceRule": "resourceInterpolated",
-                    "beforeDeltaMs": -2055,
-                    "afterDeltaMs": 2015,
-                    "sourcePositionTime": "01:56",
-                    "markTime": "01:52",
-                    "markPositionMs": 112647,
-                    "distanceFromCenter": 4.4,
-                    "distanceFromCenterRaw": 441.1,
-                    "status": "正常"
-                  },
-                  {
-                    "time": "01:58",
-                    "positionMs": 118630,
-                    "phase": "P1",
-                    "player": "暗黑膏药",
-                    "targetID": 13,
-                    "hasPosition": true,
-                    "x": 718.0,
-                    "y": 7815.0,
-                    "rawX": -35164.0,
-                    "rawY": 483210.0,
-                    "originX": -35882.0,
-                    "originY": 475395.0,
-                    "originPlayer": "奥蕾莉亚",
-                    "waterRadiusYards": 15,
-                    "positionSourceTime": "02:00",
-                    "positionSourceDeltaMs": 2014,
-                    "positionSourceRule": "resourceAfter",
-                    "sourcePositionTime": "01:56",
-                    "markTime": "01:52",
-                    "markPositionMs": 112647,
-                    "distanceFromCenter": 35.4,
-                    "distanceFromCenterRaw": 3542.3,
-                    "status": "正常"
-                  }
-                ],
-                "text": "P1 第 ? 次虚空斥力放水位置疑似偏散：本轮识别 4 人，最大偏离约 48.3 码，异常玩家：杀杀孩。"
-              }
-            ]
           }
         ],
         "avoidableSummary": {
@@ -20678,42 +20228,6 @@
           "missedEnergy": [],
           "interferenceShockInterrupts": [
             {
-              "name": "郁闷的灵灵",
-              "role": "range-healer",
-              "roles": [
-                "range-healer"
-              ],
-              "spellKey": "interferenceShockInterrupts",
-              "spellName": "干扰震荡打断",
-              "hitCount": 1,
-              "deathCount": 0,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "playerID": 10,
-                  "player": "郁闷的灵灵",
-                  "spellID": 1064,
-                  "spell": "Chain Heal",
-                  "count": 1,
-                  "tableTimestamp": 8809125,
-                  "role": "unknown",
-                  "castStart": "00:30",
-                  "evidence": "wcl_interrupt_table",
-                  "fightID": 18,
-                  "time": "00:30",
-                  "positionMs": 30371,
-                  "counted": false,
-                  "verdictCounted": false,
-                  "displayOnly": true,
-                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
-                }
-              ],
-              "countedCount": 0,
-              "uncountedCount": 1,
-              "observedHitCount": 1,
-              "observedDeathCount": 0
-            },
-            {
               "name": "暗黑膏药",
               "role": "range-healer",
               "roles": [
@@ -20734,6 +20248,42 @@
                   "tableTimestamp": 8809125,
                   "role": "unknown",
                   "castStart": "00:29",
+                  "evidence": "wcl_interrupt_table",
+                  "fightID": 18,
+                  "time": "00:30",
+                  "positionMs": 30371,
+                  "counted": false,
+                  "verdictCounted": false,
+                  "displayOnly": true,
+                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
+                }
+              ],
+              "countedCount": 0,
+              "uncountedCount": 1,
+              "observedHitCount": 1,
+              "observedDeathCount": 0
+            },
+            {
+              "name": "郁闷的灵灵",
+              "role": "range-healer",
+              "roles": [
+                "range-healer"
+              ],
+              "spellKey": "interferenceShockInterrupts",
+              "spellName": "干扰震荡打断",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "playerID": 10,
+                  "player": "郁闷的灵灵",
+                  "spellID": 1064,
+                  "spell": "Chain Heal",
+                  "count": 1,
+                  "tableTimestamp": 8809125,
+                  "role": "unknown",
+                  "castStart": "00:30",
                   "evidence": "wcl_interrupt_table",
                   "fightID": 18,
                   "time": "00:30",
@@ -21388,8 +20938,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -21672,808 +21221,7 @@
               "text": "P1 第 6 轮银锋箭：点名 微光一刀炼狱,见见女土，命中 Boss/add 0 次，误伤点名玩家 2 次。"
             }
           ],
-          "voidGraspRays": [
-            {
-              "index": 1,
-              "phase": "P1",
-              "player": "暗黑膏药",
-              "targetID": 13,
-              "applyTime": "00:04",
-              "fireTime": "00:14",
-              "positionMs": 14967,
-              "durationMs": 10007,
-              "state": {
-                "time": null,
-                "deltaMs": null,
-                "confidence": "unknown",
-                "sourceRule": "missing",
-                "point": null,
-                "facingRaw": null,
-                "facingRadians": null
-              },
-              "rays": [],
-              "hits": [
-                {
-                  "time": "00:15",
-                  "positionMs": 15002,
-                  "target": "福乐真牛",
-                  "targetID": 12,
-                  "targetType": "player",
-                  "amount": 241784,
-                  "point": {
-                    "x": -35882.0,
-                    "y": 475395.0,
-                    "yardX": -358.82,
-                    "yardY": 4753.95
-                  },
-                  "nearestRay": null
-                }
-              ],
-              "phantomHits": 0,
-              "playerHits": 1,
-              "status": "friendly_fire",
-              "text": "00:14 暗黑膏药 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 unknown。"
-            },
-            {
-              "index": 2,
-              "phase": "P1",
-              "player": "Zeta",
-              "targetID": 15,
-              "applyTime": "00:06",
-              "fireTime": "00:16",
-              "positionMs": 16959,
-              "durationMs": 9981,
-              "state": {
-                "time": "00:07",
-                "deltaMs": 130,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -33493.0,
-                  "y": 479839.0,
-                  "yardX": -334.93,
-                  "yardY": 4798.39
-                },
-                "facingRaw": -213.0,
-                "facingRadians": -2.13
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 1.0116,
-                  "startX": -33493.0,
-                  "startY": 479839.0,
-                  "endX": -28187.89,
-                  "endY": 488315.78,
-                  "obeliskX": -33227.74,
-                  "obeliskY": 480262.84
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": -1.0828,
-                  "startX": -33493.0,
-                  "startY": 479839.0,
-                  "endX": -28804.45,
-                  "endY": 471006.25,
-                  "obeliskX": -33258.57,
-                  "obeliskY": 479397.36
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -3.1772,
-                  "startX": -33493.0,
-                  "startY": 479839.0,
-                  "endX": -43486.66,
-                  "endY": 480194.97,
-                  "obeliskX": -33992.68,
-                  "obeliskY": 479856.8
-                }
-              ],
-              "hits": [],
-              "phantomHits": 0,
-              "playerHits": 0,
-              "status": "no_hit",
-              "text": "00:16 Zeta 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 high。"
-            },
-            {
-              "index": 3,
-              "phase": "P1",
-              "player": "梨梨圆上脯",
-              "targetID": 17,
-              "applyTime": "00:28",
-              "fireTime": "00:38",
-              "positionMs": 38310,
-              "durationMs": 10011,
-              "state": {
-                "time": "00:27",
-                "deltaMs": -1231,
-                "confidence": "medium",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -33728.0,
-                  "y": 481733.0,
-                  "yardX": -337.28,
-                  "yardY": 4817.33
-                },
-                "facingRaw": -481.0,
-                "facingRadians": 1.4732
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 4.6148,
-                  "startX": -33728.0,
-                  "startY": 481733.0,
-                  "endX": -34702.56,
-                  "endY": 471780.6,
-                  "obeliskX": -33776.73,
-                  "obeliskY": 481235.38
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": 2.5204,
-                  "startX": -33728.0,
-                  "startY": 481733.0,
-                  "endX": -41859.75,
-                  "endY": 487553.19,
-                  "obeliskX": -34134.59,
-                  "obeliskY": 482024.01
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": 0.426,
-                  "startX": -33728.0,
-                  "startY": 481733.0,
-                  "endX": -24621.69,
-                  "endY": 485865.2,
-                  "obeliskX": -33272.68,
-                  "obeliskY": 481939.61
-                }
-              ],
-              "hits": [],
-              "phantomHits": 0,
-              "playerHits": 0,
-              "status": "no_hit",
-              "text": "00:38 梨梨圆上脯 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 medium。"
-            },
-            {
-              "index": 4,
-              "phase": "P1",
-              "player": "神奇大叔",
-              "targetID": 194,
-              "applyTime": "00:30",
-              "fireTime": "00:40",
-              "positionMs": 40307,
-              "durationMs": 10018,
-              "state": {
-                "time": "00:30",
-                "deltaMs": 81,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -33652.0,
-                  "y": 479417.0,
-                  "yardX": -336.52,
-                  "yardY": 4794.17
-                },
-                "facingRaw": -251.0,
-                "facingRadians": -2.51
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 0.6316,
-                  "startX": -33652.0,
-                  "startY": 479417.0,
-                  "endX": -25581.12,
-                  "endY": 485321.31,
-                  "obeliskX": -33248.46,
-                  "obeliskY": 479712.22
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": -1.4628,
-                  "startX": -33652.0,
-                  "startY": 479417.0,
-                  "endX": -32574.16,
-                  "endY": 469475.26,
-                  "obeliskX": -33598.11,
-                  "obeliskY": 478919.91
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -3.5572,
-                  "startX": -33652.0,
-                  "startY": 479417.0,
-                  "endX": -42800.72,
-                  "endY": 483454.43,
-                  "obeliskX": -34109.44,
-                  "obeliskY": 479618.87
-                }
-              ],
-              "hits": [],
-              "phantomHits": 0,
-              "playerHits": 0,
-              "status": "no_hit",
-              "text": "00:40 神奇大叔 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 high。"
-            },
-            {
-              "index": 5,
-              "phase": "P1",
-              "player": "潘哒林熊猫",
-              "targetID": 197,
-              "applyTime": "00:54",
-              "fireTime": "01:04",
-              "positionMs": 64964,
-              "durationMs": 10016,
-              "state": {
-                "time": "00:54",
-                "deltaMs": -494,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -34922.0,
-                  "y": 475535.0,
-                  "yardX": -349.22,
-                  "yardY": 4755.35
-                },
-                "facingRaw": -332.0,
-                "facingRadians": 2.9632
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 6.1048,
-                  "startX": -34922.0,
-                  "startY": 475535.0,
-                  "endX": -25080.72,
-                  "endY": 473760.38,
-                  "obeliskX": -34429.94,
-                  "obeliskY": 475446.27
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": 4.0104,
-                  "startX": -34922.0,
-                  "startY": 475535.0,
-                  "endX": -41379.51,
-                  "endY": 467899.52,
-                  "obeliskX": -35244.88,
-                  "obeliskY": 475153.23
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": 1.916,
-                  "startX": -34922.0,
-                  "startY": 475535.0,
-                  "endX": -38305.77,
-                  "endY": 484945.11,
-                  "obeliskX": -35091.19,
-                  "obeliskY": 476005.51
-                }
-              ],
-              "hits": [
-                {
-                  "time": "01:04",
-                  "positionMs": 64968,
-                  "target": "义子",
-                  "targetID": 27,
-                  "targetType": "player",
-                  "amount": 248173,
-                  "point": {
-                    "x": -34570.0,
-                    "y": 477024.0,
-                    "yardX": -345.7,
-                    "yardY": 4770.24
-                  },
-                  "nearestRay": {
-                    "label": "leftBack",
-                    "distanceYards": 8.4
-                  }
-                },
-                {
-                  "time": "01:04",
-                  "positionMs": 64968,
-                  "target": "梨梨圆上脯",
-                  "targetID": 17,
-                  "targetType": "player",
-                  "amount": 310363,
-                  "point": {
-                    "x": -34298.0,
-                    "y": 477507.0,
-                    "yardX": -342.98,
-                    "yardY": 4775.07
-                  },
-                  "nearestRay": {
-                    "label": "leftBack",
-                    "distanceYards": 12.5
-                  }
-                },
-                {
-                  "time": "01:04",
-                  "positionMs": 64968,
-                  "target": "渊重音",
-                  "targetID": 3,
-                  "targetType": "player",
-                  "amount": 282589,
-                  "point": {
-                    "x": -34211.0,
-                    "y": 476406.0,
-                    "yardX": -342.11,
-                    "yardY": 4764.06
-                  },
-                  "nearestRay": {
-                    "label": "leftBack",
-                    "distanceYards": 9.6
-                  }
-                },
-                {
-                  "time": "01:06",
-                  "positionMs": 66964,
-                  "target": "渊重音",
-                  "targetID": 3,
-                  "targetType": "player",
-                  "amount": 282590,
-                  "point": {
-                    "x": -34218.0,
-                    "y": 476314.0,
-                    "yardX": -342.18,
-                    "yardY": 4763.14
-                  },
-                  "nearestRay": {
-                    "label": "back",
-                    "distanceYards": 8.9
-                  }
-                }
-              ],
-              "phantomHits": 0,
-              "playerHits": 4,
-              "status": "friendly_fire",
-              "text": "01:04 潘哒林熊猫 崩裂空无：命中幻影 0 次，误伤玩家 4 次，坐标置信度 high。"
-            },
-            {
-              "index": 6,
-              "phase": "P1",
-              "player": "小落",
-              "targetID": 29,
-              "applyTime": "00:56",
-              "fireTime": "01:06",
-              "positionMs": 66961,
-              "durationMs": 9998,
-              "state": {
-                "time": "00:56",
-                "deltaMs": -497,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -35775.0,
-                  "y": 476088.0,
-                  "yardX": -357.75,
-                  "yardY": 4760.88
-                },
-                "facingRaw": -369.0,
-                "facingRadians": 2.5932
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 5.7348,
-                  "startX": -35775.0,
-                  "startY": 476088.0,
-                  "endX": -27241.44,
-                  "endY": 470874.71,
-                  "obeliskX": -35348.32,
-                  "obeliskY": 475827.34
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": 3.6404,
-                  "startX": -35775.0,
-                  "startY": 476088.0,
-                  "endX": -44556.62,
-                  "endY": 471304.37,
-                  "obeliskX": -36214.08,
-                  "obeliskY": 475848.82
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": 1.546,
-                  "startX": -35775.0,
-                  "startY": 476088.0,
-                  "endX": -35526.94,
-                  "endY": 486084.92,
-                  "obeliskX": -35762.6,
-                  "obeliskY": 476587.85
-                }
-              ],
-              "hits": [
-                {
-                  "time": "01:06",
-                  "positionMs": 66964,
-                  "target": "渊重音",
-                  "targetID": 3,
-                  "targetType": "player",
-                  "amount": 282590,
-                  "point": {
-                    "x": -34218.0,
-                    "y": 476314.0,
-                    "yardX": -342.18,
-                    "yardY": 4763.14
-                  },
-                  "nearestRay": {
-                    "label": "back",
-                    "distanceYards": 10.0
-                  }
-                }
-              ],
-              "phantomHits": 0,
-              "playerHits": 1,
-              "status": "friendly_fire",
-              "text": "01:06 小落 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 high。"
-            },
-            {
-              "index": 7,
-              "phase": "P1",
-              "player": "暗黑膏药",
-              "targetID": 13,
-              "applyTime": "01:21",
-              "fireTime": "01:31",
-              "positionMs": 91229,
-              "durationMs": 10008,
-              "state": {
-                "time": "01:20",
-                "deltaMs": -329,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -37489.0,
-                  "y": 475768.0,
-                  "yardX": -374.89,
-                  "yardY": 4757.68
-                },
-                "facingRaw": -656.0,
-                "facingRadians": -0.2768
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 2.8648,
-                  "startX": -37489.0,
-                  "startY": 475768.0,
-                  "endX": -47108.31,
-                  "endY": 478500.93,
-                  "obeliskX": -37969.97,
-                  "obeliskY": 475904.65
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": 0.7704,
-                  "startX": -37489.0,
-                  "startY": 475768.0,
-                  "endX": -30312.56,
-                  "endY": 482732.1,
-                  "obeliskX": -37130.18,
-                  "obeliskY": 476116.21
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -1.324,
-                  "startX": -37489.0,
-                  "startY": 475768.0,
-                  "endX": -35046.13,
-                  "endY": 466070.97,
-                  "obeliskX": -37366.86,
-                  "obeliskY": 475283.15
-                }
-              ],
-              "hits": [],
-              "phantomHits": 0,
-              "playerHits": 0,
-              "status": "no_hit",
-              "text": "01:31 暗黑膏药 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 high。"
-            },
-            {
-              "index": 8,
-              "phase": "P1",
-              "player": "小落",
-              "targetID": 29,
-              "applyTime": "01:23",
-              "fireTime": "01:33",
-              "positionMs": 93235,
-              "durationMs": 10020,
-              "state": {
-                "time": "01:21",
-                "deltaMs": -2054,
-                "confidence": "low",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -37923.0,
-                  "y": 476453.0,
-                  "yardX": -379.23,
-                  "yardY": 4764.53
-                },
-                "facingRaw": -248.0,
-                "facingRadians": -2.48
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 0.6616,
-                  "startX": -37923.0,
-                  "startY": 476453.0,
-                  "endX": -30032.85,
-                  "endY": 482596.74,
-                  "obeliskX": -37528.49,
-                  "obeliskY": 476760.19
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": -1.4328,
-                  "startX": -37923.0,
-                  "startY": 476453.0,
-                  "endX": -36547.44,
-                  "endY": 466548.06,
-                  "obeliskX": -37854.22,
-                  "obeliskY": 475957.75
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -3.5272,
-                  "startX": -37923.0,
-                  "startY": 476453.0,
-                  "endX": -47188.71,
-                  "endY": 480214.2,
-                  "obeliskX": -38386.29,
-                  "obeliskY": 476641.06
-                }
-              ],
-              "hits": [
-                {
-                  "time": "01:33",
-                  "positionMs": 93236,
-                  "target": "Jokermeow",
-                  "targetID": 185,
-                  "targetType": "player",
-                  "amount": 315566,
-                  "point": {
-                    "x": -36891.0,
-                    "y": 481364.0,
-                    "yardX": -368.91,
-                    "yardY": 4813.64
-                  },
-                  "nearestRay": {
-                    "label": "back",
-                    "distanceYards": 32.4
-                  }
-                }
-              ],
-              "phantomHits": 0,
-              "playerHits": 1,
-              "status": "friendly_fire",
-              "text": "01:33 小落 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 low。"
-            },
-            {
-              "index": 9,
-              "phase": "P1",
-              "player": "Leviac",
-              "targetID": 11,
-              "applyTime": "01:44",
-              "fireTime": "01:54",
-              "positionMs": 114584,
-              "durationMs": 10015,
-              "state": {
-                "time": "01:44",
-                "deltaMs": -29,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -40279.0,
-                  "y": 479716.0,
-                  "yardX": -402.79,
-                  "yardY": 4797.16
-                },
-                "facingRaw": -176.0,
-                "facingRadians": -1.76
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 1.3816,
-                  "startX": -40279.0,
-                  "startY": 479716.0,
-                  "endX": -38398.23,
-                  "endY": 489537.54,
-                  "obeliskX": -40184.96,
-                  "obeliskY": 480207.08
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": -0.7128,
-                  "startX": -40279.0,
-                  "startY": 479716.0,
-                  "endX": -32713.68,
-                  "endY": 473176.44,
-                  "obeliskX": -39900.73,
-                  "obeliskY": 479389.02
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -2.8072,
-                  "startX": -40279.0,
-                  "startY": 479716.0,
-                  "endX": -49725.09,
-                  "endY": 476434.02,
-                  "obeliskX": -40751.3,
-                  "obeliskY": 479551.9
-                }
-              ],
-              "hits": [
-                {
-                  "time": "01:56",
-                  "positionMs": 116574,
-                  "target": "郁闷的灵灵",
-                  "targetID": 10,
-                  "targetType": "player",
-                  "amount": 327606,
-                  "point": {
-                    "x": -38126.0,
-                    "y": 480164.0,
-                    "yardX": -381.26,
-                    "yardY": 4801.64
-                  },
-                  "nearestRay": {
-                    "label": "leftFront",
-                    "distanceYards": 17.5
-                  }
-                }
-              ],
-              "phantomHits": 0,
-              "playerHits": 1,
-              "status": "friendly_fire",
-              "text": "01:54 Leviac 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 high。"
-            },
-            {
-              "index": 10,
-              "phase": "P1",
-              "player": "小落",
-              "targetID": 29,
-              "applyTime": "01:46",
-              "fireTime": "01:56",
-              "positionMs": 116571,
-              "durationMs": 10023,
-              "state": {
-                "time": "01:46",
-                "deltaMs": 349,
-                "confidence": "high",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -39136.0,
-                  "y": 481896.0,
-                  "yardX": -391.36,
-                  "yardY": 4818.96
-                },
-                "facingRaw": -638.0,
-                "facingRadians": -0.0968
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 3.0448,
-                  "startX": -39136.0,
-                  "startY": 481896.0,
-                  "endX": -49089.17,
-                  "endY": 482862.64,
-                  "obeliskX": -39633.66,
-                  "obeliskY": 481944.33
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": 0.9504,
-                  "startX": -39136.0,
-                  "startY": 481896.0,
-                  "endX": -33322.28,
-                  "endY": 490032.38,
-                  "obeliskX": -38845.31,
-                  "obeliskY": 482302.82
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -1.144,
-                  "startX": -39136.0,
-                  "startY": 481896.0,
-                  "endX": -34996.55,
-                  "endY": 472792.98,
-                  "obeliskX": -38929.03,
-                  "obeliskY": 481440.85
-                }
-              ],
-              "hits": [
-                {
-                  "time": "01:56",
-                  "positionMs": 116574,
-                  "target": "郁闷的灵灵",
-                  "targetID": 10,
-                  "targetType": "player",
-                  "amount": 327606,
-                  "point": {
-                    "x": -38126.0,
-                    "y": 480164.0,
-                    "yardX": -381.26,
-                    "yardY": 4801.64
-                  },
-                  "nearestRay": {
-                    "label": "leftBack",
-                    "distanceYards": 2.0
-                  }
-                }
-              ],
-              "phantomHits": 0,
-              "playerHits": 1,
-              "status": "friendly_fire",
-              "text": "01:56 小落 崩裂空无：命中幻影 0 次，误伤玩家 1 次，坐标置信度 high。"
-            },
-            {
-              "index": 11,
-              "phase": "P2",
-              "player": "义子",
-              "targetID": 27,
-              "applyTime": "03:06",
-              "fireTime": "03:09",
-              "positionMs": 189061,
-              "durationMs": 2267,
-              "state": {
-                "time": "03:05",
-                "deltaMs": -1050,
-                "confidence": "medium",
-                "sourceRule": "nearestEventWithFacing",
-                "point": {
-                  "x": -30206.0,
-                  "y": 474504.0,
-                  "yardX": -302.06,
-                  "yardY": 4745.04
-                },
-                "facingRaw": -629.0,
-                "facingRadians": -0.0068
-              },
-              "rays": [
-                {
-                  "label": "back",
-                  "angleRadians": 3.1348,
-                  "startX": -30206.0,
-                  "startY": 474504.0,
-                  "endX": -40205.77,
-                  "endY": 474572.15,
-                  "obeliskX": -30705.99,
-                  "obeliskY": 474507.41
-                },
-                {
-                  "label": "leftFront",
-                  "angleRadians": 1.0404,
-                  "startX": -30206.0,
-                  "startY": 474504.0,
-                  "endX": -25147.1,
-                  "endY": 483129.98,
-                  "obeliskX": -29953.05,
-                  "obeliskY": 474935.3
-                },
-                {
-                  "label": "leftBack",
-                  "angleRadians": -1.054,
-                  "startX": -30206.0,
-                  "startY": 474504.0,
-                  "endX": -25265.13,
-                  "endY": 465809.87,
-                  "obeliskX": -29958.96,
-                  "obeliskY": 474069.29
-                }
-              ],
-              "hits": [],
-              "phantomHits": 0,
-              "playerHits": 0,
-              "status": "no_hit",
-              "text": "03:09 义子 崩裂空无：命中幻影 0 次，误伤玩家 0 次，坐标置信度 medium。"
-            }
-          ],
+          "voidGraspRays": [],
           "collapsingVoidDeaths": [],
           "missedShadows": [
             {
@@ -22496,539 +21244,8 @@
           "missedEnergy": [],
           "gravityRows": [],
           "p2RangerMarkRows": [],
-          "voidRepulsionPlacement": [
-            {
-              "time": "01:58",
-              "phase": "P1",
-              "type": "void_repulsion_scattered",
-              "severity": "warning",
-              "details": [
-                {
-                  "time": "01:58",
-                  "positionMs": 118628,
-                  "phase": "P1",
-                  "player": "杀杀孩",
-                  "targetID": 22,
-                  "hasPosition": true,
-                  "x": -4702.69,
-                  "y": 1444.36,
-                  "rawX": -40584.69,
-                  "rawY": 476839.36,
-                  "originX": -35882.0,
-                  "originY": 475395.0,
-                  "originPlayer": "奥蕾莉亚",
-                  "waterRadiusYards": 15,
-                  "positionSourceTime": "01:58",
-                  "positionSourceDeltaMs": 0,
-                  "positionSourceRule": "resourceInterpolated",
-                  "beforeDeltaMs": -4534,
-                  "afterDeltaMs": 2015,
-                  "sourcePositionTime": "01:56",
-                  "markTime": "01:52",
-                  "markPositionMs": 112647,
-                  "distanceFromCenter": 48.3,
-                  "distanceFromCenterRaw": 4829.1,
-                  "status": "偏散"
-                },
-                {
-                  "time": "01:58",
-                  "positionMs": 118629,
-                  "phase": "P1",
-                  "player": "旖旎云逸",
-                  "targetID": 196,
-                  "hasPosition": true,
-                  "x": -8.57,
-                  "y": 6041.85,
-                  "rawX": -35890.57,
-                  "rawY": 481436.85,
-                  "originX": -35882.0,
-                  "originY": 475395.0,
-                  "originPlayer": "奥蕾莉亚",
-                  "waterRadiusYards": 15,
-                  "positionSourceTime": "01:58",
-                  "positionSourceDeltaMs": 0,
-                  "positionSourceRule": "resourceInterpolated",
-                  "beforeDeltaMs": -3560,
-                  "afterDeltaMs": 922,
-                  "sourcePositionTime": "01:56",
-                  "markTime": "01:52",
-                  "markPositionMs": 112647,
-                  "distanceFromCenter": 17.7,
-                  "distanceFromCenterRaw": 1770.4,
-                  "status": "正常"
-                },
-                {
-                  "time": "01:58",
-                  "positionMs": 118629,
-                  "phase": "P1",
-                  "player": "郁闷的灵灵",
-                  "targetID": 10,
-                  "hasPosition": true,
-                  "x": -1805.23,
-                  "y": 4752.34,
-                  "rawX": -37687.23,
-                  "rawY": 480147.34,
-                  "originX": -35882.0,
-                  "originY": 475395.0,
-                  "originPlayer": "奥蕾莉亚",
-                  "waterRadiusYards": 15,
-                  "positionSourceTime": "01:58",
-                  "positionSourceDeltaMs": 0,
-                  "positionSourceRule": "resourceInterpolated",
-                  "beforeDeltaMs": -2055,
-                  "afterDeltaMs": 2015,
-                  "sourcePositionTime": "01:56",
-                  "markTime": "01:52",
-                  "markPositionMs": 112647,
-                  "distanceFromCenter": 4.4,
-                  "distanceFromCenterRaw": 441.1,
-                  "status": "正常"
-                },
-                {
-                  "time": "01:58",
-                  "positionMs": 118630,
-                  "phase": "P1",
-                  "player": "暗黑膏药",
-                  "targetID": 13,
-                  "hasPosition": true,
-                  "x": 718.0,
-                  "y": 7815.0,
-                  "rawX": -35164.0,
-                  "rawY": 483210.0,
-                  "originX": -35882.0,
-                  "originY": 475395.0,
-                  "originPlayer": "奥蕾莉亚",
-                  "waterRadiusYards": 15,
-                  "positionSourceTime": "02:00",
-                  "positionSourceDeltaMs": 2014,
-                  "positionSourceRule": "resourceAfter",
-                  "sourcePositionTime": "01:56",
-                  "markTime": "01:52",
-                  "markPositionMs": 112647,
-                  "distanceFromCenter": 35.4,
-                  "distanceFromCenterRaw": 3542.3,
-                  "status": "正常"
-                }
-              ],
-              "text": "P1 第 ? 次虚空斥力放水位置疑似偏散：本轮识别 4 人，最大偏离约 48.3 码，异常玩家：杀杀孩。"
-            }
-          ],
-          "voidRepulsionRecords": [
-            {
-              "time": "00:19",
-              "positionMs": 19058,
-              "phase": "P1",
-              "player": "郁闷的灵灵",
-              "targetID": 10,
-              "hasPosition": true,
-              "x": 4314.17,
-              "y": 3829.39,
-              "rawX": -31567.83,
-              "rawY": 479224.39,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:19",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -593,
-              "afterDeltaMs": 1792,
-              "sourcePositionTime": "00:15",
-              "markTime": "00:13",
-              "markPositionMs": 13055,
-              "distanceFromCenter": 9.4,
-              "distanceFromCenterRaw": 935.4,
-              "status": "正常"
-            },
-            {
-              "time": "00:19",
-              "positionMs": 19059,
-              "phase": "P1",
-              "player": "皇丨额娘",
-              "targetID": 16,
-              "hasPosition": true,
-              "x": 4787.0,
-              "y": 3802.0,
-              "rawX": -31095.0,
-              "rawY": 479197.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:21",
-              "positionSourceDeltaMs": 1981,
-              "positionSourceRule": "resourceAfter",
-              "sourcePositionTime": "00:15",
-              "markTime": "00:13",
-              "markPositionMs": 13055,
-              "distanceFromCenter": 10.9,
-              "distanceFromCenterRaw": 1088.2,
-              "status": "正常"
-            },
-            {
-              "time": "00:19",
-              "positionMs": 19059,
-              "phase": "P1",
-              "player": "杀杀孩",
-              "targetID": 22,
-              "hasPosition": true,
-              "x": 4332.74,
-              "y": 5881.89,
-              "rawX": -31549.26,
-              "rawY": 481276.89,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:19",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -400,
-              "afterDeltaMs": 1278,
-              "sourcePositionTime": "00:15",
-              "markTime": "00:13",
-              "markPositionMs": 13055,
-              "distanceFromCenter": 11.2,
-              "distanceFromCenterRaw": 1119.1,
-              "status": "正常"
-            },
-            {
-              "time": "00:19",
-              "positionMs": 19060,
-              "phase": "P1",
-              "player": "义子",
-              "targetID": 27,
-              "hasPosition": true,
-              "x": 3680.0,
-              "y": 5543.0,
-              "rawX": -32202.0,
-              "rawY": 480938.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:19",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -903,
-              "afterDeltaMs": 637,
-              "sourcePositionTime": "00:15",
-              "markTime": "00:13",
-              "markPositionMs": 13055,
-              "distanceFromCenter": 9.8,
-              "distanceFromCenterRaw": 982.3,
-              "status": "正常"
-            },
-            {
-              "time": "00:59",
-              "positionMs": 59050,
-              "phase": "P1",
-              "player": "义子",
-              "targetID": 27,
-              "hasPosition": true,
-              "x": 2746.0,
-              "y": 1577.0,
-              "rawX": -33136.0,
-              "rawY": 476972.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:59",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceExact",
-              "markTime": "00:53",
-              "markPositionMs": 53061,
-              "distanceFromCenter": 10.1,
-              "distanceFromCenterRaw": 1008.6,
-              "status": "正常"
-            },
-            {
-              "time": "00:59",
-              "positionMs": 59051,
-              "phase": "P1",
-              "player": "渊重音",
-              "targetID": 3,
-              "hasPosition": true,
-              "x": 1671.0,
-              "y": 1011.0,
-              "rawX": -34211.0,
-              "rawY": 476406.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:04",
-              "positionSourceDeltaMs": 5917,
-              "positionSourceRule": "resourceAfter",
-              "markTime": "00:53",
-              "markPositionMs": 53061,
-              "distanceFromCenter": 3.6,
-              "distanceFromCenterRaw": 361.7,
-              "status": "正常"
-            },
-            {
-              "time": "00:59",
-              "positionMs": 59052,
-              "phase": "P1",
-              "player": "微光一刀炼狱",
-              "targetID": 19,
-              "hasPosition": true,
-              "x": 2076.19,
-              "y": 590.97,
-              "rawX": -33805.81,
-              "rawY": 475985.97,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:59",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -1188,
-              "afterDeltaMs": 1998,
-              "markTime": "00:53",
-              "markPositionMs": 53061,
-              "distanceFromCenter": 3.0,
-              "distanceFromCenterRaw": 302.8,
-              "status": "正常"
-            },
-            {
-              "time": "00:59",
-              "positionMs": 59054,
-              "phase": "P1",
-              "player": "神奇大叔",
-              "targetID": 194,
-              "hasPosition": true,
-              "x": 1549.49,
-              "y": 367.59,
-              "rawX": -34332.51,
-              "rawY": 475762.59,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "00:59",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -4073,
-              "afterDeltaMs": 1996,
-              "markTime": "00:53",
-              "markPositionMs": 53061,
-              "distanceFromCenter": 6.9,
-              "distanceFromCenterRaw": 694.3,
-              "status": "正常"
-            },
-            {
-              "time": "01:31",
-              "positionMs": 91555,
-              "phase": "P1",
-              "player": "潘哒林熊猫",
-              "targetID": 197,
-              "hasPosition": true,
-              "x": -5964.47,
-              "y": 3564.18,
-              "rawX": -41846.47,
-              "rawY": 478959.18,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:31",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -107,
-              "afterDeltaMs": 405,
-              "markTime": "01:25",
-              "markPositionMs": 85542,
-              "distanceFromCenter": 23.4,
-              "distanceFromCenterRaw": 2343.7,
-              "status": "正常"
-            },
-            {
-              "time": "01:31",
-              "positionMs": 91556,
-              "phase": "P1",
-              "player": "微光一刀炼狱",
-              "targetID": 19,
-              "hasPosition": true,
-              "x": -4881.96,
-              "y": 5893.28,
-              "rawX": -40763.96,
-              "rawY": 481288.28,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:31",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -820,
-              "afterDeltaMs": 658,
-              "markTime": "01:25",
-              "markPositionMs": 85542,
-              "distanceFromCenter": 11.7,
-              "distanceFromCenterRaw": 1165.2,
-              "status": "正常"
-            },
-            {
-              "time": "01:31",
-              "positionMs": 91557,
-              "phase": "P1",
-              "player": "皇丨额娘",
-              "targetID": 16,
-              "hasPosition": true,
-              "x": -4292.0,
-              "y": 2707.0,
-              "rawX": -40174.0,
-              "rawY": 478102.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:33",
-              "positionSourceDeltaMs": 1992,
-              "positionSourceRule": "resourceAfter",
-              "markTime": "01:25",
-              "markPositionMs": 85542,
-              "distanceFromCenter": 23.1,
-              "distanceFromCenterRaw": 2310.5,
-              "status": "正常"
-            },
-            {
-              "time": "01:31",
-              "positionMs": 91558,
-              "phase": "P1",
-              "player": "见见女土",
-              "targetID": 9,
-              "hasPosition": true,
-              "x": -1344.7,
-              "y": 7880.0,
-              "rawX": -37226.7,
-              "rawY": 483275.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:31",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -1023,
-              "afterDeltaMs": 173,
-              "markTime": "01:25",
-              "markPositionMs": 85542,
-              "distanceFromCenter": 39.9,
-              "distanceFromCenterRaw": 3992.1,
-              "status": "正常"
-            },
-            {
-              "time": "01:58",
-              "positionMs": 118628,
-              "phase": "P1",
-              "player": "杀杀孩",
-              "targetID": 22,
-              "hasPosition": true,
-              "x": -4702.69,
-              "y": 1444.36,
-              "rawX": -40584.69,
-              "rawY": 476839.36,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:58",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -4534,
-              "afterDeltaMs": 2015,
-              "sourcePositionTime": "01:56",
-              "markTime": "01:52",
-              "markPositionMs": 112647,
-              "distanceFromCenter": 48.3,
-              "distanceFromCenterRaw": 4829.1,
-              "status": "偏散"
-            },
-            {
-              "time": "01:58",
-              "positionMs": 118629,
-              "phase": "P1",
-              "player": "旖旎云逸",
-              "targetID": 196,
-              "hasPosition": true,
-              "x": -8.57,
-              "y": 6041.85,
-              "rawX": -35890.57,
-              "rawY": 481436.85,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:58",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -3560,
-              "afterDeltaMs": 922,
-              "sourcePositionTime": "01:56",
-              "markTime": "01:52",
-              "markPositionMs": 112647,
-              "distanceFromCenter": 17.7,
-              "distanceFromCenterRaw": 1770.4,
-              "status": "正常"
-            },
-            {
-              "time": "01:58",
-              "positionMs": 118629,
-              "phase": "P1",
-              "player": "郁闷的灵灵",
-              "targetID": 10,
-              "hasPosition": true,
-              "x": -1805.23,
-              "y": 4752.34,
-              "rawX": -37687.23,
-              "rawY": 480147.34,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "01:58",
-              "positionSourceDeltaMs": 0,
-              "positionSourceRule": "resourceInterpolated",
-              "beforeDeltaMs": -2055,
-              "afterDeltaMs": 2015,
-              "sourcePositionTime": "01:56",
-              "markTime": "01:52",
-              "markPositionMs": 112647,
-              "distanceFromCenter": 4.4,
-              "distanceFromCenterRaw": 441.1,
-              "status": "正常"
-            },
-            {
-              "time": "01:58",
-              "positionMs": 118630,
-              "phase": "P1",
-              "player": "暗黑膏药",
-              "targetID": 13,
-              "hasPosition": true,
-              "x": 718.0,
-              "y": 7815.0,
-              "rawX": -35164.0,
-              "rawY": 483210.0,
-              "originX": -35882.0,
-              "originY": 475395.0,
-              "originPlayer": "奥蕾莉亚",
-              "waterRadiusYards": 15,
-              "positionSourceTime": "02:00",
-              "positionSourceDeltaMs": 2014,
-              "positionSourceRule": "resourceAfter",
-              "sourcePositionTime": "01:56",
-              "markTime": "01:52",
-              "markPositionMs": 112647,
-              "distanceFromCenter": 35.4,
-              "distanceFromCenterRaw": 3542.3,
-              "status": "正常"
-            }
-          ],
+          "voidRepulsionPlacement": [],
+          "voidRepulsionRecords": [],
           "voidGraspHealing": [],
           "interferenceShockRows": [
             {
@@ -23050,17 +21267,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 10,
-                  "player": "郁闷的灵灵",
-                  "spellID": 1064,
-                  "spell": "Chain Heal",
-                  "count": 1,
-                  "tableTimestamp": 8809125,
-                  "role": "unknown",
-                  "castStart": "00:30",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 13,
                   "player": "暗黑膏药",
                   "spellID": 596,
@@ -23070,11 +21276,22 @@
                   "role": "unknown",
                   "castStart": "00:29",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 10,
+                  "player": "郁闷的灵灵",
+                  "spellID": 1064,
+                  "spell": "Chain Heal",
+                  "count": 1,
+                  "tableTimestamp": 8809125,
+                  "role": "unknown",
+                  "castStart": "00:30",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 2,
               "confidence": "wcl_interrupt_table",
-              "text": "00:30 干扰震荡实际打断 2 人：郁闷的灵灵：Chain Heal（1064）；暗黑膏药：Prayer of Healing（596）"
+              "text": "00:30 干扰震荡实际打断 2 人：暗黑膏药：Prayer of Healing（596）；郁闷的灵灵：Chain Heal（1064）"
             }
           ],
           "p3PortalSummons": [],
@@ -23087,14 +21304,14 @@
             "cutoffTime": "02:42.359",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=18",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=18",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 18,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=18",
-              "generatedAt": "2026-07-15T15:50:36.697059+00:00",
+              "generatedAt": "2026-07-15T09:23:51.083023+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -27895,20 +26112,7 @@
                     },
                     "applyFacingReliable": true,
                     "applyFacingEstimated": false,
-                    "fadeState": {
-                      "time": "03:05",
-                      "deltaMs": -1050,
-                      "confidence": "medium",
-                      "sourceRule": "nearestEventWithFacing",
-                      "point": {
-                        "x": -30206.0,
-                        "y": 474504.0,
-                        "yardX": -302.06,
-                        "yardY": 4745.04
-                      },
-                      "facingRaw": -629.0,
-                      "facingRadians": -0.0068
-                    },
+                    "fadeState": null,
                     "lastSecondState": null,
                     "lastSecondMovementYards": null,
                     "isSnapAiming": false,
@@ -27944,71 +26148,7 @@
                         "angleRadians": -1.164
                       }
                     ],
-                    "rays": [
-                      {
-                        "label": "back",
-                        "start": {
-                          "x": -30206.0,
-                          "y": 474504.0,
-                          "yardX": -302.06,
-                          "yardY": 4745.04
-                        },
-                        "through": {
-                          "x": -30705.99,
-                          "y": 474507.41,
-                          "yardX": -307.06,
-                          "yardY": 4745.07
-                        },
-                        "end": {
-                          "x": -40205.77,
-                          "y": 474572.15,
-                          "yardX": -402.06,
-                          "yardY": 4745.72
-                        }
-                      },
-                      {
-                        "label": "leftFront",
-                        "start": {
-                          "x": -30206.0,
-                          "y": 474504.0,
-                          "yardX": -302.06,
-                          "yardY": 4745.04
-                        },
-                        "through": {
-                          "x": -29953.05,
-                          "y": 474935.3,
-                          "yardX": -299.53,
-                          "yardY": 4749.35
-                        },
-                        "end": {
-                          "x": -25147.1,
-                          "y": 483129.98,
-                          "yardX": -251.47,
-                          "yardY": 4831.3
-                        }
-                      },
-                      {
-                        "label": "leftBack",
-                        "start": {
-                          "x": -30206.0,
-                          "y": 474504.0,
-                          "yardX": -302.06,
-                          "yardY": 4745.04
-                        },
-                        "through": {
-                          "x": -29958.96,
-                          "y": 474069.29,
-                          "yardX": -299.59,
-                          "yardY": 4740.69
-                        },
-                        "end": {
-                          "x": -25265.13,
-                          "y": 465809.87,
-                          "yardX": -252.65,
-                          "yardY": 4658.1
-                        }
-                      }
-                    ],
+                    "rays": [],
                     "actualHits": [],
                     "actualPhantomHitCount": 0,
                     "resolvedPhantomInstances": [],
@@ -33711,6 +31851,128 @@
         "wipeReason": "P1 放弃/add",
         "investigation": "P1 起手后团队快速放弃。在选择重开前已有1人死亡。 疑似引怪玩家：【福乐真牛】（最先对敌方造成伤害）。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=19&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "00:04",
@@ -34291,8 +32553,7 @@
           "gravityLineViolation": [],
           "tankRiftSlashFailure": [],
           "corruptionEssenceDamage": [],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -34613,7 +32874,7 @@
           ],
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
-          "transitionAbandoned": true,
+          "transitionAbandoned": false,
           "globalExemption": {
             "deathThreshold": 8,
             "deathCount": 20,
@@ -34621,14 +32882,14 @@
             "cutoffTime": "00:08.517",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=19",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=19",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 19,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=19",
-              "generatedAt": "2026-07-15T15:50:19.685527+00:00",
+              "generatedAt": "2026-07-15T09:23:39.735703+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -36122,6 +34383,128 @@
         "wipeReason": "P1 银锋箭处理异常",
         "investigation": "01:21 非预期时间移除 殁里乌姆 的幽影束缚",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=20&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "00:40",
@@ -37988,42 +36371,6 @@
               "observedDeathCount": 0
             },
             {
-              "name": "郁闷的灵灵",
-              "role": "range-healer",
-              "roles": [
-                "range-healer"
-              ],
-              "spellKey": "interferenceShockInterrupts",
-              "spellName": "干扰震荡打断",
-              "hitCount": 1,
-              "deathCount": 0,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "playerID": 10,
-                  "player": "郁闷的灵灵",
-                  "spellID": 1064,
-                  "spell": "Chain Heal",
-                  "count": 1,
-                  "tableTimestamp": 9682800,
-                  "role": "unknown",
-                  "castStart": "00:29",
-                  "evidence": "wcl_interrupt_table",
-                  "fightID": 20,
-                  "time": "00:30",
-                  "positionMs": 30201,
-                  "counted": false,
-                  "verdictCounted": false,
-                  "displayOnly": true,
-                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
-                }
-              ],
-              "countedCount": 0,
-              "uncountedCount": 1,
-              "observedHitCount": 1,
-              "observedDeathCount": 0
-            },
-            {
               "name": "暗黑膏药",
               "role": "range-healer",
               "roles": [
@@ -38080,6 +36427,42 @@
                   "tableTimestamp": 9682800,
                   "role": "unknown",
                   "castStart": "00:30",
+                  "evidence": "wcl_interrupt_table",
+                  "fightID": 20,
+                  "time": "00:30",
+                  "positionMs": 30201,
+                  "counted": false,
+                  "verdictCounted": false,
+                  "displayOnly": true,
+                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
+                }
+              ],
+              "countedCount": 0,
+              "uncountedCount": 1,
+              "observedHitCount": 1,
+              "observedDeathCount": 0
+            },
+            {
+              "name": "郁闷的灵灵",
+              "role": "range-healer",
+              "roles": [
+                "range-healer"
+              ],
+              "spellKey": "interferenceShockInterrupts",
+              "spellName": "干扰震荡打断",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "playerID": 10,
+                  "player": "郁闷的灵灵",
+                  "spellID": 1064,
+                  "spell": "Chain Heal",
+                  "count": 1,
+                  "tableTimestamp": 9682800,
+                  "role": "unknown",
+                  "castStart": "00:29",
                   "evidence": "wcl_interrupt_table",
                   "fightID": 20,
                   "time": "00:30",
@@ -38396,8 +36779,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -40279,28 +38661,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 10,
-                  "player": "郁闷的灵灵",
-                  "spellID": 1064,
-                  "spell": "Chain Heal",
-                  "count": 1,
-                  "tableTimestamp": 9682800,
-                  "role": "unknown",
-                  "castStart": "00:29",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
-                  "playerID": 11,
-                  "player": "Leviac",
-                  "spellID": 373861,
-                  "spell": "Temporal Anomaly",
-                  "count": 2,
-                  "tableTimestamp": 9662159,
-                  "role": "unknown",
-                  "castStart": "00:29",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 13,
                   "player": "暗黑膏药",
                   "spellID": 596,
@@ -40321,16 +38681,38 @@
                   "role": "unknown",
                   "castStart": "00:30",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 11,
+                  "player": "Leviac",
+                  "spellID": 373861,
+                  "spell": "Temporal Anomaly",
+                  "count": 2,
+                  "tableTimestamp": 9662159,
+                  "role": "unknown",
+                  "castStart": "00:29",
+                  "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 10,
+                  "player": "郁闷的灵灵",
+                  "spellID": 1064,
+                  "spell": "Chain Heal",
+                  "count": 1,
+                  "tableTimestamp": 9682800,
+                  "role": "unknown",
+                  "castStart": "00:29",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 4,
               "confidence": "wcl_interrupt_table",
-              "text": "00:30 干扰震荡实际打断 4 人：郁闷的灵灵：Chain Heal（1064）；Leviac：Temporal Anomaly（373861）；暗黑膏药：Prayer of Healing（596）；皇丨额娘：Spell 205021（205021）"
+              "text": "00:30 干扰震荡实际打断 4 人：暗黑膏药：Prayer of Healing（596）；皇丨额娘：Spell 205021（205021）；Leviac：Temporal Anomaly（373861）；郁闷的灵灵：Chain Heal（1064）"
             }
           ],
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
-          "transitionAbandoned": true,
+          "transitionAbandoned": false,
           "globalExemption": {
             "deathThreshold": 8,
             "deathCount": 21,
@@ -40338,14 +38720,14 @@
             "cutoffTime": "02:16.396",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=20",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=20",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 20,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=20",
-              "generatedAt": "2026-07-15T15:51:46.408338+00:00",
+              "generatedAt": "2026-07-15T09:24:53.275898+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -51800,6 +50182,128 @@
         "wipeReason": "P2 团队减员后放弃",
         "investigation": "P2 阶段累计出现 18 人次减员，团队随后选择放弃。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=21&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "01:02",
@@ -55843,8 +54347,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -58858,7 +57361,7 @@
           ],
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
-          "transitionAbandoned": true,
+          "transitionAbandoned": false,
           "globalExemption": {
             "deathThreshold": 8,
             "deathCount": 21,
@@ -58866,14 +57369,14 @@
             "cutoffTime": "04:03.999",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=21",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=21",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 21,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=21",
-              "generatedAt": "2026-07-15T15:51:46.011808+00:00",
+              "generatedAt": "2026-07-15T09:24:56.746487+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -74803,6 +73306,128 @@
         "wipeReason": "P2 宇宙屏障狂暴（裂隙幻影未及时击杀）",
         "investigation": "P2 有 12 人死于宇宙屏障，判定为裂隙幻影没有被正常转火处理。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=22&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "02:37",
@@ -77865,8 +76490,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -79986,17 +78610,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 17,
-                  "player": "梨梨圆上脯",
-                  "spellID": 116858,
-                  "spell": "Chaos Bolt",
-                  "count": 2,
-                  "tableTimestamp": 10857224,
-                  "role": "unknown",
-                  "castStart": "00:30",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 26,
                   "player": "脆皮麦克思",
                   "spellID": 205021,
@@ -80006,11 +78619,22 @@
                   "role": "unknown",
                   "castStart": "00:29",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 17,
+                  "player": "梨梨圆上脯",
+                  "spellID": 116858,
+                  "spell": "Chaos Bolt",
+                  "count": 2,
+                  "tableTimestamp": 10857224,
+                  "role": "unknown",
+                  "castStart": "00:30",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 2,
               "confidence": "wcl_interrupt_table",
-              "text": "00:30 干扰震荡实际打断 2 人：梨梨圆上脯：Chaos Bolt（116858）；脆皮麦克思：Spell 205021（205021）"
+              "text": "00:30 干扰震荡实际打断 2 人：脆皮麦克思：Spell 205021（205021）；梨梨圆上脯：Chaos Bolt（116858）"
             }
           ],
           "p3PortalSummons": [],
@@ -80023,14 +78647,14 @@
             "cutoffTime": "03:38.018",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=22",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=22",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 22,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=22",
-              "generatedAt": "2026-07-15T15:51:48.783603+00:00",
+              "generatedAt": "2026-07-15T09:25:08.948362+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -93161,6 +91785,128 @@
         "wipeReason": "P2 团队减员后放弃",
         "investigation": "P2 阶段累计出现 19 人次减员，团队随后选择放弃。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=23&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "02:38",
@@ -96219,8 +94965,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -98850,7 +97595,7 @@
           ],
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
-          "transitionAbandoned": true,
+          "transitionAbandoned": false,
           "globalExemption": {
             "deathThreshold": 8,
             "deathCount": 21,
@@ -98858,14 +97603,14 @@
             "cutoffTime": "04:05.712",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=23",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=23",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 23,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=23",
-              "generatedAt": "2026-07-15T15:51:58.082290+00:00",
+              "generatedAt": "2026-07-15T09:25:19.696321+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -114640,6 +113385,128 @@
         "wipeReason": "P1 银锋箭处理异常",
         "investigation": "01:39 预期银锋箭应处理 殁里乌姆，但未识别到幽影束缚移除或腐化精华移除；本轮点名为 杀杀孩,义子。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=24&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "01:21",
@@ -117273,8 +116140,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -119192,7 +118058,7 @@
           ],
           "p3PortalSummons": [],
           "riftSlashTankSwaps": [],
-          "transitionAbandoned": true,
+          "transitionAbandoned": false,
           "globalExemption": {
             "deathThreshold": 8,
             "deathCount": 20,
@@ -119200,14 +118066,14 @@
             "cutoffTime": "01:54.275",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=24",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=24",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 24,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=24",
-              "generatedAt": "2026-07-15T15:53:08.691286+00:00",
+              "generatedAt": "2026-07-15T09:26:14.488457+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -129353,6 +128219,128 @@
         "wipeReason": "P2 过多玩家死于拉弓",
         "investigation": "本场有 10 名玩家死于拉弓/射击/转阶段走位相关伤害。相关玩家：【网管、小落、Zeta、脆皮麦克思、杀杀孩、郁闷的灵灵、渊重音、微光一刀炼狱、网管、Leviac】。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=25&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "00:40",
@@ -132858,8 +131846,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -135651,14 +134638,14 @@
             "cutoffTime": "04:08.787",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=25",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=25",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 25,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=25",
-              "generatedAt": "2026-07-15T15:53:21.102707+00:00",
+              "generatedAt": "2026-07-15T09:26:21.482569+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -153416,6 +152403,128 @@
         "wipeReason": "P2.5 团队减员后放弃",
         "investigation": "P2.5 阶段累计出现 2 人次减员，团队随后选择放弃。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=26&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "00:21",
@@ -156255,42 +155364,6 @@
               "observedDeathCount": 0
             },
             {
-              "name": "梨梨圆上脯",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "interferenceShockInterrupts",
-              "spellName": "干扰震荡打断",
-              "hitCount": 1,
-              "deathCount": 0,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "playerID": 17,
-                  "player": "梨梨圆上脯",
-                  "spellID": 29722,
-                  "spell": "Incinerate",
-                  "count": 1,
-                  "tableTimestamp": 12581327,
-                  "role": "unknown",
-                  "castStart": "00:29",
-                  "evidence": "wcl_interrupt_table",
-                  "fightID": 26,
-                  "time": "00:30",
-                  "positionMs": 30307,
-                  "counted": false,
-                  "verdictCounted": false,
-                  "displayOnly": true,
-                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
-                }
-              ],
-              "countedCount": 0,
-              "uncountedCount": 1,
-              "observedHitCount": 1,
-              "observedDeathCount": 0
-            },
-            {
               "name": "义子",
               "role": "range-dps",
               "roles": [
@@ -156311,6 +155384,42 @@
                   "tableTimestamp": 12581326,
                   "role": "unknown",
                   "castStart": "00:30",
+                  "evidence": "wcl_interrupt_table",
+                  "fightID": 26,
+                  "time": "00:30",
+                  "positionMs": 30307,
+                  "counted": false,
+                  "verdictCounted": false,
+                  "displayOnly": true,
+                  "countReason": "干扰震荡仅展示分析，永远不计数、不进入终审"
+                }
+              ],
+              "countedCount": 0,
+              "uncountedCount": 1,
+              "observedHitCount": 1,
+              "observedDeathCount": 0
+            },
+            {
+              "name": "梨梨圆上脯",
+              "role": "range-dps",
+              "roles": [
+                "range-dps"
+              ],
+              "spellKey": "interferenceShockInterrupts",
+              "spellName": "干扰震荡打断",
+              "hitCount": 1,
+              "deathCount": 0,
+              "totalDamage": 0,
+              "events": [
+                {
+                  "playerID": 17,
+                  "player": "梨梨圆上脯",
+                  "spellID": 29722,
+                  "spell": "Incinerate",
+                  "count": 1,
+                  "tableTimestamp": 12581327,
+                  "role": "unknown",
+                  "castStart": "00:29",
                   "evidence": "wcl_interrupt_table",
                   "fightID": 26,
                   "time": "00:30",
@@ -157022,8 +156131,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": []
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -159533,17 +158641,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 17,
-                  "player": "梨梨圆上脯",
-                  "spellID": 29722,
-                  "spell": "Incinerate",
-                  "count": 1,
-                  "tableTimestamp": 12581327,
-                  "role": "unknown",
-                  "castStart": "00:29",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 27,
                   "player": "义子",
                   "spellID": 1217610,
@@ -159553,11 +158650,22 @@
                   "role": "unknown",
                   "castStart": "00:30",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 17,
+                  "player": "梨梨圆上脯",
+                  "spellID": 29722,
+                  "spell": "Incinerate",
+                  "count": 1,
+                  "tableTimestamp": 12581327,
+                  "role": "unknown",
+                  "castStart": "00:29",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 2,
               "confidence": "wcl_interrupt_table",
-              "text": "00:30 干扰震荡实际打断 2 人：梨梨圆上脯：Incinerate（29722）；义子：Spell 1217610（1217610）"
+              "text": "00:30 干扰震荡实际打断 2 人：义子：Spell 1217610（1217610）；梨梨圆上脯：Incinerate（29722）"
             }
           ],
           "p3PortalSummons": [],
@@ -159570,14 +158678,14 @@
             "cutoffTime": "04:38.423",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=26",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=26",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 26,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=26",
-              "generatedAt": "2026-07-15T15:53:21.429248+00:00",
+              "generatedAt": "2026-07-15T09:26:34.045900+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -176735,6 +175843,128 @@
         "wipeReason": "P2 过多玩家死于拉弓",
         "investigation": "本场有 8 名玩家死于拉弓/射击/转阶段走位相关伤害。相关玩家：【Leviac、脆皮麦克思、渊重音、潘哒林熊猫、郁闷的灵灵、杀杀孩、旖旎云逸、义子】。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=27&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "00:40",
@@ -180770,42 +180000,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": [
-            {
-              "name": "皇丨额娘",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 27,
-                  "player": "皇丨额娘",
-                  "role": "range-dps",
-                  "phase": "P2",
-                  "time": "03:30",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight27 皇丨额娘 于 03:30（P2）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
-            }
-          ]
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -184150,14 +183345,14 @@
             "cutoffTime": "04:26.261",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=27",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=27",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 27,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=27",
-              "generatedAt": "2026-07-15T15:53:35.539364+00:00",
+              "generatedAt": "2026-07-15T09:26:45.991755+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -201903,6 +201098,128 @@
         "wipeReason": "P3 前置减员过多后团队崩溃",
         "investigation": "最终死亡簇前已有 14 名不同玩家发生过死亡，判定为前置阶段减员过多导致团队失去续战能力。前置死亡分布：P1.5 3人次、P2 5人次、P2.5 2人次、P3 4人次。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=28&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "02:19",
@@ -206227,75 +205544,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": [
-            {
-              "name": "小落",
-              "role": "melee-dps",
-              "roles": [
-                "melee-dps"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 28,
-                  "player": "小落",
-                  "role": "melee-dps",
-                  "phase": "P2",
-                  "time": "03:25",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight28 小落 于 03:25（P2）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
-            },
-            {
-              "name": "郁闷的灵灵",
-              "role": "range-healer",
-              "roles": [
-                "range-healer"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 28,
-                  "player": "郁闷的灵灵",
-                  "role": "range-healer",
-                  "phase": "P2",
-                  "time": "04:51",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight28 郁闷的灵灵 于 04:51（P2）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
-            }
-          ]
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -209972,17 +209221,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 17,
-                  "player": "梨梨圆上脯",
-                  "spellID": 116858,
-                  "spell": "Chaos Bolt",
-                  "count": 1,
-                  "tableTimestamp": 13588259,
-                  "role": "unknown",
-                  "castStart": "00:29",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 26,
                   "player": "脆皮麦克思",
                   "spellID": 205021,
@@ -209992,11 +209230,22 @@
                   "role": "unknown",
                   "castStart": "00:29",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 17,
+                  "player": "梨梨圆上脯",
+                  "spellID": 116858,
+                  "spell": "Chaos Bolt",
+                  "count": 1,
+                  "tableTimestamp": 13588259,
+                  "role": "unknown",
+                  "castStart": "00:29",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 2,
               "confidence": "wcl_interrupt_table",
-              "text": "00:30 干扰震荡实际打断 2 人：梨梨圆上脯：Chaos Bolt（116858）；脆皮麦克思：Spell 205021（205021）"
+              "text": "00:30 干扰震荡实际打断 2 人：脆皮麦克思：Spell 205021（205021）；梨梨圆上脯：Chaos Bolt（116858）"
             }
           ],
           "p3PortalSummons": [
@@ -210022,14 +209271,14 @@
             "cutoffTime": "04:57.312",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=28",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=28",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 28,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=28",
-              "generatedAt": "2026-07-15T15:54:45.687253+00:00",
+              "generatedAt": "2026-07-15T09:27:31.239472+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -232554,7 +231803,7 @@
         "reportID": "mH8AFN1xXq94J2kW",
         "fightID": 29,
         "fightName": "Crown of the Cosmos",
-        "date": "2026-07-13",
+        "date": "2026-07-12",
         "startClock": "00:02",
         "startDateTime": "2026-07-13 00:02",
         "duration": "06:06",
@@ -232569,6 +231818,128 @@
         "wipeReason": "P2.5 转阶段击飞",
         "investigation": "P2.5 宇宙屏障持续期间发生坠崖，归因为转阶段击飞。相关玩家：【梨梨圆上脯】。",
         "wclDeepLink": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=29&type=deaths",
+        "combatants": [
+          {
+            "name": "Jokermeow",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "Leviac",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "Zeta",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "义子",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "小落",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "微光一刀炼狱",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "旖旎云逸",
+            "roles": [
+              "melee-healer"
+            ]
+          },
+          {
+            "name": "暗黑膏药",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "杀杀孩",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "梨梨圆上脯",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "渊重音",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "潘哒林熊猫",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "皇丨额娘",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "神奇大叔",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "福乐真牛",
+            "roles": [
+              "tank"
+            ]
+          },
+          {
+            "name": "网管",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "脆皮麦克思",
+            "roles": [
+              "range-dps"
+            ]
+          },
+          {
+            "name": "见见女土",
+            "roles": [
+              "melee-dps"
+            ]
+          },
+          {
+            "name": "郁闷的灵灵",
+            "roles": [
+              "range-healer"
+            ]
+          },
+          {
+            "name": "锦礼",
+            "roles": [
+              "melee-dps"
+            ]
+          }
+        ],
         "deathTimeline": [
           {
             "time": "01:07",
@@ -235674,10 +235045,10 @@
           ],
           "interferenceShockInterrupts": [
             {
-              "name": "郁闷的灵灵",
-              "role": "range-healer",
+              "name": "渊重音",
+              "role": "range-dps",
               "roles": [
-                "range-healer"
+                "range-dps"
               ],
               "spellKey": "interferenceShockInterrupts",
               "spellName": "干扰震荡打断",
@@ -235686,10 +235057,10 @@
               "totalDamage": 0,
               "events": [
                 {
-                  "playerID": 10,
-                  "player": "郁闷的灵灵",
-                  "spellID": 1064,
-                  "spell": "Chain Heal",
+                  "playerID": 3,
+                  "player": "渊重音",
+                  "spellID": 116,
+                  "spell": "Frostbolt",
                   "count": 1,
                   "tableTimestamp": 14085376,
                   "role": "unknown",
@@ -235710,10 +235081,10 @@
               "observedDeathCount": 0
             },
             {
-              "name": "渊重音",
-              "role": "range-dps",
+              "name": "郁闷的灵灵",
+              "role": "range-healer",
               "roles": [
-                "range-dps"
+                "range-healer"
               ],
               "spellKey": "interferenceShockInterrupts",
               "spellName": "干扰震荡打断",
@@ -235722,10 +235093,10 @@
               "totalDamage": 0,
               "events": [
                 {
-                  "playerID": 3,
-                  "player": "渊重音",
-                  "spellID": 116,
-                  "spell": "Frostbolt",
+                  "playerID": 10,
+                  "player": "郁闷的灵灵",
+                  "spellID": 1064,
+                  "spell": "Chain Heal",
                   "count": 1,
                   "tableTimestamp": 14085376,
                   "role": "unknown",
@@ -236938,42 +236309,7 @@
               "uncountedCount": 1
             }
           ],
-          "voreluthVulnerabilityFade": [],
-          "passageCliffMistakes": [
-            {
-              "name": "皇丨额娘",
-              "role": "range-dps",
-              "roles": [
-                "range-dps"
-              ],
-              "spellKey": "passageCliffMistakes",
-              "spellName": "过场失误",
-              "hitCount": 1,
-              "deathCount": 1,
-              "totalDamage": 0,
-              "events": [
-                {
-                  "fightID": 29,
-                  "player": "皇丨额娘",
-                  "role": "range-dps",
-                  "phase": "P2",
-                  "time": "03:28",
-                  "positionMs": null,
-                  "ability": "坠崖",
-                  "abilityID": null,
-                  "counted": true,
-                  "verdictCounted": true,
-                  "displayOnly": false,
-                  "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-                  "text": "Fight29 皇丨额娘 于 03:28（P2）死于坠崖 · 过场失误"
-                }
-              ],
-              "observedHitCount": 1,
-              "observedDeathCount": 1,
-              "countedCount": 1,
-              "uncountedCount": 0
-            }
-          ]
+          "voreluthVulnerabilityFade": []
         },
         "globalExemption": {
           "deathThreshold": 8,
@@ -240362,17 +239698,6 @@
               "source": "殆米阿尔",
               "interrupted": [
                 {
-                  "playerID": 10,
-                  "player": "郁闷的灵灵",
-                  "spellID": 1064,
-                  "spell": "Chain Heal",
-                  "count": 1,
-                  "tableTimestamp": 14085376,
-                  "role": "unknown",
-                  "castStart": "00:09",
-                  "evidence": "wcl_interrupt_table"
-                },
-                {
                   "playerID": 3,
                   "player": "渊重音",
                   "spellID": 116,
@@ -240382,11 +239707,22 @@
                   "role": "unknown",
                   "castStart": "00:09",
                   "evidence": "wcl_interrupt_table"
+                },
+                {
+                  "playerID": 10,
+                  "player": "郁闷的灵灵",
+                  "spellID": 1064,
+                  "spell": "Chain Heal",
+                  "count": 1,
+                  "tableTimestamp": 14085376,
+                  "role": "unknown",
+                  "castStart": "00:09",
+                  "evidence": "wcl_interrupt_table"
                 }
               ],
               "interruptedCount": 2,
               "confidence": "wcl_interrupt_table",
-              "text": "00:09 干扰震荡实际打断 2 人：郁闷的灵灵：Chain Heal（1064）；渊重音：Frostbolt（116）"
+              "text": "00:09 干扰震荡实际打断 2 人：渊重音：Frostbolt（116）；郁闷的灵灵：Chain Heal（1064）"
             },
             {
               "index": 2,
@@ -240435,14 +239771,14 @@
             "cutoffTime": "04:54.009",
             "reason": "本场第8次死亡后所有失误均不计数"
           },
-          "fieldAuditUrl": "crown-fight-audit.html?source=wcl_hardcore_api.json&report=mH8AFN1xXq94J2kW&fight=29",
+          "fieldAuditUrl": "crown-fight-audit.html?report=mH8AFN1xXq94J2kW&fight=29",
           "fieldAudit": {
             "meta": {
               "reportID": "mH8AFN1xXq94J2kW",
               "fightID": 29,
               "schemaVersion": "2026-07-14-global-exemption-v6",
               "sourceURL": "https://www.warcraftlogs.com/reports/mH8AFN1xXq94J2kW?fight=29",
-              "generatedAt": "2026-07-15T15:54:53.257148+00:00",
+              "generatedAt": "2026-07-15T09:27:39.546997+00:00",
               "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks."
             },
             "fight": {
@@ -273548,129 +272884,7 @@
           ]
         }
       ],
-      "voreluthVulnerabilityFade": [],
-      "passageCliffMistakes": [
-        {
-          "name": "皇丨额娘",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-dps",
-          "roles": [
-            "range-dps"
-          ],
-          "hitCount": 2,
-          "countedCount": 2,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 2,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 27,
-              "player": "皇丨额娘",
-              "role": "range-dps",
-              "phase": "P2",
-              "time": "03:30",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight27 皇丨额娘 于 03:30（P2）死于坠崖 · 过场失误"
-            },
-            {
-              "fightID": 29,
-              "player": "皇丨额娘",
-              "role": "range-dps",
-              "phase": "P2",
-              "time": "03:28",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight29 皇丨额娘 于 03:28（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "小落",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "melee-dps",
-          "roles": [
-            "melee-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 28,
-              "player": "小落",
-              "role": "melee-dps",
-              "phase": "P2",
-              "time": "03:25",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight28 小落 于 03:25（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "郁闷的灵灵",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-healer",
-          "roles": [
-            "range-healer"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 28,
-              "player": "郁闷的灵灵",
-              "role": "range-healer",
-              "phase": "P2",
-              "time": "04:51",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight28 郁闷的灵灵 于 04:51（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        }
-      ]
+      "voreluthVulnerabilityFade": []
     },
     "page4_finalVerdict": [
       {
@@ -273750,26 +272964,6 @@
         "iqLoss": 50
       },
       {
-        "name": "皇丨额娘",
-        "roles": [
-          "range-dps"
-        ],
-        "recognitionCount": 5,
-        "appealAcquittalCount": 0,
-        "breakdown": {
-          "p15AvoidableDeaths": 2,
-          "collapsingVoidSnapAiming": 0,
-          "waterOutliers": 0,
-          "p1SilverArrowMissedFights": 1,
-          "missedShadows": 0,
-          "passageCliffMistakes": 2
-        },
-        "penaltyUnits": 5.0,
-        "scoreMultiplier": 1.0,
-        "appealUnitMultiplier": 1.0,
-        "iqLoss": 50
-      },
-      {
         "name": "见见女土",
         "roles": [
           "melee-dps"
@@ -273806,6 +273000,25 @@
         "iqLoss": 40
       },
       {
+        "name": "皇丨额娘",
+        "roles": [
+          "range-dps"
+        ],
+        "recognitionCount": 3,
+        "appealAcquittalCount": 0,
+        "breakdown": {
+          "p15AvoidableDeaths": 2,
+          "collapsingVoidSnapAiming": 0,
+          "waterOutliers": 0,
+          "p1SilverArrowMissedFights": 1,
+          "missedShadows": 0
+        },
+        "penaltyUnits": 3.0,
+        "scoreMultiplier": 1.0,
+        "appealUnitMultiplier": 1.0,
+        "iqLoss": 30
+      },
+      {
         "name": "渊重音",
         "roles": [
           "range-dps"
@@ -273817,26 +273030,6 @@
           "collapsingVoidSnapAiming": 0,
           "waterOutliers": 0,
           "missedShadows": 2
-        },
-        "penaltyUnits": 3.0,
-        "scoreMultiplier": 1.0,
-        "appealUnitMultiplier": 1.0,
-        "iqLoss": 30
-      },
-      {
-        "name": "郁闷的灵灵",
-        "roles": [
-          "range-healer"
-        ],
-        "recognitionCount": 3,
-        "appealAcquittalCount": 0,
-        "breakdown": {
-          "p15AvoidableDeaths": 0,
-          "collapsingVoidSnapAiming": 0,
-          "waterOutliers": 0,
-          "p1SilverArrowMissedFights": 2,
-          "missedShadows": 0,
-          "passageCliffMistakes": 1
         },
         "penaltyUnits": 3.0,
         "scoreMultiplier": 1.0,
@@ -273863,18 +273056,18 @@
         "iqLoss": 20
       },
       {
-        "name": "小落",
+        "name": "郁闷的灵灵",
         "roles": [
-          "melee-dps"
+          "range-healer"
         ],
         "recognitionCount": 2,
         "appealAcquittalCount": 0,
         "breakdown": {
-          "p15AvoidableDeaths": 1,
+          "p15AvoidableDeaths": 0,
           "collapsingVoidSnapAiming": 0,
           "waterOutliers": 0,
-          "missedShadows": 0,
-          "passageCliffMistakes": 1
+          "p1SilverArrowMissedFights": 2,
+          "missedShadows": 0
         },
         "penaltyUnits": 2.0,
         "scoreMultiplier": 1.0,
@@ -273909,6 +273102,24 @@
           "collapsingVoidSnapAiming": 0,
           "waterOutliers": 0,
           "p1SilverArrowMissedFights": 0,
+          "missedShadows": 0
+        },
+        "penaltyUnits": 1.0,
+        "scoreMultiplier": 1.0,
+        "appealUnitMultiplier": 1.0,
+        "iqLoss": 10
+      },
+      {
+        "name": "小落",
+        "roles": [
+          "melee-dps"
+        ],
+        "recognitionCount": 1,
+        "appealAcquittalCount": 0,
+        "breakdown": {
+          "p15AvoidableDeaths": 1,
+          "collapsingVoidSnapAiming": 0,
+          "waterOutliers": 0,
           "missedShadows": 0
         },
         "penaltyUnits": 1.0,
@@ -285037,129 +284248,7 @@
           ]
         }
       ],
-      "voreluthVulnerabilityFade": [],
-      "passageCliffMistakes": [
-        {
-          "name": "皇丨额娘",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-dps",
-          "roles": [
-            "range-dps"
-          ],
-          "hitCount": 2,
-          "countedCount": 2,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 2,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 27,
-              "player": "皇丨额娘",
-              "role": "range-dps",
-              "phase": "P2",
-              "time": "03:30",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight27 皇丨额娘 于 03:30（P2）死于坠崖 · 过场失误"
-            },
-            {
-              "fightID": 29,
-              "player": "皇丨额娘",
-              "role": "range-dps",
-              "phase": "P2",
-              "time": "03:28",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight29 皇丨额娘 于 03:28（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "小落",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "melee-dps",
-          "roles": [
-            "melee-dps"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 28,
-              "player": "小落",
-              "role": "melee-dps",
-              "phase": "P2",
-              "time": "03:25",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight28 小落 于 03:25（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        },
-        {
-          "name": "郁闷的灵灵",
-          "spellKey": "passageCliffMistakes",
-          "spellName": "过场失误",
-          "role": "range-healer",
-          "roles": [
-            "range-healer"
-          ],
-          "hitCount": 1,
-          "countedCount": 1,
-          "uncountedCount": 0,
-          "markedCount": 0,
-          "deathCount": 1,
-          "totalDamage": 0,
-          "damageText": null,
-          "isSystem": false,
-          "excludeFromCourtPlayers": false,
-          "events": [
-            {
-              "fightID": 28,
-              "player": "郁闷的灵灵",
-              "role": "range-healer",
-              "phase": "P2",
-              "time": "04:51",
-              "positionMs": null,
-              "ability": "坠崖",
-              "abilityID": null,
-              "counted": true,
-              "verdictCounted": true,
-              "displayOnly": false,
-              "countReason": "P2 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第8次内，按过场失误计数",
-              "text": "Fight28 郁闷的灵灵 于 04:51（P2）死于坠崖 · 过场失误"
-            }
-          ]
-        }
-      ]
+      "voreluthVulnerabilityFade": []
     }
   }
 }

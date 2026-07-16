@@ -1546,9 +1546,88 @@ def merge_boards(fights):
     }
 
 
+def consolidate_voreluth_events(
+    events,
+    tank_name="",
+    default_fight_id=None,
+    final_p1_arrow_ms=None,
+    silver_arrow_ignore_window_ms=3_000,
+    default_apply_time=None,
+):
+    buckets = {}
+    for event in events or []:
+        if not isinstance(event, dict):
+            continue
+        fight_id = event.get("fightID", default_fight_id)
+        buckets.setdefault(fight_id, []).append(event)
+    merged = []
+    for fight_id, group in buckets.items():
+        counted_group = [item for item in group if item.get("counted") is not False]
+        source = counted_group or group
+        fades = []
+        for item in source:
+            if item.get("fades"):
+                fades.extend(item["fades"])
+            else:
+                fades.append({
+                    "time": item.get("time"),
+                    "positionMs": item.get("positionMs"),
+                    "stack": item.get("stack"),
+                })
+        fades = [fade for fade in fades if isinstance(fade, dict)]
+        if final_p1_arrow_ms is not None:
+            fades = [
+                fade for fade in fades
+                if fade.get("positionMs") is not None
+                and int(fade.get("positionMs") or 0) < int(final_p1_arrow_ms)
+                and abs(int(fade.get("positionMs") or 0) - int(final_p1_arrow_ms)) > int(silver_arrow_ignore_window_ms)
+            ]
+        if not fades:
+            continue
+        fades.sort(key=lambda fade: fade.get("positionMs") or 0)
+        stacks = [int(fade.get("stack") or 0) for fade in fades if fade.get("stack") is not None]
+        stack_text = "、".join(f"{stack}层" for stack in stacks if stack)
+        times = [fade.get("time") for fade in fades if fade.get("time")]
+        first = source[0]
+        display_only = not counted_group
+        apply_time = first.get("applyTime")
+        # 历史数据可能把 applyTime 写成 '-'；此时需要回退到 summary 的 applyTime
+        if apply_time in (None, "", "-"):
+            apply_time = first.get("summaryApplyTime")
+        if apply_time in (None, "", "-"):
+            apply_time = default_apply_time
+        if apply_time in (None, ""):
+            apply_time = "-"
+        first_fade_time = (times[0] if times else first.get("firstFadeTime") or first.get("time") or "-")
+        first_fade_stack = stacks[0] if stacks else int(first.get("firstFadeStack") or first.get("stack") or 0)
+        text = (
+            f"Fight{fight_id} {tank_name}（坦克）· 龌勒卢斯第一次被施加腐化精华时间为 {apply_time}，"
+            f"第一次消失时间为 {first_fade_time}，断时约 {first_fade_stack}层。"
+            + (f"（同场fade {stack_text}）仅计1次" if stack_text else "仅计1次")
+        )
+        merged.append({
+            **{key: value for key, value in first.items() if key not in {"fades", "fadeCount", "stack", "time", "positionMs", "text"}},
+            "fightID": fight_id,
+            "time": times[-1] if times else first.get("time"),
+            "positionMs": fades[-1].get("positionMs") if fades else first.get("positionMs"),
+            "stack": stacks[-1] if stacks else first.get("stack"),
+            "applyTime": apply_time,
+            "firstFadeTime": first_fade_time,
+            "firstFadeStack": first_fade_stack,
+            "fadeCount": len(fades),
+            "fades": fades,
+            "counted": not display_only,
+            "verdictCounted": not display_only,
+            "displayOnly": display_only,
+            "text": text,
+        })
+    return merged
+
+
 def normalize_voreluth_vulnerability(fight):
     crown = fight.setdefault("crownOfTheCosmos", {})
     summary = crown.get("voreluthVulnerabilityFade")
+    default_apply_time = summary.get("applyTime") if isinstance(summary, dict) else None
     rows = fight.setdefault("avoidableSummary", {}).setdefault(VORELUTH_VULN_SKILL_KEY, [])
     for row in rows:
         name = str(row.get("name") or "")
@@ -1564,6 +1643,30 @@ def normalize_voreluth_vulnerability(fight):
         else:
             row["isSystem"] = True
             row["excludeFromCourtPlayers"] = True
+        if is_tank_row and not name.startswith("Fight"):
+            silver_arrow_times_ms = [
+                int(r.get("timeMs") or r.get("fireTimeMs") or 0)
+                for r in ((crown.get("fieldAudit") or {}).get("silverArrows") or [])
+                if r.get("phase") == "P1" and (r.get("timeMs") is not None or r.get("fireTimeMs") is not None)
+            ]
+            p1_arrows = [
+                r for r in ((crown.get("fieldAudit") or {}).get("silverArrows") or [])
+                if r.get("phase") == "P1" and (r.get("timeMs") is not None or r.get("fireTimeMs") is not None)
+            ]
+            round6 = next((r for r in p1_arrows if int(r.get("index") or 0) == 6), None)
+            if round6 is not None:
+                final_p1_arrow_ms = int(round6.get("timeMs") or round6.get("fireTimeMs") or 0)
+            elif len(silver_arrow_times_ms) >= 6:
+                final_p1_arrow_ms = int(sorted(silver_arrow_times_ms)[5])
+            else:
+                final_p1_arrow_ms = max(silver_arrow_times_ms) if silver_arrow_times_ms else None
+            row["events"] = consolidate_voreluth_events(
+                row.get("events") or [],
+                tank_name=name,
+                default_fight_id=fight.get("id"),
+                final_p1_arrow_ms=final_p1_arrow_ms,
+                default_apply_time=default_apply_time,
+            )
         for event in row.get("events") or []:
             if not isinstance(event, dict):
                 continue
@@ -1578,19 +1681,19 @@ def normalize_voreluth_vulnerability(fight):
                 event["excludeFromCourtPlayers"] = False
                 event["isSystem"] = False
                 event["role"] = "tank"
-                event["countReason"] = "P1 龌勒卢斯易伤异常：腐化精华完整 faded，当场坦克计数"
+                event["countReason"] = "P1 龌勒卢斯易伤异常：银锋箭作用附近造成的腐化精华消失不计断层，同场仅计 1 次"
             else:
                 event["excludeFromCourtPlayers"] = True
                 event["isSystem"] = True
                 event["countReason"] = (
-                    "腐化精华在幽影束缚仍存在期间因层数/时间完整消失，记为龌勒卢斯易伤异常"
+                    "腐化精华在幽影束缚仍存在期间发生完整 faded；若消失发生在银锋箭作用附近则视为预期内不计断层"
                     "（按场汇总；受第8死豁免）"
                 )
         if is_tank_row:
-            counted = [e for e in (row.get("events") or []) if isinstance(e, dict) and e.get("counted") is not False]
-            row["hitCount"] = sum(int(e.get("fadeCount") or 1) for e in counted)
-        elif isinstance(summary, dict) and not row.get("hitCount"):
-            row["hitCount"] = int(summary.get("fadeCount") or 0)
+            counted = [event for event in (row.get("events") or []) if isinstance(event, dict) and event.get("counted") is not False]
+            row["hitCount"] = len(counted)
+        elif isinstance(summary, dict):
+            row["hitCount"] = 1 if int(summary.get("fadeCount") or 0) else int(row.get("hitCount") or 0)
 
 
 def rebuild_verdict(board, config):

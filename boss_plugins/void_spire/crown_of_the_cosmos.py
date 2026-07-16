@@ -759,6 +759,19 @@ def analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs
     fades = []
     first_apply_ms = None
     binding_gone_ms = None
+    silver_arrow_apply_times_ms = sorted(
+        (
+            int(event.get("timestamp") or 0) - int(fight.get("startTime") or 0)
+            for event in debuffs or []
+            if ability_id(event) == SILVER_ARROW_MARK_ID and event_is_apply(event)
+        )
+    )
+    # 只以第6轮银锋箭（P1关键击杀轮）作为截断点；没有第6轮时再回退到最后一轮
+    final_p1_arrow_ms = None
+    if len(silver_arrow_apply_times_ms) >= 6:
+        final_p1_arrow_ms = int(silver_arrow_apply_times_ms[5])
+    elif silver_arrow_apply_times_ms:
+        final_p1_arrow_ms = int(silver_arrow_apply_times_ms[-1])
     for target_id in sorted(voreluth_ids):
         corruption_applies = sorted(
             (
@@ -807,7 +820,14 @@ def analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs
             if not (apply_ts < fade_ts < window_end):
                 continue
             position_ms = fade_ts - int(fight["startTime"])
+            # 仅统计第6银锋箭（P1 最后一轮）前的断层；其后不再计入
+            if final_p1_arrow_ms is not None and position_ms >= int(final_p1_arrow_ms):
+                continue
             stack = corruption_stack_at(debuffs, target_id, fade_ts)
+            # Boss 会被银锋箭射击；如果腐化精华消失发生在银锋箭作用时刻附近，
+            # 视为“预期内消失”，不作为断层计入。
+            if final_p1_arrow_ms is not None and abs(position_ms - int(final_p1_arrow_ms)) <= 3_000:
+                continue
             fades.append({
                 "time": format_time(position_ms),
                 "positionMs": position_ms,
@@ -823,6 +843,7 @@ def analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs
     fades.sort(key=lambda row: int(row.get("positionMs") or 0))
     stack_parts = [f"{int(row.get('stack') or 0)}层@{row.get('time')}" for row in fades]
     first_fade_ms = int(fades[0].get("positionMs") or 0)
+    first_fade_stack = int(fades[0].get("stack") or 0)
     stack_label = "、".join(f"{int(row.get('stack') or 0)}层" for row in fades)
     return {
         "fightID": fight.get("id"),
@@ -835,20 +856,18 @@ def analyze_voreluth_vulnerability_fade(fight, actor_map, actor_game_id, debuffs
         "bindingRemoved": binding_gone_ms is not None,
         "time": format_time(first_fade_ms),
         "positionMs": first_fade_ms,
+        "firstFadeTime": format_time(first_fade_ms),
+        "firstFadeStack": first_fade_stack,
         "counted": True,
         "verdictCounted": True,
         "displayOnly": False,
         "excludeFromCourtPlayers": False,
         "isSystem": False,
-        "countReason": "腐化精华在幽影束缚仍存在期间因层数/时间完整消失，记为龌勒卢斯易伤异常（当场坦克各计 fade 次；受第8死豁免）",
+        "countReason": "腐化精华在幽影束缚仍存在期间因层数完整消失发生 complete faded；若消失时间落在银锋箭作用附近则视为预期内不计断层（同场仅计1次；受第8死豁免）",
         "text": (
-            f"Fight{fight.get('id')} 龌勒卢斯腐化精华完整 faded ×{len(fades)}"
-            f"（断层：{stack_label}；首次 apply {format_time(first_apply_ms) if first_apply_ms is not None else '-'}"
-            + (
-                f"，束缚移除 {format_time(binding_gone_ms)}"
-                if binding_gone_ms is not None else "，束缚至灭团未移除"
-            )
-            + "）"
+            f"Fight{fight.get('id')} 龌勒卢斯第一次被施加腐化精华时间为 {format_time(first_apply_ms) if first_apply_ms is not None else '-'}，"
+            f"第一次消失时间为 {format_time(first_fade_ms)}，断时约 {first_fade_stack}层。"
+            f"（同场fade {stack_label}）仅计1次"
         ),
     }
 
@@ -860,7 +879,7 @@ def build_voreluth_vulnerability_board(fight, actor_map, actor_game_id, debuffs,
     tanks = fight_tank_players(actor_map, player_roles)
     if not tanks:
         row = build_board_row(f"Fight{fight.get('id')}", VORELUTH_VULN_SKILL_KEY, VORELUTH_VULN_SKILL_NAME, role="unknown")
-        row["hitCount"] = int(summary.get("fadeCount") or 0)
+        row["hitCount"] = 1 if int(summary.get("fadeCount") or 0) else 0
         row["isSystem"] = True
         row["excludeFromCourtPlayers"] = True
         row["events"] = [summary]
@@ -871,31 +890,36 @@ def build_voreluth_vulnerability_board(fight, actor_map, actor_game_id, debuffs,
         if not name:
             continue
         row = build_board_row(name, VORELUTH_VULN_SKILL_KEY, VORELUTH_VULN_SKILL_NAME, role="tank")
-        tank_events = []
-        for fade in summary.get("fades") or []:
-            stack = int(fade.get("stack") or 0)
-            tank_events.append({
-                "fightID": fight.get("id"),
-                "player": name,
-                "targetID": actor_id,
-                "role": "tank",
-                "time": fade.get("time"),
-                "positionMs": fade.get("positionMs"),
-                "stack": stack,
-                "fadeCount": 1,
-                "fades": [fade],
-                "counted": True,
-                "verdictCounted": True,
-                "displayOnly": False,
-                "excludeFromCourtPlayers": False,
-                "isSystem": False,
-                "countReason": "P1 龌勒卢斯易伤异常：腐化精华完整 faded，当场坦克计数",
-                "text": (
-                    f"Fight{fight.get('id')} {name}（坦克）· {fade.get('time')} "
-                    f"龌勒卢斯腐化精华完整 faded（断时约 {stack} 层）"
-                ),
-            })
-        row["hitCount"] = len(tank_events)
+        fades = summary.get("fades") or []
+        stacks = [int(fade.get("stack") or 0) for fade in fades if fade.get("stack") is not None]
+        stack_text = "、".join(f"{stack}层" for stack in stacks if stack)
+        times = [fade.get("time") for fade in fades if fade.get("time")]
+        tank_events = [{
+            "fightID": fight.get("id"),
+            "player": name,
+            "targetID": actor_id,
+            "role": "tank",
+            "time": times[-1] if times else None,
+            "positionMs": fades[-1].get("positionMs") if fades else None,
+            "stack": stacks[-1] if stacks else None,
+            "fadeCount": len(fades),
+            "fades": fades,
+            "counted": True,
+            "verdictCounted": True,
+            "displayOnly": False,
+            "excludeFromCourtPlayers": False,
+            "isSystem": False,
+            "countReason": "P1 龌勒卢斯易伤异常：银锋箭作用附近造成的腐化精华消失不计断层，同场仅计 1 次",
+            "applyTime": summary.get("applyTime"),
+            "firstFadeTime": summary.get("firstFadeTime"),
+            "firstFadeStack": summary.get("firstFadeStack"),
+            "text": (
+                f"Fight{fight.get('id')} {name}（坦克）· 龌勒卢斯第一次被施加腐化精华时间为 {summary.get('applyTime') or '-'}，"
+                f"第一次消失时间为 {summary.get('firstFadeTime') or '-'}，断时约 {summary.get('firstFadeStack') or 0}层。"
+                + (f"（同场fade {stack_text}）仅计1次" if stack_text else "仅计1次")
+            ),
+        }]
+        row["hitCount"] = 1 if tank_events else 0
         row["events"] = tank_events
         rows.append(row)
     tank_names = "、".join(name for _, name in tanks if name)
@@ -2331,13 +2355,14 @@ def apply_global_death_exemption(local_board, deaths, fight):
                 counted_events = [event for event in events if event.get("counted") is not False]
                 display_only_keys = set(AVOIDABLE_DAMAGE_SPELLS) | {"missedEnergy", "interferenceShockInterrupts"}
                 if skill_key in display_only_keys:
-                    # 仅展示项：保留观察到的次数；计数字段永远为 0
+                    # 仅展示项：保留观察到的次数与伤害；计数字段永远为 0
                     row["hitCount"] = int(row.get("observedHitCount") or len(events))
                     row["countedCount"] = 0
                     row["uncountedCount"] = len(events)
                     if skill_key in set(AVOIDABLE_DAMAGE_SPELLS):
                         row["deathCount"] = 0
-                        row["totalDamage"] = 0
+                        if any(event.get("amount") is not None for event in events):
+                            row["totalDamage"] = sum(int(event.get("amount") or 0) for event in events)
                     continue
                 row["hitCount"] = len(counted_events)
                 row["countedCount"] = len(counted_events)

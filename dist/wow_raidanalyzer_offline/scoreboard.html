@@ -170,9 +170,9 @@
         { key: 'gravityLineViolation', label: '重力违规致死' },
         { key: 'tankRiftSlashFailure', label: '裂隙换坦失误' },
     ];
-    // 与 report.html 开庭面板保持一致
-    const COURT_DISPLAY_EXCLUDED_PLAYERS = new Set(['Jokermeow', '黑心喵', 'Leviac', 'Leviackerman', '茶喵不吃糖']);
-    const isCourtDisplayExcluded = name => COURT_DISPLAY_EXCLUDED_PLAYERS.has(String(name || '').trim());
+    // 与 report.html 开庭面板保持一致（大小写不敏感）
+    const COURT_DISPLAY_EXCLUDED_PLAYERS = new Set(['jokermeow', '黑心喵', 'leviac', 'leviackerman', '茶喵不吃糖']);
+    const isCourtDisplayExcluded = name => COURT_DISPLAY_EXCLUDED_PLAYERS.has(String(name || '').trim().toLowerCase());
     const TEAM_PLAYER_NAME = '团队';
     const ROLE_ICONS = {
         tank: '🛡️', healer: '✚', dps: '⚔️',
@@ -432,20 +432,23 @@
                 (row.roles || []).forEach(r => { if (r && !p.roles.includes(r)) p.roles.push(r); });
                 (row.events || []).forEach((ev, idx) => {
                     if (ev.counted === false || ev.verdictCounted === false) return;
-                    const fades = Array.isArray(ev.fades) && ev.fades.length
-                        ? ev.fades
-                        : null;
-                    if (m.key === 'voreluthVulnerabilityFade' && fades) {
-                        fades.forEach((fade, fadeIdx) => {
-                            p.mechanics[m.key].incidents.push({
-                                id: [m.key, ev.fightID, fade.time || ev.time || idx, fadeIdx, name].join(':'),
-                                fightID: ev.fightID,
-                                tag: ev.tag || '',
-                                time: fade.time || ev.time || '',
-                                text: fade.text || ev.text || ev.countReason || m.label,
-                                appealed: false,
-                                appealNote: '',
-                            });
+                    if (m.key === 'voreluthVulnerabilityFade') {
+                        const fightKey = String(ev.fightID ?? '');
+                        const already = p.mechanics[m.key].incidents.some(item => String(item.fightID ?? '') === fightKey);
+                        if (already) return;
+                        const fades = Array.isArray(ev.fades) && ev.fades.length
+                            ? ev.fades
+                            : [{ stack: ev.stack, time: ev.time }];
+                        const stacks = fades.map(fade => fade.stack).filter(stack => stack != null);
+                        p.mechanics[m.key].incidents.push({
+                            id: [m.key, ev.fightID, name].join(':'),
+                            fightID: ev.fightID,
+                            tag: ev.tag || '',
+                            time: ev.time || '',
+                            text: (ev.text || ev.countReason || m.label)
+                                + (stacks.length > 1 ? `（同场 fade ${stacks.map(stack => `${stack}层`).join('、')}，仅计1次）` : ''),
+                            appealed: false,
+                            appealNote: '',
                         });
                         return;
                     }
