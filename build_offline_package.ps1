@@ -66,12 +66,30 @@ if (Test-Path -LiteralPath $dataSrc) {
         Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $target "data\$($_.Name)") -Force
         Write-Host "  + data\$($_.Name)"
     }
+    $manifest = Join-Path $dataSrc "manifest.json"
+    if (Test-Path -LiteralPath $manifest) {
+        Copy-Item -LiteralPath $manifest -Destination (Join-Path $target "data\manifest.json") -Force
+        Write-Host "  + data\manifest.json"
+    }
 }
 $wcl = Join-Path $root "wcl_hardcore_api.json"
 if (Test-Path -LiteralPath $wcl) {
     Copy-Item -LiteralPath $wcl -Destination (Join-Path $target "data\wcl_hardcore_api.json") -Force
     Copy-Item -LiteralPath $wcl -Destination (Join-Path $target "wcl_hardcore_api.json") -Force
     Write-Host "  + wcl_hardcore_api.json"
+}
+
+# —— 终审 Excel：浏览器端 verdict-xlsx.js 已随 assets\ 复制；再附带 Python 导出器供本机有 Python+openpyxl 时由宿主调用 ——
+# 注意：离线包本身不内嵌 openpyxl；最终用户无需安装 Python。openpyxl 仅本机 server.py / OfflineHost 调 Python 时需要。
+New-Item -ItemType Directory -Force -Path (Join-Path $target "tools\templates") | Out-Null
+foreach ($toolFile in @("tools\__init__.py", "tools\export_verdict_excel.py", "tools\templates\verdict_excel_style.xlsx")) {
+    $src = Join-Path $root $toolFile
+    if (Test-Path -LiteralPath $src) {
+        Copy-Item -LiteralPath $src -Destination (Join-Path $target $toolFile) -Force
+        Write-Host "  + $toolFile"
+    } else {
+        Write-Warning "Missing: $toolFile"
+    }
 }
 
 # —— 编译离线宿主（最终用户无需 Python）——
@@ -85,24 +103,33 @@ Write-Host "Compiled RaidAnalyzer.exe"
 @"
 @echo off
 cd /d "%~dp0"
+title WoW Raid Analyzer Offline
 echo Starting local host...
-start "" "%~dp0RaidAnalyzer.exe"
+echo (若 8765 被占用会自动换端口；保持本窗口开启)
+"%~dp0RaidAnalyzer.exe"
+if errorlevel 1 (
+  echo.
+  echo 启动失败。若仍提示端口占用，可手动: RaidAnalyzer.exe --port 8877
+  pause
+)
 "@ | Set-Content -LiteralPath (Join-Path $target "start.bat") -Encoding ASCII
 
 @"
-离线包使用说明（无需安装 Python）
-================================
+离线包使用说明（无需安装 Python / openpyxl）
+==========================================
 
-1. 解压本目录到任意位置。
+1. 解压后应得到外层文件夹 wow_raidanalyzer_offline\，再进入该目录使用。
 2. 分析 JSON 已放入 data\（也可之后自行覆盖/追加）。
    命名建议：data/wcl_<reportId>_<bossKey>_<开荒日YYYYMMDD>.json
 3. 双击 start.bat（或 RaidAnalyzer.exe）。
 4. 浏览器会打开本地页面：
    - 首页：选择「场面复盘」或「智商记事本」
-   - report：场面分析 / 开庭（顶部可切换 data\ 多份日志）
-   - scoreboard：日记式记事本（10 项扣分；「团队」行含 P1 龌勒易伤等）
+   - report：场面分析 / 开庭 / 终审（顶部可切换 data\ 多份日志）
+   - scoreboard：日记式记事本（判定明细默认可收起）
+5. 终审「导出 Excel」：优先走本机 API；若无 Python+openpyxl，
+   浏览器会用 assets\vendor\verdict-xlsx.js 直接生成 .xlsx（无需额外依赖）。
 
-计分板数据保存在 scoreboard\ 目录（本机 IndexedDB + 可选服务端库）。
+计分板数据保存在 scoreboard\ 目录。
 关闭 RaidAnalyzer.exe 黑窗口即停止服务。
 
 若 8765 端口被占用：
@@ -131,9 +158,10 @@ $lastErr = $null
 for ($attempt = 1; $attempt -le 6; $attempt++) {
     try {
         if (Test-Path -LiteralPath $zipTmp) { Remove-Item -LiteralPath $zipTmp -Force -ErrorAction Stop }
+        # includeBaseDirectory=$true → zip 内含外层文件夹 wow_raidanalyzer_offline\
         [System.IO.Compression.ZipFile]::CreateFromDirectory(
             $target, $zipTmp,
-            [System.IO.Compression.CompressionLevel]::Optimal, $false
+            [System.IO.Compression.CompressionLevel]::Optimal, $true
         )
         Move-Item -LiteralPath $zipTmp -Destination $zip -Force
         $zipOk = $true

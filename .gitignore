@@ -13,6 +13,9 @@ wcl_hardcore_api.json
 data/wcl_*.json
 data/manifest.json
 !data/.gitkeep
+/tmp/
+/verdicts/
+/scoreboard/*.db
 
 # Local workspace metadata.
 .agents/

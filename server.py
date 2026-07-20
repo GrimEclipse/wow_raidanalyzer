@@ -29,6 +29,8 @@ SCOREBOARD_DIR = ROOT / "scoreboard"
 SCOREBOARD_DIR.mkdir(exist_ok=True)
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
+_DESKTOP = Path.home() / "Desktop"
+DEFAULT_EXPORT_EXCEL_DIR = _DESKTOP if _DESKTOP.is_dir() else VERDICT_DIR
 
 FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
@@ -262,6 +264,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         try:
             if path == "/api/verdicts":
                 return self.handle_save_verdict()
+            if path == "/api/export-verdict-excel":
+                return self.handle_export_verdict_excel()
             if path in {"/api/notebook", "/api/scoreboard", "/api/notebook/store", "/api/scoreboard/store"}:
                 payload = self.read_json_body()
                 return self.send_response_body(*json_bytes(notebook_db.save_store(payload)))
@@ -296,6 +300,33 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             }, HTTPStatus.ACCEPTED))
         except Exception as exc:
             return self.send_response_body(*json_bytes({"error": str(exc)}, HTTPStatus.BAD_REQUEST))
+
+    def handle_export_verdict_excel(self):
+        try:
+            from urllib.parse import quote
+
+            from tools.export_verdict_excel import export_verdict_excel, resolve_export_dir
+
+            payload = self.read_json_body()
+            out_dir = resolve_export_dir(Path.home() / "Desktop")
+            out_path = export_verdict_excel(payload, out_dir, boss_name="宇宙之冕")
+            body = out_path.read_bytes()
+            # HTTP headers are latin-1 only; keep ASCII filename= and RFC5987 filename*.
+            ascii_name = "verdict_export.xlsx"
+            disp = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(out_path.name)}"
+            self.send_response(HTTPStatus.OK)
+            self.send_header(
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            self.send_header("Content-Disposition", disp)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as exc:
+            return self.send_response_body(
+                *json_bytes({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            )
 
     def handle_save_verdict(self):
         try:
