@@ -2,7 +2,7 @@
 
 ## 分支信息
 
-- 分支：`codex/project-cleanup-20260727`
+- 来源：项目瘦身集成分支
 - 基线：`origin/main` 的 `8d7c621`
 - 目的：清理误入项目的本地产物，明确源码、工具、运行数据和离线包的边界。
 - 本分支不包含后续奥蕾莉亚机制调整。
@@ -54,7 +54,7 @@
 git fetch origin
 git switch main
 git pull --ff-only origin main
-git merge --no-ff origin/codex/project-cleanup-20260727
+git merge --no-ff <项目瘦身分支>
 ```
 
 如果远端在合并前继续修改了 `.gitignore`，按本文“`.gitignore`”一节保留双方有效规则。
@@ -65,4 +65,4 @@ git merge --no-ff origin/codex/project-cleanup-20260727
 - `dist/`、`data/*`、根目录兼容 JSON 与本地数据库均命中忽略规则。
 - `mythic_dungeon_export/` 目录规划与原有 `__pycache__` 均保留。
 - `git diff --check` 通过。
-- 本机 `py` 未安装可用的 Python 3；Codex 自带 Python 缺少 `requests`，因此本次未完成测试套件运行。此次分支的实际差异仅涉及忽略规则、删除未引用 SVG 和文档。
+- 合并后的完整测试套件已使用 Python 3.9 执行，30 项测试全部通过。
