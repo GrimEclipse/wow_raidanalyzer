@@ -4,6 +4,7 @@ from boss_plugins.void_spire.crown_of_the_cosmos import (
     apply_global_death_exemption,
     analyze_voreluth_vulnerability_fade,
     build_passage_cliff_board,
+    build_transition_death_board,
     corruption_stack_at,
     melurium_alive_in_arrow_snapshot,
     CORRUPTION_ID,
@@ -63,6 +64,49 @@ class CrownGlobalDeathExemptionTests(unittest.TestCase):
 
         self.assertEqual(event["mechanicExemptionReason"], "P1放水仅展示，不计数")
         self.assertIn("全局最高优先级豁免", event["countReason"])
+
+
+class TransitionDeathCourtTests(unittest.TestCase):
+    @staticmethod
+    def death(index, phase):
+        return {
+            "player": f"玩家{index}",
+            "role": "dps",
+            "absoluteTime": 100_000 + index * 1_000,
+            "time": f"01:{index:02d}",
+            "phase": phase,
+            "ability": "转阶段击飞" if phase == "P2.5" else "银锋箭",
+            "abilityID": None if phase == "P2.5" else 1233649,
+        }
+
+    def test_p15_and_small_p25_window_are_counted(self):
+        fight = {"startTime": 100_000}
+        rows = build_transition_death_board(
+            fight,
+            [self.death(1, "P1.5"), self.death(2, "P2.5"), self.death(3, "P2.5")],
+            transition_abandoned=False,
+        )
+        events = [event for row in rows for event in row["events"]]
+
+        self.assertEqual({event["phase"] for event in events}, {"P1.5", "P2.5"})
+        self.assertTrue(all(event["counted"] for event in events))
+        p25_events = [event for event in events if event["phase"] == "P2.5"]
+        self.assertTrue(all(event["transitionTeamDeathCount"] == 2 for event in p25_events))
+        self.assertTrue(all("<8" in event["countReason"] for event in p25_events))
+
+    def test_p25_window_with_eight_deaths_is_display_only(self):
+        fight = {"startTime": 100_000}
+        rows = build_transition_death_board(
+            fight,
+            [self.death(index, "P2.5") for index in range(1, 9)],
+            transition_abandoned=False,
+        )
+        events = [event for row in rows for event in row["events"]]
+
+        self.assertEqual(len(events), 8)
+        self.assertTrue(all(event["counted"] is False for event in events))
+        self.assertTrue(all(event["transitionTeamDeathCount"] == 8 for event in events))
+        self.assertTrue(all("达到8人" in event["countReason"] for event in events))
 
 
 class MeluriumRound5SnapshotTests(unittest.TestCase):

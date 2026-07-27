@@ -29,25 +29,49 @@ namespace WowRaidAnalyzer
             Directory.CreateDirectory(DataDir);
             Directory.CreateDirectory(ScoreboardDir);
 
-            int port = DefaultPort;
+            int preferredPort = DefaultPort;
+            bool portExplicit = false;
             bool openBrowser = true;
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--port" && i + 1 < args.Length) int.TryParse(args[++i], out port);
+                if (args[i] == "--port" && i + 1 < args.Length)
+                {
+                    if (int.TryParse(args[++i], out preferredPort)) portExplicit = true;
+                }
                 if (args[i] == "--no-open") openBrowser = false;
             }
 
-            string prefix = "http://127.0.0.1:" + port + "/";
-            Listener = new HttpListener();
-            Listener.Prefixes.Add(prefix);
-            try
+            string prefix = null;
+            Exception lastBindError = null;
+            int[] candidates = portExplicit
+                ? new int[] { preferredPort }
+                : BuildPortCandidates(preferredPort);
+            foreach (int port in candidates)
             {
-                Listener.Start();
+                string tryPrefix = "http://127.0.0.1:" + port + "/";
+                var listener = new HttpListener();
+                listener.Prefixes.Add(tryPrefix);
+                try
+                {
+                    listener.Start();
+                    Listener = listener;
+                    prefix = tryPrefix;
+                    if (port != preferredPort)
+                        Console.WriteLine("端口 " + preferredPort + " 已被占用，改用 " + port);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    lastBindError = ex;
+                    try { listener.Close(); } catch { }
+                }
             }
-            catch (Exception ex)
+            if (Listener == null || prefix == null)
             {
-                Console.Error.WriteLine("无法启动本地服务（端口可能被占用）: " + ex.Message);
+                Console.Error.WriteLine("无法启动本地服务（端口可能被占用）: " + (lastBindError != null ? lastBindError.Message : "unknown"));
                 Console.Error.WriteLine("可尝试: RaidAnalyzer.exe --port 8877");
+                Console.Error.WriteLine("按任意键退出...");
+                try { Console.ReadKey(true); } catch { }
                 return 1;
             }
 
@@ -76,6 +100,18 @@ namespace WowRaidAnalyzer
                 catch (ObjectDisposedException) { break; }
             }
             return 0;
+        }
+
+        static int[] BuildPortCandidates(int preferred)
+        {
+            var ports = new List<int>();
+            ports.Add(preferred);
+            for (int p = 8766; p <= 8780; p++)
+            {
+                if (p != preferred) ports.Add(p);
+            }
+            if (preferred != 8877) ports.Add(8877);
+            return ports.ToArray();
         }
 
         static void Handle(HttpListenerContext ctx)
@@ -281,7 +317,117 @@ namespace WowRaidAnalyzer
                 return;
             }
 
+            // POST /api/export-verdict-excel  → spawn Python openpyxl exporter when available
+            if (path.Equals("/api/export-verdict-excel", StringComparison.OrdinalIgnoreCase))
+            {
+                if (req.HttpMethod != "POST")
+                {
+                    WriteJson(res, 405, "{\"error\":\"POST required\"}");
+                    return;
+                }
+                try
+                {
+                    string body = ReadBody(req);
+                    string outPath = ExportVerdictExcelViaPython(body);
+                    if (outPath == null || !File.Exists(outPath))
+                    {
+                        WriteJson(res, 501, "{\"error\":\"xlsx export unavailable (install Python+openpyxl, or use browser VerdictXlsx fallback)\"}");
+                        return;
+                    }
+                    byte[] bytes = File.ReadAllBytes(outPath);
+                    res.StatusCode = 200;
+                    res.ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    // Keep Content-Disposition ASCII-safe; UTF-8 name via filename*.
+                    string utfName = Uri.EscapeDataString(Path.GetFileName(outPath));
+                    res.Headers.Add("Content-Disposition", "attachment; filename=\"verdict_export.xlsx\"; filename*=UTF-8''" + utfName);
+                    res.Headers.Add("Cache-Control", "no-store");
+                    res.ContentLength64 = bytes.LongLength;
+                    res.OutputStream.Write(bytes, 0, bytes.Length);
+                    res.OutputStream.Close();
+                }
+                catch (Exception ex)
+                {
+                    WriteJson(res, 500, "{\"error\":" + JsonString(ex.Message) + "}");
+                }
+                return;
+            }
+
             WriteJson(res, 404, "{\"error\":\"unknown api\"}");
+        }
+
+        static string ExportVerdictExcelViaPython(string jsonBody)
+        {
+            string root = Root;
+            string toolsPy = Path.Combine(root, "tools", "export_verdict_excel.py");
+            DirectoryInfo dir = new DirectoryInfo(root);
+            for (int i = 0; i < 5 && dir != null && !File.Exists(toolsPy); i++, dir = dir.Parent)
+                toolsPy = Path.Combine(dir.FullName, "tools", "export_verdict_excel.py");
+            if (!File.Exists(toolsPy)) return null;
+
+            string workDir = Path.GetDirectoryName(Path.GetDirectoryName(toolsPy));
+            string tempJson = Path.Combine(Path.GetTempPath(), "verdict_export_" + Guid.NewGuid().ToString("N") + ".json");
+            string tempOut = Path.Combine(Path.GetTempPath(), "verdict_export_" + Guid.NewGuid().ToString("N") + ".xlsx");
+            string tempScript = Path.Combine(Path.GetTempPath(), "verdict_export_" + Guid.NewGuid().ToString("N") + ".py");
+            File.WriteAllText(tempJson, jsonBody ?? "{}", new UTF8Encoding(false));
+            string script =
+                "# -*- coding: utf-8 -*-\n" +
+                "import json, sys\n" +
+                "from pathlib import Path\n" +
+                "sys.path.insert(0, r'''" + workDir + "''')\n" +
+                "from tools.export_verdict_excel import export_verdict_excel\n" +
+                "payload = json.loads(Path(r'''" + tempJson + "''').read_text(encoding='utf-8'))\n" +
+                "out = export_verdict_excel(payload, Path(r'''" + Path.GetDirectoryName(tempOut) + "'''), boss_name='宇宙之冕')\n" +
+                "Path(r'''" + tempOut + "''').write_bytes(out.read_bytes())\n" +
+                "print(out)\n";
+            File.WriteAllText(tempScript, script, new UTF8Encoding(false));
+
+            string[] pyCandidates = new string[]
+            {
+                Path.Combine(workDir, ".venv", "Scripts", "python.exe"),
+                "py",
+                "python",
+            };
+
+            Exception last = null;
+            foreach (string py in pyCandidates)
+            {
+                if (py.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !File.Exists(py)) continue;
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = py == "py" ? "py" : py,
+                        Arguments = (py == "py" ? "-3 " : "") + "\"" + tempScript + "\"",
+                        WorkingDirectory = workDir,
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true,
+                    };
+                    using (var proc = Process.Start(psi))
+                    {
+                        string stdout = proc.StandardOutput.ReadToEnd();
+                        string stderr = proc.StandardError.ReadToEnd();
+                        proc.WaitForExit(120000);
+                        if (proc.ExitCode == 0 && File.Exists(tempOut))
+                        {
+                            try { File.Delete(tempJson); } catch { }
+                            try { File.Delete(tempScript); } catch { }
+                            return tempOut;
+                        }
+                        last = new Exception(string.IsNullOrWhiteSpace(stderr) ? stdout : stderr);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                }
+            }
+            try { File.Delete(tempJson); } catch { }
+            try { File.Delete(tempOut); } catch { }
+            try { File.Delete(tempScript); } catch { }
+            if (last != null) throw last;
+            return null;
         }
 
         static void UpsertStore(string storePath, string date, string dayJson)

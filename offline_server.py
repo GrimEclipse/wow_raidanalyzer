@@ -18,10 +18,8 @@ ROUTES = {
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
 
-# 按用户提供的样板路径输出
-DEFAULT_EXPORT_EXCEL_DIR = Path(
-    r"C:\Users\卫宇珩\xwechat_files\wxid_clfikfy24o4422_444a\msg\file\2026-07"
-)
+# 默认写桌面；不可写时由 resolve_export_dir 回退到项目 verdicts/
+DEFAULT_EXPORT_EXCEL_DIR = Path.home() / "Desktop"
 
 
 class OfflineHandler(SimpleHTTPRequestHandler):
@@ -32,16 +30,24 @@ class OfflineHandler(SimpleHTTPRequestHandler):
                 content_len = int(self.headers.get("Content-Length") or 0)
                 raw = self.rfile.read(content_len) if content_len > 0 else b"{}"
                 payload = json.loads(raw.decode("utf-8"))
-                from tools.export_verdict_excel import export_verdict_excel
+                from tools.export_verdict_excel import export_verdict_excel, resolve_export_dir
 
-                out_path = export_verdict_excel(payload, DEFAULT_EXPORT_EXCEL_DIR, boss_name="宇宙之冕")
+                from urllib.parse import quote
+
+                out_path = export_verdict_excel(
+                    payload,
+                    resolve_export_dir(DEFAULT_EXPORT_EXCEL_DIR),
+                    boss_name="宇宙之冕",
+                )
                 body = out_path.read_bytes()
+                ascii_name = "verdict_export.xlsx"
+                disp = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(out_path.name)}"
                 self.send_response(HTTPStatus.OK)
                 self.send_header(
                     "Content-Type",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
-                self.send_header("Content-Disposition", f"attachment; filename=\"{out_path.name}\"")
+                self.send_header("Content-Disposition", disp)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -118,7 +124,7 @@ def main():
     server = ThreadingHTTPServer(("127.0.0.1", args.port), OfflineHandler)
     url = f"http://127.0.0.1:{args.port}/"
     print(f"Offline server at {url}")
-    print("终审 Excel 由浏览器前端 assets/vendor/verdict-xlsx.js 直接导出，无需 Python。")
+    print(f"终审 Excel 导出目录: {DEFAULT_EXPORT_EXCEL_DIR}")
     if not args.no_open:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:

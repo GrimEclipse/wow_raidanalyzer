@@ -6,6 +6,7 @@
     <title>WCL 开荒复盘</title>
     <script src="./assets/vendor/vue.global.prod.js"></script>
     <script src="./assets/vendor/tailwindcss.js"></script>
+    <script src="./assets/vendor/verdict-xlsx.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -51,9 +52,6 @@
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
             <button @click="currentTab='wipe'" :class="tabClass('wipe','red')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 灭团复盘
-            </button>
-            <button v-if="isCrownBoss" @click="currentTab='transition'" :class="tabClass('transition','purple')" class="px-5 py-2 text-sm rounded border font-bold transition">
-                转阶段死亡
             </button>
             <button @click="currentTab='avoidable'" :class="tabClass('avoidable','blue')" class="px-5 py-2 text-sm rounded border font-bold transition">
                 {{ avoidablePanelLabel }}
@@ -256,33 +254,6 @@
             </div>
         </section>
 
-        <section v-if="isCrownBoss" v-show="currentTab === 'transition'" class="space-y-5">
-            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-800"><h2 class="text-lg font-bold text-white">转阶段死亡排名</h2></div>
-                <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排名</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">P1.5死亡</th><th class="p-3 text-center">P2.5死亡</th><th class="p-3 text-left">致死技能</th><th class="p-3 text-center">死亡</th><th class="p-3 text-right">合计</th></tr></thead>
-                    <tbody><tr v-for="(row,index) in transitionRanking" :key="row.name" class="border-t border-gray-800 hover:bg-gray-800/60"><td class="p-3 text-center text-gray-500">{{ index+1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono text-red-300">{{ row.categories['P1.5死亡'] || 0 }}</td><td class="p-3 text-center font-mono text-purple-300">{{ row.categories['P2.5死亡'] || 0 }}</td><td class="p-3 text-left text-xs text-gray-300">{{ row.abilityText || '-' }}</td><td class="p-3 text-center font-mono">{{ transitionDeathDisplay(row) }}</td><td class="p-3 text-right font-mono font-bold">{{ row.total }}</td></tr>
-                    <tr v-if="!transitionRanking.length"><td colspan="8" class="p-12 text-center text-gray-500">没有识别到转阶段死亡。</td></tr></tbody>
-                </table>
-            </div>
-            <div class="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-800"><h2 class="text-lg font-bold text-white">转阶段死亡明细（含致死技能）</h2></div>
-                <div class="max-h-[28rem] overflow-y-auto no-scrollbar">
-                    <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400 sticky top-0"><tr><th class="p-3 text-left">Fight</th><th class="p-3 text-left">时间</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">阶段</th><th class="p-3 text-left">致死技能</th></tr></thead>
-                        <tbody>
-                            <tr v-for="row in transitionDeathDetails" :key="row.key" class="border-t border-gray-800">
-                                <td class="p-3 font-mono text-gray-500">{{ row.fightID }}</td>
-                                <td class="p-3 font-mono text-gray-400">{{ row.time }}</td>
-                                <td class="p-3 text-blue-300 font-bold">{{ row.player }}</td>
-                                <td class="p-3 text-center">{{ row.phase }}</td>
-                                <td class="p-3 text-amber-200">{{ row.ability || '未知技能' }}</td>
-                            </tr>
-                            <tr v-if="!transitionDeathDetails.length"><td colspan="5" class="p-10 text-center text-gray-500">没有明细。</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
         <!-- 可躲避伤害 -->
         <section v-show="currentTab === 'avoidable'" class="space-y-5">
             <div class="bg-gray-900 border border-sky-900/70 rounded-xl overflow-hidden shadow-xl">
@@ -341,6 +312,39 @@
                             <p v-if="card.countReason && card.countReason !== card.text" class="mt-1 text-xs" :class="card.hitStatOnly ? 'text-slate-400' : (card.counted !== false ? 'text-red-300' : 'text-emerald-300')">{{ card.countReason }}</p>
                             <a v-if="card.link" :href="card.link" target="_blank" class="inline-block mt-2 px-2 py-1 rounded border border-purple-700 bg-purple-950/60 text-purple-200 text-xs">定位 Tag</a>
                         </article>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="isCrownBoss && avoidableTab === 'p15AvoidableDeaths'" class="space-y-4">
+                <div class="px-1">
+                    <h2 class="text-lg font-black text-purple-100">转阶段死亡 · 开庭统计</h2>
+                    <p class="text-xs text-gray-500 mt-1">仅统计确认发生于 P1.5 / P2.5 的死亡；P2.5 窗口团队死亡达到 8 人时只展示、不计数。</p>
+                </div>
+                <div class="bg-gray-900 border border-purple-900/70 rounded-lg overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-800"><h3 class="text-base font-bold text-white">转阶段死亡排名</h3></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400"><tr><th class="p-3 text-center w-16">排名</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">职责</th><th class="p-3 text-center">P1.5死亡</th><th class="p-3 text-center">P2.5死亡</th><th class="p-3 text-left">致死技能</th><th class="p-3 text-center">死亡</th><th class="p-3 text-right">合计</th></tr></thead>
+                            <tbody><tr v-for="(row,index) in transitionRanking" :key="'court-transition-rank-'+row.name" class="border-t border-gray-800 hover:bg-gray-800/60"><td class="p-3 text-center text-gray-500">{{ index+1 }}</td><td class="p-3 text-blue-300 font-bold">{{ row.name }}</td><td class="p-3 text-center">{{ roleIcons(row.roles) }}</td><td class="p-3 text-center font-mono text-red-300">{{ row.categories['P1.5死亡'] || 0 }}</td><td class="p-3 text-center font-mono text-purple-300">{{ row.categories['P2.5死亡'] || 0 }}</td><td class="p-3 text-left text-xs text-gray-300">{{ row.abilityText || '-' }}</td><td class="p-3 text-center font-mono">{{ transitionDeathDisplay(row) }}</td><td class="p-3 text-right font-mono font-bold">{{ row.total }}</td></tr>
+                            <tr v-if="!transitionRanking.length"><td colspan="8" class="p-12 text-center text-gray-500">没有识别到转阶段死亡。</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="bg-gray-900 border border-purple-900/70 rounded-lg overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-800"><h3 class="text-base font-bold text-white">转阶段死亡明细（含致死技能）</h3></div>
+                    <div class="max-h-[28rem] overflow-auto no-scrollbar">
+                        <table class="w-full text-sm"><thead class="bg-gray-950 text-gray-400 sticky top-0"><tr><th class="p-3 text-left">Fight</th><th class="p-3 text-left">时间</th><th class="p-3 text-left">玩家</th><th class="p-3 text-center">阶段</th><th class="p-3 text-left">致死技能</th></tr></thead>
+                            <tbody>
+                                <tr v-for="row in transitionDeathDetails" :key="'court-transition-detail-'+row.key" class="border-t border-gray-800">
+                                    <td class="p-3 font-mono text-gray-500">{{ row.fightID }}</td>
+                                    <td class="p-3 font-mono text-gray-400">{{ row.time }}</td>
+                                    <td class="p-3 text-blue-300 font-bold">{{ row.player }}</td>
+                                    <td class="p-3 text-center">{{ row.phase }}</td>
+                                    <td class="p-3 text-amber-200">{{ row.ability || '未知技能' }}</td>
+                                </tr>
+                                <tr v-if="!transitionDeathDetails.length"><td colspan="5" class="p-10 text-center text-gray-500">没有明细。</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -968,6 +972,111 @@ function countCourtSkillHits(skillKey, events) {
     }
     return counted.length;
 }
+function buildTransitionCourtRows(transitionAnalysis, rawWipeAnalysis, existingRows, threshold = 8) {
+    const existingEvents = (existingRows || []).flatMap(row =>
+        (row.events || []).map(event => ({ row, event }))
+    );
+    const playerRows = {};
+    const findFight = (reportID, fightID) => (rawWipeAnalysis || []).find(fight =>
+        Number(fight.fightID) === Number(fightID)
+        && (!reportID || !fight.reportID || String(fight.reportID) === String(reportID))
+    );
+
+    (transitionAnalysis?.fights || []).forEach(fight => {
+        const deathRows = (fight.rows || []).filter(row =>
+            ['P1.5', 'P2.5'].includes(row.phase)
+            && Number(row.deathCount || 0) > 0
+        );
+        const p25TeamDeaths = deathRows
+            .filter(row => row.phase === 'P2.5')
+            .reduce((sum, row) => sum + Number(row.deathCount || 0), 0);
+        const rawFight = findFight(fight.reportID, fight.fightID);
+        const transitionAbandoned = Boolean(rawFight?.crownOfTheCosmos?.transitionAbandoned);
+        const cutoff = rawFight?.globalExemption?.cutoffPositionMs
+            ?? rawFight?.crownOfTheCosmos?.globalExemption?.cutoffPositionMs;
+
+        deathRows.forEach(source => {
+            if (!source.player || isCourtDisplayExcluded(source.player)) return;
+            const deathCount = Math.max(1, Number(source.deathCount || 1));
+            for (let deathIndex = 0; deathIndex < deathCount; deathIndex += 1) {
+                const existing = existingEvents.find(item =>
+                    Number(item.event?.fightID) === Number(fight.fightID)
+                    && item.row?.name === source.player
+                    && item.event?.phase === source.phase
+                    && (!source.time || !item.event?.time || item.event.time === source.time)
+                )?.event;
+                const positionMs = Number(source.positionMs ?? existing?.positionMs ?? 0);
+                const isP25MassLoss = source.phase === 'P2.5' && p25TeamDeaths >= Number(threshold || 8);
+                const isP15AbandonJump = source.phase === 'P1.5'
+                    && transitionAbandoned
+                    && [null, undefined, 3].includes(source.abilityID);
+                const isAfterGlobalCutoff = cutoff !== null && cutoff !== undefined && positionMs > Number(cutoff);
+                let counted = source.phase === 'P1.5'
+                    ? (existing ? existing.counted !== false : !isP15AbandonJump)
+                    : !isP25MassLoss;
+                let countReason = existing?.countReason || '';
+                if (isP25MassLoss) {
+                    counted = false;
+                    countReason = `P2.5转阶段窗口团队死亡${p25TeamDeaths}人，达到${threshold}人，仅展示不计数`;
+                } else if (source.phase === 'P2.5') {
+                    countReason = `确认发生于P2.5转阶段，窗口团队死亡${p25TeamDeaths}人（<${threshold}），按转阶段死亡计数`;
+                } else if (!countReason) {
+                    countReason = isP15AbandonJump
+                        ? '识别为团队主动跳崖重开，仅展示不计数'
+                        : '确认发生于P1.5转阶段，按转阶段死亡计数';
+                }
+                if (isAfterGlobalCutoff) {
+                    counted = false;
+                    countReason = `全局最高优先级豁免：本场第${threshold}次死亡后发生，仅展示不计数`;
+                }
+
+                const player = playerRows[source.player] || (playerRows[source.player] = {
+                    name: source.player,
+                    role: source.role || 'unknown',
+                    roles: source.role && source.role !== 'unknown' ? [source.role] : [],
+                    spellKey: 'p15AvoidableDeaths',
+                    spellName: '转阶段死亡',
+                    damageText: '-',
+                    hitCount: 0,
+                    deathCount: 0,
+                    countedCount: 0,
+                    uncountedCount: 0,
+                    observedHitCount: 0,
+                    observedDeathCount: 0,
+                    totalDamage: 0,
+                    events: [],
+                });
+                if (source.role && source.role !== 'unknown' && !player.roles.includes(source.role)) {
+                    player.roles.push(source.role);
+                }
+                player.observedHitCount += 1;
+                player.observedDeathCount += 1;
+                if (counted) {
+                    player.hitCount += 1;
+                    player.deathCount += 1;
+                    player.countedCount += 1;
+                } else {
+                    player.uncountedCount += 1;
+                }
+                player.events.push({
+                    ...source,
+                    reportID: fight.reportID,
+                    fightID: fight.fightID,
+                    positionMs,
+                    deathCount: 1,
+                    counted,
+                    verdictCounted: counted,
+                    transitionTeamDeathCount: source.phase === 'P2.5' ? p25TeamDeaths : null,
+                    transitionDeathThreshold: source.phase === 'P2.5' ? Number(threshold || 8) : null,
+                    countReason,
+                    text: `${source.player} 于 ${source.time || '-'} 死于【${source.ability || '未知技能'}】（${countReason}）`,
+                });
+            }
+        });
+    });
+    return Object.values(playerRows)
+        .sort((a, b) => b.deathCount - a.deathCount || b.observedDeathCount - a.observedDeathCount || a.name.localeCompare(b.name));
+}
 function findMissedShadowAttr(player) {
     const attrs = player?.shotAttribution || [];
     return attrs.find(attr =>
@@ -1031,8 +1140,8 @@ function corruptionRowDamage(row) {
 /** 各开庭技能公开判定逻辑（与 crown_of_the_cosmos 后端路径对齐；阈值可读自 meta.courtConfig） */
 const COURT_SKILL_RULES = {
     p15AvoidableDeaths: {
-        count: '确认发生于 P1.5 转阶段窗口内的玩家死亡，按次计入转阶段死亡。',
-        exempt: '识别为团队主动跳崖重开（放弃/大规模跳崖）时仅展示不计数；本场第 8 次死亡之后发生的死亡强制不计数。',
+        count: '确认发生于 P1.5 或 P2.5 转阶段窗口内的玩家死亡，按次计入转阶段死亡；P2.5 仅在该窗口团队死亡总数 <8 时计数。',
+        exempt: 'P1.5 识别为团队主动跳崖重开时仅展示不计数；P2.5 窗口团队死亡达到 8 人时整段仅展示不计数；本场第 8 次死亡之后发生的死亡强制不计数。',
     },
     passageCliffMistakes: {
         count: 'P2/P3（非转阶段窗口）、不在密集跳崖放弃波内、且本场死亡仍未满 8 次时，玩家莫名死于坠崖，按次计入过场失误（必扣）。',
@@ -1252,17 +1361,16 @@ createApp({
         transitionRanking() {
             const players = {};
             (this.transitionAnalysis.fights || []).forEach(fight => (fight.rows || []).forEach(row => {
-                if (!(row.deathCount > 0 || row.displayDeathCount > 0 || row.compensationCount > 0)) return;
+                if (!(row.deathCount > 0) || !['P1.5', 'P2.5'].includes(row.phase)) return;
                 const item = players[row.player] || (players[row.player] = { name: row.player, roles: [], categories: {}, abilities: {}, deathCount: 0, compensationCount: 0, total: 0 });
                 if (row.role && row.role !== 'unknown' && !item.roles.includes(row.role)) item.roles.push(row.role);
                 if (row.deathCount > 0) {
                     item.categories[row.category] = (item.categories[row.category] || 0) + row.deathCount;
                 }
                 const ability = row.ability || '未知技能';
-                item.abilities[ability] = (item.abilities[ability] || 0) + Number(row.displayDeathCount || row.deathCount || 1);
+                item.abilities[ability] = (item.abilities[ability] || 0) + Number(row.deathCount || 1);
                 item.deathCount += row.deathCount || 0;
-                item.compensationCount += row.compensationCount || 0;
-                item.total += row.displayDeathCount || 1;
+                item.total += row.deathCount || 0;
             }));
             Object.values(players).forEach(item => {
                 item.abilityText = Object.entries(item.abilities)
@@ -1278,7 +1386,7 @@ createApp({
         transitionDeathDetails() {
             const rows = [];
             (this.transitionAnalysis.fights || []).forEach(fight => (fight.rows || []).forEach((row, index) => {
-                if (!(row.deathCount > 0 || Number(row.displayDeathCount || 0) > 0)) return;
+                if (!(row.deathCount > 0) || !['P1.5', 'P2.5'].includes(row.phase)) return;
                 rows.push({
                     key: `${fight.fightID}-${row.player}-${row.time}-${index}`,
                     fightID: fight.fightID,
@@ -1335,8 +1443,8 @@ createApp({
                 .sort((a, b) => b.countedCount - a.countedCount || b.uncountedCount - a.uncountedCount || a.name.localeCompare(b.name));
         },
         courtDeductionTabs() {
-            // 重力坍缩仅 P3 且单场 Tag 地图为空，开庭分项不展示入口
-            const order = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure'];
+            // 逐场推演继续隐藏 P3 重力坍缩；开庭面板保留其可溯源判定证据。
+            const order = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure','gravityLineViolation'];
             return order.map(key => this.avoidableTabs.find(tab => tab.key === key)).filter(Boolean);
         },
         courtDisplayOnlyTabs() {
@@ -2141,7 +2249,7 @@ createApp({
                 || (skillKey === 'p15AvoidableDeaths' ? 'P1.5' : null)
                 || (skillKey === 'tankRiftSlashFailure' || skillKey === 'missedShadows' || skillKey === 'missedEnergy' ? 'P2' : null)
                 || (skillKey === 'gravityLineViolation' ? 'P3' : null);
-            if (skillKey === 'p15AvoidableDeaths') return this.fightAuditLink(fight, 'P1.5');
+            if (skillKey === 'p15AvoidableDeaths') return this.fightAuditLink(fight, phase || 'P1.5', event.tag);
             if (event.tag) return this.fightAuditLink(fight, phase, event.tag);
             if (skillKey === 'gravityLineViolation') return this.fightAuditLink(fight, 'P3');
             if (!audit) return this.fightAuditLink(fight, phase);
@@ -2221,17 +2329,6 @@ createApp({
         async exportVerdictExcel() {
             this.confirmVerdict(false);
             const date = this.verdictProgressDate || this.rawWipeAnalysis.find(row => row.date)?.date || new Date().toISOString().slice(0,10);
-            const excelMechanics = [
-                'waterOutliers', 'p15AvoidableDeaths', 'passageCliffMistakes', 'p1SilverArrowMissedFights',
-                'p1SilverArrowDeaths', 'missedShadows', 'collapsingVoidSnapAiming', 'gravityLineViolation',
-                'voidGraspHealingLow', 'tankRiftSlashFailure', 'voreluthVulnerabilityFade',
-            ];
-            const excelHeaders = [
-                'ID', '职责', '判定次数', '放水未集中', '转阶段死亡', '过场失误', 'P1银锋射怪失误', 'P1银锋高伤致死',
-                'P2拉弓未中幻影', '崩裂甩狙', '重力坍缩致死违规', '空虚之握治疗不足', '裂隙换坦失误', 'P1龌勒易伤',
-                '申诉次数', '原因', '追加次数', '追加原因', '总计',
-            ];
-
             const payload = {
                 date,
                 players: this.finalVerdict.map((row) => ({
@@ -2245,45 +2342,70 @@ createApp({
                     additionalReasons: String(row.additionalReasons || row.additionalNote || ''),
                 })),
             };
+            const filename = `智力表_宇宙之冕_${date}.xlsx`;
 
+            // 1) Prefer server export (openpyxl + template styles) when the API exists.
             try {
                 const res = await fetch('/api/export-verdict-excel', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 });
-                if (!res.ok) throw new Error(await res.text());
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const anchor = document.createElement('a');
-                anchor.href = url;
-                anchor.download = `智力表_宇宙之冕_${date}.xlsx`;
-                anchor.click();
-                setTimeout(() => URL.revokeObjectURL(url), 1000);
-                this.verdictSavedDate = `${date} 已导出 Excel`;
-            } catch (e) {
-                const mechCell = (breakdown, key) => {
-                    const count = Number(breakdown?.[key] || 0);
-                    return count ? String(count) : '';
-                };
-                const rows = payload.players.map((p) => `
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const anchor = document.createElement('a');
+                    anchor.href = url;
+                    anchor.download = filename;
+                    anchor.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    this.verdictSavedDate = `${date} 已导出 Excel`;
+                    return;
+                }
+                var apiErr = await res.text();
+                throw new Error(apiErr || (`HTTP ${res.status}`));
+            } catch (apiError) {
+                // 2) Browser-side real .xlsx (works on OfflineHost / static / missing openpyxl).
+                try {
+                    if (!window.VerdictXlsx || typeof window.VerdictXlsx.downloadVerdictXlsx !== 'function') {
+                        throw new Error('缺少 assets/vendor/verdict-xlsx.js');
+                    }
+                    window.VerdictXlsx.downloadVerdictXlsx(payload, { bossName: '宇宙之冕', filename });
+                    this.verdictSavedDate = `${date} 已导出 Excel（浏览器）`;
+                    return;
+                } catch (browserError) {
+                    const excelMechanics = (window.VerdictXlsx && window.VerdictXlsx.MECHANICS)
+                        ? window.VerdictXlsx.MECHANICS.map((m) => m[0])
+                        : [
+                            'waterOutliers', 'p15AvoidableDeaths', 'passageCliffMistakes', 'p1SilverArrowMissedFights',
+                            'p1SilverArrowDeaths', 'missedShadows', 'collapsingVoidSnapAiming', 'gravityLineViolation',
+                            'voidGraspHealingLow', 'tankRiftSlashFailure', 'voreluthVulnerabilityFade',
+                        ];
+                    const excelHeaders = (window.VerdictXlsx && window.VerdictXlsx.HEADERS) || [
+                        'ID', '职责', '判定次数', '放水未集中', '转阶段死亡', '过场失误', 'P1银锋射怪失误', 'P1银锋高伤致死',
+                        'P2拉弓未中幻影', '崩裂甩狙', '重力坍缩致死违规', '空虚之握治疗不足', '裂隙换坦失误', 'P1龌勒易伤',
+                        '申诉次数', '原因', '追加次数', '追加原因', '总计',
+                    ];
+                    const numCell = (value) => String(Number(value || 0));
+                    const rows = payload.players.map((p) => `
 <tr>
 <td>${this.escapeHtml(p.name || '')}</td>
 <td>${this.escapeHtml(p.rolesText || '')}</td>
-<td>${Number(p.recognitionCount || 0)}</td>
-${excelMechanics.map(key => `<td>${mechCell(p.breakdown, key)}</td>`).join('')}
-<td>${Number(p.appealAcquittalCount || 0) || ''}</td>
+<td>${numCell(p.recognitionCount)}</td>
+${excelMechanics.map(key => `<td>${numCell(p.breakdown?.[key])}</td>`).join('')}
+<td>${numCell(p.appealAcquittalCount)}</td>
 <td>${this.escapeHtml(p.appealAcquittalReasons || '')}</td>
-<td>${Number(p.additionalCount || 0) || ''}</td>
+<td>${numCell(p.additionalCount)}</td>
 <td>${this.escapeHtml(p.additionalReasons || '')}</td>
 <td>${(Number(p.recognitionCount || 0) - Number(p.appealAcquittalCount || 0) + Number(p.additionalCount || 0)) * 10}</td>
 </tr>`).join('');
-                const html = `<html><head><meta charset="utf-8"></head><body><table border="1">
+                    const html = `<html><head><meta charset="utf-8"></head><body><table border="1">
 <tr>${excelHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
 ${rows}
 </table></body></html>`;
-                this.downloadFile(`智力表_宇宙之冕_${date}.xls`, html, 'application/vnd.ms-excel;charset=utf-8');
-                this.verdictSavedDate = `${date} 已导出（本地兜底，请重启离线服务以获取 xlsx）`;
+                    this.downloadFile(`智力表_宇宙之冕_${date}.xls`, html, 'application/vnd.ms-excel;charset=utf-8');
+                    this.verdictSavedDate = `${date} 已导出（本地兜底 HTML；xlsx 失败：${browserError?.message || browserError} / API：${apiError?.message || apiError}）`;
+                }
             }
         },
         voidRecords(fight) {
@@ -2547,6 +2669,14 @@ ${rows}
                         : rows,
                 ])
             );
+            if (this.isCrownBoss) {
+                this.avoidableBoard.p15AvoidableDeaths = buildTransitionCourtRows(
+                    this.transitionAnalysis,
+                    this.rawWipeAnalysis,
+                    this.avoidableBoard.p15AvoidableDeaths || [],
+                    Number(this.meta?.courtConfig?.globalDeathExemptionThreshold || 8),
+                );
+            }
             this.finalVerdict = this.rebuildFinalVerdictFromBoard(result.data.page4_finalVerdict || []);
             this.verdictDirty = false;
             if (this.isCrownBoss) this.confirmVerdict(false);
@@ -2558,11 +2688,10 @@ ${rows}
             const playerMap = {};
             const spellLabels = this.meta.avoidableSpells || {};
             const showAvoidableTotal = this.meta?.features?.avoidableTotal !== false;
-            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter','gravityLineViolation']);
-            const courtOrder = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure','corruptionEssenceDamage','missedEnergy','interferenceShockInterrupts'];
-            const hiddenCourtKeys = new Set(['gravityLineViolation']);
+            const hiddenAvoidableKeys = new Set(['dailyAvoidableDamage','avoidableDamageDeaths','devouringAbyss','voidResidue','dimensionalSlashSteel','dimensionalSlashMoonRing','orbitingMatter']);
+            const courtOrder = ['p15AvoidableDeaths','passageCliffMistakes','collapsingVoidSnapAiming','waterOutliers','voidGraspHealingLow','p1SilverArrowDeaths','p1SilverArrowMissedFights','voreluthVulnerabilityFade','missedShadows','tankRiftSlashFailure','gravityLineViolation','corruptionEssenceDamage','missedEnergy','interferenceShockInterrupts'];
             const skillKeys = Object.keys(this.avoidableBoard)
-                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && key !== 'gravityLineViolation' && Array.isArray(this.avoidableBoard[key]))
+                .filter(key => key !== 'total' && !hiddenAvoidableKeys.has(key) && Array.isArray(this.avoidableBoard[key]))
                 .sort((a, b) => {
                     const rankA = courtOrder.includes(a) ? courtOrder.indexOf(a) : courtOrder.length;
                     const rankB = courtOrder.includes(b) ? courtOrder.indexOf(b) : courtOrder.length;

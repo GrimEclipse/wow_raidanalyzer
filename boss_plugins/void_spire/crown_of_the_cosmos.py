@@ -3612,6 +3612,82 @@ def build_transition_details(fight, actor_map, player_roles, deaths, markers, bu
     return rows
 
 
+def build_transition_death_board(fight, death_timeline, transition_abandoned):
+    """Build court rows for confirmed P1.5/P2.5 deaths.
+
+    P2.5 is judged as one transition-loss window per fight.  Individual deaths
+    remain visible, but the whole window is exempt when team losses reach the
+    global eight-death threshold.
+    """
+    transition_rows = defaultdict(
+        lambda: {"name": "", "hitCount": 0, "deathCount": 0, "totalDamage": 0, "events": []}
+    )
+    p25_team_deaths = sum(
+        1 for death_row in death_timeline or []
+        if death_row.get("phase") == "P2.5"
+    )
+
+    for death_row in death_timeline or []:
+        transition_phase = death_row.get("phase")
+        if transition_phase not in {"P1.5", "P2.5"}:
+            continue
+        name = death_row.get("player")
+        role = death_row.get("role", "unknown")
+        row = transition_rows[name]
+        row["name"] = name
+        row["role"] = role
+        row["roles"] = [] if role == "unknown" else [role]
+        row["spellKey"] = "p15AvoidableDeaths"
+        row["spellName"] = "转阶段死亡"
+        row["damageText"] = "-"
+        row["hitCount"] += 1
+        row["deathCount"] += 1
+
+        is_abandon_jump = bool(
+            transition_phase == "P1.5"
+            and transition_abandoned
+            and death_row.get("abilityID") in {None, 3}
+        )
+        is_p25_mass_loss = bool(
+            transition_phase == "P2.5"
+            and p25_team_deaths >= GLOBAL_DEATH_EXEMPT_THRESHOLD
+        )
+        counted = not is_abandon_jump and not is_p25_mass_loss
+        ability_name = death_row.get("ability") or "未知技能"
+        if is_abandon_jump:
+            count_reason = "识别为团队主动跳崖重开，仅展示不计数"
+            result_text = "主动跳崖重开"
+        elif is_p25_mass_loss:
+            count_reason = (
+                f"P2.5转阶段窗口团队死亡{p25_team_deaths}人，达到"
+                f"{GLOBAL_DEATH_EXEMPT_THRESHOLD}人，仅展示不计数"
+            )
+            result_text = "P2.5团队损失达到8人，不计数"
+        elif transition_phase == "P2.5":
+            count_reason = (
+                f"确认发生于P2.5转阶段，窗口团队死亡{p25_team_deaths}人"
+                f"（<{GLOBAL_DEATH_EXEMPT_THRESHOLD}），按转阶段死亡计数"
+            )
+            result_text = "P2.5转阶段死亡计数"
+        else:
+            count_reason = "确认发生于P1.5转阶段，按转阶段死亡计数"
+            result_text = "P1.5转阶段死亡计数"
+
+        row["events"].append({
+            **death_row,
+            "positionMs": int(death_row.get("absoluteTime") or 0) - int(fight["startTime"]),
+            "deathCount": 1,
+            "ability": ability_name,
+            "transitionTeamDeathCount": p25_team_deaths if transition_phase == "P2.5" else None,
+            "transitionDeathThreshold": GLOBAL_DEATH_EXEMPT_THRESHOLD if transition_phase == "P2.5" else None,
+            "counted": counted,
+            "countReason": count_reason,
+            "text": f"{name} 于 {death_row.get('time')} 死于【{ability_name}】（{result_text}）",
+        })
+
+    return sorted(transition_rows.values(), key=lambda item: item["deathCount"], reverse=True)
+
+
 def build_p3_portal_summons(fight, actor_map, actor_game_id, casts):
     portal_map = {}
     for event in casts:
@@ -4303,41 +4379,9 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         item["events"].append({**slash, "fightID": fight["id"]})
     local_board["tankRiftSlashFailure"] = list(rift_board.values())
 
-    p15_death_rows = defaultdict(lambda: {"name": "", "hitCount": 0, "deathCount": 0, "totalDamage": 0, "events": []})
-    for death_row in death_timeline:
-        if death_row.get("phase") == "P1.5":
-            name = death_row.get("player")
-            role = death_row.get("role", "unknown")
-            row = p15_death_rows[name]
-            row["name"] = name
-            row["role"] = role
-            row["roles"] = [] if role == "unknown" else [role]
-            row["spellKey"] = "p15AvoidableDeaths"
-            row["spellName"] = "转阶段死亡"
-            row["damageText"] = "-"
-            row["hitCount"] += 1
-            row["deathCount"] += 1
-            is_abandon_jump = bool(
-                transition_abandoned
-                and death_row.get("abilityID") in {None, 3}
-            )
-            ability_name = death_row.get("ability") or "未知技能"
-            row["events"].append({
-                **death_row,
-                "positionMs": int(death_row.get("absoluteTime") or 0) - int(fight["startTime"]),
-                "deathCount": 1,
-                "ability": ability_name,
-                "counted": not is_abandon_jump,
-                "countReason": (
-                    "识别为团队主动跳崖重开，仅展示不计数"
-                    if is_abandon_jump else "确认发生于P1.5转阶段，按转阶段死亡计数"
-                ),
-                "text": (
-                    f"{name} 于 {death_row.get('time')} 死于【{ability_name}】"
-                    + ("（主动跳崖重开）" if is_abandon_jump else "（转阶段死亡计数）")
-                ),
-            })
-    local_board["p15AvoidableDeaths"] = sorted(p15_death_rows.values(), key=lambda item: item["deathCount"], reverse=True)
+    local_board["p15AvoidableDeaths"] = build_transition_death_board(
+        fight, death_timeline, transition_abandoned,
+    )
     local_board[PASSAGE_CLIFF_SKILL_KEY] = build_passage_cliff_board(
         fight, deaths, markers, death_timeline, player_roles, reason_key,
     )
