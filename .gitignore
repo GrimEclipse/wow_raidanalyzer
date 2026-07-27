@@ -11,8 +11,8 @@ tools/tmp/
 .analysis_jobs/
 /wcl_hardcore_api.json
 /verdict_data.json
-/data/*.json
-!data/.gitkeep
+/data/*
+!/data/.gitkeep
 /tmp/
 /verdicts/*
 !/verdicts/.gitkeep
@@ -21,6 +21,15 @@ tools/tmp/
 *.zip
 *.rar
 *.exe
+
+# Accidental artifacts from unrelated local tasks.
+/.tools/
+/.video_work/
+/audio_material_license_notes.txt
+
+# Local generated Word documents.
+*.doc
+*.docx
 
 # Local workspace metadata.
 .agents/
