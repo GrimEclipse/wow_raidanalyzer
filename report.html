@@ -47,6 +47,9 @@
                     导入 JSON
                     <input type="file" accept=".json,application/json" multiple class="hidden" @change="importDataFiles">
                 </label>
+                <button v-if="dataFiles.some(file => file.cached)" @click="clearDataCache" class="rounded border border-gray-700 bg-gray-950 px-3 py-1 text-xs text-gray-400 hover:border-red-700 hover:text-red-200">
+                    清除页面缓存
+                </button>
             </div>
         </div>
         <div class="flex flex-wrap gap-3" v-if="dataLoaded">
@@ -96,6 +99,9 @@
                     选择 JSON 文件
                     <input type="file" accept=".json,application/json" multiple class="hidden" @change="importDataFiles">
                 </label>
+                <button v-if="dataFiles.some(file => file.cached)" @click="clearDataCache" class="rounded border border-gray-700 bg-gray-950 px-5 py-3 text-sm text-gray-400 hover:border-red-700 hover:text-red-200">
+                    清除页面缓存
+                </button>
                 <label class="cursor-pointer rounded border border-gray-700 bg-gray-950 px-4 py-3 text-sm text-gray-300 hover:bg-gray-900">
                     选择目录
                     <input type="file" accept=".json,application/json" multiple webkitdirectory directory class="hidden" @change="importDataFiles">
@@ -1728,6 +1734,8 @@ createApp({
             }
             const baked = window.OfflineDataLoader?.bakedSourceFiles?.() || [];
             baked.forEach(pushUnique);
+            const cached = await (window.OfflineDataLoader?.cachedSourceFiles?.() || []);
+            cached.forEach(pushUnique);
             const local = window.OfflineDataLoader?.localSourceFiles?.() || [];
             local.forEach(pushUnique);
             files.sort((a, b) => (b.mtime || 0) - (a.mtime || 0));
@@ -1786,14 +1794,31 @@ createApp({
         },
         async importDataFiles(event) {
             this.errorMsg = '';
-            const rows = window.OfflineDataLoader?.registerLocalFiles?.(event.target.files) || [];
+            const selectedFiles = Array.from(event.target.files || []);
             event.target.value = '';
-            if (!rows.length) {
-                this.errorMsg = '未在选择结果中找到 JSON 文件。';
-                return;
+            try {
+                const rows = await (window.OfflineDataLoader?.registerLocalFiles?.(selectedFiles) || []);
+                if (!rows.length) {
+                    this.errorMsg = '未在选择结果中找到 JSON 文件。';
+                    return;
+                }
+                await this.loadDataFileList();
+                await this.selectDataFile(rows[0].path);
+            } catch (error) {
+                this.errorMsg = `导入失败：${error.message || error}`;
             }
+        },
+        async clearDataCache() {
+            const activeWasCached = this.normalizedJsonSource.startsWith('cache/');
+            await window.OfflineDataLoader?.clearCachedSources?.();
             await this.loadDataFileList();
-            await this.selectDataFile(rows[0].path);
+            if (!activeWasCached) return;
+            const next = this.dataFiles[0]?.path || '';
+            if (next) await this.selectDataFile(next);
+            else {
+                this.syncJsonQuery('');
+                this.dataLoaded = false;
+            }
         },
         handleFileUpload(event) {
             return this.importDataFiles(event);
@@ -1992,11 +2017,46 @@ createApp({
                 (player.events || []).forEach((event, index) => {
                     const fight = this.rawWipeAnalysis.find(row => Number(row.fightID) === Number(event.fightID));
                     if (!fight) return;
-                    const names = filterCourtDisplayNames(event.players || event.markPlayers || []);
+                    const isSnapAiming = this.avoidableTab === 'collapsingVoidSnapAiming';
+                    const auditBow = isSnapAiming
+                        ? (fight?.crownOfTheCosmos?.fieldAudit?.bowGroups || []).find(group =>
+                            Number(group.index) === Number(event.group)
+                            && (!event.phase || group.phase === event.phase))
+                        : null;
+                    // 点名/受害者属于事实证据，即使某玩家不进入开庭排名也不能从轮次事实中删掉。
+                    const markedNames = (
+                        event.markPlayers
+                        || (auditBow?.players || []).map(marked => marked.player)
+                        || []
+                    ).filter(Boolean);
+                    const victimNames = (event.victimPlayers || event.players || []).filter(Boolean);
+                    const names = isSnapAiming
+                        ? markedNames
+                        : filterCourtDisplayNames(event.players || event.markPlayers || []);
                     const normalized = normalizeCourtEvent(this.avoidableTab, event);
+                    if (this.avoidableTab === 'voidGraspHealingLow' && normalized.counted === false && !normalized.countReason) {
+                        const rawDeath = (fight?.crownOfTheCosmos?.voidGraspHealing || []).find(row =>
+                            (event.group == null || Number(row.bowGroup) === Number(event.group))
+                            && (!event.death || row.player === event.death)
+                            && (!event.time || row.time === event.time));
+                        normalized.countReason = (rawDeath?.exemptionReasons || event.exemptionReasons || []).join('；')
+                            || '历史 JSON 未保存具体不计数原因，请使用当前版本重跑该日志';
+                    }
                     let detailText = event.count != null && (this.avoidableTab === 'corruptionEssenceHits' || this.avoidableTab === 'corruptionEssenceTop3')
                         ? `本场 ${event.count} 次；${scrubDisplayOnlyText(event.countReason || '')}`
                         : scrubExcludedNamesFromText(scrubDisplayOnlyText(normalized.text || event.countReason || `${player.name}：${event.ability || this.activeAvoidableLabel}`));
+                    if (this.avoidableTab === 'voidGraspHealingLow' && normalized.counted === false && normalized.countReason && !detailText.includes(normalized.countReason)) {
+                        detailText += `；不计数原因：${normalized.countReason}`;
+                    }
+                    if (isSnapAiming) {
+                        const parts = [
+                            `归责玩家：${player.name}`,
+                            markedNames.length ? `本轮点名：${markedNames.join('、')}` : '',
+                            victimNames.length ? `死亡玩家：${victimNames.join('、')}` : '',
+                            scrubDisplayOnlyText(normalized.countReason || ''),
+                        ].filter(Boolean);
+                        detailText = parts.join('；');
+                    }
                     if (this.avoidableTab === 'corruptionEssenceDamage') {
                         const amount = Number(event.amount || 0);
                         detailText = `${player.name} 被腐化精华击中` + (amount ? `，伤害 ${this.number(amount)}` : '') + (event.time ? `（${event.time}）` : '');
@@ -2010,7 +2070,9 @@ createApp({
                         player: player.name,
                         players: names,
                         counted: normalized.counted !== false && !normalized.hitStatOnly,
-                        text: names.length && this.avoidableTab !== 'corruptionEssenceDamage' ? `点名玩家：${names.join('、')}；${detailText}` : detailText,
+                        text: isSnapAiming
+                            ? detailText
+                            : (names.length && this.avoidableTab !== 'corruptionEssenceDamage' ? `点名玩家：${names.join('、')}；${detailText}` : detailText),
                         link: this.courtEventLink(fight, event, this.avoidableTab),
                     });
                 });

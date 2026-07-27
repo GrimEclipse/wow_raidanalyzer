@@ -170,8 +170,10 @@ class BossPluginNotImplemented(NotImplementedError):
 
 
 def write_json_result(result, output_path=None):
+    from analyzer_core.contracts import apply_analysis_contract
     from analyzer_core.wcl_paths import resolve_wcl_output_path, write_data_manifest
 
+    result = apply_analysis_contract(result)
     output = resolve_wcl_output_path(result=result, output_path=output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with open(output, "w", encoding="utf-8") as file:

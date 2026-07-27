@@ -60,7 +60,7 @@ RIFT_SIMULACRUM_GAME_ID = 254098
 HEALER_SPEC_IDS = {65, 105, 256, 257, 264, 270, 1468}
 WATER_OUTLIER_YARDS = 15.0
 SNAP_MOVEMENT_YARDS = 5.0
-FIELD_AUDIT_VERSION = "2026-07-14-global-exemption-v6"
+FIELD_AUDIT_VERSION = "2026-07-24-compensation-gravity-v7"
 COMBAT_RESURRECTION_IDS = {20484, 20608, 20707, 61999, 391054}
 RAY_LENGTH_RAW = 10_000.0
 RAY_WIDTH_RAW = 300.0
@@ -70,6 +70,7 @@ COSMIC_DEVOUR_ID = 1238843
 TERMINAL_GUARD_ID = 1239111
 GRAVITY_COLLAPSE_ID = 1255453
 GRAVITY_COLLAPSE_DAMAGE_ID = 1239095
+DEATH_COMPENSATION_ID = 211319
 P1_BINDING_IDS = {1233470, 1237844, SPELL["corruption"]}
 
 
@@ -351,6 +352,7 @@ def fetch_spell_bundle(token, report_id, fight):
         SPELL["cosmic_radiation"],
         TERMINAL_GUARD_ID,
         GRAVITY_COLLAPSE_ID,
+        DEATH_COMPENSATION_ID,
     ]:
         debuffs.extend(fetch_events_all(token, report_id, "Debuffs", fight, ability_id=spell_id, include_resources=True))
     for spell_id in [SPELL["cosmic_barrier"], SPELL["cosmic_radiation"], SPELL["silver_havoc"], 26662, 27680, 1239672]:
@@ -362,6 +364,7 @@ def fetch_spell_bundle(token, report_id, fight):
         SPELL["void_repulsion_damage"],
         SPELL["silver_ricochet"],
         SPELL["silver_ricochet_energy_drain"],
+        GRAVITY_COLLAPSE_DAMAGE_ID,
     ]:
         damage.extend(fetch_events_all(token, report_id, "DamageTaken", fight, ability_id=spell_id, include_resources=True))
         damage.extend(fetch_events_all(token, report_id, "DamageDone", fight, ability_id=spell_id, hostility_type="Enemies", include_resources=True))
@@ -1310,7 +1313,7 @@ def build_silver_arrows(fight, actor_map, actor_type, actor_game_id, events, pha
     return rows
 
 
-def build_gravity_rounds(fight, actor_map, debuffs, deaths, player_roles):
+def build_gravity_rounds(fight, actor_map, debuffs, deaths, player_roles, damage=None):
     guard_applies = [event for event in debuffs if ability_id(event) == TERMINAL_GUARD_ID and event_type(event) == "applydebuff"]
     rounds = []
     for index, cluster in enumerate(group_by_window(guard_applies, 1_000), start=1):
@@ -1328,14 +1331,85 @@ def build_gravity_rounds(fight, actor_map, debuffs, deaths, player_roles):
         for order, event in enumerate(breaks, start=1):
             delay = event.get("timestamp", 0) - start if order == 1 else event.get("timestamp", 0) - previous
             compliant = delay <= 3_000 if order == 1 else delay >= 2_000
+            trigger_death = min(
+                (
+                    death for death in deaths
+                    if death.get("targetID") == event.get("targetID")
+                    and abs(death.get("timestamp", 0) - event.get("timestamp", 0)) <= 750
+                ),
+                key=lambda death: abs(death.get("timestamp", 0) - event.get("timestamp", 0)),
+                default=None,
+            )
             break_rows.append({
                 "order": order, "player": event_actor_name(actor_map, {}, event.get("targetID")), "targetID": event.get("targetID"),
                 "timeMs": rel(fight, event.get("timestamp")), "time": fmt(rel(fight, event.get("timestamp"))),
                 "delayMs": delay, "compliant": compliant,
                 "rule": "首棒≤3秒" if order == 1 else "与前一棒间隔≥2秒",
+                "deathTriggered": trigger_death is not None,
+                "deathTrigger": {
+                    "timeMs": rel(fight, trigger_death.get("timestamp")),
+                    "time": fmt(rel(fight, trigger_death.get("timestamp"))),
+                    "abilityID": trigger_death.get("killingAbilityGameID"),
+                } if trigger_death else None,
             })
             previous = event.get("timestamp", 0)
         gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == GRAVITY_COLLAPSE_DAMAGE_ID and start <= death.get("timestamp", 0) <= start + 25_000]
+        gravity_hits = [
+            event for event in damage or []
+            if ability_id(event) == GRAVITY_COLLAPSE_DAMAGE_ID
+            and start <= event.get("timestamp", 0) <= start + 25_000
+        ]
+        compensation_rows = []
+        for compensation in (
+            event for event in debuffs
+            if ability_id(event) == DEATH_COMPENSATION_ID
+            and event_type(event) == "applydebuff"
+            and start <= event.get("timestamp", 0) <= start + 25_000
+        ):
+            target_id = compensation.get("targetID")
+            matching_hit = min(
+                (
+                    event for event in gravity_hits
+                    if event.get("targetID") == target_id
+                    and 0 <= compensation.get("timestamp", 0) - event.get("timestamp", 0) <= 15_000
+                ),
+                key=lambda event: compensation.get("timestamp", 0) - event.get("timestamp", 0),
+                default=None,
+            )
+            if not matching_hit:
+                continue
+            death_events_before = [
+                death for death in deaths
+                if death.get("timestamp", 0) <= compensation.get("timestamp", 0)
+            ]
+            dead_before = {
+                death.get("targetID")
+                for death in death_events_before
+                if death.get("targetID") is not None
+            }
+            under_eight = len(death_events_before) < 8
+            compensation_rows.append({
+                "player": event_actor_name(actor_map, {}, target_id),
+                "targetID": target_id,
+                "timeMs": rel(fight, compensation.get("timestamp")),
+                "time": fmt(rel(fight, compensation.get("timestamp"))),
+                "gravityDamageTimeMs": rel(fight, matching_hit.get("timestamp")),
+                "gravityDamageTime": fmt(rel(fight, matching_hit.get("timestamp"))),
+                "gravityDamageAmount": int(matching_hit.get("amount") or 0) + int(matching_hit.get("absorbed") or 0),
+                "deathEventCountBeforeCompensation": len(death_events_before),
+                "uniqueDeadPlayerCountBeforeCompensation": len(dead_before),
+                "underEightDeaths": under_eight,
+                "countedAsEffectiveDeath": under_eight,
+            })
+        actual_death_ids = {death.get("targetID") for death in gravity_deaths}
+        effective_compensations = [
+            row for row in compensation_rows
+            if row["countedAsEffectiveDeath"] and row.get("targetID") not in actual_death_ids
+        ]
+        effective_death_count = len(gravity_deaths) + len(effective_compensations)
+        effective_death_players = [
+            event_actor_name(actor_map, {}, death.get("targetID")) for death in gravity_deaths
+        ] + [row["player"] for row in effective_compensations]
         prior_deaths = [death for death in deaths if death.get("timestamp", 0) < start]
         prior_dead_ids = {death.get("targetID") for death in prior_deaths if death.get("targetID") is not None}
         prior_healer_deaths = [
@@ -1347,27 +1421,65 @@ def build_gravity_rounds(fight, actor_map, debuffs, deaths, player_roles):
             if str(player_roles.get(death.get("targetID"), "")).endswith("-healer")
         ]
         healer_death_count = len(prior_healer_deaths) + len(round_healer_deaths)
-        first_violation = next((row for row in break_rows if not row["compliant"]), None)
+        violations = [
+            row for row in break_rows
+            if not row["compliant"] and not row.get("deathTriggered")
+        ]
+        first_violation = next(iter(violations), None)
         attrition_exempt = len(prior_dead_ids) > 4 or healer_death_count > 2
-        counted = bool(gravity_deaths and first_violation and not attrition_exempt)
-        trigger = max((row for row in break_rows if not gravity_deaths or fight["startTime"] + row["timeMs"] <= gravity_deaths[0].get("timestamp", 0)), key=lambda row: row["timeMs"], default=None)
+        compensation_countable = bool(effective_compensations)
+        counted = bool(
+            first_violation
+            and effective_death_count
+            and (compensation_countable or not attrition_exempt)
+        )
+        casualty_timestamps = [death.get("timestamp", 0) for death in gravity_deaths]
+        casualty_timestamps += [
+            fight["startTime"] + row["gravityDamageTimeMs"]
+            for row in effective_compensations
+        ]
+        first_casualty = min(casualty_timestamps, default=None)
+        trigger = max(
+            (
+                row for row in break_rows
+                if first_casualty is None
+                or fight["startTime"] + row["timeMs"] <= first_casualty
+            ),
+            key=lambda row: row["timeMs"],
+            default=None,
+        )
+        death_triggered_collapse = bool(trigger and trigger.get("deathTriggered"))
         rounds.append({
             "index": index, "applyTimeMs": rel(fight, start), "applyTime": fmt(rel(fight, start)),
             "targets": [event_actor_name(actor_map, {}, event.get("targetID")) for event in unique],
-            "breaks": break_rows, "violations": [row for row in break_rows if not row["compliant"]],
-            "deathCount": len(gravity_deaths), "deathPlayers": [event_actor_name(actor_map, {}, death.get("targetID")) for death in gravity_deaths],
+            "breaks": break_rows, "violations": violations,
+            "deathCount": len(gravity_deaths),
+            "deathPlayers": [event_actor_name(actor_map, {}, death.get("targetID")) for death in gravity_deaths],
+            "compensationCount": len(effective_compensations),
+            "compensationPlayers": [row["player"] for row in effective_compensations],
+            "compensations": compensation_rows,
+            "effectiveDeathCount": effective_death_count,
+            "effectiveDeathPlayers": effective_death_players,
             "collapseTrigger": trigger,
+            "deathTriggeredCollapse": death_triggered_collapse,
+            "deathTriggeredPlayer": trigger.get("player") if death_triggered_collapse else None,
             "priorDeathCount": len(prior_dead_ids),
             "priorHealerDeathCount": len(prior_healer_deaths),
             "healerDeathCountThroughRound": healer_death_count,
             "firstViolation": first_violation,
             "attributedPlayer": first_violation.get("player") if first_violation else None,
             "attributedPlayerID": first_violation.get("targetID") if first_violation else None,
-            "causedDeaths": bool(gravity_deaths),
+            "causedDeaths": bool(effective_death_count),
             "counted": counted,
             "exemptReason": (
                 f"大团已减员过多（本轮前已有{len(prior_dead_ids)}名不同玩家死亡，本轮结算后治疗死亡{healer_death_count}人）"
-                if attrition_exempt else ("本轮没有造成减员" if not gravity_deaths else None)
+                if attrition_exempt and not compensation_countable else (
+                    "本轮没有造成减员"
+                    if not effective_death_count else (
+                        f"本轮重力坍缩由{trigger.get('player')}死亡直接触发，死亡玩家不作为归因人"
+                        if death_triggered_collapse and not first_violation else None
+                    )
+                )
             ),
         })
     return rounds
@@ -1650,7 +1762,14 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
     ranger_energy = build_ranger_energy(fight, actor_map, actor_game_id, events, phase)
     void_deaths = build_void_death_healing(fight, actor_map, actor_game_id, events, players, healers, phantom_segments)
     p3_events, p3_contaminations = build_p3_events(fight, actor_map, actor_game_id, events, phase, position_index, players)
-    gravity_rounds = build_gravity_rounds(fight, actor_map, events["debuffs"], events["deaths"], player_roles)
+    gravity_rounds = build_gravity_rounds(
+        fight,
+        actor_map,
+        events["debuffs"],
+        events["deaths"],
+        player_roles,
+        events["damage"],
+    )
     refine_p2_shot_attribution(fight, bow_groups, water_events, phantom_segments, player_roles)
     rift_instances = build_rift_instances(fight, events["casts"] + extra_position_events, events["enemyDeaths"], actor_game_id)
     apply_npc_lifetimes(fight, events["enemyDeaths"], bow_groups + water_events + silver_arrows + p3_events)

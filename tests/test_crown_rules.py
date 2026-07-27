@@ -11,7 +11,14 @@ from boss_plugins.void_spire.crown_of_the_cosmos import (
     P1_SHADOW_BINDING_ID,
     MELURIUM_EXPECTED_MS,
 )
-from tools.crown_single_fight_audit import SPELL, build_void_death_healing
+from tools.crown_single_fight_audit import (
+    DEATH_COMPENSATION_ID,
+    GRAVITY_COLLAPSE_DAMAGE_ID,
+    SPELL,
+    TERMINAL_GUARD_ID,
+    build_gravity_rounds,
+    build_void_death_healing,
+)
 
 
 class CrownGlobalDeathExemptionTests(unittest.TestCase):
@@ -152,6 +159,104 @@ class VoidDeathHealingRosterTests(unittest.TestCase):
         self.assertEqual(rows[0]["deadPlayerIDsAtDeath"], [1])
         self.assertEqual(rows[0]["playerRosterCount"], 3)
         self.assertEqual(rows[0]["aliveHealerIDsAtDeath"], [])
+
+
+class GravityDeathTriggerTests(unittest.TestCase):
+    def test_dead_trigger_is_marked_and_not_attributed(self):
+        fight = {"id": 5, "startTime": 100_000, "endTime": 200_000}
+        actor_map = {1: "第一棒", 2: "死亡触发者"}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 1, "timestamp": 110_000},
+            {"type": "applydebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 2, "timestamp": 110_050},
+            {"type": "removedebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 1, "timestamp": 112_000},
+            {"type": "removedebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 2, "timestamp": 113_000},
+        ]
+        deaths = [{
+            "targetID": 2,
+            "timestamp": 113_000,
+            "killingAbilityGameID": GRAVITY_COLLAPSE_DAMAGE_ID,
+        }]
+
+        round_row = build_gravity_rounds(
+            fight,
+            actor_map,
+            debuffs,
+            deaths,
+            {1: "melee-dps", 2: "range-dps"},
+        )[0]
+
+        self.assertTrue(round_row["breaks"][1]["deathTriggered"])
+        self.assertTrue(round_row["deathTriggeredCollapse"])
+        self.assertEqual(round_row["deathTriggeredPlayer"], "死亡触发者")
+        self.assertEqual(round_row["violations"], [])
+        self.assertIsNone(round_row["attributedPlayer"])
+        self.assertFalse(round_row["counted"])
+        self.assertIn("不作为归因人", round_row["exemptReason"])
+
+    def test_gravity_compensation_under_eight_counts_as_effective_death(self):
+        fight = {"id": 16, "startTime": 100_000, "endTime": 200_000}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 1, "timestamp": 110_000},
+            {"type": "removedebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 1, "timestamp": 114_000},
+            {"type": "applydebuff", "abilityGameID": DEATH_COMPENSATION_ID, "targetID": 9, "timestamp": 115_000},
+        ]
+        damage = [{
+            "type": "damage",
+            "abilityGameID": GRAVITY_COLLAPSE_DAMAGE_ID,
+            "targetID": 9,
+            "timestamp": 114_010,
+            "amount": 150_000,
+        }]
+
+        round_row = build_gravity_rounds(
+            fight,
+            {1: "违规者", 9: "暗黑膏药"},
+            debuffs,
+            [],
+            {1: "melee-dps", 9: "priest-healer"},
+            damage,
+        )[0]
+
+        self.assertEqual(round_row["deathCount"], 0)
+        self.assertEqual(round_row["compensationCount"], 1)
+        self.assertEqual(round_row["effectiveDeathCount"], 1)
+        self.assertEqual(round_row["compensationPlayers"], ["暗黑膏药"])
+        self.assertEqual(round_row["attributedPlayer"], "违规者")
+        self.assertTrue(round_row["counted"])
+
+    def test_compensation_after_eighth_death_is_display_only(self):
+        fight = {"id": 6, "startTime": 100_000, "endTime": 200_000}
+        debuffs = [
+            {"type": "applydebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 1, "timestamp": 110_000},
+            {"type": "removedebuff", "abilityGameID": TERMINAL_GUARD_ID, "targetID": 1, "timestamp": 114_000},
+            {"type": "applydebuff", "abilityGameID": DEATH_COMPENSATION_ID, "targetID": 9, "timestamp": 115_000},
+        ]
+        deaths = [
+            {"targetID": 20 + index, "timestamp": 100_100 + index * 100, "killingAbilityGameID": 1}
+            for index in range(8)
+        ]
+        damage = [{
+            "type": "damage",
+            "abilityGameID": GRAVITY_COLLAPSE_DAMAGE_ID,
+            "targetID": 9,
+            "timestamp": 114_010,
+            "amount": 150_000,
+        }]
+
+        round_row = build_gravity_rounds(
+            fight,
+            {1: "违规者", 9: "暗黑膏药"},
+            debuffs,
+            deaths,
+            {1: "melee-dps", 9: "priest-healer"},
+            damage,
+        )[0]
+
+        self.assertEqual(round_row["compensationCount"], 0)
+        self.assertEqual(round_row["effectiveDeathCount"], 0)
+        self.assertFalse(round_row["compensations"][0]["underEightDeaths"])
+        self.assertEqual(round_row["compensations"][0]["deathEventCountBeforeCompensation"], 8)
+        self.assertFalse(round_row["counted"])
 
 
 class VoreluthVulnerabilityFadeTests(unittest.TestCase):

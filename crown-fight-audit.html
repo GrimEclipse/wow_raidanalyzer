@@ -595,10 +595,18 @@
       if (group.eventType === 'gravity') {
         const breaks = (group.breaks || []).map(item => `<tr>
           <td>${item.order}</td><td>${escapeHtml(item.player)}</td><td>${item.time}</td><td>${(item.delayMs / 1000).toFixed(3)}s</td>
-          <td>${item.rule}</td><td>${item.compliant ? '合规' : '<span style="color:#ef4444;font-weight:700">违反</span>'}</td>
+          <td>${item.rule}</td><td>${item.deathTriggered ? '<span style="color:#f59e0b;font-weight:700">死亡触发（不归责）</span>' : (item.compliant ? '合规' : '<span style="color:#ef4444;font-weight:700">违反</span>')}</td>
         </tr>`).join('');
+        const collapseText = group.collapseTrigger
+          ? (group.deathTriggeredCollapse || group.collapseTrigger.deathTriggered
+            ? ` · 由 ${escapeHtml(group.collapseTrigger.player)} 死亡直接触发（不归责）`
+            : ` · 团血崩于 ${escapeHtml(group.collapseTrigger.player)} 拉断`)
+          : '';
+        const casualtyText = group.compensationCount
+          ? `实际死亡 ${group.deathCount || 0} 人 · 代偿 ${group.compensationCount} 次（按有效减员计）`
+          : `死亡 ${group.deathCount || 0} 人`;
         holder.innerHTML = `<section class="card"><h3>P3 重力坍缩 #${group.index} ${group.applyTime}</h3>
-          <div class="muted">点名：${escapeHtml((group.targets || []).join(' / '))} · 死亡 ${group.deathCount || 0} 人${group.collapseTrigger ? ` · 团血崩于 ${escapeHtml(group.collapseTrigger.player)} 拉断` : ''}</div>
+          <div class="muted">点名：${escapeHtml((group.targets || []).join(' / '))} · ${casualtyText}${collapseText}</div>
           <table><thead><tr><th>棒次</th><th>玩家</th><th>拉断时间</th><th>间隔</th><th>规则</th><th>判定</th></tr></thead><tbody>${breaks}</tbody></table>
         </section>`;
         return;
@@ -725,11 +733,19 @@
       holder.innerHTML = `<table><thead><tr><th>轮次</th><th>点名</th><th>1棒</th><th>2棒间隔</th><th>3棒间隔</th><th>违规</th><th>死亡/归因</th></tr></thead><tbody>${rows.map(row => {
         const breaks = row.breaks || [];
         const violation = (row.violations || []).map(item => `${escapeHtml(item.player)}：${item.rule}（${(item.delayMs / 1000).toFixed(3)}秒）`).join('<br>') || '无';
+        const breakText = item => item
+          ? `${escapeHtml(item.player)} ${(item.delayMs / 1000).toFixed(3)}s${item.deathTriggered ? '（死亡触发，不归责）' : ''}`
+          : '-';
+        const attribution = row.collapseTrigger
+          ? (row.deathTriggeredCollapse || row.collapseTrigger.deathTriggered
+            ? ` · ${escapeHtml(row.collapseTrigger.player)}死亡触发（不归责）`
+            : ` · ${escapeHtml(row.collapseTrigger.player)}`)
+          : '';
         return `<tr><td>#${row.index} ${row.applyTime}</td><td>${escapeHtml((row.targets || []).join(' / '))}</td>
-          <td>${breaks[0] ? `${escapeHtml(breaks[0].player)} ${(breaks[0].delayMs / 1000).toFixed(3)}s` : '-'}</td>
-          <td>${breaks[1] ? `${escapeHtml(breaks[1].player)} ${(breaks[1].delayMs / 1000).toFixed(3)}s` : '-'}</td>
-          <td>${breaks[2] ? `${escapeHtml(breaks[2].player)} ${(breaks[2].delayMs / 1000).toFixed(3)}s` : '-'}</td>
-          <td>${violation}</td><td>${row.deathCount || 0} 人${row.collapseTrigger ? ` · ${escapeHtml(row.collapseTrigger.player)}` : ''}</td></tr>`;
+          <td>${breakText(breaks[0])}</td>
+          <td>${breakText(breaks[1])}</td>
+          <td>${breakText(breaks[2])}</td>
+          <td>${violation}</td><td>${row.deathCount || 0} 人${row.compensationCount ? ` + 代偿 ${row.compensationCount}` : ''}${attribution}</td></tr>`;
       }).join('')}</tbody></table>`;
     }
 

@@ -179,8 +179,17 @@ def apply_global_death_exemption(fight):
                 row["hitCount"] = len(counted)
                 row["countedCount"] = len(counted)
                 row["uncountedCount"] = len(events) - len(counted)
-                if skill_key in {"collapsingVoidSnapAiming", "gravityLineViolation"}:
+                if skill_key == "collapsingVoidSnapAiming":
                     row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted)
+                elif skill_key == "gravityLineViolation":
+                    row["deathCount"] = sum(
+                        int(
+                            event.get("effectiveDeathCount")
+                            if event.get("effectiveDeathCount") is not None
+                            else event.get("deathCount") or 0
+                        )
+                        for event in counted
+                    )
                 elif skill_key in {"p1SilverArrowDeaths", "p15AvoidableDeaths"}:
                     row["deathCount"] = len(counted)
                 elif skill_key == "tankRiftSlashFailure":
@@ -756,6 +765,11 @@ def normalize_snap_aiming(fight):
     audit = ((fight.get("crownOfTheCosmos") or {}).get("fieldAudit") or {})
     per_player = {}
     for group in audit.get("bowGroups") or []:
+        marked_players = [
+            marked.get("player")
+            for marked in group.get("players") or []
+            if marked.get("player")
+        ]
         for player in group.get("players") or []:
             name = player.get("player")
             if not name:
@@ -770,6 +784,8 @@ def normalize_snap_aiming(fight):
                     "time": player.get("deathTime") or player.get("fadeTime") or group.get("fireTime"),
                     "positionMs": player.get("deathTimeMs") or player.get("fadeTimeMs") or group.get("fireTimeMs"),
                     "players": [],
+                    "markPlayers": marked_players,
+                    "victimPlayers": [],
                     "deathCount": 0,
                     "counted": False,
                     "displayOnly": True,
@@ -791,6 +807,8 @@ def normalize_snap_aiming(fight):
                 "positionMs": player.get("fadeTimeMs") or group.get("fireTimeMs"),
                 "movementYards": movement,
                 "players": [death.get("player") for death in deaths if death.get("player")],
+                "markPlayers": marked_players,
+                "victimPlayers": [death.get("player") for death in deaths if death.get("player")],
                 "deathCount": len(deaths),
                 "counted": bool(deaths),
                 "countReason": (
@@ -1142,15 +1160,81 @@ def normalize_gravity(fight):
     rendered = []
     for round_row in rounds:
         apply_ms = int(round_row.get("applyTimeMs") or 0)
+        fight_start = int(fight.get("fightStart") or fight.get("startTime") or 0)
+        for break_row in round_row.get("breaks") or []:
+            break_absolute = fight_start + int(break_row.get("timeMs") or 0)
+            trigger_death = min(
+                (
+                    death for death in deaths
+                    if death.get("player") == break_row.get("player")
+                    and abs(int(death.get("absoluteTime") or 0) - break_absolute) <= 750
+                ),
+                key=lambda death: abs(int(death.get("absoluteTime") or 0) - break_absolute),
+                default=None,
+            )
+            break_row["deathTriggered"] = trigger_death is not None
+            break_row["deathTrigger"] = {
+                "time": trigger_death.get("time"),
+                "absoluteTime": trigger_death.get("absoluteTime"),
+                "abilityID": trigger_death.get("abilityID"),
+            } if trigger_death else None
+        violations = [
+            row for row in round_row.get("breaks") or []
+            if not row.get("compliant") and not row.get("deathTriggered")
+        ]
+        round_row["violations"] = violations
+        collapse_trigger = round_row.get("collapseTrigger") or {}
+        matching_trigger = min(
+            (
+                row for row in round_row.get("breaks") or []
+                if row.get("player") == collapse_trigger.get("player")
+                and abs(int(row.get("timeMs") or 0) - int(collapse_trigger.get("timeMs") or 0)) <= 750
+            ),
+            key=lambda row: abs(int(row.get("timeMs") or 0) - int(collapse_trigger.get("timeMs") or 0)),
+            default=None,
+        )
+        if matching_trigger:
+            round_row["collapseTrigger"] = matching_trigger
+            collapse_trigger = matching_trigger
+        death_triggered_collapse = bool(collapse_trigger.get("deathTriggered"))
+        round_row["deathTriggeredCollapse"] = death_triggered_collapse
+        round_row["deathTriggeredPlayer"] = collapse_trigger.get("player") if death_triggered_collapse else None
         prior = [death for death in deaths if int(death.get("absoluteTime") or 0) < int(fight.get("fightStart") or 0) + apply_ms]
         prior_names = {death.get("player") for death in prior if death.get("player")}
         prior_healers = [death for death in prior if str(death.get("role") or "").endswith("-healer")]
         first = min(
-            (row for row in round_row.get("violations") or []),
+            violations,
             key=lambda row: int(row.get("order") or 999),
             default=None,
         )
         death_count = int(round_row.get("deathCount") or 0)
+        effective_compensations = []
+        for compensation in round_row.get("compensations") or []:
+            compensation_absolute = fight_start + int(compensation.get("timeMs") or 0)
+            prior_death_events = [
+                death for death in deaths
+                if int(death.get("absoluteTime") or 0) <= compensation_absolute
+            ]
+            prior_dead_players = {
+                death.get("player") for death in prior_death_events if death.get("player")
+            }
+            under_eight = len(prior_death_events) < GLOBAL_DEATH_EXEMPT_THRESHOLD
+            compensation.update({
+                "deathEventCountBeforeCompensation": len(prior_death_events),
+                "uniqueDeadPlayerCountBeforeCompensation": len(prior_dead_players),
+                "underEightDeaths": under_eight,
+                "countedAsEffectiveDeath": under_eight,
+            })
+            if under_eight and compensation.get("player") not in (round_row.get("deathPlayers") or []):
+                effective_compensations.append(compensation)
+        compensation_count = len(effective_compensations)
+        round_row["compensationCount"] = compensation_count
+        round_row["compensationPlayers"] = [row.get("player") for row in effective_compensations]
+        effective_death_count = death_count + compensation_count
+        round_row["effectiveDeathPlayers"] = (
+            list(round_row.get("deathPlayers") or [])
+            + [row.get("player") for row in effective_compensations]
+        )
         round_healer_deaths = sum(
             1 for name in round_row.get("deathPlayers") or []
             if str(role_for(fight, name)).endswith("-healer")
@@ -1161,7 +1245,13 @@ def normalize_gravity(fight):
             exempt_reason = f"大团已减员过多（本轮前已有{len(prior_names)}名不同玩家死亡，本轮结算后治疗死亡{healer_death_count}人）"
         elif not death_count:
             exempt_reason = "本轮没有造成减员"
-        counted = bool(first and death_count and not exempt_reason)
+        elif death_triggered_collapse and not first:
+            exempt_reason = f"本轮重力坍缩由{collapse_trigger.get('player')}死亡直接触发，死亡玩家不作为归因人"
+        counted = bool(
+            first
+            and effective_death_count
+            and (compensation_count or not exempt_reason)
+        )
         round_row.update({
             "priorDeathCount": len(prior_names),
             "priorHealerDeathCount": len(prior_healers),
@@ -1169,16 +1259,24 @@ def normalize_gravity(fight):
             "firstViolation": first,
             "attributedPlayer": first.get("player") if first else None,
             "attributedPlayerID": first.get("targetID") if first else None,
-            "causedDeaths": bool(death_count),
+            "causedDeaths": bool(effective_death_count),
+            "effectiveDeathCount": effective_death_count,
             "counted": counted,
-            "exemptReason": exempt_reason,
+            "exemptReason": None if compensation_count and counted else exempt_reason,
         })
-        death_text = f"是（{first.get('player')}·{death_count}人）" if death_count and first else "否"
+        death_text = (
+            f"是（{first.get('player')}·有效减员{effective_death_count}人"
+            + (f"，其中代偿{compensation_count}次" if compensation_count else "")
+            + "）"
+            if effective_death_count and first else "否"
+        )
         reason = (
             f"归因：{first.get('player')}为本轮第一个违规者（{first.get('rule')}，{int(first.get('delayMs') or 0) / 1000:.3f}秒）"
             if first else "归因：未发现违反时序的拉线玩家"
         )
-        if exempt_reason:
+        if death_triggered_collapse:
+            reason += f"；死亡触发：{collapse_trigger.get('player')}死亡直接触发坍缩，该玩家不归责"
+        if exempt_reason and not counted:
             reason += f"；豁免：{exempt_reason}"
         round_row["text"] = f"{round_row.get('applyTime')} 本轮是否减员：{death_text}；{reason}"
         rendered.append(round_row)
@@ -1187,7 +1285,7 @@ def normalize_gravity(fight):
         name = first["player"]
         item = per_player.setdefault(name, board_row(fight, name, "gravityLineViolation", "P3 重力坍缩违规致死"))
         item["hitCount"] += 1 if counted else 0
-        item["deathCount"] += death_count if counted else 0
+        item["deathCount"] += effective_death_count if counted else 0
         item["events"].append({
             **first,
             "fightID": fight.get("fightID"),
@@ -1196,8 +1294,17 @@ def normalize_gravity(fight):
             "players": round_row.get("targets") or [],
             "deathCount": death_count,
             "deathPlayers": round_row.get("deathPlayers") or [],
+            "compensationCount": compensation_count,
+            "compensationPlayers": round_row.get("compensationPlayers") or [],
+            "compensations": round_row.get("compensations") or [],
+            "effectiveDeathCount": effective_death_count,
+            "effectiveDeathPlayers": round_row.get("effectiveDeathPlayers") or round_row.get("deathPlayers") or [],
             "counted": counted,
-            "countReason": f"首个违规者导致本轮减员{death_count}人" if counted else (exempt_reason or "本轮未满足归责计数条件，仅展示不计数"),
+            "countReason": (
+                f"首个违规者导致本轮有效减员{effective_death_count}人"
+                + (f"（其中代偿{compensation_count}次）" if compensation_count else "")
+                if counted else (exempt_reason or "本轮未满足归责计数条件，仅展示不计数")
+            ),
             "text": round_row["text"],
         })
     crown["gravityRows"] = rendered

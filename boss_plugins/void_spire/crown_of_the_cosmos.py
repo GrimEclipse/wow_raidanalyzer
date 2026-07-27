@@ -1398,7 +1398,7 @@ def detail_spell_plan(classification, deaths):
         buff_ids |= {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID}
 
     if classification["phase"] == "P3" or key.startswith("p3"):
-        debuff_ids |= {VOID_GRASP_ID, GRAVITY_COLLAPSE_DEBUFF_ID, TERMINAL_GUARD_DEBUFF_ID, RANGER_MARK_ID, VOID_REPULSION_DEBUFF_ID}
+        debuff_ids |= {VOID_GRASP_ID, GRAVITY_COLLAPSE_DEBUFF_ID, TERMINAL_GUARD_DEBUFF_ID, RANGER_MARK_ID, VOID_REPULSION_DEBUFF_ID, DEATH_COMPENSATION_ID}
         damage_ids |= {COLLAPSING_VOID_ID, P3_LINE_DEATH_ID, COSMIC_RADIATION_DAMAGE_ID, COSMIC_DEVOUR_ID, VOID_REPULSION_DAMAGE_ID, 1242553}
         buff_ids |= ENRAGE_IDS | {COSMIC_RADIATION_BUFF_ID}
         cast_ids |= {PORTAL_CAST_ID}
@@ -2158,7 +2158,7 @@ def unique_event_targets(events, actor_map):
     return rows
 
 
-def gravity_round_at(timestamp, debuffs, fight, actor_map):
+def gravity_round_at(timestamp, debuffs, fight, actor_map, deaths=None):
     guard_applies = [
         event for event in debuffs
         if ability_id(event) == TERMINAL_GUARD_DEBUFF_ID
@@ -2254,6 +2254,17 @@ def gravity_round_at(timestamp, debuffs, fight, actor_map):
             key=lambda item: item.get("timestamp", 0),
             default=None,
         )
+    trigger_death = None
+    if trigger:
+        trigger_death = min(
+            (
+                death for death in deaths or []
+                if death.get("targetID") == trigger.get("targetID")
+                and abs(death.get("timestamp", 0) - trigger.get("timestamp", 0)) <= 750
+            ),
+            key=lambda death: abs(death.get("timestamp", 0) - trigger.get("timestamp", 0)),
+            default=None,
+        )
     return {
         "targets": round_targets,
         "trigger": {
@@ -2261,6 +2272,12 @@ def gravity_round_at(timestamp, debuffs, fight, actor_map):
             "player": actor(actor_map, trigger.get("targetID")),
             "timestamp": trigger.get("timestamp", 0),
             "time": format_time(fight_elapsed(trigger, fight)),
+            "deathTriggered": trigger_death is not None,
+            "deathTrigger": {
+                "timestamp": trigger_death.get("timestamp", 0),
+                "time": format_time(fight_elapsed(trigger_death, fight)),
+                "abilityID": trigger_death.get("killingAbilityGameID"),
+            } if trigger_death else None,
         } if trigger else None,
     }
 
@@ -2271,19 +2288,29 @@ def analyze_gravity_attribution(fight, actor_map, deaths, debuffs):
     for cluster in cluster_events(gravity_deaths, window_ms=1_500):
         if len(cluster["events"]) <= 2:
             continue
-        round_info = gravity_round_at(cluster["start"], debuffs, fight, actor_map)
+        round_info = gravity_round_at(cluster["start"], debuffs, fight, actor_map, deaths)
         trigger = round_info["trigger"]
         target_names = [row["player"] for row in round_info["targets"]]
         trigger_name = trigger["player"] if trigger else "未知拉线"
+        death_triggered = bool(trigger and trigger.get("deathTriggered"))
+        source = "死亡触发（不归责）" if death_triggered else trigger_name
         target_text = "、".join(target_names) if target_names else "未识别"
+        trigger_text = (
+            f"由{trigger_name}死亡直接触发，该死亡玩家不作为归因人"
+            if death_triggered
+            else f"团血崩于{trigger_name}的那次拉线"
+        )
         rows.append({
             "time": format_time(cluster["start"] - fight["startTime"]),
-            "source": trigger_name,
+            "source": source,
+            "sourcePlayer": None if death_triggered else (trigger_name if trigger else None),
             "deathCount": len(cluster["events"]),
             "markPlayers": target_names,
             "trigger": trigger,
+            "deathTriggered": death_triggered,
+            "deathTriggeredPlayer": trigger_name if death_triggered else None,
             "players": [actor(actor_map, death.get("targetID")) for death in cluster["events"]],
-            "text": f"{format_time(cluster['start'] - fight['startTime'])} 重力坍缩造成 {len(cluster['events'])} 人死亡，本轮点名为 {target_text}，团血崩于{trigger_name}的那次拉线。",
+            "text": f"{format_time(cluster['start'] - fight['startTime'])} 重力坍缩造成 {len(cluster['events'])} 人死亡，本轮点名为 {target_text}，{trigger_text}。",
         })
     return rows
 
@@ -2384,7 +2411,14 @@ def apply_global_death_exemption(local_board, deaths, fight):
                 elif skill_key == "collapsingVoidSnapAiming":
                     row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted_events)
                 elif skill_key == "gravityLineViolation":
-                    row["deathCount"] = sum(int(event.get("deathCount") or 0) for event in counted_events)
+                    row["deathCount"] = sum(
+                        int(
+                            event.get("effectiveDeathCount")
+                            if event.get("effectiveDeathCount") is not None
+                            else event.get("deathCount") or 0
+                        )
+                        for event in counted_events
+                    )
                 elif skill_key in {"p1SilverArrowDeaths", "p15AvoidableDeaths", PASSAGE_CLIFF_SKILL_KEY}:
                     row["deathCount"] = len(counted_events)
                 elif skill_key == "tankRiftSlashFailure":
@@ -2446,6 +2480,11 @@ def analyze_avoidable_damage(fight, actor_map, actor_type, player_roles, damage_
 def build_snap_aiming_board(field_audit, player_roles, fight_id):
     rows = {}
     for group in (field_audit or {}).get("bowGroups") or []:
+        marked_players = [
+            marked.get("player")
+            for marked in group.get("players") or []
+            if marked.get("player")
+        ]
         for player in group.get("players") or []:
             name = player.get("player")
             if not name:
@@ -2468,6 +2507,8 @@ def build_snap_aiming_board(field_audit, player_roles, fight_id):
                     "time": player.get("deathTime") or player.get("fadeTime") or group.get("fireTime"),
                     "positionMs": player.get("deathTimeMs") or player.get("fadeTimeMs") or group.get("fireTimeMs"),
                     "players": [],
+                    "markPlayers": marked_players,
+                    "victimPlayers": [],
                     "deathCount": 0,
                     "counted": False,
                     "displayOnly": True,
@@ -2488,6 +2529,8 @@ def build_snap_aiming_board(field_audit, player_roles, fight_id):
                 "positionMs": player.get("fadeTimeMs") or group.get("fireTimeMs"),
                 "movementYards": player.get("lastSecondMovementYards"),
                 "players": [death.get("player") for death in deaths if death.get("player")],
+                "markPlayers": marked_players,
+                "victimPlayers": [death.get("player") for death in deaths if death.get("player")],
                 "deathCount": len(deaths),
                 "counted": bool(deaths),
                 "countReason": (
@@ -3864,7 +3907,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         fight, actor_map, actor_type, deaths, healing_by_target,
         player_roles=player_roles, field_audit=field_audit, classification_key=reason_key,
     )
-    transition_details = build_transition_details(fight, actor_map, player_roles, deaths, markers, detail_buffs)
+    transition_details = build_transition_details(fight, actor_map, player_roles, deaths, markers, detail_buffs + detail_debuffs)
     p3_portal_summons = build_p3_portal_summons(fight, actor_map, actor_game_id, detail_casts)
     rift_slash_rows = analyze_rift_slash_tank_swaps(fight, actor_map, actor_type, player_roles, detail_debuffs, deaths, markers)
 
@@ -4350,14 +4393,28 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         name = first_violation.get("player")
         item = gravity_board.setdefault(name, build_board_row(name, "gravityLineViolation", "P3 重力坍缩违规致死", role=player_roles.get(first_violation.get("targetID"), "unknown")))
         counted = gravity.get("counted") is True
+        effective_death_count = int(
+            gravity.get("effectiveDeathCount")
+            if gravity.get("effectiveDeathCount") is not None
+            else gravity.get("deathCount") or 0
+        )
+        compensation_count = int(gravity.get("compensationCount") or 0)
         item["hitCount"] += 1 if counted else 0
-        item["deathCount"] += int(gravity.get("deathCount") or 0) if counted else 0
+        item["deathCount"] += effective_death_count if counted else 0
         item["events"].append({
             **first_violation, "fightID": fight["id"], "phase": "P3", "group": gravity.get("index"),
             "players": gravity.get("targets") or [], "deathCount": gravity.get("deathCount"),
             "deathPlayers": gravity.get("deathPlayers") or [], "counted": counted,
+            "compensationCount": compensation_count,
+            "compensationPlayers": gravity.get("compensationPlayers") or [],
+            "compensations": gravity.get("compensations") or [],
+            "effectiveDeathCount": effective_death_count,
+            "effectiveDeathPlayers": gravity.get("effectiveDeathPlayers") or gravity.get("deathPlayers") or [],
             "countReason": (
-                f"首个违规者导致本轮减员{int(gravity.get('deathCount') or 0)}人"
+                (
+                    f"首个违规者导致本轮有效减员{effective_death_count}人"
+                    + (f"（其中代偿{compensation_count}次）" if compensation_count else "")
+                )
                 if counted else (gravity.get("exemptReason") or "本轮未满足归责计数条件，仅展示不计数")
             ),
         })
@@ -4472,7 +4529,7 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
         shock_interrupt_table = fetch_interference_interrupt_table(token, report_id, fight)
     buffs = fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID, RAGE_STACK_ID, DEATH_COMPENSATION_ID} | ENRAGE_IDS, "读取阶段/狂暴 Buff")
     buffs += fetch_spell_events(token, report_id, fight, "Buffs", {COSMIC_RADIATION_BUFF_ID, COSMIC_BARRIER_ID, RAGE_STACK_ID} | ENRAGE_IDS, "读取敌方阶段/狂暴 Buff", hostility_type="Enemies")
-    debuffs = fetch_spell_events(token, report_id, fight, "Debuffs", {1234570, TERMINAL_GUARD_DEBUFF_ID}, "读取阶段 Debuff")
+    debuffs = fetch_spell_events(token, report_id, fight, "Debuffs", {1234570, TERMINAL_GUARD_DEBUFF_ID, DEATH_COMPENSATION_ID}, "读取阶段 Debuff")
     progress("读取敌方能量事件", 2)
     energy_events = fetch_events_all(token, report_id, "Resources", fight, hostility_type="Enemies", include_resources=True)
     progress(f"敌方能量事件：{len(energy_events)} 条", 2)
@@ -4628,7 +4685,7 @@ def build_aggregated_json(report_ids):
             cached_root = json.loads(Path(cache_path).read_text(encoding="utf-8"))
             for cached_fight in cached_root.get("data", {}).get("page1_wipeAnalysis", []):
                 audit = (cached_fight.get("crownOfTheCosmos") or {}).get("fieldAudit")
-                if audit and (audit.get("meta") or {}).get("schemaVersion") == "2026-07-14-global-exemption-v6":
+                if audit and (audit.get("meta") or {}).get("schemaVersion") == "2026-07-24-compensation-gravity-v7":
                     field_audit_cache[(str(cached_fight.get("reportID")), int(cached_fight.get("fightID")))] = audit
             progress(f"复用逐技能场地缓存：{len(field_audit_cache)} 场", 1)
         except Exception as error:
