@@ -7,12 +7,29 @@ tools/tmp/
 .env.*
 !.env.example
 
-# Local generated WCL output and private report snapshots.
+# Local generated WCL output, private report snapshots, and release artifacts.
 .analysis_jobs/
-wcl_hardcore_api.json
-data/wcl_*.json
-data/manifest.json
-!data/.gitkeep
+/wcl_hardcore_api.json
+/verdict_data.json
+/data/*
+!/data/.gitkeep
+/tmp/
+/verdicts/*
+!/verdicts/.gitkeep
+/scoreboard/*.db
+/dist/
+*.zip
+*.rar
+*.exe
+
+# Accidental artifacts from unrelated local tasks.
+/.tools/
+/.video_work/
+/audio_material_license_notes.txt
+
+# Local generated Word documents.
+*.doc
+*.docx
 
 # Local workspace metadata.
 .agents/
