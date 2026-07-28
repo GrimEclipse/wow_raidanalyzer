@@ -68,7 +68,117 @@
               "plugin": "boss_plugins.void_spire.crown_of_the_cosmos",
               "supported": true,
               "disabledReason": "",
-              "configSchema": []
+              "configSchema": [
+                {
+                  "key": "voidGraspReviewEnabled",
+                  "type": "boolean",
+                  "label": "取证空虚之握治疗",
+                  "description": "关闭后不请求空虚之握阵亡者的治疗明细，可降低 WCL 请求量。",
+                  "default": true
+                },
+                {
+                  "key": "voidGraspCountEnabled",
+                  "type": "boolean",
+                  "label": "空虚之握治疗不足计入终审",
+                  "description": "关闭后仍保留治疗证据，但不会记为违规或扣分。",
+                  "default": true,
+                  "visibleWhen": {
+                    "field": "voidGraspReviewEnabled",
+                    "equals": true
+                  }
+                },
+                {
+                  "key": "voidGraspDesignatedHealers",
+                  "type": "playerList",
+                  "label": "空虚之握指定治疗玩家",
+                  "description": "填写角色名或 WCL actor ID；留空表示不指定任何治疗。",
+                  "placeholder": "旖旎云逸, 暗黑膏药",
+                  "default": [
+                    "旖旎云逸",
+                    "暗黑膏药"
+                  ],
+                  "visibleWhen": {
+                    "field": "voidGraspReviewEnabled",
+                    "equals": true
+                  }
+                },
+                {
+                  "key": "voidGraspHealingThreshold",
+                  "type": "number",
+                  "label": "空虚之握死亡前 8 秒治疗阈值",
+                  "description": "指定治疗对阵亡者的 8 秒总治疗低于此值时标记为治疗不足。",
+                  "unit": "治疗量",
+                  "integer": true,
+                  "min": 0,
+                  "max": 5000000,
+                  "step": 10000,
+                  "default": 200000,
+                  "visibleWhen": {
+                    "field": "voidGraspReviewEnabled",
+                    "equals": true
+                  }
+                },
+                {
+                  "key": "silverArrowCountEnabled",
+                  "type": "boolean",
+                  "label": "银锋箭高伤致死计入终审",
+                  "description": "关闭后仍展示高伤致死证据，但不会记为违规或扣分。",
+                  "default": true
+                },
+                {
+                  "key": "silverArrowFatalThreshold",
+                  "type": "number",
+                  "label": "银锋箭高伤致死阈值",
+                  "description": "P1 点名玩家受到高于此值的致死银锋箭时触发记录。",
+                  "unit": "伤害",
+                  "integer": true,
+                  "min": 0,
+                  "max": 5000000,
+                  "step": 5000,
+                  "default": 275000
+                },
+                {
+                  "key": "gravityResponsibilityMode",
+                  "type": "select",
+                  "label": "重力坍缩处理方式",
+                  "description": "默认只保留大规模减员组、成员与死亡间隔；实验性归责需显式开启。",
+                  "default": "evidence_only",
+                  "options": [
+                    {
+                      "value": "evidence_only",
+                      "label": "仅取证，不定罪"
+                    },
+                    {
+                      "value": "adjudicate",
+                      "label": "启用实验性归责"
+                    }
+                  ]
+                },
+                {
+                  "key": "gravityMassDeathMinimum",
+                  "type": "number",
+                  "label": "重力坍缩大规模减员人数",
+                  "description": "同一时间组达到该死亡人数后，输出为大规模减员证据。",
+                  "unit": "人",
+                  "integer": true,
+                  "min": 2,
+                  "max": 20,
+                  "step": 1,
+                  "default": 3
+                },
+                {
+                  "key": "gravityClusterWindowMs",
+                  "type": "number",
+                  "label": "重力坍缩死亡分组间隔",
+                  "description": "相邻死亡间隔不超过此值时归入同一组。",
+                  "unit": "毫秒",
+                  "integer": true,
+                  "min": 100,
+                  "max": 10000,
+                  "step": 100,
+                  "default": 1500
+                }
+              ]
             }
           ]
         },

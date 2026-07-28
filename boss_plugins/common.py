@@ -1,6 +1,15 @@
 import json
 from pathlib import Path
 
+from boss_plugins.combat_config import (
+    PERSONAL_DEFENSIVES,
+    RAID_DEFENSIVES,
+    audit_personal_defensive_readiness,
+    audit_raid_defensive_assignment,
+    defensive_spell_ids,
+    find_defensive_uses_before_death,
+)
+
 
 COMBAT_RES_SPELLS = {
     20484: "复生",

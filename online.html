@@ -85,7 +85,8 @@ const state = {
     eventSource: null,
     selectedVersion: '',
     selectedRaid: '',
-    selectedBoss: ''
+    selectedBoss: '',
+    configValues: {}
 };
 
 const el = {
@@ -118,6 +119,36 @@ function activeRaid() {
 
 function activeBoss() {
     return (activeRaid().bosses || []).find(item => item.key === state.selectedBoss) || (activeRaid().bosses || [])[0] || {};
+}
+
+function configIdentity() {
+    return [state.selectedVersion, state.selectedRaid, state.selectedBoss].join('/');
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function currentConfigValue(field) {
+    const values = state.configValues[configIdentity()] || {};
+    if (Object.prototype.hasOwnProperty.call(values, field.key)) return values[field.key];
+    if (Object.prototype.hasOwnProperty.call(field, 'default')) {
+        return Array.isArray(field.default) ? [...field.default] : field.default;
+    }
+    if (field.type === 'boolean') return false;
+    if (['playerList', 'textList'].includes(field.type)) return [];
+    return '';
+}
+
+function rememberConfigValue(key, value) {
+    const identity = configIdentity();
+    state.configValues[identity] ||= {};
+    state.configValues[identity][key] = value;
 }
 
 function fillSelect(select, items, getValue, getLabel, selectedValue, disabledCheck) {
@@ -167,21 +198,148 @@ function renderConfig() {
     el.configSection.classList.toggle('hidden', schema.length === 0);
 
     schema.forEach(field => {
-        if (field.type !== 'interruptGroups') return;
         const wrapper = document.createElement('div');
+        const value = currentConfigValue(field);
         wrapper.dataset.configKey = field.key;
-        wrapper.innerHTML = `
-            <div class="text-sm font-semibold text-gray-200">${field.label}</div>
-            <div class="mt-3 grid gap-3 md:grid-cols-2">
-                ${field.groups.map(group => `
-                    <label class="block rounded border border-gray-800 bg-gray-900 p-3">
-                        <span class="text-xs font-bold text-gray-400">${group.label}</span>
-                        <input data-group="${group.key}" class="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none" placeholder="x x x">
-                    </label>
-                `).join('')}
-            </div>
-        `;
+        wrapper.dataset.configType = field.type;
+        wrapper.className = 'rounded border border-gray-800 bg-gray-900 p-4';
+        wrapper.configVisibleWhen = field.visibleWhen || null;
+        if (field.visibleWhen) {
+            wrapper.classList.add('ml-4', 'border-l-2', 'border-l-blue-800');
+        }
+
+        const label = escapeHtml(field.label || field.key);
+        const description = field.description
+            ? `<div class="mt-1 text-xs leading-5 text-gray-500">${escapeHtml(field.description)}</div>`
+            : '';
+        const unit = field.unit ? `<span class="text-xs text-gray-500">${escapeHtml(field.unit)}</span>` : '';
+        const inputClass = 'mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none';
+        let control = '';
+
+        if (field.type === 'boolean') {
+            control = `
+                <label class="flex cursor-pointer items-start gap-3">
+                    <input data-config-input type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-600 bg-gray-950 text-blue-600" ${value ? 'checked' : ''}>
+                    <span><span class="text-sm font-semibold text-gray-200">${label}</span>${description}</span>
+                </label>
+            `;
+        } else if (field.type === 'number') {
+            control = `
+                <label class="block">
+                    <span class="flex items-center justify-between gap-3"><span class="text-sm font-semibold text-gray-200">${label}</span>${unit}</span>
+                    ${description}
+                    <input data-config-input type="number" value="${escapeHtml(value)}"
+                        ${field.min != null ? `min="${escapeHtml(field.min)}"` : ''}
+                        ${field.max != null ? `max="${escapeHtml(field.max)}"` : ''}
+                        ${field.step != null ? `step="${escapeHtml(field.step)}"` : ''}
+                        class="${inputClass}">
+                </label>
+            `;
+        } else if (field.type === 'select') {
+            control = `
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-200">${label}</span>
+                    ${description}
+                    <select data-config-input class="${inputClass}">
+                        ${(field.options || []).map(option => {
+                            const optionValue = typeof option === 'object' ? option.value : option;
+                            const optionLabel = typeof option === 'object' ? option.label : option;
+                            return `<option value="${escapeHtml(optionValue)}" ${String(value) === String(optionValue) ? 'selected' : ''}>${escapeHtml(optionLabel)}</option>`;
+                        }).join('')}
+                    </select>
+                </label>
+            `;
+        } else if (['playerList', 'textList'].includes(field.type)) {
+            const textValue = Array.isArray(value) ? value.join(', ') : value;
+            control = `
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-200">${label}</span>
+                    ${description}
+                    <textarea data-config-input rows="2" placeholder="${escapeHtml(field.placeholder || '用逗号、空格或换行分隔')}" class="${inputClass}">${escapeHtml(textValue)}</textarea>
+                </label>
+            `;
+        } else if (field.type === 'text') {
+            control = `
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-200">${label}</span>
+                    ${description}
+                    <input data-config-input type="text" value="${escapeHtml(value)}" class="${inputClass}">
+                </label>
+            `;
+        } else if (field.type === 'interruptGroups') {
+            control = `
+                <div class="text-sm font-semibold text-gray-200">${label}</div>
+                ${description}
+                <div class="mt-3 grid gap-3 md:grid-cols-2">
+                    ${(field.groups || []).map(group => `
+                        <label class="block rounded border border-gray-800 bg-gray-950 p-3">
+                            <span class="text-xs font-bold text-gray-400">${escapeHtml(group.label)}</span>
+                            <input data-group="${escapeHtml(group.key)}" value="${escapeHtml((value?.[group.key] || []).join(' '))}" class="${inputClass}" placeholder="玩家A 玩家B 玩家C">
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+        }
+        wrapper.innerHTML = control;
+        wrapper.querySelectorAll('input, textarea, select').forEach(input => {
+            input.addEventListener('change', () => {
+                rememberConfigValue(field.key, readConfigField(wrapper));
+                updateConfigVisibility();
+            });
+        });
         el.configFields.appendChild(wrapper);
+    });
+    updateConfigVisibility();
+}
+
+function splitList(value) {
+    return String(value || '').split(/[\s,，、;；]+/).map(item => item.trim()).filter(Boolean);
+}
+
+function readConfigField(section) {
+    const type = section.dataset.configType;
+    if (type === 'interruptGroups') {
+        const groups = {};
+        section.querySelectorAll('input[data-group]').forEach(input => {
+            groups[input.dataset.group] = splitList(input.value);
+        });
+        return groups;
+    }
+    const input = section.querySelector('[data-config-input]');
+    if (!input) return null;
+    if (type === 'boolean') return input.checked;
+    if (type === 'number') return input.value === '' ? null : Number(input.value);
+    if (['playerList', 'textList'].includes(type)) return splitList(input.value);
+    return input.value;
+}
+
+function configConditionMatches(condition, actual) {
+    if (!condition) return true;
+    if (Object.prototype.hasOwnProperty.call(condition, 'equals')) {
+        return actual === condition.equals;
+    }
+    if (Object.prototype.hasOwnProperty.call(condition, 'notEquals')) {
+        return actual !== condition.notEquals;
+    }
+    return true;
+}
+
+function updateConfigVisibility() {
+    const sections = [...document.querySelectorAll('[data-config-key]')];
+    const byKey = Object.fromEntries(sections.map(section => [section.dataset.configKey, section]));
+    sections.forEach(section => {
+        const condition = section.configVisibleWhen;
+        if (!condition) {
+            section.classList.remove('hidden');
+            return;
+        }
+        const parent = byKey[condition.field];
+        const parentVisible = parent && !parent.classList.contains('hidden');
+        const parentValue = parent ? readConfigField(parent) : undefined;
+        section.classList.toggle(
+            'hidden',
+            !parentVisible || !configConditionMatches(condition, parentValue)
+        );
     });
 }
 
@@ -202,10 +360,8 @@ function collectOptions() {
     const options = {};
     document.querySelectorAll('[data-config-key]').forEach(section => {
         const key = section.dataset.configKey;
-        options[key] = {};
-        section.querySelectorAll('input[data-group]').forEach(input => {
-            options[key][input.dataset.group] = input.value.split(/[\s,，、]+/).map(item => item.trim()).filter(Boolean);
-        });
+        options[key] = readConfigField(section);
+        rememberConfigValue(key, options[key]);
     });
     return options;
 }

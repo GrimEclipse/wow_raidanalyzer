@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+from analyzer_core.config import validate_config_schema
+
 
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "boss_catalog.json"
 
@@ -81,6 +83,8 @@ def build_catalog(document: Optional[dict] = None) -> List[BossEntry]:
 
                 supported = bool(boss.get("supported"))
                 plugin = str(boss.get("plugin") or "").strip()
+                config_schema = list(boss.get("configSchema") or [])
+                validate_config_schema(config_schema)
                 if supported and not plugin:
                     raise RuntimeError(f"已启用 Boss 缺少 plugin：{'/'.join(identity)}")
 
@@ -97,7 +101,7 @@ def build_catalog(document: Optional[dict] = None) -> List[BossEntry]:
                             boss.get("disabledReason")
                             or ("" if supported else "暂未接入在线分析")
                         ),
-                        config_schema=list(boss.get("configSchema") or []),
+                        config_schema=config_schema,
                         order=int(boss.get("order") or index),
                         english_name=str(boss.get("englishName") or ""),
                         external_key=external_key,

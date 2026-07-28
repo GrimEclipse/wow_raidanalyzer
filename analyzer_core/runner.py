@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 from analyzer_core.catalog import find_boss
+from analyzer_core.config import resolve_analysis_options
 from analyzer_core.progress import emit_progress, progress_scope
 
 
@@ -45,6 +46,7 @@ def analyze_report(
         print(f"[analyze] loading plugin: {entry.plugin}", flush=True)
         emit_progress("加载 Boss 插件", percent=2, stage="prepare")
         plugin = load_plugin(entry)
+        resolved_options = resolve_analysis_options(entry.config_schema, options or {})
         print("[analyze] plugin loaded, starting WCL analysis", flush=True)
         emit_progress("启动 WCL 分析任务", percent=5, stage="prepare")
         return call_plugin(
@@ -52,6 +54,6 @@ def analyze_report(
             report_ids=report_ids,
             output_path=output_path,
             catalog_entry=entry,
-            options=options or {},
+            options=resolved_options,
             progress_callback=progress_callback,
         )

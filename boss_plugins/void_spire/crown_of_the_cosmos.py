@@ -226,6 +226,25 @@ VOID_GRASP_HEALING_MIN = int(os.getenv("CROWN_VOID_GRASP_HEALING_MIN", "200000")
 VERDICT_POINTS_PER_COUNT = int(os.getenv("CROWN_VERDICT_POINTS_PER_COUNT", "10"))
 VERDICT_TANK_MULTIPLIER = float(os.getenv("CROWN_VERDICT_TANK_MULTIPLIER", "1"))
 
+CROWN_ANALYSIS_DEFAULTS = {
+    "voidGraspReviewEnabled": True,
+    "voidGraspCountEnabled": True,
+    "voidGraspDesignatedHealers": sorted(DESIGNATED_HEALER_NAMES),
+    "voidGraspHealingThreshold": VOID_GRASP_HEALING_MIN,
+    "silverArrowCountEnabled": True,
+    "silverArrowFatalThreshold": 275_000,
+    "gravityResponsibilityMode": "evidence_only",
+    "gravityMassDeathMinimum": 3,
+    "gravityClusterWindowMs": 1_500,
+}
+
+
+def resolve_crown_analysis_config(options=None):
+    config = dict(CROWN_ANALYSIS_DEFAULTS)
+    config.update(options or {})
+    config["voidGraspDesignatedHealers"] = list(config.get("voidGraspDesignatedHealers") or [])
+    return config
+
 
 def configured_acquittals():
     result = {}
@@ -2282,12 +2301,23 @@ def gravity_round_at(timestamp, debuffs, fight, actor_map, deaths=None):
     }
 
 
-def analyze_gravity_attribution(fight, actor_map, deaths, debuffs):
+def analyze_gravity_attribution(
+    fight,
+    actor_map,
+    deaths,
+    debuffs,
+    *,
+    cluster_window_ms=1_500,
+    minimum_deaths=3,
+):
     gravity_deaths = [death for death in deaths if death.get("killingAbilityGameID") == P3_LINE_DEATH_ID]
     rows = []
-    for cluster in cluster_events(gravity_deaths, window_ms=1_500):
-        if len(cluster["events"]) <= 2:
+    for cluster in cluster_events(gravity_deaths, window_ms=cluster_window_ms):
+        if len(cluster["events"]) < minimum_deaths:
             continue
+        ordered_events = sorted(cluster["events"], key=lambda event: int(event.get("timestamp") or 0))
+        timestamps = [int(event.get("timestamp") or 0) for event in ordered_events]
+        intervals = [timestamps[index] - timestamps[index - 1] for index in range(1, len(timestamps))]
         round_info = gravity_round_at(cluster["start"], debuffs, fight, actor_map, deaths)
         trigger = round_info["trigger"]
         target_names = [row["player"] for row in round_info["targets"]]
@@ -2309,7 +2339,10 @@ def analyze_gravity_attribution(fight, actor_map, deaths, debuffs):
             "trigger": trigger,
             "deathTriggered": death_triggered,
             "deathTriggeredPlayer": trigger_name if death_triggered else None,
-            "players": [actor(actor_map, death.get("targetID")) for death in cluster["events"]],
+            "players": [actor(actor_map, death.get("targetID")) for death in ordered_events],
+            "deathIntervalsMs": intervals,
+            "clusterDurationMs": (timestamps[-1] - timestamps[0]) if len(timestamps) > 1 else 0,
+            "clusterWindowMs": cluster_window_ms,
             "text": f"{format_time(cluster['start'] - fight['startTime'])} 重力坍缩造成 {len(cluster['events'])} 人死亡，本轮点名为 {target_text}，{trigger_text}。",
         })
     return rows
@@ -3473,18 +3506,40 @@ def matching_void_grasp_bow(field_audit, target_id, death_elapsed_ms):
     }
 
 
-def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_target, player_roles=None, field_audit=None, classification_key=None):
+def analyze_void_grasp_healing(
+    fight,
+    actor_map,
+    actor_type,
+    deaths,
+    healing_by_target,
+    player_roles=None,
+    field_audit=None,
+    classification_key=None,
+    designated_healers=None,
+    healing_threshold=VOID_GRASP_HEALING_MIN,
+):
     rows = []
     player_roles = player_roles or {}
     audit_deaths = (field_audit or {}).get("voidDeaths") or []
+    configured_healers = (
+        [*sorted(DESIGNATED_HEALER_NAMES), *[str(value) for value in sorted(DESIGNATED_HEALER_IDS)]]
+        if designated_healers is None
+        else list(designated_healers)
+    )
+    designated_healer_ids = {
+        int(value) for value in configured_healers
+        if str(value).strip().isdigit()
+    }
+    designated_healer_names = {
+        str(value).strip() for value in configured_healers
+        if str(value).strip() and not str(value).strip().isdigit()
+    }
     designated_name_ids = defaultdict(set)
-    if DESIGNATED_HEALER_IDS:
-        for actor_id in DESIGNATED_HEALER_IDS:
-            designated_name_ids[actor(actor_map, actor_id)].add(actor_id)
-    else:
-        for actor_id, name in actor_map.items():
-            if name in DESIGNATED_HEALER_NAMES:
-                designated_name_ids[name].add(actor_id)
+    for actor_id in designated_healer_ids:
+        designated_name_ids[actor(actor_map, actor_id)].add(actor_id)
+    for actor_id, name in actor_map.items():
+        if name in designated_healer_names:
+            designated_name_ids[name].add(actor_id)
     for death in deaths:
         if death.get("killingAbilityGameID") != VOID_GRASP_ID:
             continue
@@ -3522,12 +3577,12 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
         for source in (audit_death or {}).get("healerRoster") or []:
             healer_name = source.get("healer")
             healer_id = source.get("healerID")
-            if healer_name in DESIGNATED_HEALER_NAMES and healer_id is not None:
+            if healer_name in designated_healer_names and healer_id is not None:
                 death_designated_name_ids[healer_name].add(healer_id)
         for source in (audit_death or {}).get("healingByHealer") or []:
             healer_name = source.get("healer")
             healer_id = source.get("healerID")
-            if healer_name in DESIGNATED_HEALER_NAMES and healer_id is not None:
+            if healer_name in designated_healer_names and healer_id is not None:
                 death_designated_name_ids[healer_name].add(healer_id)
         active_phantoms = int((audit_death or {}).get("activePhantomCount") or 0)
         dead_player_count = int((audit_death or {}).get("deadPlayerCountAtDeath") or len(prior_dead_names))
@@ -3574,7 +3629,7 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
                 "healer": healer_name,
                 "healing6s": healing6s,
                 "healing8s": healing8s,
-                "insufficient": healing8s < VOID_GRASP_HEALING_MIN,
+                "insufficient": healing8s < healing_threshold,
             })
         rows.append({
             "time": format_time(death_elapsed_ms),
@@ -3591,7 +3646,7 @@ def analyze_void_grasp_healing(fight, actor_map, actor_type, deaths, healing_by_
             "totalHealing6s": sum(item["healing6s"] for item in breakdown),
             "window6s": f"{format_time(max(0, death_ts - fight['startTime'] - 6_000))}-{format_time(death_ts - fight['startTime'])}",
             "window8s": f"{format_time(max(0, death_elapsed_ms - 8_000))}-{format_time(death_elapsed_ms)}",
-            "threshold8s": VOID_GRASP_HEALING_MIN,
+            "threshold8s": healing_threshold,
             "activePhantomCount": active_phantoms,
             "deadPlayerCountAtDeath": dead_player_count,
             "deathEventCountAtDeath": death_event_count,
@@ -3815,6 +3870,7 @@ def analyze_rift_slash_tank_swaps(fight, actor_map, actor_type, player_roles, de
 
 
 def analyze_fight(report_id, fight, actor_map, actor_type, payload):
+    analysis_config = resolve_crown_analysis_config(payload.get("analysisConfig"))
     deaths = payload["deaths"]
     markers = payload["markers"]
     classification = payload["classification"]
@@ -3882,7 +3938,14 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         collapsing_rows, collapsing_deaths = analyze_collapsing_void(fight, actor_map, actor_type, deaths, detail_damage, detail_debuffs, player_roles)
         shadow_misses = analyze_p2_shadow_misses(fight, actor_map, actor_game_id, detail_damage, detail_debuffs, markers, phantom_damage)
         energy_misses = analyze_p2_energy(markers, fight, detail_debuffs, detail_damage, energy_events, actor_map, actor_game_id)
-        gravity_rows = analyze_gravity_attribution(fight, actor_map, deaths, detail_debuffs)
+        gravity_rows = analyze_gravity_attribution(
+            fight,
+            actor_map,
+            deaths,
+            detail_debuffs,
+            cluster_window_ms=analysis_config["gravityClusterWindowMs"],
+            minimum_deaths=analysis_config["gravityMassDeathMinimum"],
+        )
         p2_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P2"), actor_map, "P2")
         void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage, deaths)
     else:
@@ -3893,7 +3956,14 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         collapsing_rows, collapsing_deaths = analyze_collapsing_void(fight, actor_map, actor_type, deaths, detail_damage, detail_debuffs, player_roles)
         shadow_misses = analyze_p2_shadow_misses(fight, actor_map, actor_game_id, detail_damage, detail_debuffs, markers, phantom_damage)
         energy_misses = analyze_p2_energy(markers, fight, detail_debuffs, detail_damage, energy_events, actor_map, actor_game_id)
-        gravity_rows = analyze_gravity_attribution(fight, actor_map, deaths, detail_debuffs)
+        gravity_rows = analyze_gravity_attribution(
+            fight,
+            actor_map,
+            deaths,
+            detail_debuffs,
+            cluster_window_ms=analysis_config["gravityClusterWindowMs"],
+            minimum_deaths=analysis_config["gravityMassDeathMinimum"],
+        )
         p2_ranger_mark_rows = render_ranger_mark_groups(analyze_ranger_mark_groups(markers, fight, detail_debuffs, "P2"), actor_map, "P2")
         void_repulsion_rows, void_repulsion_records = analyze_void_repulsion_placement(fight, actor_map, detail_debuffs, markers, position_events, detail_casts, actor_game_id, detail_damage, deaths)
 
@@ -3903,9 +3973,21 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
         fight, actor_map, actor_type, shock_casts, player_casts, shock_interrupt_table, markers,
     )
     energy_misses = refine_p2_energy_with_field_audit(energy_misses, field_audit, actor_map)
-    void_grasp_healing = analyze_void_grasp_healing(
-        fight, actor_map, actor_type, deaths, healing_by_target,
-        player_roles=player_roles, field_audit=field_audit, classification_key=reason_key,
+    void_grasp_healing = (
+        analyze_void_grasp_healing(
+            fight,
+            actor_map,
+            actor_type,
+            deaths,
+            healing_by_target,
+            player_roles=player_roles,
+            field_audit=field_audit,
+            classification_key=reason_key,
+            designated_healers=analysis_config["voidGraspDesignatedHealers"],
+            healing_threshold=analysis_config["voidGraspHealingThreshold"],
+        )
+        if analysis_config["voidGraspReviewEnabled"]
+        else []
     )
     transition_details = build_transition_details(fight, actor_map, player_roles, deaths, markers, detail_buffs + detail_debuffs)
     p3_portal_summons = build_p3_portal_summons(fight, actor_map, actor_game_id, detail_casts)
@@ -4200,7 +4282,7 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 continue
             name = healer["healer"]
             item = healing_board.setdefault(name, build_board_row(name, "voidGraspHealingLow", "空虚之握死亡治疗不足", role=player_roles.get(healer.get("healerID"), "unknown")))
-            counted = not death_row.get("exempt")
+            counted = analysis_config["voidGraspCountEnabled"] and not death_row.get("exempt")
             item["hitCount"] += 1 if counted else 0
             bow_text = (
                 f"{death_row.get('bowPhase')}拉弓#{death_row.get('phaseBowGroup')}（全场#{death_row.get('bowGroup')}）"
@@ -4221,8 +4303,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
                 "victimVerifiedDead": death_row.get("verifiedDeath") is True,
                 "counted": counted,
                 "countReason": (
-                    "已核对死亡事件；本场死亡<8、点名时血量>50%、幻影<4且4名治疗均存活，统计死亡前8秒指定治疗量低于200000"
-                    if counted else "；".join(death_row.get("exemptionReasons") or ["命中空虚之握豁免条件"])
+                    (
+                        "已核对死亡事件；本场死亡<8、点名时血量>50%、幻影<4且4名治疗均存活，"
+                        f"统计死亡前8秒指定治疗量低于{analysis_config['voidGraspHealingThreshold']}"
+                    )
+                    if counted else (
+                        "当前预设仅取证，空虚之握治疗不足不计入终审"
+                        if not analysis_config["voidGraspCountEnabled"]
+                        else "；".join(death_row.get("exemptionReasons") or ["命中空虚之握豁免条件"])
+                    )
                 ),
                 "text": f"{death_row['player']} 于 Fight{fight['id']} {bow_text}中阵亡（{death_row['time']}）；死亡前8秒内 {name} 对其治疗量为 {healing_amount:,}",
             })
@@ -4230,21 +4319,33 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
 
     silver_death_board = {}
     for death_row in death_timeline:
-        if death_row.get("phase") != "P1" or death_row.get("abilityID") != SILVER_ARROW_DAMAGE_ID or int(death_row.get("amount") or 0) <= 275_000:
+        if (
+            death_row.get("phase") != "P1"
+            or death_row.get("abilityID") != SILVER_ARROW_DAMAGE_ID
+            or int(death_row.get("amount") or 0) <= analysis_config["silverArrowFatalThreshold"]
+        ):
             continue
         name = death_row["player"]
         item = silver_death_board.setdefault(name, build_board_row(name, "p1SilverArrowDeaths", "P1 银锋箭高伤致死", role=death_row.get("role", "unknown")))
-        item["hitCount"] += 1
-        item["deathCount"] += 1
+        silver_counted = analysis_config["silverArrowCountEnabled"]
+        item["hitCount"] += 1 if silver_counted else 0
+        item["deathCount"] += 1 if silver_counted else 0
         item["totalDamage"] += int(death_row.get("amount") or 0)
         amount = int(death_row.get("amount") or 0)
         item["events"].append({
             **death_row,
             "fightID": fight["id"],
-            "counted": True,
-            "verdictCounted": True,
-            "countReason": "点名玩家受到超过275000的致死银锋箭",
-            "text": f"{name} 死于 P1 银锋箭高伤（{amount:,}），按高伤致死计数",
+            "counted": silver_counted,
+            "verdictCounted": silver_counted,
+            "displayOnly": not silver_counted,
+            "countReason": (
+                f"点名玩家受到超过{analysis_config['silverArrowFatalThreshold']}的致死银锋箭"
+                if silver_counted else "当前预设仅取证，银锋箭高伤致死不计入终审"
+            ),
+            "text": (
+                f"{name} 死于 P1 银锋箭高伤（{amount:,}），"
+                + ("按高伤致死计数" if silver_counted else "仅保留证据")
+            ),
         })
     local_board["p1SilverArrowDeaths"] = list(silver_death_board.values())
 
@@ -4382,7 +4483,12 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
     local_board["missedShadows"] = list(shadow_board.values())
 
     gravity_board = {}
-    for gravity in (field_audit or {}).get("gravityRounds", []):
+    gravity_rounds = (
+        (field_audit or {}).get("gravityRounds", [])
+        if analysis_config["gravityResponsibilityMode"] == "adjudicate"
+        else []
+    )
+    for gravity in gravity_rounds:
         first_violation = gravity.get("firstViolation") or min(
             (row for row in gravity.get("violations") or []),
             key=lambda row: int(row.get("order") or 999),
@@ -4499,13 +4605,15 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "riftSlashTankSwaps": rift_slash_rows,
             "transitionAbandoned": transition_abandoned,
             "globalExemption": global_exemption,
+            "analysisConfig": analysis_config,
             "fieldAuditUrl": f"crown-fight-audit.html?source=wcl_hardcore_api.json&report={report_id}&fight={fight['id']}",
             "fieldAudit": field_audit,
         },
     }
 
 
-def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
+def fetch_fight_payload(token, report_id, fight, actor_game_id=None, analysis_config=None):
+    analysis_config = resolve_crown_analysis_config(analysis_config)
     progress("读取死亡事件", 2)
     deaths = fetch_events_all(token, report_id, "Deaths", fight)
     progress(f"死亡事件：{len(deaths)} 条", 2)
@@ -4593,7 +4701,11 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
     healing_by_target = {}
     void_grasp_death_targets = sorted({
         death.get("targetID") for death in deaths
-        if death.get("killingAbilityGameID") == VOID_GRASP_ID and death.get("targetID") is not None
+        if (
+            analysis_config["voidGraspReviewEnabled"]
+            and death.get("killingAbilityGameID") == VOID_GRASP_ID
+            and death.get("targetID") is not None
+        )
     })
     for target_id in void_grasp_death_targets:
         target_deaths = [death.get("timestamp", 0) for death in deaths if death.get("targetID") == target_id and death.get("killingAbilityGameID") == VOID_GRASP_ID]
@@ -4624,8 +4736,9 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None):
     }
 
 
-def build_aggregated_json(report_ids):
+def build_aggregated_json(report_ids, options=None):
     global _API_LOGICAL_REQUESTS
+    analysis_config = resolve_crown_analysis_config(options)
     started_at = time.perf_counter()
     with _API_METRICS_LOCK:
         _API_LOGICAL_REQUESTS = 0
@@ -4666,13 +4779,21 @@ def build_aggregated_json(report_ids):
             },
             "courtConfig": {
                 "waterOutlierYards": 15,
-                "voidGraspHealingThreshold8s": VOID_GRASP_HEALING_MIN,
+                "voidGraspHealingThreshold8s": analysis_config["voidGraspHealingThreshold"],
                 "globalDeathExemptionThreshold": GLOBAL_DEATH_EXEMPT_THRESHOLD,
-                "designatedHealerIDs": sorted(DESIGNATED_HEALER_IDS),
-                "designatedHealerNames": sorted(DESIGNATED_HEALER_NAMES),
+                "designatedHealers": analysis_config["voidGraspDesignatedHealers"],
+                "designatedHealerIDs": sorted(
+                    int(value) for value in analysis_config["voidGraspDesignatedHealers"]
+                    if str(value).strip().isdigit()
+                ),
+                "designatedHealerNames": sorted(
+                    str(value).strip() for value in analysis_config["voidGraspDesignatedHealers"]
+                    if str(value).strip() and not str(value).strip().isdigit()
+                ),
                 "verdictPointsPerCount": VERDICT_POINTS_PER_COUNT,
                 "verdictTankMultiplier": VERDICT_TANK_MULTIPLIER,
             },
+            "analysisOptions": analysis_config,
             "spellLabels": {str(key): value for key, value in SPELLS.items()},
         },
         "data": {"page1_wipeAnalysis": [], "page2_transitionAnalysis": {"summary": [], "fights": []}, "page3_courtBoard": {}, "page4_finalVerdict": [], "page2_avoidableBoard": {}},
@@ -4701,8 +4822,15 @@ def build_aggregated_json(report_ids):
         def analyze_one_fight(index_and_fight):
             index, fight = index_and_fight
             progress(f"分析 Fight {fight['id']} ({index}/{len(fights)})", 1)
-            payload = fetch_fight_payload(token, report_id, fight, actor_game_id)
+            payload = fetch_fight_payload(
+                token,
+                report_id,
+                fight,
+                actor_game_id,
+                analysis_config=analysis_config,
+            )
             payload["actorGameID"] = actor_game_id
+            payload["analysisConfig"] = analysis_config
             cached_audit = field_audit_cache.get((str(report_id), int(fight["id"])))
             if cached_audit:
                 payload["fieldAudit"] = cached_audit
@@ -4817,5 +4945,5 @@ def build_aggregated_json(report_ids):
 
 
 def analyze(report_ids: str, output_path=None, catalog_entry=None, options=None):
-    result = build_aggregated_json(report_ids)
+    result = build_aggregated_json(report_ids, options=options)
     return write_json_result(result, output_path)
