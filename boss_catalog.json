@@ -60,6 +60,15 @@
               "plugin": "boss_plugins.void_spire.lightblinded_vanguard",
               "supported": true,
               "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "generic-wipe" },
+                "avoidable": { "enabled": true, "renderer": "generic-avoidable" },
+                "interrupts": { "enabled": false, "renderer": "generic-interrupts" },
+                "dispels": { "enabled": true, "renderer": "generic-dispels" },
+                "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
+                "verdict": { "enabled": false, "renderer": "mistake-verdict" },
+                "replay": { "enabled": false, "renderer": "field-audit" }
+              },
               "configSchema": []
             },
             {
@@ -68,6 +77,15 @@
               "plugin": "boss_plugins.void_spire.crown_of_the_cosmos",
               "supported": true,
               "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "generic-wipe" },
+                "avoidable": { "enabled": true, "renderer": "mistake-tracker" },
+                "interrupts": { "enabled": false, "renderer": "generic-interrupts" },
+                "dispels": { "enabled": false, "renderer": "generic-dispels" },
+                "mistakes": { "enabled": true, "renderer": "mistake-tracker" },
+                "verdict": { "enabled": true, "renderer": "mistake-verdict" },
+                "replay": { "enabled": true, "renderer": "field-audit" }
+              },
               "configSchema": [
                 {
                   "key": "voidGraspReviewEnabled",
@@ -200,6 +218,15 @@
               "plugin": "boss_plugins.march_on_queldanas.midnight_falls",
               "supported": true,
               "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "generic-wipe" },
+                "avoidable": { "enabled": true, "renderer": "generic-avoidable" },
+                "interrupts": { "enabled": true, "renderer": "generic-interrupts" },
+                "dispels": { "enabled": false, "renderer": "generic-dispels" },
+                "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
+                "verdict": { "enabled": false, "renderer": "mistake-verdict" },
+                "replay": { "enabled": false, "renderer": "field-audit" }
+              },
               "configSchema": [
                 {
                   "key": "terminalMatrixInterruptGroups",

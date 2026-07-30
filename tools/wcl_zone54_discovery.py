@@ -1,8 +1,9 @@
-"""Collect a first-pass spell/evidence catalog for WCL zone 54.
+"""Collect a difficulty-aware spell/evidence catalog for WCL zone 54.
 
 This is a developer discovery tool, not a player-facing analysis entry point.
-It selects one representative (kill or longest) Mythic pull per encounter from
-the supplied public reports and keeps provenance for every discovered spell.
+It uses Heroic kills/long pulls as the baseline, Mythic pulls as observed
+differences, and a separately extracted Dungeon Journal as the expected
+mechanic surface.  Every WCL spell keeps report/fight provenance.
 """
 
 import argparse
@@ -24,6 +25,7 @@ from boss_plugins.void_spire.crown_of_the_cosmos import (
 
 
 ZONE_ID = 54
+DIFFICULTIES = {4: "heroic", 5: "mythic"}
 ENCOUNTERS = {
     53470: {"key": "nakzali", "name": "Nek'zali the Soulcoiler"},
     53445: {"key": "sentinels", "name": "Entombed Sentinels"},
@@ -113,6 +115,281 @@ MODE_DRAFTS = {
     },
 }
 
+BOSS_ZH = {
+    "nakzali": "缠魂者内克扎莉",
+    "sentinels": "陵寝哨兵",
+    "vashnik": "万毒邪祟者瓦什尼克",
+    "lostexplorers": "迷失的探险者",
+    "sszorak": "斯索拉克",
+    "twinfangs": "双子毒牙",
+    "bargained": "盘卷祭坛",
+    "ulatek": "乌拉特克",
+}
+
+# These are editorial translations for the discovery document, not stable rule
+# keys. English spell names and numeric spell IDs remain authoritative.
+SPELL_ZH = {
+    1243002: "恐惧行军",
+    1277002: "撕裂",
+    1277025: "顶级掠食者",
+    1277027: "毁伤",
+    1280189: "恶性反应",
+    1280935: "瘟疫泡沫",
+    1281907: "瘟疫泡沫",
+    1282116: "适应性毒素",
+    1282117: "适应性感染",
+    1282287: "毒牙",
+    1282403: "聚合毒液",
+    1282419: "不稳定毒液",
+    1282487: "熔炉之牙",
+    1282525: "恶性催化",
+    1282869: "腐蚀毒液",
+    1283164: "汲取",
+    1283290: "剧毒地面",
+    1283489: "断头台",
+    1283623: "寡妇之吻",
+    1283631: "寡妇之触",
+    1283832: "飞旋战斧",
+    1284032: "缠魂之井",
+    1284033: "缠魂仪式",
+    1284034: "解缚之怒",
+    1284103: "附身弹幕",
+    1284109: "灵魂残缺",
+    1284110: "斩魂",
+    1284207: "活体毒液",
+    1284208: "鲜血毒液",
+    1284251: "毒液凝结",
+    1284257: "污染",
+    1284434: "剧毒液滴",
+    1284452: "毒性爆炸",
+    1284458: "强化猛击",
+    1284471: "枯萎之血",
+    1284487: "血毒注射",
+    1284494: "酸液印记",
+    1284503: "鲜血印记",
+    1284588: "腐毒停滞",
+    1284590: "螺旋毒素",
+    1284670: "汲取",
+    1285681: "缠魂点燃",
+    1285732: "呼啸漩涡",
+    1285844: "恐惧化身",
+    1285911: "不安凝视",
+    1285979: "腐蚀涌动",
+    1286033: "稳固姿态",
+    1286324: "暗影之牙",
+    1286399: "恐惧哀嚎",
+    1286573: "灵魂割裂",
+    1286620: "灵魂割裂",
+    1286834: "死灵蒸汽",
+    1286837: "墓缚",
+    1286860: "被缚者之怒",
+    1286895: "幽暗炸弹",
+    1286912: "暮光帷幕",
+    1286918: "永恒夜幕",
+    1286921: "冰缚烈焰",
+    1286945: "失控之怒",
+    1286997: "毒液涌动",
+    1287008: "黏稠囊肿",
+    1287036: "剧毒撕咬",
+    1287072: "风暴",
+    1287198: "潜伏教徒",
+    1287265: "碎裂盘卷",
+    1287426: "精华撕裂",
+    1287587: "连接斩断",
+    1287718: "回收精华",
+    1287722: "灵体抹除",
+    1288232: "不稳定瘴气",
+    1288297: "附着幽暗",
+    1288624: "恐怖存在",
+    1288879: "涌动之牙",
+    1289192: "腐蚀洪流",
+    1289683: "苏醒仪式",
+    1289696: "苏醒纽带",
+    1289855: "饥渴火葬",
+    1289875: "火葬",
+    1289919: "躁动的阿曼尼",
+    1289962: "蜿蜒之握",
+    1289993: "腐蚀液球",
+    1290003: "解缚",
+    1290189: "乌拉特克的统御",
+    1290193: "乌拉特克的统御",
+    1290336: "永恒毒液",
+    1290361: "缠魂",
+    1290516: "饥饿盛宴",
+    1290779: "恶意",
+    1290809: "盘绕毒素",
+    1290956: "搅动深渊",
+    1290990: "蠕动孵化",
+    1291390: "灾变召唤",
+    1291478: "腐蚀喷吐",
+    1291930: "稳健打击",
+    1292034: "附身弹幕",
+    1292104: "蘑菇投掷",
+    1292177: "真菌爆发",
+    1292248: "灵魂转移",
+    1292388: "邪眼",
+    1292505: "毒性滑液",
+    1292779: "强化升腾",
+    1293212: "攫取深渊",
+    1293497: "交织舞步",
+    1293749: "涌动",
+    1293792: "弹幕",
+    1293968: "暗影灌注",
+    1293969: "鲜血灌注",
+    1293971: "火焰灌注",
+    1294293: "涌动",
+    1294729: "尸体枯萎",
+    1294994: "汲取感染",
+    1295049: "毒性烟雾",
+    1295107: "浓缩唾液",
+    1295173: "爆炸感染",
+    1295209: "爆炸",
+    1295224: "冥河感染",
+    1295229: "汲取鲜血",
+    1295360: "恶性外壳",
+    1295449: "恶毒存在",
+    1295451: "黑暗低语",
+    1295798: "瘟疫波浪",
+    1295854: "撕裂碎片",
+    1295886: "霜火箭雨",
+    1295905: "毒蛇之咬",
+    1295952: "元素爆炸",
+    1296061: "甲壳旋转",
+    1296092: "强力重击",
+    1296301: "腐毒横扫",
+    1296602: "腐蚀残留",
+    1296878: "变换原毒",
+    1296898: "无拘狂暴",
+    1296962: "原毒爆发",
+    1297022: "束缚痛苦",
+    1297024: "束缚痛苦",
+    1297075: "强化",
+    1297367: "毒蛇之怒",
+    1297624: "仪式灼烧",
+    1297644: "团结光环",
+    1297645: "联合防御",
+    1297646: "联合防御",
+    1297648: "冰霜地带",
+    1297649: "烈焰地带",
+    1297707: "剧毒",
+    1298367: "母神之怒",
+    1298381: "熔炉亵渎",
+    1298417: "石化毒液",
+    1298484: "汲取",
+    1298489: "汲取",
+    1298490: "汲取",
+    1298591: "亵渎之地",
+    1298698: "残响代价",
+    1299267: "恐怖断头台",
+    1299396: "死亡之拥",
+    1299401: "死亡低语",
+    1299526: "暴露之心",
+    1299650: "硬化",
+    1299673: "召请",
+    1299757: "毒性孵化",
+    1299838: "毒液破裂",
+    1299941: "汲取感染",
+    1299949: "爆炸感染",
+    1299950: "冥河感染",
+    1299960: "剧毒洪流",
+    1299988: "不朽盘卷",
+    1300235: "灵魂衰竭",
+    1300238: "缠魂者诅咒",
+    1300265: "末日鳞片信息素",
+    1300312: "末日鳞片外壳",
+    1300322: "双牙毒素",
+    1300743: "毒液气泡",
+    1300751: "毒蛇召唤",
+    1301117: "攫取之牙",
+    1301213: "暗影蜕皮",
+    1301268: "腐臭薄膜",
+    1301510: "毁灭重击",
+    1301800: "酸液爆发",
+    1302013: "鲜血喷发",
+    1302489: "冥河爆发",
+    1302505: "乌拉特克的纽带",
+    1302982: "剧毒喷吐",
+    1303230: "鲜血洪流",
+    1303378: "受护孵化",
+    1303414: "石化蜇刺",
+    1304012: "毒蛇召唤",
+    1304028: "死亡守卫",
+    1304032: "灵魂绑定",
+    1304033: "幽魂再生",
+    1304437: "硬化肿瘤",
+    1304459: "肿瘤爆裂",
+    1305650: "痛苦尖啸",
+    1305709: "绝望横扫",
+    1305775: "恐惧咆哮",
+    1305833: "凝结箭",
+    1305844: "冲击波",
+    1305902: "灼热存在",
+    1305959: "毒液涌动",
+    1305998: "腐蚀利爪",
+    1306086: "不稳定净化",
+    1306119: "钙化尸体",
+    1306858: "守卫者庇护",
+    1306872: "弹幕",
+    1306922: "凝结血块",
+    1307009: "绝望",
+    1307184: "恐惧箭",
+    1307279: "枯萎斩魂",
+    1307425: "被斩首",
+    1307612: "毒性外壳",
+    1307635: "毒性飞溅",
+    1308038: "群体孵化",
+    1308323: "报复恶意",
+    1308356: "唤醒蛇群",
+    1308385: "内脏爆裂",
+    1308583: "解缚之怒",
+}
+
+PHASE_DRAFTS = {
+    "nakzali": [
+        ("P1 缠魂者启蒙", "开场至 50% 生命", [1284033, 1285681, 1287426, 1284103], "用灵魂强化缠魂之井；处理精华撕裂、躁动的阿曼尼与坦克弹幕。"),
+        ("转阶段：苏醒仪式", "50% 生命触发", [1289683, 1289696, 1292248, 1293212], "Boss 受苏醒纽带保护；击杀回响切断纽带。史诗还会把玩家拉入不朽盘卷。"),
+        ("P2 解缚", "能量满后直至击杀", [1290003, 1299673, 1293497], "场地持续伤害并反复召请潜伏教徒；史诗召请会打断施法并沉默打断者。"),
+    ],
+    "sentinels": [
+        ("双首领循环", "0–100 能量", [1284207, 1284208, 1284251, 1284487], "两只哨兵分别制造活体毒液和鲜血毒液；需要拉开超过 25 码并处理软泥、液滴、驱散与换坦。"),
+        ("腐毒停滞", "100 能量", [1284588, 1284590, 1284941], "两只哨兵会合并平衡生命；玩家用碰撞把螺旋毒素精确叠到 4 层，否则持续时间结束时爆炸。"),
+        ("史诗附加：变换原毒", "全程周期出现", [1296878, 1296962], "同类原毒相碰可中和；碰到未感染玩家会造成范围爆发与击退。"),
+    ],
+    "lostexplorers": [
+        ("附身轮次", "全程轮换", [1295451, 1297022, 1297075], "莫扎希依次控制探险者；破除控制后用束缚痛苦重新附身并赋予目标更多技能。"),
+        ("探险者技能组合", "随当前被控制目标变化", [1295886, 1295854, 1296061, 1292104], "冰火效果可互相抵消；包含远近衰减、分摊、场地与坦克易伤等不同解题方式。"),
+        ("强化升腾", "Boss 达到满能量", [1292779], "未及时打断附身循环的惩罚/软狂暴信号。"),
+    ],
+    "vashnik": [
+        ("三毒灌注循环", "Boss 从最近两座喷泉汲取", [1284670, 1293968, 1293969, 1293971], "血、暗影、火焰三类灌注组合改变小怪与玩家感染的结果。"),
+        ("感染结算", "每轮灌注期间", [1282117, 1299941, 1299949, 1299950], "血感染吸收治疗并吸取队友；火感染需远离衰减；暗影感染在脚下制造爆发。"),
+        ("史诗肿瘤", "全程附加", [1304437, 1304459, 1280935, 1295798], "硬化肿瘤不能直接正常处理，需要用玩家身上的瘟疫波浪命中去除硬化。"),
+    ],
+    "sszorak": [
+        ("掠食者循环", "全程", [1277025, 1277027, 1277002, 1297367], "毁伤/撕裂形成坦克连段；蛇之怒要求团队正确承受/引导攻击，失败会进入屠戮惩罚。"),
+        ("风暴升级", "随能量与场地风压推进", [1285419, 1285447, 1285732], "交叉风与阵风限制站位，最终进入呼啸漩涡。"),
+        ("后段强化", "战斗后段", [1286997, 1296898, 1287008], "毒液涌动与无拘狂暴增加团伤，黏稠囊肿/腐蚀残留持续压缩场地。"),
+    ],
+    "twinfangs": [
+        ("双首领循环", "全程", [1293749, 1293792, 1290336, 1289192], "两只毒牙分别施放涌动/弹幕并叠加永恒毒液；腐蚀洪流和场地毒液形成持续压力。"),
+        ("受护孵化", "能量阶段", [1303378, 1308356, 1308385], "首领保护并唤醒蛇群，需要处理孵化目标与内脏爆裂。"),
+        ("深渊盛宴", "阶段切换", [1290956, 1290516, 1306922], "搅动深渊后进入饥饿盛宴，凝结血块等目标改变场上处理优先级。"),
+    ],
+    "bargained": [
+        ("P1 毒蛇交易", "开场至祖尔金 50%", [1282487, 1283832, 1282287, 1283489], "祖尔金强化熔炉之牙并使用飞斧、毒斧和断头台；熔炉亵渎逐步改变场地。"),
+        ("P2 篡位者复仇", "祖尔金 50% 后", [1243002, 1285844, 1285911, 1286573], "玛拉克拉斯附身玩家并召出恐惧化身；凝视、恐惧哀嚎和灵魂割裂构成核心控制链。"),
+        ("转阶段：被夺取的容器", "祖尔金降至 1 点生命", [1304032, 1304033, 1287722], "玛拉克拉斯与祖尔金绑定并产生灵魂碎片；踩碎会造成团队伤害，漏掉则治疗祖尔金。"),
+        ("P3 盘卷联合", "最终阶段", [1289802, 1298381, 1286918, 1286912], "两名首领同时作战且一方先死会令另一方狂暴；暗影与毒液机制叠加。"),
+    ],
+    "ulatek": [
+        ("P1 毒蛇之母的怒火", "开场", [1292403, 1300751, 1298367, 1298559], "毒浪会孵化场上虫卵；处理尾部实体、母神之怒与暴露之心。"),
+        ("转阶段：恶意孵化", "阶段转换", [1299757, 1299650, 1307612], "毒性孵化的直线会令虫卵立即孵化；史诗虫卵带硬化与毒性外壳。"),
+        ("中段：多形态循环", "手册重复技能组", [1304012, 1301117, 1301213, 1306086], "召唤蛇群并处理抓取、蜕皮和毒素传递；不稳定净化在史诗到期时额外放出波浪。"),
+        ("转阶段：碎裂", "后段转换", [1287265, 1301510, 1300743], "尾部砸击需要集合分摊，同时虫卵和毒液气泡压缩安全区域。"),
+        ("终局：怒火释放", "最终阶段/狂暴", [1286905, 1286834, 1302505], "场地被彻底破坏，持续全团伤害急剧上升。乌拉特克无公开测试日志，本段完全来自地下城手册草案。"),
+    ],
+}
+
 
 def report_index(token, report_id):
     query = """
@@ -188,12 +465,15 @@ def event_is_remove(event):
     }
 
 
-def choose_representative_fights(report_documents):
+def choose_representative_fights(report_documents, difficulty):
     candidates = defaultdict(list)
     for report_id, document in report_documents.items():
         for fight in document.get("fights") or []:
             encounter_id = int(fight.get("encounterID") or 0)
-            if encounter_id not in ENCOUNTERS or int(fight.get("difficulty") or 0) != 5:
+            if (
+                encounter_id not in ENCOUNTERS
+                or int(fight.get("difficulty") or 0) != int(difficulty)
+            ):
                 continue
             candidates[encounter_id].append({
                 **fight,
@@ -388,6 +668,7 @@ def analyze_fight(token, fight, document):
             "name": fight.get("name"),
             "kill": bool(fight.get("kill")),
             "durationMs": int(fight["endTime"] - fight["startTime"]),
+            "difficulty": int(fight.get("difficulty") or 0),
         },
         "enemyCasts": summarize_spell_events(
             event_sets["casts"],
@@ -430,96 +711,315 @@ def analyze_fight(token, fight, document):
     }
 
 
+SPELL_CATEGORIES = (
+    "enemyCasts",
+    "damageAbilities",
+    "playerDebuffs",
+    "bossAuras",
+)
+
+
+def merge_spell_catalog(evidence, journal):
+    journal_by_id = {
+        int(row["spellID"]): row
+        for row in (journal or {}).get("spells") or []
+    }
+    catalog = {}
+    for category in SPELL_CATEGORIES:
+        rows = {}
+        for difficulty_name, analysis in evidence.items():
+            for item in analysis.get(category) or []:
+                spell_id = int(item["spellID"])
+                row = rows.setdefault(
+                    spell_id,
+                    {
+                        "spellID": spell_id,
+                        "name": item.get("name") or str(spell_id),
+                        "observedIn": {},
+                    },
+                )
+                row["observedIn"][difficulty_name] = item
+        for spell_id, journal_row in journal_by_id.items():
+            if spell_id not in rows:
+                continue
+            rows[spell_id]["journal"] = {
+                "name": journal_row.get("name"),
+                "mythicOnly": bool(journal_row.get("mythicOnly")),
+                "mythicMentioned": bool(journal_row.get("mythicMentioned")),
+            }
+        catalog[category] = sorted(
+            rows.values(),
+            key=lambda row: (
+                "heroic" not in row["observedIn"],
+                "mythic" not in row["observedIn"],
+                row["spellID"],
+            ),
+        )
+    observed_ids = {
+        row["spellID"]
+        for rows in catalog.values()
+        for row in rows
+    }
+    catalog["journalOnly"] = [
+        row for row in (journal or {}).get("spells") or []
+        if int(row["spellID"]) not in observed_ids
+    ]
+    return catalog
+
+
+def migrate_result(result):
+    if int(result.get("schemaVersion") or 1) >= 2:
+        result.setdefault("reports", {"heroic": [], "mythic": []})
+        return result
+    old_reports = result.get("reports") or []
+    bosses = {}
+    for key, boss in (result.get("bosses") or {}).items():
+        analysis = {
+            field: boss.get(field)
+            for field in (
+                "fight",
+                "enemyCasts",
+                "damageAbilities",
+                "playerDebuffs",
+                "bossAuras",
+                "bossResources",
+                "deathClusters",
+            )
+            if boss.get(field) is not None
+        }
+        bosses[key] = {
+            "encounterID": boss.get("encounterID"),
+            "name": boss.get("name"),
+            "evidence": {"mythic": analysis},
+            "modeDraft": boss.get("modeDraft"),
+        }
+    return {
+        "schemaVersion": 2,
+        "zoneID": result.get("zoneID") or ZONE_ID,
+        "reports": {"heroic": [], "mythic": old_reports},
+        "bosses": bosses,
+        "missingEncounterIDs": {},
+        "expectedUntested": result.get("expectedUntested") or [],
+    }
+
+
 def render_markdown(document):
+    def observed_cell(row, difficulty):
+        item = (row.get("observedIn") or {}).get(difficulty)
+        if not item:
+            return "—"
+        events = int(item.get("eventCount") or 0)
+        targets = int(item.get("uniqueTargetCount") or 0)
+        first_ms = int(item.get("firstMs") or 0)
+        return f"{events} 次 / {targets} 人 / 首次 {first_ms / 1000:.1f}s"
+
+    def spell_label(spell_id, english_name):
+        zh_name = SPELL_ZH.get(int(spell_id))
+        return f"{zh_name}<br><small>{english_name}</small>" if zh_name else english_name
+
+    def mechanic_hint(boss_key, category, row):
+        spell_id = int(row["spellID"])
+        for phase in PHASE_DRAFTS.get(boss_key, []):
+            if spell_id in phase[2]:
+                return phase[3]
+        if category == "playerDebuffs":
+            return "玩家状态事件；结合施加、层数、移除/死亡时间和伤害事件确认结算。"
+        if category == "bossAuras":
+            return "Boss/add 的强化或阶段状态，可作为阶段切换和机制成立的时间锚点。"
+        if category == "damageAbilities":
+            return "Boss/add 伤害来源；用于高伤、可规避伤害和死亡归因。"
+        return "敌方施法时间轴信号；用于技能轮次、打断和阶段定位。"
+
     lines = [
-        "# WCL Zone 54 Mythic 初始取数",
+        "# 12.1 烈毒之渊：Boss 法术 ID、Debuff 与阶段草案",
         "",
-        "所有条目均保留 report/fight 来源；以下是日志事实，不等同于最终机制判定。",
+        "> 数据分层：地下城手册列出预期机制，英雄日志覆盖完整流程，史诗日志验证差异。"
+        "中文名称和效果摘要是编辑译文；英文名与 spell ID 才是稳定分析键。",
+        "",
+        "> Bilibili H1–H7 视频用于核对玩家实际流程，但公开视频没有字幕轨；阶段边界以视频观感、"
+        "地下城手册的 Stage/Intermission 标题和 WCL cast/aura 信号合并起草。",
         "",
     ]
     for key, boss in document["bosses"].items():
+        heroic = (boss.get("evidence") or {}).get("heroic")
+        mythic = (boss.get("evidence") or {}).get("mythic")
         lines.extend([
-            f"## {boss['name']} (`{key}`)",
-            "",
-            f"- 代表战斗：`{boss['fight']['reportID']}` / Fight {boss['fight']['fightID']}"
-            f"，时长 {boss['fight']['durationMs']}ms，kill={boss['fight']['kill']}",
-            f"- 敌方 Cast：{len(boss['enemyCasts'])} 个 spell ID",
-            f"- 敌方伤害：{len(boss['damageAbilities'])} 个 spell ID",
-            f"- 玩家 Debuff：{len(boss['playerDebuffs'])} 个 spell ID",
-            f"- Boss/add Aura：{len(boss['bossAuras'])} 个 spell ID",
-            f"- 模式草稿置信度：{(boss.get('modeDraft') or {}).get('confidence', 'unknown')}",
-            f"- 模式草稿：{(boss.get('modeDraft') or {}).get('summary', '尚未形成')}",
-            "",
-            "高频敌方 Cast：",
+            f"## {BOSS_ZH.get(key, boss['name'])} / {boss['name']} (`{key}`)",
             "",
         ])
-        for row in boss["enemyCasts"][:12]:
+        for label, analysis in (("英雄", heroic), ("史诗", mythic)):
+            if not analysis:
+                lines.append(f"- {label}代表战斗：无")
+                continue
+            fight = analysis["fight"]
             lines.append(
-                f"- `{row['spellID']}` {row['name']}：{row['eventCount']} 次"
-                f"，中位间隔 {row['medianIntervalMs']}ms"
+                f"- {label}代表战斗：`{fight['reportID']}` / Fight {fight['fightID']}，"
+                f"{fight['durationMs'] / 1000:.1f}s，kill={fight['kill']}"
             )
-        lines.extend(["", "主要伤害技能：", ""])
-        for row in boss["damageAbilities"][:15]:
-            lines.append(
-                f"- `{row['spellID']}` {row['name']}：{row['eventCount']} 次"
-                f"，总量 {row['totalAmount']}，单次最高 {row['maxAmount']}"
-            )
-        lines.extend(["", "玩家 Debuff：", ""])
-        for row in boss["playerDebuffs"][:15]:
-            lines.append(
-                f"- `{row['spellID']}` {row['name']}：{row['eventCount']} 事件"
-                f"，涉及 {row['uniqueTargetCount']} 个目标"
-            )
-        lines.append("")
-    expected_untested = document.get("expectedUntested") or []
-    if expected_untested:
-        lines.extend(["## 预期不开放测试", ""])
-        for row in expected_untested:
-            lines.append(f"- {row['name']} (`{row['key']}`)：{row['note']}")
+        journal = boss.get("journal") or {}
+        lines.append(
+            f"- 地下城手册收录 {len(journal.get('spells') or [])} 个法术 ID；"
+            f"其中日志尚未观察到 {len((boss.get('spellCatalog') or {}).get('journalOnly') or [])} 个。"
+        )
+        if key == "ulatek":
+            lines.append("- 状态：惯例不开放尾王公开测试；以下只有手册证据，不应误标为数据缺失。")
+
+        lines.extend(["", "### 战斗阶段（初稿）", ""])
+        lines.append("| 阶段 | 触发/边界 | 核心 spell ID | 大致机制 |")
+        lines.append("|---|---|---|---|")
+        for phase_name, trigger, spell_ids, note in PHASE_DRAFTS.get(key, []):
+            ids = ", ".join(f"`{spell_id}`" for spell_id in spell_ids)
+            lines.append(f"| {phase_name} | {trigger} | {ids} | {note} |")
+
+        for category, label in (
+            ("damageAbilities", "Boss / add 伤害来源"),
+            ("playerDebuffs", "施加到玩家的 Debuff"),
+            ("bossAuras", "Boss / add 强化与 Aura"),
+            ("enemyCasts", "Boss / add Cast 与阶段信号"),
+        ):
+            rows = [
+                row for row in (boss.get("spellCatalog") or {}).get(category) or []
+                if int(row.get("spellID") or 0) >= 1_000_000
+            ]
+            lines.extend(["", f"### {label}", ""])
+            if not rows:
+                lines.append("该类别在当前代表日志中没有可用记录。")
+                continue
+            lines.append("| spell ID | 技能（中文编辑译名 / 英文稳定名） | 英雄证据 | 史诗证据 | 机制/取证用途 |")
+            lines.append("|---:|---|---|---|---|")
+            for row in rows:
+                spell_id = int(row["spellID"])
+                name = str(
+                    (row.get("journal") or {}).get("name")
+                    or row.get("name")
+                    or spell_id
+                )
+                hint = mechanic_hint(key, category, row).replace("|", "／")
+                lines.append(
+                    f"| `{spell_id}` | {spell_label(spell_id, name)} | "
+                    f"{observed_cell(row, 'heroic')} | {observed_cell(row, 'mythic')} | {hint} |"
+                )
+
+        journal_only = (boss.get("spellCatalog") or {}).get("journalOnly") or []
+        lines.extend(["", "### 手册已列出、当前 WCL 代表战斗未观察到的 ID", ""])
+        if journal_only:
+            lines.append("| spell ID | 技能 | 难度提示 |")
+            lines.append("|---:|---|---|")
+            for row in journal_only:
+                spell_id = int(row["spellID"])
+                difficulty = (
+                    "仅史诗" if row.get("mythicOnly")
+                    else "手册提及史诗差异" if row.get("mythicMentioned")
+                    else "通用/尚未分类"
+                )
+                lines.append(
+                    f"| `{spell_id}` | {spell_label(spell_id, row.get('name') or str(spell_id))} | "
+                    f"{difficulty} |"
+                )
+        else:
+            lines.append("无。")
+
+        if journal.get("mythicDifferences"):
+            lines.extend(["", "### 地下城手册明确写出的史诗差异（英文原意）", ""])
+            for note in journal["mythicDifferences"]:
+                lines.append(f"- {note}")
         lines.append("")
     return "\n".join(lines)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--reports", required=True, help="逗号分隔的 WCL report ID")
+    parser.add_argument("--reports", help="旧参数：逗号分隔的 Mythic WCL report ID")
+    parser.add_argument("--heroic-reports", help="逗号分隔的 Heroic WCL report ID")
+    parser.add_argument("--mythic-reports", help="逗号分隔的 Mythic WCL report ID")
+    parser.add_argument("--journal", default="docs/zone54_journal.json")
     parser.add_argument("--output", default="docs/zone54_spell_discovery.json")
     parser.add_argument("--markdown", default="docs/zone54_spell_discovery.md")
     parser.add_argument("--resume", action="store_true", help="保留已有 Boss 结果，只补缺失 encounter")
     args = parser.parse_args()
 
-    report_ids = [value.strip() for value in args.reports.split(",") if value.strip()]
+    heroic_report_ids = [
+        value.strip() for value in (args.heroic_reports or "").split(",")
+        if value.strip()
+    ]
+    mythic_report_ids = [
+        value.strip() for value in (args.mythic_reports or args.reports or "").split(",")
+        if value.strip()
+    ]
+    report_ids = list(dict.fromkeys([*heroic_report_ids, *mythic_report_ids]))
+    if not report_ids and not (args.resume and Path(args.output).exists()):
+        parser.error("至少提供 --heroic-reports 或 --mythic-reports")
     output = Path(args.output)
     markdown = Path(args.markdown)
-    token = get_token()
+    token = get_token() if report_ids else None
     documents = {report_id: report_index(token, report_id) for report_id in report_ids}
-    selected = choose_representative_fights(documents)
+    selected_by_difficulty = {
+        "heroic": choose_representative_fights(
+            {key: documents[key] for key in heroic_report_ids}, 4,
+        ),
+        "mythic": choose_representative_fights(
+            {key: documents[key] for key in mythic_report_ids}, 5,
+        ),
+    }
 
     if args.resume and output.exists():
-        result = json.loads(output.read_text(encoding="utf-8"))
-        result["reports"] = list(dict.fromkeys([*(result.get("reports") or []), *report_ids]))
+        result = migrate_result(json.loads(output.read_text(encoding="utf-8")))
     else:
         result = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "zoneID": ZONE_ID,
-            "reports": report_ids,
+            "reports": {"heroic": [], "mythic": []},
             "bosses": {},
-            "missingEncounterIDs": [],
+            "missingEncounterIDs": {},
         }
-    for encounter_id, fight in sorted(selected.items(), key=lambda item: list(ENCOUNTERS).index(item[0])):
-        metadata = ENCOUNTERS[encounter_id]
-        if metadata["key"] in result["bosses"]:
-            continue
-        print(
-            f"[zone54] {metadata['name']}: {fight['reportID']} Fight {fight['id']}",
-            flush=True,
-        )
-        result["bosses"][metadata["key"]] = {
+    for difficulty_name, ids in (
+        ("heroic", heroic_report_ids),
+        ("mythic", mythic_report_ids),
+    ):
+        result["reports"][difficulty_name] = list(dict.fromkeys([
+            *(result["reports"].get(difficulty_name) or []),
+            *ids,
+        ]))
+        selected = selected_by_difficulty[difficulty_name]
+        for encounter_id, fight in sorted(
+            selected.items(),
+            key=lambda item: list(ENCOUNTERS).index(item[0]),
+        ):
+            metadata = ENCOUNTERS[encounter_id]
+            boss = result["bosses"].setdefault(metadata["key"], {
+                "encounterID": encounter_id,
+                "name": metadata["name"],
+                "evidence": {},
+            })
+            if difficulty_name in boss.setdefault("evidence", {}):
+                continue
+            print(
+                f"[zone54] {difficulty_name} {metadata['name']}: "
+                f"{fight['reportID']} Fight {fight['id']}",
+                flush=True,
+            )
+            boss["evidence"][difficulty_name] = analyze_fight(
+                token,
+                fight,
+                documents[fight["reportID"]],
+            )
+
+    journal_document = {}
+    journal_path = Path(args.journal)
+    if journal_path.exists():
+        journal_document = json.loads(journal_path.read_text(encoding="utf-8"))
+    result["sources"] = {
+        "journal": journal_document.get("source"),
+        "referenceVideos": journal_document.get("referenceVideos") or [],
+    }
+    # Keep journal-only encounters (notably the traditionally untested final
+    # boss Ula'tek) in the same output shape as encounters with WCL evidence.
+    for encounter_id, metadata in ENCOUNTERS.items():
+        result["bosses"].setdefault(metadata["key"], {
             "encounterID": encounter_id,
             "name": metadata["name"],
-            **analyze_fight(token, fight, documents[fight["reportID"]]),
-        }
-
+            "evidence": {},
+        })
     for boss_key, boss in result["bosses"].items():
         boss["modeDraft"] = MODE_DRAFTS.get(boss_key, {
             "confidence": "unknown",
@@ -527,6 +1027,13 @@ def main():
             "phaseSignals": [],
             "majorMechanics": [],
         })
+        boss["journal"] = (
+            (journal_document.get("bosses") or {}).get(boss_key) or {}
+        )
+        boss["spellCatalog"] = merge_spell_catalog(
+            boss.get("evidence") or {},
+            boss.get("journal") or {},
+        )
     captured_encounters = {
         int(boss.get("encounterID") or 0)
         for boss in result["bosses"].values()
@@ -546,16 +1053,30 @@ def main():
         for encounter_id in sorted(expected_untested_ids)
         if encounter_id not in captured_encounters
     ]
-    result["missingEncounterIDs"] = sorted(
-        set(ENCOUNTERS) - captured_encounters - expected_untested_ids
-    )
+    captured_by_difficulty = {
+        difficulty_name: {
+            int(boss.get("encounterID") or 0)
+            for boss in result["bosses"].values()
+            if difficulty_name in (boss.get("evidence") or {})
+        }
+        for difficulty_name in DIFFICULTIES.values()
+    }
+    result["missingEncounterIDs"] = {
+        difficulty_name: sorted(
+            set(ENCOUNTERS) - captured - expected_untested_ids
+        )
+        for difficulty_name, captured in captured_by_difficulty.items()
+    }
     output.parent.mkdir(parents=True, exist_ok=True)
     markdown.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     markdown.write_text(render_markdown(result), encoding="utf-8")
     print(f"[zone54] wrote {output} and {markdown}", flush=True)
-    if result["missingEncounterIDs"]:
-        print(f"[zone54] missing encounter IDs: {result['missingEncounterIDs']}", flush=True)
+    if any(result["missingEncounterIDs"].values()):
+        print(
+            f"[zone54] missing encounter IDs: {result['missingEncounterIDs']}",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

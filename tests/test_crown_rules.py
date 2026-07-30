@@ -16,8 +16,12 @@ from tools.crown_single_fight_audit import (
     GRAVITY_COLLAPSE_DAMAGE_ID,
     SPELL,
     TERMINAL_GUARD_ID,
+    attach_snapshot_vitals,
+    build_heal_absorb_index,
+    build_player_vitals_index,
     build_gravity_rounds,
     build_void_death_healing,
+    player_vitals_at,
 )
 
 
@@ -420,6 +424,79 @@ class PassageCliffMistakeTests(unittest.TestCase):
         ]
         rows = build_passage_cliff_board(fight, deaths, markers, timeline, {}, "phase_abandon")
         self.assertEqual(rows, [])
+
+
+class PlayerVitalsSnapshotTests(unittest.TestCase):
+    def test_healing_absorb_is_derived_from_debuff_and_consumed_healing(self):
+        index = build_heal_absorb_index(
+            [
+                {
+                    "timestamp": 1_000,
+                    "type": "applydebuff",
+                    "abilityGameID": 123,
+                    "targetID": 7,
+                    "absorb": 1_000,
+                },
+                {
+                    "timestamp": 3_000,
+                    "type": "removedebuff",
+                    "abilityGameID": 123,
+                    "targetID": 7,
+                    "absorb": 700,
+                },
+            ],
+            [{
+                "timestamp": 2_000,
+                "type": "heal",
+                "targetID": 7,
+                "absorbed": 300,
+            }],
+        )
+        self.assertEqual(index[7][0]["amount"], 1_000)
+        self.assertEqual(index[7][1]["amount"], 700)
+        self.assertEqual(index[7][2]["amount"], 0)
+
+    def test_uses_nearest_prior_wcl_resource_sample(self):
+        index = build_player_vitals_index([[
+            {
+                "timestamp": 10_000,
+                "targetID": 7,
+                "resourceActor": 2,
+                "hitPoints": 600,
+                "maxHitPoints": 1_000,
+            },
+            {
+                "timestamp": 11_500,
+                "targetID": 7,
+                "resourceActor": 2,
+                "hitPoints": 900,
+                "maxHitPoints": 1_000,
+            },
+        ]])
+        sample = player_vitals_at(index, 7, 11_000)
+        self.assertEqual(sample["healthPercent"], 60.0)
+        self.assertEqual(sample["sampleDeltaMs"], -1_000)
+        self.assertIsNone(sample["absorb"])
+
+    def test_does_not_treat_per_hit_absorbed_as_current_shield(self):
+        index = build_player_vitals_index([[
+            {
+                "timestamp": 20_000,
+                "targetID": 8,
+                "resourceActor": 2,
+                "hitPoints": 800,
+                "maxHitPoints": 1_000,
+                "absorbed": 250,
+            },
+        ]])
+        groups = [{"snapshot": {
+            "timeMsAbsolute": 20_100,
+            "players": [{"id": 8}],
+        }}]
+        attach_snapshot_vitals(groups, index)
+        vitals = groups[0]["snapshot"]["players"][0]["vitals"]
+        self.assertEqual(vitals["healthPercent"], 80.0)
+        self.assertIsNone(vitals["absorb"])
 
     def test_dense_p2_cliff_cluster_exempts_even_within_first_eight(self):
         """Fight18 型：P1.5 先有机制减员，进 P2 后短时大团跳崖；前几名坠崖虽在第8死内也要豁免。"""

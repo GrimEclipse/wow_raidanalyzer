@@ -154,6 +154,60 @@ RAID_DEFENSIVE_COOLDOWNS_MS = {
     388615: 180_000,
 }
 
+# Raid-planning abilities are intentionally broader than ``RAID_DEFENSIVES``.
+# They drive the raid-leader timeline/export tool and must not automatically be
+# interpreted as mitigation covering a death.
+TEAM_COOLDOWNS = {
+    # Restoration Druid
+    740: {"name": "宁静", "class": "Druid", "category": "healing", "specKeys": ["restoration-druid"]},
+    197721: {"name": "繁盛", "class": "Druid", "category": "healing", "specKeys": ["restoration-druid"]},
+    33891: {"name": "化身：生命之树", "class": "Druid", "category": "healing", "specKeys": ["restoration-druid"]},
+    # Discipline / Holy Priest
+    62618: {"name": "真言术：障", "class": "Priest", "category": "raid_defensive", "specKeys": ["discipline-priest"]},
+    47536: {"name": "全神贯注", "class": "Priest", "category": "healing", "specKeys": ["discipline-priest"]},
+    246287: {"name": "福音", "class": "Priest", "category": "healing", "specKeys": ["discipline-priest"]},
+    33206: {"name": "痛苦压制", "class": "Priest", "category": "external", "specKeys": ["discipline-priest"]},
+    64843: {"name": "神圣赞美诗", "class": "Priest", "category": "healing", "specKeys": ["holy-priest"]},
+    265202: {"name": "圣言术：赎", "class": "Priest", "category": "healing", "specKeys": ["holy-priest"]},
+    200183: {"name": "神圣化身", "class": "Priest", "category": "healing", "specKeys": ["holy-priest"]},
+    47788: {"name": "守护之魂", "class": "Priest", "category": "external", "specKeys": ["holy-priest"]},
+    # Holy Paladin
+    31821: {"name": "光环掌握", "class": "Paladin", "category": "raid_defensive", "specKeys": ["holy-paladin"]},
+    31884: {"name": "复仇之怒", "class": "Paladin", "category": "healing", "specKeys": ["holy-paladin"]},
+    200652: {"name": "提尔的拯救", "class": "Paladin", "category": "healing", "specKeys": ["holy-paladin"]},
+    414170: {"name": "破晓", "class": "Paladin", "category": "healing", "specKeys": ["holy-paladin"]},
+    375576: {"name": "圣洁鸣钟", "class": "Paladin", "category": "healing", "specKeys": ["holy-paladin"]},
+    # Restoration Shaman
+    98008: {"name": "灵魂链接图腾", "class": "Shaman", "category": "raid_defensive", "specKeys": ["restoration-shaman"]},
+    108280: {"name": "治疗之潮图腾", "class": "Shaman", "category": "healing", "specKeys": ["restoration-shaman"]},
+    114052: {"name": "升腾", "class": "Shaman", "category": "healing", "specKeys": ["restoration-shaman"]},
+    207399: {"name": "先祖护佑图腾", "class": "Shaman", "category": "raid_defensive", "specKeys": ["restoration-shaman"]},
+    # Mistweaver Monk
+    115310: {"name": "还魂术", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
+    388615: {"name": "祛病延年", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
+    322118: {"name": "召唤青龙玉珑", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
+    325197: {"name": "召唤朱鹤赤精", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
+    116849: {"name": "作茧缚命", "class": "Monk", "category": "external", "specKeys": ["mistweaver-monk"]},
+    # Preservation Evoker
+    363534: {"name": "回溯", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
+    359816: {"name": "梦境飞行", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
+    370537: {"name": "静滞", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
+    357170: {"name": "时间膨胀", "class": "Evoker", "category": "external", "specKeys": ["preservation-evoker"]},
+    374227: {"name": "微风拂面", "class": "Evoker", "category": "raid_defensive", "specKeys": ["preservation-evoker", "augmentation-evoker"]},
+    # Cross-role raid defensives
+    97462: {"name": "命令怒吼", "class": "Warrior", "category": "raid_defensive", "specKeys": []},
+    51052: {"name": "反魔法领域", "class": "DeathKnight", "category": "raid_defensive", "specKeys": []},
+    196718: {"name": "黑暗", "class": "DemonHunter", "category": "raid_defensive", "specKeys": []},
+    414660: {"name": "群体屏障", "class": "Mage", "category": "raid_defensive", "specKeys": []},
+    # Raid movement / positional utility
+    106898: {"name": "狂奔怒吼", "class": "Druid", "category": "movement", "specKeys": []},
+    192077: {"name": "狂风图腾", "class": "Shaman", "category": "movement", "specKeys": []},
+    111771: {"name": "恶魔传送门", "class": "Warlock", "category": "movement", "specKeys": []},
+    # Augmentation / Evoker raid utility
+    374968: {"name": "时间螺旋", "class": "Evoker", "category": "augmentation", "specKeys": ["augmentation-evoker"]},
+    406732: {"name": "空间悖论", "class": "Evoker", "category": "augmentation", "specKeys": ["augmentation-evoker"]},
+}
+
 
 def _ability_id(event: dict) -> Optional[int]:
     value = (

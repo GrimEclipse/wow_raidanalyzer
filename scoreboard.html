@@ -481,8 +481,14 @@
             date,
             sourceReports: payload?.meta?.analyzedReports || [],
             sourceFile: sourcePath || '',
-            pointsPerCount: n(payload?.meta?.courtConfig?.verdictPointsPerCount) || 10,
-            tankMultiplier: n(payload?.meta?.courtConfig?.verdictTankMultiplier) || 0.5,
+            pointsPerCount: n(
+                payload?.meta?.mistakeTracker?.pointsPerUnit
+                ?? payload?.meta?.courtConfig?.verdictPointsPerCount
+            ) || 10,
+            tankMultiplier: n(
+                payload?.meta?.mistakeTracker?.roleMultipliers?.tank
+                ?? payload?.meta?.courtConfig?.verdictTankMultiplier
+            ) || 0.5,
             updatedAt: new Date().toISOString(),
             players: Object.values(players),
         };

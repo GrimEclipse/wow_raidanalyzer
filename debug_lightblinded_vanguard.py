@@ -1,9 +1,9 @@
 import os
 
 VERSION = "12.0"
-RAID = "void_spire"
-BOSS = "lightblinded_vanguard"
-REPORT_ID = "KaYJRC3PX2ntDq8y"
+RAID = "march_on_queldanas"
+BOSS = "midnight_falls"
+REPORT_ID = "rdtvn6ghqY4AkLj1"
 INCLUDE_DISPELS = True
 
 

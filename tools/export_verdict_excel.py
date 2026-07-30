@@ -240,6 +240,7 @@ def export_verdict_excel(
     """
     date = str(payload.get("date") or datetime.now().date())
     players_raw: Sequence[Dict[str, Any]] = payload.get("players") or []
+    points_per_count = _safe_int(payload.get("pointsPerCount"), 10)
 
     out_dir = resolve_export_dir(target_dir)
     out_path = _next_available_path(out_dir / f"智力表_{boss_name}_{date}.xlsx")
@@ -288,7 +289,7 @@ def export_verdict_excel(
             value=(
                 f"=({get_column_letter(COL_RECOGNITION)}{row_idx}"
                 f"-{get_column_letter(COL_APPEAL)}{row_idx}"
-                f"+{get_column_letter(COL_ADDITIONAL)}{row_idx})*10"
+                f"+{get_column_letter(COL_ADDITIONAL)}{row_idx})*{points_per_count}"
             ),
         )
         _apply_total_style(total_cell)

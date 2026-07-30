@@ -1849,4 +1849,4 @@ def build_aggregated_json(report_ids):
 
 def analyze(report_ids: str, output_path=None, catalog_entry=None, options=None):
     result = build_aggregated_json(report_ids)
-    return write_json_result(result, output_path)
+    return write_json_result(result, output_path, catalog_entry=catalog_entry)

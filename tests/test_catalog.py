@@ -9,6 +9,8 @@ class BossCatalogTests(unittest.TestCase):
         crown = find_boss("12.0", "void_spire", "crown_of_the_cosmos")
         self.assertTrue(crown.supported)
         self.assertEqual(crown.plugin, "boss_plugins.void_spire.crown_of_the_cosmos")
+        self.assertEqual(crown.capabilities["avoidable"]["renderer"], "mistake-tracker")
+        self.assertTrue(crown.capabilities["replay"]["enabled"])
 
     def test_venomous_abyss_order_and_external_keys(self):
         frontend = to_frontend_catalog()

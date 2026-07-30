@@ -191,7 +191,7 @@
       '</styleSheet>';
   }
 
-  function sheetXml(players, bossName, date) {
+  function sheetXml(players, bossName, date, pointsPerCount) {
     var cols = HEADERS.length;
     var recognitionCol = 3;
     var appealCol = 3 + MECHANICS.length + 1;
@@ -242,8 +242,8 @@
         }
       }
       var totalRef = cellRef(totalCol, rowNum);
-      var formula = '(' + cellRef(recognitionCol, rowNum) + '-' + cellRef(appealCol, rowNum) + '+' + cellRef(additionalCol, rowNum) + ')*10';
-      var totalVal = (recognition - appeal + additional) * 10;
+      var formula = '(' + cellRef(recognitionCol, rowNum) + '-' + cellRef(appealCol, rowNum) + '+' + cellRef(additionalCol, rowNum) + ')*' + pointsPerCount;
+      var totalVal = (recognition - appeal + additional) * pointsPerCount;
       cells.push('<c r="' + totalRef + '" s="4"><f>' + formula + '</f><v>' + totalVal + '</v></c>');
       rows.push('<row r="' + rowNum + '">' + cells.join('') + '</row>');
     }
@@ -273,6 +273,7 @@
     var bossName = options.bossName || '宇宙之冕';
     var date = String((payload && payload.date) || new Date().toISOString().slice(0, 10));
     var players = (payload && payload.players) || [];
+    var pointsPerCount = safeInt(payload && payload.pointsPerCount) || 10;
     var sheetName = (bossName + '_' + date.replace(/-/g, '')).slice(0, 31);
 
     var files = [
@@ -319,7 +320,7 @@
         ),
       },
       { name: 'xl/styles.xml', data: enc(stylesXml()) },
-      { name: 'xl/worksheets/sheet1.xml', data: enc(sheetXml(players, bossName, date)) },
+      { name: 'xl/worksheets/sheet1.xml', data: enc(sheetXml(players, bossName, date, pointsPerCount)) },
     ];
     return zipStore(files);
   }

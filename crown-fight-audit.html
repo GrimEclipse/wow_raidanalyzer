@@ -40,7 +40,7 @@
     .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
     .layout {
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: 340px minmax(0, 1fr);
       gap: 14px;
       padding: 14px;
     }
@@ -72,8 +72,41 @@
       cursor: pointer;
     }
     button.event:hover, button.event.active { background: #172033; }
+    button.event.active {
+      box-shadow: inset 3px 0 0 var(--amber);
+    }
+    button.event.anchor-target {
+      animation: anchor-pulse 1.2s ease-out 1;
+    }
+    @keyframes anchor-pulse {
+      0% { background: rgba(245, 158, 11, .34); }
+      100% { background: #172033; }
+    }
     .event-title { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13px; }
     .event-sub { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .phase-pulls {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0 14px 14px;
+    }
+    .phase-card {
+      min-height: 76px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(145deg, #121a28, #0a0f18);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .phase-card:hover { border-color: #64748b; }
+    .phase-card.active {
+      border-color: var(--amber);
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .24);
+    }
+    .phase-card strong { display: block; color: #fff; font-size: 15px; }
+    .phase-card span { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
     .stage {
       padding: 12px;
       display: grid;
@@ -88,21 +121,69 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       overflow: hidden;
+      touch-action: none;
+      cursor: grab;
     }
-    .map-wrap img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: fill;
-      opacity: .86;
-    }
+    .map-wrap .overlay.dragging { cursor: grabbing; }
     .overlay {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
     }
+    .map-controls {
+      position: absolute;
+      z-index: 8;
+      right: 10px;
+      top: 10px;
+      display: flex;
+      gap: 5px;
+      padding: 5px;
+      border: 1px solid rgba(148, 163, 184, .32);
+      border-radius: 7px;
+      background: rgba(2, 6, 23, .82);
+      backdrop-filter: blur(5px);
+    }
+    .map-controls button {
+      min-width: 30px;
+      height: 28px;
+      padding: 0 8px;
+      border: 1px solid #334155;
+      border-radius: 5px;
+      background: #111827;
+      color: #e2e8f0;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .map-controls button:hover { border-color: #94a3b8; }
+    .map-zoom-value { min-width: 46px; color: #cbd5e1; font: 11px/28px ui-monospace, monospace; text-align: center; }
+    .player-tooltip {
+      position: absolute;
+      z-index: 12;
+      display: none;
+      width: max-content;
+      min-width: 210px;
+      max-width: 290px;
+      padding: 10px 12px;
+      border: 1px solid var(--tooltip-color, #f59e0b);
+      border-radius: 5px;
+      background: linear-gradient(160deg, rgba(5, 10, 20, .98), rgba(11, 18, 32, .98));
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .62), inset 0 0 18px rgba(255, 255, 255, .025);
+      color: #e5e7eb;
+      pointer-events: none;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .player-tooltip.visible { display: block; }
+    .tooltip-head { display: flex; align-items: center; gap: 9px; padding-bottom: 7px; border-bottom: 1px solid #273244; }
+    .tooltip-head img { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--tooltip-color, #f59e0b); }
+    .tooltip-name { color: var(--tooltip-color, #fff); font-weight: 800; font-size: 13px; }
+    .tooltip-id { color: #94a3b8; font-family: ui-monospace, monospace; }
+    .tooltip-body { padding-top: 7px; color: #cbd5e1; }
+    .tooltip-vitals { margin-top: 7px; padding-top: 7px; border-top: 1px solid #273244; }
+    .tooltip-vitals-row { display: flex; justify-content: space-between; gap: 12px; }
+    .tooltip-health-track { height: 5px; margin: 5px 0 6px; overflow: hidden; border-radius: 999px; background: #1e293b; }
+    .tooltip-health-fill { height: 100%; background: var(--tooltip-color, #22c55e); box-shadow: 0 0 8px var(--tooltip-color, #22c55e); }
     .legend {
       display: flex;
       flex-wrap: wrap;
@@ -153,9 +234,32 @@
       gap: 14px;
       padding: 0 14px 14px;
     }
+    .detail-tabs {
+      display: flex;
+      gap: 6px;
+      margin: 0 14px 14px;
+      padding: 6px;
+    }
+    .detail-tabs button {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .detail-tabs button.active {
+      border-color: #475569;
+      background: #172033;
+      color: #f8fafc;
+    }
+    [hidden] { display: none !important; }
     label.toggle { font-size: 12px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
     @media (max-width: 980px) {
       .layout, .details, .footer-grid { grid-template-columns: 1fr; }
+      .phase-pulls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .event-list { max-height: 420px; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
@@ -178,9 +282,11 @@
       <div class="stat"><strong id="statDeaths">-</strong><span class="muted">空虚之握死亡</span></div>
     </section>
 
+    <section id="phasePulls" class="phase-pulls" aria-label="阶段化 Pull 导航"></section>
+
     <section class="layout">
       <aside class="panel">
-        <h2>技能入口</h2>
+        <h2>重要技能逐场推演</h2>
         <div class="skill-focus" id="skillFocus">
           <button type="button" data-focus="all" class="active">全部</button>
           <button type="button" data-focus="water">放水</button>
@@ -200,34 +306,45 @@
           <span class="chip">青圈：此前放水污染，半径 25 码</span>
         </div>
         <div class="map-wrap">
-          <img id="arenaImage" src="assets/crown_of_cosmos_arena.png" alt="arena">
-          <svg id="mapSvg" class="overlay"></svg>
+          <svg id="mapSvg" class="overlay" aria-label="战斗场地雷达"></svg>
+          <div class="map-controls" aria-label="场地缩放控制">
+            <button type="button" data-map-action="out" title="缩小">−</button>
+            <span id="mapZoomValue" class="map-zoom-value">100%</span>
+            <button type="button" data-map-action="in" title="放大">+</button>
+            <button type="button" data-map-action="reset" title="重置视图">重置</button>
+          </div>
+          <div id="playerTooltip" class="player-tooltip" role="tooltip"></div>
         </div>
         <div id="selectedDetails" class="details"></div>
       </section>
     </section>
 
+    <nav id="detailTabs" class="detail-tabs panel" aria-label="单场明细分类">
+      <button type="button" data-detail-tab="deaths" class="active">阵亡与治疗</button>
+      <button type="button" data-detail-tab="mechanics">机制统计</button>
+    </nav>
+
     <section class="footer-grid">
-      <section class="panel">
+      <section class="panel" data-detail-panel="deaths">
         <h2>死于空虚之握前 6 秒治疗</h2>
         <div style="padding:10px 12px">
           <label class="toggle"><input id="includeExempt" type="checkbox"> 包括场上银色幻影 >= 4 的不追究样本</label>
         </div>
         <div id="deathHealing"></div>
       </section>
-      <section class="panel">
+      <section class="panel" data-detail-panel="mechanics" hidden>
         <h2>P2 失败统计</h2>
         <div id="p2Stats"></div>
       </section>
-      <section class="panel">
+      <section class="panel" data-detail-panel="mechanics" hidden>
         <h2>各阶段放水偏离 &gt; 15 码</h2>
         <div id="waterStats"></div>
       </section>
-      <section class="panel">
+      <section class="panel" data-detail-panel="mechanics" hidden>
         <h2>阶段拉弓组数</h2>
         <div id="phaseStats"></div>
       </section>
-      <section class="panel" style="grid-column:1/-1">
+      <section class="panel" data-detail-panel="mechanics" style="grid-column:1/-1" hidden>
         <h2>P3 重力坍缩时序统计</h2>
         <div id="gravityStats"></div>
       </section>
@@ -242,7 +359,25 @@
     const ROUTE_PHASE = ROUTE.get('phase');
     const ROUTE_TAG = ROUTE.get('tag');
     const ICON_SIZE = 32;
-    const state = { data: null, selectedKey: null, includeExempt: false, pendingRouteScroll: false, skillFocus: 'all' };
+    const PLAYER_ICON_SIZE = 18;
+    const PLAYER_ICON_ASSET_REVISION = '20260728';
+    const PHASE_ORDER = ['P1', 'P1.5', 'P2', 'P2.5', 'P3'];
+    const CLASS_COLORS = {
+      deathknight: '#C41E3A', demonhunter: '#A330C9', druid: '#FF7C0A',
+      evoker: '#33937F', hunter: '#AAD372', mage: '#3FC7EB', monk: '#00FF98',
+      paladin: '#F48CBA', priest: '#FFFFFF', rogue: '#FFF468',
+      shaman: '#0070DD', warlock: '#8788EE', warrior: '#C69B6D',
+    };
+    const state = {
+      data: null,
+      selectedKey: null,
+      includeExempt: false,
+      pendingRouteScroll: false,
+      skillFocus: 'all',
+      phaseFocus: ROUTE_PHASE || 'all',
+      detailTab: 'deaths',
+      mapView: { zoom: 1, x: 0, y: 0, dragging: false, pointerID: null, startX: 0, startY: 0, originX: 0, originY: 0 },
+    };
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -290,8 +425,19 @@
       const p3Events = (state.data.p3Events || []).map(event => ({
         ...event, key: `${event.eventType}:${event.id}`, sortMs: event.timeMs, displayTime: event.time,
       }));
-      // 重力坍缩地图无事件点，不进左侧技能入口（统计区仍可在底部查看）
-      return [...bows, ...waters, ...arrows, ...p3Events].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
+      const gravities = (state.data.gravityRounds || []).map((event, index) => {
+        const id = event.id || event.index || index + 1;
+        return {
+          ...event,
+          id,
+          phase: event.phase || 'P3',
+          eventType: 'gravity',
+          key: `gravity:${id}`,
+          sortMs: event.applyTimeMs ?? event.timeMs ?? 0,
+          displayTime: event.applyTime || event.time || '-',
+        };
+      });
+      return [...bows, ...waters, ...arrows, ...p3Events, ...gravities].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
     }
 
     function eventMatchesFocus(event, focus) {
@@ -303,27 +449,74 @@
     }
 
     function focusedEvents() {
-      return auditEvents().filter(event => eventMatchesFocus(event, state.skillFocus));
+      return auditEvents().filter(event =>
+        eventMatchesFocus(event, state.skillFocus)
+        && (state.phaseFocus === 'all' || event.phase === state.phaseFocus)
+      );
     }
 
     function selectedEvent() {
       const all = auditEvents();
       const focused = focusedEvents();
       const pool = focused.length ? focused : all;
-      return all.find(event => event.key === state.selectedKey) || pool[0] || all[0];
+      return pool.find(event => event.key === state.selectedKey) || pool[0] || all[0];
+    }
+
+    function eventAnchorId(key) {
+      return `event-${String(key || 'unknown').replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
+    }
+
+    function phaseCards() {
+      const grouped = new Map();
+      for (const event of auditEvents()) {
+        const phase = event.phase || '未知';
+        if (!grouped.has(phase)) grouped.set(phase, []);
+        grouped.get(phase).push(event);
+      }
+      return [...grouped.entries()]
+        .map(([phase, events]) => ({
+          phase,
+          count: events.length,
+          start: events[0]?.displayTime || '-',
+          end: events[events.length - 1]?.displayTime || '-',
+        }))
+        .sort((a, b) => {
+          const ai = PHASE_ORDER.indexOf(a.phase);
+          const bi = PHASE_ORDER.indexOf(b.phase);
+          return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+        });
+    }
+
+    function renderPhasePulls() {
+      const holder = document.getElementById('phasePulls');
+      const cards = phaseCards();
+      holder.innerHTML = cards.map(card => `
+        <button type="button" class="phase-card${state.phaseFocus === card.phase ? ' active' : ''}" data-phase="${escapeHtml(card.phase)}">
+          <strong>${escapeHtml(card.phase)}</strong>
+          <span>${card.count} 个关键事件 · ${card.start}${card.end !== card.start ? ` — ${card.end}` : ''}</span>
+        </button>
+      `).join('');
+      holder.querySelectorAll('button[data-phase]').forEach(button => {
+        button.addEventListener('click', () => {
+          state.phaseFocus = state.phaseFocus === button.dataset.phase ? 'all' : button.dataset.phase;
+          state.selectedKey = null;
+          render();
+        });
+      });
     }
 
     function renderStats() {
-      document.getElementById('sourceLink').href = state.data.meta.sourceURL;
-      document.getElementById('sourceLink').textContent = `Fight ${state.data.meta.fightID}`;
-      document.getElementById('statDuration').textContent = state.data.fight.duration;
-      document.getElementById('statBows').textContent = state.data.bowGroups.length;
-      document.getElementById('statWater').textContent = state.data.waterDrops.length;
-      document.getElementById('statDeaths').textContent = state.data.voidDeaths.length;
+      document.getElementById('sourceLink').href = state.data.meta?.sourceURL || '#';
+      document.getElementById('sourceLink').textContent = `Fight ${state.data.meta?.fightID ?? '-'}`;
+      document.getElementById('statDuration').textContent = state.data.fight?.duration || '-';
+      document.getElementById('statBows').textContent = (state.data.bowGroups || []).length;
+      document.getElementById('statWater').textContent = (state.data.waterDrops || []).length;
+      document.getElementById('statDeaths').textContent = (state.data.voidDeaths || []).length;
     }
 
     function renderEventList() {
       const holder = document.getElementById('eventList');
+      const current = selectedEvent();
       holder.innerHTML = focusedEvents().map(event => {
         const isBow = event.eventType === 'bow';
         const isWater = event.eventType === 'water';
@@ -337,7 +530,7 @@
           : (event.markedPlayers || []).join(' / ');
         const miss = isBow ? event.players.filter(player => player.missedPhantom).map(player => player.player) : [];
         const outliers = isWater ? event.drops.filter(drop => drop.isOutlier).map(drop => drop.player) : [];
-        const cls = event.key === selectedEvent().key ? 'event active' : 'event';
+        const cls = event.key === current?.key ? 'event active' : 'event';
         const title = isBow ? `${event.phase} 拉弓 ${event.displayTime}`
           : isWater ? `${event.phase} 放水 ${event.displayTime}`
           : isArrow ? `${event.phase} ${event.phase === 'P2' ? '银锋弹射' : '银锋箭'} ${event.displayTime}`
@@ -349,7 +542,7 @@
           : isArrow ? (event.phase === 'P1' ? `实际命中 ${event.actualHits?.length || 0}` : `点名来源 ${event.sourceAssignments?.length || 0} · ${event.bossEnergyDrained ? '已消能' : '未消能'}`)
           : isGravity ? `违规 ${event.violations?.length || 0} · 死亡 ${event.deathCount || 0}`
           : `Boss 能量 ${event.bossEnergy?.amount ?? '未知'}`;
-        return `<button class="${cls}" data-id="${event.key}">
+        return `<button id="${eventAnchorId(event.key)}" class="${cls}" data-id="${event.key}">
           <div class="event-title"><span>${title}</span><span>#${event.index}</span></div>
           <div class="event-sub">${escapeHtml(players)}<br>${sub}</div>
         </button>`;
@@ -357,6 +550,7 @@
       holder.querySelectorAll('button').forEach(button => {
         button.addEventListener('click', () => {
           state.selectedKey = button.dataset.id;
+          history.replaceState(null, '', `${location.pathname}${location.search}#${eventAnchorId(button.dataset.id)}`);
           render();
         });
       });
@@ -365,6 +559,7 @@
         requestAnimationFrame(() => {
           const active = holder.querySelector('button.event.active');
           if (active) {
+            active.classList.add('anchor-target');
             active.scrollIntoView({ block: 'center', inline: 'nearest' });
             active.focus({ preventScroll: true });
           }
@@ -407,22 +602,221 @@
       svg.appendChild(node);
     }
 
-    function drawIcon(svg, point, href, title, offsetX = 0, offsetY = 0) {
+    function drawIcon(svg, point, href, title, offsetX = 0, offsetY = 0, size = ICON_SIZE, circular = false) {
       if (!point || !href) return;
       const p = worldToPixel(point);
       const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
       image.setAttribute('href', href);
-      image.setAttribute('x', p.x - ICON_SIZE / 2 + offsetX);
-      image.setAttribute('y', p.y - ICON_SIZE / 2 + offsetY);
-      image.setAttribute('width', ICON_SIZE);
-      image.setAttribute('height', ICON_SIZE);
+      image.setAttribute('x', p.x - size / 2 + offsetX);
+      image.setAttribute('y', p.y - size / 2 + offsetY);
+      image.setAttribute('width', size);
+      image.setAttribute('height', size);
       image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      if (circular) image.style.clipPath = 'circle(50%)';
       if (title) {
         const titleNode = document.createElementNS('http://www.w3.org/2000/svg', 'title');
         titleNode.textContent = title;
         image.appendChild(titleNode);
       }
       svg.appendChild(image);
+      return image;
+    }
+
+    function playerDisplayName(player) {
+      return String(player?.name || '未知玩家').split('-')[0];
+    }
+
+    function playerSpec(player) {
+      const specs = state.data.playerSpecs || {};
+      return specs[String(player?.id)]
+        || specs[playerDisplayName(player)]
+        || specs[String(player?.name || '')]
+        || null;
+    }
+
+    function playerClassColor(spec) {
+      return spec?.classColor || CLASS_COLORS[spec?.classSlug] || '#f8ff4a';
+    }
+
+    function playerIconHref(spec) {
+      const href = String(spec?.icon || '');
+      if (!href || !href.startsWith('assets/specs/') || href.includes('?')) return href;
+      return `${href}?v=${PLAYER_ICON_ASSET_REVISION}`;
+    }
+
+    const PLAYER_LOCALE = 'zhCN';
+    const LEGACY_SPEC_LABELS_ZHCN = {
+      62:'奥术',63:'火焰',64:'冰霜',65:'神圣',66:'防护',70:'惩戒',71:'武器',72:'狂怒',73:'防护',
+      102:'平衡',103:'野性',104:'守护',105:'恢复',250:'鲜血',251:'冰霜',252:'邪恶',
+      253:'野兽控制',254:'射击',255:'生存',256:'戒律',257:'神圣',258:'暗影',
+      259:'奇袭',260:'狂徒',261:'敏锐',262:'元素',263:'增强',264:'恢复',
+      265:'痛苦',266:'恶魔学识',267:'毁灭',268:'酒仙',269:'踏风',270:'织雾',
+      577:'浩劫',581:'复仇',1467:'湮灭',1468:'恩护',1473:'增辉',1480:'吞噬'
+    };
+    const LEGACY_CLASS_LABELS_ZHCN = {
+      deathknight:'死亡骑士',demonhunter:'恶魔猎手',druid:'德鲁伊',evoker:'唤魔师',
+      hunter:'猎人',mage:'法师',monk:'武僧',paladin:'圣骑士',priest:'牧师',
+      rogue:'潜行者',shaman:'萨满祭司',warlock:'术士',warrior:'战士'
+    };
+    const LEGACY_ROLE_LABELS_ZHCN = {tank:'坦克',healer:'治疗',dps:'输出',unknown:'未知'};
+
+    function basicPlayerRole(role) {
+      if (role === 'tank') return 'tank';
+      if (role === 'melee-healer' || role === 'range-healer' || role === 'healer') return 'healer';
+      if (role === 'melee-dps' || role === 'range-dps' || role === 'dps') return 'dps';
+      return 'unknown';
+    }
+
+    function localizedSpecSummary(spec) {
+      if (!spec) return '专精数据缺失';
+      const labels = spec.labels || {};
+      const specName = labels.spec?.[PLAYER_LOCALE] || LEGACY_SPEC_LABELS_ZHCN[Number(spec.specID)] || spec.slug || '未知专精';
+      const className = labels.class?.[PLAYER_LOCALE] || LEGACY_CLASS_LABELS_ZHCN[spec.classSlug] || spec.classSlug || '未知职业';
+      const basicRole = basicPlayerRole(spec.role);
+      const roleName = labels.role?.[PLAYER_LOCALE] || LEGACY_ROLE_LABELS_ZHCN[basicRole] || basicRole;
+      return `${specName} ${className}·${roleName}`;
+    }
+
+    function playerMarkerTransform(x, y) {
+      return `translate(${x} ${y}) scale(${(1 / state.mapView.zoom).toFixed(5)})`;
+    }
+
+    function movePlayerTooltip(event) {
+      const tooltip = document.getElementById('playerTooltip');
+      const wrap = document.querySelector('.map-wrap');
+      if (!tooltip || !wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const left = Math.min(rect.width - tooltip.offsetWidth - 10, Math.max(10, event.clientX - rect.left + 14));
+      const top = Math.min(rect.height - tooltip.offsetHeight - 10, Math.max(10, event.clientY - rect.top + 14));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+
+    function showPlayerTooltip(event, player, spec) {
+      const tooltip = document.getElementById('playerTooltip');
+      if (!tooltip) return;
+      const color = playerClassColor(spec);
+      const name = playerDisplayName(player);
+      const point = player.position || {};
+      const positionEvidence = player.positionSource === 'interpolated'
+        ? `位置为线性插值；最近邻点 ${Math.abs(Number(player.deltaMs || 0))}ms${player.positionBracketSpanMs == null ? '' : `，两侧跨度 ${player.positionBracketSpanMs}ms`}`
+        : `最近坐标样本偏移 ${Math.abs(Number(player.deltaMs || 0))}ms`;
+      const vitals = player.vitals || null;
+      const healthPercent = vitals?.healthPercent == null ? null : Math.max(0, Math.min(100, Number(vitals.healthPercent)));
+      const vitalsHtml = vitals ? `
+          <div class="tooltip-vitals">
+            <div class="tooltip-vitals-row"><span>生命值</span><strong>${healthPercent == null ? '无快照' : `${healthPercent.toFixed(1)}%`}</strong></div>
+            ${healthPercent == null ? '' : `<div class="tooltip-health-track"><div class="tooltip-health-fill" style="width:${healthPercent}%"></div></div>`}
+            ${vitals.hitPoints != null && vitals.maxHitPoints != null ? `<div class="tooltip-vitals-row"><span>当前 / 最大</span><span>${Number(vitals.hitPoints).toLocaleString()} / ${Number(vitals.maxHitPoints).toLocaleString()}</span></div>` : ''}
+            <div class="tooltip-vitals-row"><span>护盾</span><span>${vitals.absorb == null ? 'WCL 无当前值' : Number(vitals.absorb).toLocaleString()}</span></div>
+            <div class="tooltip-vitals-row"><span>治疗吸收</span><span>${vitals.healAbsorb == null ? '未配置取证' : `${Number(vitals.healAbsorb).toLocaleString()}${vitals.healAbsorbSource === 'derived' ? '（推算）' : ''}`}</span></div>
+            ${vitals.sampleDeltaMs != null ? `<div class="tooltip-id">生命采样偏移 ${escapeHtml(vitals.sampleDeltaMs)}ms · ${escapeHtml(vitals.confidence || 'unknown')}</div>` : ''}
+          </div>` : `
+          <div class="tooltip-vitals">
+            <div class="tooltip-id">当前 JSON 未包含生命值 / 护盾快照</div>
+          </div>`;
+      tooltip.style.setProperty('--tooltip-color', color);
+      tooltip.innerHTML = `
+        <div class="tooltip-head">
+          ${spec?.icon ? `<img src="${escapeHtml(playerIconHref(spec))}" alt="">` : ''}
+          <div>
+            <div class="tooltip-name">${escapeHtml(name)}</div>
+            <div class="tooltip-id">${escapeHtml(localizedSpecSummary(spec))}</div>
+          </div>
+        </div>
+        <div class="tooltip-body">
+          <div>坐标 ${escapeHtml(point.yardX ?? '-')}，${escapeHtml(point.yardY ?? '-')}</div>
+          ${player.deltaMs != null ? `<div>${escapeHtml(positionEvidence)}</div>` : ''}
+          ${vitalsHtml}
+        </div>`;
+      tooltip.classList.add('visible');
+      movePlayerTooltip(event);
+    }
+
+    function hidePlayerTooltip() {
+      document.getElementById('playerTooltip')?.classList.remove('visible');
+    }
+
+    function drawPlayerIcon(svg, player) {
+      if (!player?.position || player.confidence === 'low') return;
+      const p = worldToPixel(player.position);
+      const spec = playerSpec(player);
+      const color = playerClassColor(spec);
+      const name = playerDisplayName(player);
+      const marker = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      marker.setAttribute('class', 'player-marker');
+      marker.dataset.mapX = p.x;
+      marker.dataset.mapY = p.y;
+      marker.setAttribute('transform', playerMarkerTransform(p.x, p.y));
+      marker.style.cursor = 'help';
+      svg.appendChild(marker);
+
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', 0);
+      ring.setAttribute('cy', 0);
+      ring.setAttribute('r', spec?.icon ? PLAYER_ICON_SIZE / 2 + 1.5 : 4.5);
+      ring.setAttribute('fill', spec?.icon ? '#020617' : '#f8ff4a');
+      ring.setAttribute('stroke', color);
+      ring.setAttribute('stroke-width', spec?.icon ? 2 : 1);
+      ring.addEventListener('mouseover', event => showPlayerTooltip(event, player, spec));
+      ring.addEventListener('mousemove', movePlayerTooltip);
+      ring.addEventListener('mouseout', hidePlayerTooltip);
+      ring.addEventListener('click', event => showPlayerTooltip(event, player, spec));
+      marker.appendChild(ring);
+
+      if (spec?.icon) {
+        const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+        image.setAttribute('href', playerIconHref(spec));
+        image.setAttribute('x', -PLAYER_ICON_SIZE / 2);
+        image.setAttribute('y', -PLAYER_ICON_SIZE / 2);
+        image.setAttribute('width', PLAYER_ICON_SIZE);
+        image.setAttribute('height', PLAYER_ICON_SIZE);
+        image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+        image.style.clipPath = 'circle(50%)';
+        image.style.pointerEvents = 'none';
+        marker.appendChild(image);
+      }
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', 0);
+      label.setAttribute('y', spec?.icon ? PLAYER_ICON_SIZE / 2 + 12 : 17);
+      label.setAttribute('fill', color);
+      label.setAttribute('font-size', 9);
+      label.setAttribute('font-weight', 700);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('paint-order', 'stroke');
+      label.setAttribute('stroke', '#020617');
+      label.setAttribute('stroke-width', 3);
+      label.style.pointerEvents = 'none';
+      label.textContent = name;
+      marker.appendChild(label);
+    }
+
+    function applyMapTransform() {
+      const scene = document.getElementById('mapScene');
+      if (!scene) return;
+      const view = state.mapView;
+      scene.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.zoom})`);
+      scene.querySelectorAll('.player-marker').forEach(marker => {
+        marker.setAttribute('transform', playerMarkerTransform(Number(marker.dataset.mapX), Number(marker.dataset.mapY)));
+      });
+      document.getElementById('mapZoomValue').textContent = `${Math.round(view.zoom * 100)}%`;
+    }
+
+    function resetMapView() {
+      Object.assign(state.mapView, { zoom: 1, x: 0, y: 0 });
+      applyMapTransform();
+    }
+
+    function setMapZoom(nextZoom, focusX = 436.5, focusY = 397) {
+      const view = state.mapView;
+      const zoom = Math.max(1, Math.min(4, nextZoom));
+      const worldX = (focusX - view.x) / view.zoom;
+      const worldY = (focusY - view.y) / view.zoom;
+      view.x = focusX - worldX * zoom;
+      view.y = focusY - worldY * zoom;
+      view.zoom = zoom;
+      applyMapTransform();
     }
 
     function drawLine(svg, start, end, color, width = 3, dash = '', opacity = 1) {
@@ -484,11 +878,25 @@
 
     function renderMap() {
       const event = selectedEvent();
-      const arenaImage = document.getElementById('arenaImage');
-      arenaImage.src = state.data.arena.imageByPhase?.[event.phase] || state.data.arena.image;
-      const svg = document.getElementById('mapSvg');
-      svg.setAttribute('viewBox', '0 0 873 794');
-      svg.innerHTML = '';
+      const svgRoot = document.getElementById('mapSvg');
+      svgRoot.setAttribute('viewBox', '0 0 873 794');
+      svgRoot.innerHTML = '';
+      hidePlayerTooltip();
+      if (!event) return;
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      svg.setAttribute('id', 'mapScene');
+      svgRoot.appendChild(svg);
+      const arena = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      arena.setAttribute('href', state.data.arena.imageByPhase?.[event.phase] || state.data.arena.image);
+      arena.setAttribute('x', 0);
+      arena.setAttribute('y', 0);
+      arena.setAttribute('width', 873);
+      arena.setAttribute('height', 794);
+      arena.setAttribute('preserveAspectRatio', 'none');
+      arena.setAttribute('opacity', 0.86);
+      arena.style.pointerEvents = 'none';
+      svg.appendChild(arena);
 
       const eventMs = event.sortMs ?? event.timeMs ?? 0;
       const currentDropIds = new Set(event.eventType === 'water' ? (event.drops || []).map(drop => drop.id) : []);
@@ -518,7 +926,7 @@
 
       for (const player of event.snapshot?.players || []) {
         if (!player.position) continue;
-        drawCircle(svg, player.position, 4.5, '#f8ff4a', 0.98, '', `${player.name} · ${player.position.yardX}, ${player.position.yardY}`);
+        drawPlayerIcon(svg, player);
       }
 
       for (const marked of event.markedPlayerPositions || []) {
@@ -558,6 +966,8 @@
         drawText(svg, pixel.x, pixel.y + 25, location.instances.map(item => `#${item}`).join('/'), '#e9d5ff', 'middle');
       }
 
+      applyMapTransform();
+
       if (event.eventType !== 'bow') {
         if (event.eventType === 'water') {
           for (const drop of event.drops || []) {
@@ -584,11 +994,16 @@
           }
         }
       }
+      applyMapTransform();
     }
 
     function renderDetails() {
       const group = selectedEvent();
       const holder = document.getElementById('selectedDetails');
+      if (!group) {
+        holder.innerHTML = '<section class="card muted">本场没有可回放的关键机制事件。</section>';
+        return;
+      }
       const actors = (group.actors || group.snapshot?.bosses || []).filter(actor => actor.position).map(actor => `
         <tr><td>${escapeHtml(actor.name)}</td><td>${actor.position.yardX}, ${actor.position.yardY}</td><td>${actor.confidence || 'unknown'}</td></tr>
       `).join('');
@@ -689,7 +1104,7 @@
 
     function renderDeathHealing() {
       const holder = document.getElementById('deathHealing');
-      const rows = state.data.voidDeaths.filter(row => state.includeExempt || !row.exemptByPhantoms);
+      const rows = (state.data.voidDeaths || []).filter(row => state.includeExempt || !row.exemptByPhantoms);
       holder.innerHTML = `<table><thead><tr><th>时间</th><th>死亡玩家</th><th>幻影数</th><th>6秒治疗总量</th><th>治疗拆分</th><th>不追究</th></tr></thead><tbody>${
         rows.map(row => `<tr>
           <td>${row.time}</td>
@@ -705,15 +1120,15 @@
     function renderP2Stats() {
       const holder = document.getElementById('p2Stats');
       holder.closest('.panel').style.display = '';
-      const missPhantom = state.data.summary.p2MissedPhantomByPlayer || [];
-      const missEnergy = state.data.summary.p2MissedEnergyByPlayer || [];
+      const missPhantom = state.data.summary?.p2MissedPhantomByPlayer || [];
+      const missEnergy = state.data.summary?.p2MissedEnergyByPlayer || [];
       holder.innerHTML = `
         <div class="card"><h3>没有射到银色幻影</h3><table><thead><tr><th>玩家</th><th>P2被点名</th><th>未命中</th></tr></thead><tbody>${missPhantom.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.markedCount || 0}</td><td>${row.count}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">无</td></tr>'}</tbody></table></div>
         <div class="card"><h3>没有成功消 Boss 能量</h3><table><tbody>${missEnergy.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('') || '<tr><td class="muted">无</td></tr>'}</tbody></table></div>`;
     }
 
     function renderWaterStats() {
-      const allRows = state.data.summary.waterOutliersByPhase || {};
+      const allRows = state.data.summary?.waterOutliersByPhase || {};
       const rows = allRows;
       document.getElementById('waterStats').innerHTML = Object.keys(rows).length
         ? Object.entries(rows).map(([phase, players]) => `<div class="card"><h3>${phase}</h3><table><tbody>${players.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('')}</tbody></table></div>`).join('')
@@ -721,7 +1136,7 @@
     }
 
     function renderPhaseStats() {
-      const allRows = state.data.summary.bowGroupsByPhase || {};
+      const allRows = state.data.summary?.bowGroupsByPhase || {};
       const rows = allRows;
       document.getElementById('phaseStats').innerHTML = `<table><tbody>${Object.entries(rows).map(([phase, count]) => `<tr><td>${phase}</td><td>${count}</td></tr>`).join('')}</tbody></table>`;
     }
@@ -755,6 +1170,15 @@
       });
     }
 
+    function renderDetailTabs() {
+      document.querySelectorAll('#detailTabs button[data-detail-tab]').forEach(button => {
+        button.classList.toggle('active', button.dataset.detailTab === state.detailTab);
+      });
+      document.querySelectorAll('[data-detail-panel]').forEach(panel => {
+        panel.hidden = panel.dataset.detailPanel !== state.detailTab;
+      });
+    }
+
     function render() {
       const events = focusedEvents();
       const all = auditEvents();
@@ -765,6 +1189,7 @@
       }
       if (!events.length && all.length && !state.selectedKey) state.selectedKey = all[0].key;
       renderSkillFocus();
+      renderPhasePulls();
       renderStats();
       renderEventList();
       renderMap();
@@ -774,6 +1199,7 @@
       renderWaterStats();
       renderPhaseStats();
       renderGravityStats();
+      renderDetailTabs();
     }
 
 
@@ -789,6 +1215,64 @@
       state.includeExempt = event.target.checked;
       renderDeathHealing();
     });
+
+    document.getElementById('detailTabs')?.addEventListener('click', event => {
+      const button = event.target.closest('button[data-detail-tab]');
+      if (!button) return;
+      state.detailTab = button.dataset.detailTab;
+      renderDetailTabs();
+    });
+
+    document.querySelector('.map-controls')?.addEventListener('click', event => {
+      const button = event.target.closest('button[data-map-action]');
+      if (!button) return;
+      if (button.dataset.mapAction === 'reset') resetMapView();
+      if (button.dataset.mapAction === 'in') setMapZoom(state.mapView.zoom * 1.25);
+      if (button.dataset.mapAction === 'out') setMapZoom(state.mapView.zoom / 1.25);
+    });
+
+    const mapSvg = document.getElementById('mapSvg');
+    mapSvg.addEventListener('wheel', event => {
+      event.preventDefault();
+      const rect = mapSvg.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * 873 / rect.width;
+      const y = (event.clientY - rect.top) * 794 / rect.height;
+      setMapZoom(state.mapView.zoom * (event.deltaY < 0 ? 1.16 : 1 / 1.16), x, y);
+    }, { passive: false });
+    mapSvg.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || event.target.closest?.('.player-marker')) return;
+      const view = state.mapView;
+      const rect = mapSvg.getBoundingClientRect();
+      Object.assign(view, {
+        dragging: true,
+        pointerID: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: view.x,
+        originY: view.y,
+        scaleX: 873 / rect.width,
+        scaleY: 794 / rect.height,
+      });
+      mapSvg.setPointerCapture(event.pointerId);
+      mapSvg.classList.add('dragging');
+    });
+    mapSvg.addEventListener('pointermove', event => {
+      const view = state.mapView;
+      if (!view.dragging || view.pointerID !== event.pointerId) return;
+      view.x = view.originX + (event.clientX - view.startX) * view.scaleX;
+      view.y = view.originY + (event.clientY - view.startY) * view.scaleY;
+      applyMapTransform();
+    });
+    const stopMapDrag = event => {
+      const view = state.mapView;
+      if (!view.dragging || view.pointerID !== event.pointerId) return;
+      view.dragging = false;
+      mapSvg.classList.remove('dragging');
+      if (mapSvg.hasPointerCapture(event.pointerId)) mapSvg.releasePointerCapture(event.pointerId);
+      view.pointerID = null;
+    };
+    mapSvg.addEventListener('pointerup', stopMapDrag);
+    mapSvg.addEventListener('pointercancel', stopMapDrag);
 
     window.OfflineDataLoader.loadJson(DATA_URL)
       .then(data => {
@@ -807,6 +1291,7 @@
         if (ROUTE_TAG) {
           const match = auditEvents().find(event => event.key === ROUTE_TAG);
           state.selectedKey = match?.key || null;
+          if (match?.phase) state.phaseFocus = match.phase;
           state.pendingRouteScroll = Boolean(match);
         } else if (ROUTE_PHASE) {
           state.selectedKey = auditEvents().find(event => event.phase === ROUTE_PHASE)?.key || null;

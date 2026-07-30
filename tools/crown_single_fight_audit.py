@@ -1,5 +1,6 @@
 import json
 import math
+from bisect import bisect_left
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,7 +39,16 @@ except ModuleNotFoundError:
     get_token,
     group_by_window,
     )
-from boss_plugins.common import build_player_mechanic_roles
+from boss_plugins.common import (
+    build_player_mechanic_roles,
+    combatant_spec_id,
+    event_source_id,
+    spec_class_color,
+    spec_class_slug,
+    spec_icon_slug,
+    spec_localization,
+    spec_role_group,
+)
 
 
 FIGHT_ID = 30
@@ -178,6 +188,8 @@ def state_at(index, actor_id, timestamp, max_gap_ms=3_000, allow_loose_position=
         y = before["y"] + (after["y"] - before["y"]) * ratio
         source = "interpolated"
         delta = int(min(timestamp - before["timestamp"], after["timestamp"] - timestamp))
+        before_delta = int(timestamp - before["timestamp"])
+        after_delta = int(after["timestamp"] - timestamp)
     else:
         close = sorted(candidates, key=lambda item: abs(item["timestamp"] - timestamp))
         if not close:
@@ -188,6 +200,13 @@ def state_at(index, actor_id, timestamp, max_gap_ms=3_000, allow_loose_position=
         x, y = best["x"], best["y"]
         source = "nearest"
         delta = int(best["timestamp"] - timestamp)
+        span = None
+        before_delta = (
+            int(timestamp - before["timestamp"]) if before is not None else None
+        )
+        after_delta = (
+            int(after["timestamp"] - timestamp) if after is not None else None
+        )
     facing_row = nearest_facing or before or after
     raw_facing = facing_row.get("facingRaw") if facing_row else None
     return {
@@ -196,6 +215,9 @@ def state_at(index, actor_id, timestamp, max_gap_ms=3_000, allow_loose_position=
         "point": point_payload((x, y)),
         "source": source,
         "deltaMs": delta,
+        "bracketSpanMs": int(span) if span is not None else None,
+        "beforeDeltaMs": before_delta,
+        "afterDeltaMs": after_delta,
         "facingRaw": raw_facing,
         "facingRadians": normalize_facing(raw_facing),
         "confidence": "high" if abs(delta) <= 500 else ("medium" if abs(delta) <= 1500 else "low"),
@@ -354,7 +376,14 @@ def fetch_spell_bundle(token, report_id, fight):
         GRAVITY_COLLAPSE_ID,
         DEATH_COMPENSATION_ID,
     ]:
-        debuffs.extend(fetch_events_all(token, report_id, "Debuffs", fight, ability_id=spell_id, include_resources=True))
+        debuffs.extend(fetch_events_all(
+            token,
+            report_id,
+            "Debuffs",
+            fight,
+            ability_id=spell_id,
+            include_resources=True,
+        ))
     for spell_id in [SPELL["cosmic_barrier"], SPELL["cosmic_radiation"], SPELL["silver_havoc"], 26662, 27680, 1239672]:
         buffs.extend(fetch_events_all(token, report_id, "Buffs", fight, ability_id=spell_id, include_resources=True))
         buffs.extend(fetch_events_all(token, report_id, "Buffs", fight, ability_id=spell_id, hostility_type="Enemies", include_resources=True))
@@ -415,16 +444,6 @@ def fetch_actor_position_events(token, report_id, fight, actor_ids):
             include_resources=True,
         ))
     return dedupe(rows)
-
-
-def combatant_spec_id(event):
-    for key in ("specID", "specId", "spec", "specializationID", "specializationId"):
-        value = event.get(key)
-        if isinstance(value, int):
-            return value
-        if isinstance(value, str) and value.isdigit():
-            return int(value)
-    return None
 
 
 def healer_ids(combatants):
@@ -560,18 +579,32 @@ def phantom_position(segment, timestamp, position_index):
     return state["point"] if state else None
 
 
-def actors_at(timestamp, actor_ids, position_index, actor_map, actor_game_id, max_gap_ms=60_000):
+def actors_at(timestamp, actor_ids, position_index, actor_map, actor_game_id, max_gap_ms=3_000):
     rows = []
     for actor_id in actor_ids:
-        state = state_at(position_index, actor_id, timestamp, max_gap_ms=max_gap_ms, allow_loose_position=True)
+        state = state_at(
+            position_index,
+            actor_id,
+            timestamp,
+            max_gap_ms=max_gap_ms,
+            allow_loose_position=False,
+        )
+        position = (
+            state["point"]
+            if state and state.get("confidence") != "low"
+            else None
+        )
         rows.append({
             "id": actor_id,
             "name": event_actor_name(actor_map, actor_game_id, actor_id),
             "gameID": actor_game_id.get(actor_id),
-            "position": state["point"] if state else None,
+            "position": position,
             "confidence": state.get("confidence") if state else "unknown",
             "deltaMs": state.get("deltaMs") if state else None,
             "positionSource": state.get("source") if state else None,
+            "positionBracketSpanMs": state.get("bracketSpanMs") if state else None,
+            "positionBeforeDeltaMs": state.get("beforeDeltaMs") if state else None,
+            "positionAfterDeltaMs": state.get("afterDeltaMs") if state else None,
         })
     return rows
 
@@ -599,6 +632,160 @@ def snapshot_at(timestamp, player_actor_ids, boss_actor_ids, position_index, act
         "players": actors_at(timestamp, living_player_ids_at(player_actor_ids, deaths, timestamp), position_index, actor_map, actor_game_id, max_gap_ms=6_000),
         "bosses": actors_at(timestamp, boss_actor_ids, position_index, actor_map, actor_game_id),
     }
+
+
+def build_player_vitals_index(event_groups):
+    """Index WCL resource samples without treating per-hit absorbed damage as a shield."""
+    rows = defaultdict(list)
+    shield_fields = ("absorb", "absorbAmount", "absorbRemaining", "totalAbsorbs")
+    heal_absorb_fields = ("healAbsorb", "healAbsorbAmount", "healAbsorbRemaining")
+
+    def first_value(event, keys):
+        for key in keys:
+            if event.get(key) is not None:
+                return event.get(key)
+        return None
+
+    for events in event_groups:
+        for event in events or []:
+            hit_points = event.get("hitPoints")
+            max_hit_points = event.get("maxHitPoints")
+            if hit_points is None or not max_hit_points:
+                continue
+            resource_actor = event.get("resourceActor")
+            if resource_actor in {2, "2"}:
+                actor_id = event.get("targetID")
+            elif resource_actor in {1, "1"}:
+                actor_id = event.get("sourceID")
+            else:
+                actor_id = event.get("targetID") or event.get("sourceID")
+            if actor_id is None:
+                continue
+            rows[actor_id].append({
+                "timestamp": int(event.get("timestamp") or 0),
+                "hitPoints": int(hit_points or 0),
+                "maxHitPoints": int(max_hit_points or 0),
+                "absorb": first_value(event, shield_fields),
+                "healAbsorb": first_value(event, heal_absorb_fields),
+            })
+    for actor_rows in rows.values():
+        actor_rows.sort(key=lambda row: row["timestamp"])
+    return rows
+
+
+def build_heal_absorb_index(debuff_events, healing_events):
+    """Derive remaining healing absorption from absorb debuffs and consumed healing."""
+    by_actor = defaultdict(list)
+    for event in debuff_events or []:
+        kind = event_type(event)
+        if "debuff" not in kind or event.get("targetID") is None:
+            continue
+        if event.get("absorb") is None and "remove" not in kind:
+            continue
+        by_actor[event["targetID"]].append((int(event.get("timestamp") or 0), 0, event))
+    for event in healing_events or []:
+        if event.get("targetID") is None or not int(event.get("absorbed") or 0):
+            continue
+        by_actor[event["targetID"]].append((int(event.get("timestamp") or 0), 1, event))
+
+    timelines = defaultdict(list)
+    for actor_id, actor_events in by_actor.items():
+        active = {}
+        for timestamp, _, event in sorted(actor_events, key=lambda item: (item[0], item[1])):
+            kind = event_type(event)
+            ability = int(event.get("abilityGameID") or 0)
+            if "debuff" in kind:
+                if "remove" in kind:
+                    active.pop(ability, None)
+                elif int(event.get("absorb") or 0) > 0:
+                    active[ability] = int(event.get("absorb") or 0)
+            elif active:
+                consumed = int(event.get("absorbed") or 0)
+                for active_ability in list(active):
+                    if consumed <= 0:
+                        break
+                    used = min(active[active_ability], consumed)
+                    active[active_ability] -= used
+                    consumed -= used
+                    if active[active_ability] <= 0:
+                        active.pop(active_ability, None)
+            timelines[actor_id].append({
+                "timestamp": timestamp,
+                "amount": sum(active.values()),
+                "abilities": sorted(active),
+            })
+    return timelines
+
+
+def heal_absorb_at(index, actor_id, timestamp):
+    rows = index.get(actor_id) or []
+    if not rows:
+        return None
+    cursor = bisect_left([row["timestamp"] for row in rows], timestamp)
+    if cursor < len(rows) and rows[cursor]["timestamp"] == timestamp:
+        sample = rows[cursor]
+    elif cursor > 0:
+        sample = rows[cursor - 1]
+    else:
+        return None
+    return {
+        "amount": int(sample.get("amount") or 0),
+        "abilities": list(sample.get("abilities") or []),
+        "sampleDeltaMs": int(sample["timestamp"] - timestamp),
+    }
+
+
+def player_vitals_at(index, actor_id, timestamp, before_ms=3_000, after_ms=1_000, heal_absorb_index=None):
+    rows = index.get(actor_id) or []
+    if not rows:
+        return None
+    timestamps = [row["timestamp"] for row in rows]
+    cursor = bisect_left(timestamps, timestamp)
+    before = rows[cursor - 1] if cursor > 0 else None
+    after = rows[cursor] if cursor < len(rows) else None
+    if before and timestamp - before["timestamp"] <= before_ms:
+        sample = before
+    elif after and after["timestamp"] - timestamp <= after_ms:
+        sample = after
+    else:
+        return None
+    maximum = int(sample.get("maxHitPoints") or 0)
+    current = int(sample.get("hitPoints") or 0)
+    delta = int(sample["timestamp"] - timestamp)
+    heal_absorb = heal_absorb_at(heal_absorb_index or {}, actor_id, timestamp)
+    direct_heal_absorb = sample.get("healAbsorb")
+    return {
+        "hitPoints": current,
+        "maxHitPoints": maximum,
+        "healthPercent": round(current * 100 / maximum, 2) if maximum else None,
+        "absorb": int(sample["absorb"]) if sample.get("absorb") is not None else None,
+        "healAbsorb": (
+            int(direct_heal_absorb)
+            if direct_heal_absorb is not None
+            else (heal_absorb or {}).get("amount")
+        ),
+        "healAbsorbAbilities": (heal_absorb or {}).get("abilities") or [],
+        "healAbsorbSource": "wcl-resource" if direct_heal_absorb is not None else (
+            "derived" if heal_absorb is not None else None
+        ),
+        "sampleDeltaMs": delta,
+        "confidence": "high" if abs(delta) <= 500 else ("medium" if abs(delta) <= 1500 else "low"),
+    }
+
+
+def attach_snapshot_vitals(groups, vitals_index, heal_absorb_index=None):
+    for group in groups or []:
+        snapshot = group.get("snapshot") or {}
+        timestamp = snapshot.get("timeMsAbsolute")
+        if timestamp is None:
+            continue
+        for player in snapshot.get("players") or []:
+            player["vitals"] = player_vitals_at(
+                vitals_index,
+                player.get("id"),
+                timestamp,
+                heal_absorb_index=heal_absorb_index,
+            )
 
 
 def boss_energy_at(timestamp, boss_actor_ids, events):
@@ -1754,6 +1941,22 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
     players = player_ids(events["combatants"], actor_type)
     healers = healer_ids(events["combatants"])
     player_roles = build_player_mechanic_roles(events["combatants"])
+    player_specs = {}
+    for combatant in events["combatants"]:
+        player_id = event_source_id(combatant)
+        spec_id = combatant_spec_id(combatant)
+        icon_slug = spec_icon_slug(spec_id)
+        if not player_id or not icon_slug:
+            continue
+        player_specs[str(player_id)] = {
+            "specID": spec_id,
+            "slug": icon_slug,
+            "classSlug": spec_class_slug(spec_id),
+            "classColor": spec_class_color(spec_id),
+            "role": spec_role_group(spec_id),
+            "labels": spec_localization(spec_id),
+            "icon": f"assets/specs/{icon_slug}.jpg",
+        }
     phantom_segments = phantom_segments_from_damage(events["damage"], actor_game_id, events["casts"])
     water_drops = build_water(events["debuffs"], events["damage"], position_index, actor_map, actor_game_id, fight, phase, events["deaths"])
     bow_groups = build_bow_groups(fight, actor_map, actor_type, actor_game_id, events, phase, position_index, phantom_segments, water_drops, players, healers)
@@ -1762,6 +1965,23 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
     ranger_energy = build_ranger_energy(fight, actor_map, actor_game_id, events, phase)
     void_deaths = build_void_death_healing(fight, actor_map, actor_game_id, events, players, healers, phantom_segments)
     p3_events, p3_contaminations = build_p3_events(fight, actor_map, actor_game_id, events, phase, position_index, players)
+    vitals_index = build_player_vitals_index([
+        events["healing"],
+        events["damage"],
+        events["casts"],
+        events["debuffs"],
+        events["buffs"],
+        events["resources"],
+    ])
+    # WCL Resources does not expose the target's total current healing absorb.
+    # Keep this empty until the boss config explicitly opts in the relevant
+    # healing-absorb spell IDs; generic debuffs must not imply a known zero.
+    heal_absorb_index = {}
+    attach_snapshot_vitals(
+        bow_groups + water_events + silver_arrows + p3_events,
+        vitals_index,
+        heal_absorb_index,
+    )
     gravity_rounds = build_gravity_rounds(
         fight,
         actor_map,
@@ -1780,6 +2000,12 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
             "reportID": report_id,
             "fightID": fight["id"],
             "schemaVersion": FIELD_AUDIT_VERSION,
+            "snapshotVitalsSchemaVersion": 1,
+            "snapshotVitals": {
+                "health": "nearest WCL includeResources sample: <=3s before, otherwise <=1s after",
+                "absorb": "nearest WCL includeResources absorb sample; per-hit absorbed is not substituted",
+                "healAbsorb": "optional configured evidence only; WCL resources do not expose a total current healing-absorb field",
+            },
             "sourceURL": f"https://www.warcraftlogs.com/reports/{report_id}?fight={fight['id']}",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "mechanicNote": "Void Grasp apply fixes three obelisks behind/left-front/right-front; on debuff remove, rays fire from the player's current position toward those fixed obelisks.",
@@ -1812,6 +2038,7 @@ def build_single_fight_audit(token, report_id, fight, actor_map=None, actor_type
             "alleria": "boss_plugins/assets/alleria_windrunner.png",
             "silverPhantom": "boss_plugins/assets/silver_phantom.png",
         },
+        "playerSpecs": player_specs,
         "bowGroups": bow_groups,
         "waterEvents": water_events,
         "silverArrows": silver_arrows,

@@ -200,6 +200,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
         if path == "/api/catalog":
             return self.send_response_body(*json_bytes(to_frontend_catalog()))
+        if path == "/api/raid-cooldowns/options":
+            from analyzer_core.raid_cooldowns import options_document
+
+            return self.send_response_body(*json_bytes(options_document()))
         if path.startswith("/api/jobs/") and path.endswith("/events"):
             return self.handle_events(path)
         if path.startswith("/api/jobs/") and path.endswith("/result"):
@@ -266,6 +270,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.handle_save_verdict()
             if path == "/api/export-verdict-excel":
                 return self.handle_export_verdict_excel()
+            if path == "/api/raid-cooldowns/search":
+                from analyzer_core.raid_cooldowns import search_raid_cooldowns
+
+                return self.send_response_body(
+                    *json_bytes(search_raid_cooldowns(self.read_json_body()))
+                )
             if path in {"/api/notebook", "/api/scoreboard", "/api/notebook/store", "/api/scoreboard/store"}:
                 payload = self.read_json_body()
                 return self.send_response_body(*json_bytes(notebook_db.save_store(payload)))
@@ -429,6 +439,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/report": "/report.html",
             "/scoreboard": "/scoreboard.html",
             "/verdict": "/scoreboard.html",
+            "/cooldowns": "/raid-cooldowns.html",
             "/LuraJudgement.html": "/report.html",
         }
         path = route_map.get(path, path)

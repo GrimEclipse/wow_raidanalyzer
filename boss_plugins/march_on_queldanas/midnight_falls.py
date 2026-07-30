@@ -27,6 +27,6 @@ def analyze(report_ids: str, output_path=None, catalog_entry=None, options=None)
             "bossName": catalog_entry.boss_name,
         })
 
-    output = write_json_result(result, output_path)
+    output = write_json_result(result, output_path, catalog_entry=catalog_entry)
     midnight_falls_core.progress(f"插件输出完成：{output}")
     return result

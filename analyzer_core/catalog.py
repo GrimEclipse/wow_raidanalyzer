@@ -25,6 +25,7 @@ class BossEntry:
     external_key: str = ""
     aliases: List[str] = field(default_factory=list)
     arena_assets: List[dict] = field(default_factory=list)
+    capabilities: dict = field(default_factory=dict)
     raid_english_name: str = ""
     raid_external_key: str = ""
     raid_aliases: List[str] = field(default_factory=list)
@@ -107,6 +108,7 @@ def build_catalog(document: Optional[dict] = None) -> List[BossEntry]:
                         external_key=external_key,
                         aliases=list(boss.get("aliases") or []),
                         arena_assets=list(boss.get("arenaAssets") or []),
+                        capabilities=dict(boss.get("capabilities") or {}),
                         raid_english_name=str(raid.get("englishName") or ""),
                         raid_external_key=str(raid.get("externalKey") or ""),
                         raid_aliases=list(raid.get("aliases") or []),
@@ -172,6 +174,8 @@ def to_frontend_catalog() -> dict:
                     boss["aliases"] = entry.aliases
                 if entry.arena_assets:
                     boss["arenaAssets"] = entry.arena_assets
+                if entry.capabilities:
+                    boss["capabilities"] = entry.capabilities
                 raid["bosses"].append(boss)
             raids.append(raid)
         versions.append({"version": version, "raids": raids})

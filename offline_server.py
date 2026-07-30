@@ -14,6 +14,7 @@ ROUTES = {
     "/": "offline_index.html" if (ROOT / "offline_index.html").exists() else "index.html",
     "/report": "report.html",
     "/audit": "crown-fight-audit.html",
+    "/cooldowns": "raid-cooldowns.html",
 }
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
@@ -25,6 +26,31 @@ DEFAULT_EXPORT_EXCEL_DIR = Path.home() / "Desktop"
 class OfflineHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/raid-cooldowns/search":
+            try:
+                content_len = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(content_len) if content_len > 0 else b"{}"
+                payload = json.loads(raw.decode("utf-8"))
+                from analyzer_core.raid_cooldowns import search_raid_cooldowns
+
+                body = json.dumps(
+                    search_raid_cooldowns(payload),
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            except Exception as e:
+                msg = json.dumps({"error": str(e)}, ensure_ascii=False).encode("utf-8")
+                self.send_response(HTTPStatus.BAD_REQUEST)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(msg)))
+                self.end_headers()
+                self.wfile.write(msg)
+                return
         if parsed.path == "/api/export-verdict-excel":
             try:
                 content_len = int(self.headers.get("Content-Length") or 0)
@@ -64,6 +90,16 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        if parsed.path == "/api/raid-cooldowns/options":
+            from analyzer_core.raid_cooldowns import options_document
+
+            body = json.dumps(options_document(), ensure_ascii=False).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if parsed.path == "/api/data-files":
             try:
                 from analyzer_core.wcl_paths import list_wcl_data_files
