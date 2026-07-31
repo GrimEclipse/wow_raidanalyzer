@@ -177,6 +177,51 @@ def phase_rows(key):
     ]
 
 
+def enrich_timelines(timelines, evidence_boss):
+    if not timelines:
+        return {}
+    result = json.loads(json.dumps(timelines))
+    source_index = {"heroic": {}, "mythic": {}}
+    catalog = evidence_boss.get("spellCatalog") or {}
+    for category in CATEGORY_LABELS:
+        for row in catalog.get(category) or []:
+            spell_id = int(row.get("spellID") or 0)
+            for difficulty, observation in (row.get("observedIn") or {}).items():
+                if difficulty not in source_index:
+                    continue
+                names = [
+                    str(name) for name in (observation.get("sourceNames") or [])
+                    if name
+                ]
+                if names:
+                    source_index[difficulty].setdefault(spell_id, set()).update(names)
+
+    for difficulty, timeline in result.items():
+        if difficulty not in source_index:
+            continue
+        for event in timeline.get("events") or []:
+            spell_id = int(event.get("spellID") or 0)
+            names = sorted(source_index[difficulty].get(spell_id) or [])
+            if not event.get("sourceName") and len(names) == 1:
+                event["sourceName"] = names[0]
+            for child in event.get("children") or []:
+                child_spell_id = int(child.get("spellID") or 0)
+                child_names = sorted(
+                    source_index[difficulty].get(child_spell_id) or []
+                )
+                if not child.get("sourceName") and len(child_names) == 1:
+                    child["sourceName"] = child_names[0]
+            if not event.get("sourceName"):
+                child_sources = {
+                    child.get("sourceName")
+                    for child in event.get("children") or []
+                    if child.get("sourceName")
+                }
+                if len(child_sources) == 1:
+                    event["sourceName"] = child_sources.pop()
+    return result
+
+
 def build_document(discovery, authored, timelines=None):
     authored_bosses = authored.get("bosses") or {}
     confirmed_spell_names = authored.get("confirmedSpellNames") or {}
@@ -208,7 +253,10 @@ def build_document(discovery, authored, timelines=None):
             "energy": source.get("energy"),
             "phases": source.get("phases") or phase_rows(key),
             "mechanics": source.get("mechanics") or [],
-            "timelines": timeline_bosses.get(key) or {},
+            "timelines": enrich_timelines(
+                timeline_bosses.get(key) or {},
+                evidence_boss,
+            ),
             "spells": build_spell_rows(
                 evidence_boss,
                 confirmed_spell_names=confirmed_spell_names,
@@ -242,9 +290,18 @@ def build_document(discovery, authored, timelines=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--discovery", default="docs/zone54_spell_discovery.json")
-    parser.add_argument("--source", default="docs/zone54_raid_guide_source.json")
-    parser.add_argument("--timelines", default="docs/zone54_boss_timelines.json")
+    parser.add_argument(
+        "--discovery",
+        default="skills/venomous-abyss-raid-development/references/source-data/spell-discovery.json",
+    )
+    parser.add_argument(
+        "--source",
+        default="skills/venomous-abyss-raid-development/references/source-data/raid-guide-source.json",
+    )
+    parser.add_argument(
+        "--timelines",
+        default="skills/venomous-abyss-raid-development/references/source-data/boss-timelines.json",
+    )
     parser.add_argument("--output", default="assets/vendor/zone54-raid-guide-data.js")
     args = parser.parse_args()
 

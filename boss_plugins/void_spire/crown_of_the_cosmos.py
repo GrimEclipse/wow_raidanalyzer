@@ -4606,7 +4606,10 @@ def analyze_fight(report_id, fight, actor_map, actor_type, payload):
             "transitionAbandoned": transition_abandoned,
             "globalExemption": global_exemption,
             "analysisConfig": analysis_config,
-            "fieldAuditUrl": f"crown-fight-audit.html?source=wcl_hardcore_api.json&report={report_id}&fight={fight['id']}",
+            "fieldAuditUrl": (
+                "frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html"
+                f"?source=data/wcl_hardcore_api.json&report={report_id}&fight={fight['id']}"
+            ),
             "fieldAudit": field_audit,
         },
     }

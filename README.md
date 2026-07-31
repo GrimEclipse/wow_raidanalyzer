@@ -1,54 +1,51 @@
 # Mythic Analyzer
 
-WCL 开荒日志复盘工具。分析场面战斗与「智商计分板」分离：前者产出 JSON 与开庭明细，后者按开荒日期做日记式计分、申诉留痕与追加扣分。
+面向 WCL 的团队副本复盘工具。Boss 逻辑、Boss 专用前端和全局产品工具彼此隔离。
 
-## 本机配置（分析用）
+## 启动
 
-复制 `.env.example` 到 `.env`，填入 WCL API 凭据后可用命令行或 `/online` 拉日志。
-
-## 给最终用户的离线包（无需 Python）
-
-```powershell
-.\build_offline_package.bat
-```
-
-产物在 `dist/wow_raidanalyzer_offline/`：
-
-- `RaidAnalyzer.exe`：本地宿主（提供静态页 + `data/` / `scoreboard/` API）
-- `start.bat`：双击启动
-- `data/`：把分析得到的 `*.json` 丢进这里即可被自动加载
-- `scoreboard/`：计分板按日持久化
-- `report.html` / `scoreboard.html` / `assets/` …
-
-对方用法：解压 → 把 JSON 放进 `data/` → 双击 `start.bat`。
-
-## 开发者本机入口
+复制 `.env.example` 为 `.env` 并填写 WCL API 凭据，然后运行：
 
 ```text
 start_app.bat
 ```
 
-或 `python server.py --open` → `http://127.0.0.1:8765/`
+或执行 `python server.py --open`，访问 `http://127.0.0.1:8765/`。
 
-- `/` 首页
-- `/report` 场面分析 / 开庭
-- `/scoreboard` 智商计分板日记
-- `/online` 在线拉 WCL（需本机 Python）
+稳定入口：
 
-## 命令行分析
+- `/report`：按 JSON 中的 Boss 身份选择通用报告或专用报告
+- `/online`：通过界面运行 WCL 分析
+- `/raid-guide`：12.1 团长手册
+- `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
+- `/scoreboard`：智商记事本
+- `/audit`：奥蕾莉亚场地明细
+
+命令行仍可用于开发和自动化：
 
 ```powershell
 py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --report your_report_id
 ```
 
-输出默认 `wcl_hardcore_api.json`（已 gitignore）。
+生成数据统一写入 `data/`。
 
 ## 目录
 
-- `analyzer_core/`：目录、进度、并发、调度
-- `boss_plugins/`：Boss 插件
-- `host/OfflineHost.cs`：离线 exe 源码（打包时用 csc 编译）
-- `tools/`：辅助脚本
-- `scoreboard.html`：计分板
-- `report.html`：分析报告
-- `docs/`：说明文档
+- `analyzer_core/`：共享契约、调度、数据路径、团队技能和记事本存储
+- `boss_plugins/`：后端 Boss 插件
+- `frontend/report/`：报告入口、通用报告和 Boss 前端插件
+- `frontend/tools/`：团长手册、团队时间轴、在线执行器、智商记事本
+- `skills/`：项目维护规范与 Boss 研究资料
+- `tools/debug/`：手工调试入口
+- `host/OfflineHost.cs`：无需 Python 的离线宿主
+
+新增 Boss 时注册后端插件，并创建
+`frontend/report/plugins/<raidKey>/<bossKey>/plugin.js`。只有通用报告无法表达时，才增加该 Boss 的专用 `report.html`。
+
+## 离线包
+
+```powershell
+.\build_offline_package.bat
+```
+
+产物位于 `dist/wow_raidanalyzer_offline/`。最终用户将 JSON 放入 `data/` 后运行 `start.bat`。

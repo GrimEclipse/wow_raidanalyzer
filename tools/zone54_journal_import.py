@@ -10,9 +10,6 @@ import json
 import re
 from pathlib import Path
 
-import requests
-
-
 SOURCE_URL = (
     "https://www.wowhead.com/news/"
     "preview-the-patch-12-1-dungeon-journal-raid-lair-and-dungeons-381960"
@@ -38,6 +35,55 @@ REFERENCE_VIDEOS = [
     {"boss": "twinfangs", "bvid": "BV12rMJ6sEg3", "title": "H6-双子毒牙"},
     {"boss": "bargained", "bvid": "BV11rMJ6sEoc", "title": "H7-盘卷祭坛"},
 ]
+
+JOURNAL_DIFFICULTY_OVERRIDES = {
+    # The original preview-news HTML flattens some difficulty badges. These
+    # overrides come from the current PTR encounter-journal NPC pages.
+    "lostexplorers": {
+        "source": "https://www.wowhead.com/ptr/npc=267077/morzahi",
+        "spellIDs": [],
+        "notes": [
+            "Relic Rupture: On Mythic difficulty, breaking a crate also inflicts Shadow damage to players within 15 yards."
+        ],
+    },
+    "sszorak": {
+        "source": "https://www.wowhead.com/ptr/npc=257347/sszorak",
+        "spellIDs": [1296898, 1297367, 1297414, 1297707],
+        "notes": [
+            "Serpent's Fury: On Mythic difficulty, Sszorak marks a player and gains rage over time. When at least 14 players are within 8 yards of the marked player, Sszorak casts To the Slaughter and consumes his rage. At 100 rage he gains Unbound Ferocity."
+        ],
+    },
+    "twinfangs": {
+        "source": "https://www.wowhead.com/ptr/npc=257361/vexhul",
+        "spellIDs": [1303230, 1303378, 1308356, 1308385],
+        "nonMythicIDs": [1290516],
+        "notes": [
+            "Eternal Venom: On Mythic difficulty, a player who dies while afflicted creates additional Caustic Globules.",
+            "Blood Torrent: On Mythic difficulty, each Caustic Globule is protected by a Barbed Bulwark. Interrupting Protected Gestation destroys the bulwark.",
+            "Rouse the Brood: On Mythic difficulty, Ithraz summons Broodlings that repeatedly cast Visceral Burst. Interrupting the cast forces the Broodling to retreat.",
+            "Ravenous Feast: On Mythic difficulty, consumed Eternal Venom creates Tainted Blood founts that must have their healing absorption removed before they expire.",
+        ],
+    },
+    "bargained": {
+        "source": (
+            "https://www.wowhead.com/ptr/guide/midnight/raids/"
+            "venomous-abyss-coiled-altar-boss-strategy-abilities"
+        ),
+        "spellIDs": [],
+        "nonMythicIDs": [
+            1283623, 1283631, 1285643, 1285911, 1286399, 1286441,
+            1287718, 1304032, 1304033,
+        ],
+        "notes": [
+            "Toxic Deluge: On Mythic difficulty, venom mutations can detonate nearby Coalesced Venom and create additional chain-reaction pressure.",
+            "Guillotine: On Mythic difficulty, Guillotined is permanent for the remainder of the encounter.",
+            "Axegrinder: On Mythic difficulty, Axegrinders do not despawn and permanently reduce usable arena space.",
+            "Manifestation of Dread: On Mythic difficulty, each manifestation is visible only to its fixated player and periodically refixates; contact triggers Malevolent Resonance.",
+            "Spiritcackle: On Mythic difficulty, the summoned spirit has a 99% damage-reduction Spirit Shield that must be weakened with Gloombomb.",
+            "Spirit Erasure: On Mythic difficulty, intercepting a fragment increases Spirit Erasure damage taken by 20% for 5 seconds.",
+        ],
+    },
+}
 
 SPELL_LINK = re.compile(
     r'href=\\"(?:https://www\.wowhead\.com)?/ptr/spell=(?P<id>\d+)'
@@ -126,6 +172,26 @@ def extract_spells(segment):
     return sorted(spells.values(), key=lambda row: (row["spellID"], row["name"]))
 
 
+def apply_difficulty_overrides(key, boss):
+    override = JOURNAL_DIFFICULTY_OVERRIDES.get(key)
+    if not override:
+        return boss
+    mythic_ids = set(override.get("spellIDs") or [])
+    non_mythic_ids = set(override.get("nonMythicIDs") or [])
+    for spell in boss.get("spells") or []:
+        if int(spell["spellID"]) in mythic_ids:
+            spell["mythicOnly"] = True
+            spell["mythicMentioned"] = True
+        if int(spell["spellID"]) in non_mythic_ids:
+            spell["mythicOnly"] = False
+    notes = boss.setdefault("mythicDifferences", [])
+    for note in override.get("notes") or []:
+        if note not in notes:
+            notes.append(note)
+    boss["difficultySource"] = override.get("source")
+    return boss
+
+
 def extract_journal(raw, source_url):
     normalized = normalized_source(raw)
     segments = boss_segments(normalized)
@@ -141,13 +207,13 @@ def extract_journal(raw, source_url):
                 "mythicDifferences": [],
             }
             continue
-        bosses[key] = {
+        bosses[key] = apply_difficulty_overrides(key, {
             "encounterID": encounter_id,
             "name": title,
             "available": True,
             "spells": extract_spells(segment["raw"]),
             "mythicDifferences": extract_explicit_mythic_notes(segment["raw"]),
-        }
+        })
     return {
         "schemaVersion": 1,
         "zoneID": 54,
@@ -171,12 +237,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-url", default=SOURCE_URL)
     parser.add_argument("--input-html", help="使用已下载页面，避免再次联网")
-    parser.add_argument("--output", default="docs/zone54_journal.json")
+    parser.add_argument(
+        "--output",
+        default="skills/venomous-abyss-raid-development/references/source-data/journal.json",
+    )
     args = parser.parse_args()
 
     if args.input_html:
         raw = Path(args.input_html).read_text(encoding="utf-8")
     else:
+        import requests
+
         response = requests.get(args.source_url, timeout=60)
         response.raise_for_status()
         raw = response.text

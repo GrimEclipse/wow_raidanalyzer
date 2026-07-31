@@ -60,6 +60,74 @@ class Zone54DiscoveryTests(unittest.TestCase):
         )
         self.assertTrue(document["bosses"]["nakzali"]["mythicDifferences"])
 
+    def test_journal_import_restores_current_ptr_mythic_difficulty_badges(self):
+        raw = (
+            '[tabs name=\\"The Lost Explorers-1-details\\"]\\r\\n'
+            '<a href=\\"/ptr/spell=1291933/throw-junk\\">Throw Junk</a>\\r\\n'
+            '[tabs name=\\"Sszorak-1-details\\"]\\r\\n'
+            '<a href=\\"/ptr/spell=1296898/unbound-ferocity\\">'
+            'Unbound Ferocity</a>\\r\\n'
+            '<a href=\\"/ptr/spell=1297367/serpents-fury\\">'
+            "Serpent's Fury</a>\\r\\n"
+            '<a href=\\"/ptr/spell=1297414/to-the-slaughter\\">'
+            'To the Slaughter</a>\\r\\n'
+            '<a href=\\"/ptr/spell=1297707/virulence\\">Virulence</a>\\r\\n'
+            '[tabs name=\\"The Twin Fangs-1-details\\"]\\r\\n'
+            '<a href=\\"/ptr/spell=1290516/ravenous-feast\\">'
+            'Ravenous Feast</a>\\r\\n'
+            '<a href=\\"/ptr/spell=1303230/blood-torrent\\">'
+            'Blood Torrent</a>\\r\\n'
+            '<a href=\\"/ptr/spell=1303378/protected-gestation\\">'
+            'Protected Gestation</a>\\r\\n'
+            '<a href=\\"/ptr/spell=1308356/rouse-the-brood\\">'
+            'Rouse the Brood</a>\\r\\n'
+            '<a href=\\"/ptr/spell=1308385/visceral-burst\\">'
+            'Visceral Burst</a>\\r\\n'
+            '[tabs name=\\"The Coiled Altar-1-details\\"]\\r\\n'
+            '<a href=\\"/ptr/spell=1285643/dreadmarch\\">'
+            'Dreadmarch</a> (Mythic)\\r\\n'
+            '<a href=\\"/ptr/spell=1285911/unnerving-fixation\\">'
+            'Unnerving Fixation</a> (Mythic)\\r\\n'
+            '<a href=\\"/ptr/spell=1304032/soulbinding\\">'
+            'Soulbinding</a> (Mythic)\\r\\n'
+            '[tabs name=\\"Ulatek-1-details\\"]'
+        )
+        document = extract_journal(raw, "https://example.invalid")
+        lost = document["bosses"]["lostexplorers"]
+        sszorak = document["bosses"]["sszorak"]
+        twinfangs = document["bosses"]["twinfangs"]
+        bargained = document["bosses"]["bargained"]
+        self.assertIn("15 yards", lost["mythicDifferences"][0])
+        self.assertIn("at least 14 players", sszorak["mythicDifferences"][0])
+        mythic_rows = {
+            row["spellID"]: row for row in sszorak["spells"]
+            if row["spellID"] in {1296898, 1297367, 1297414, 1297707}
+        }
+        self.assertEqual(len(mythic_rows), 4)
+        self.assertTrue(all(row["mythicOnly"] for row in mythic_rows.values()))
+        twin_rows = {
+            row["spellID"]: row for row in twinfangs["spells"]
+        }
+        self.assertFalse(twin_rows[1290516]["mythicOnly"])
+        self.assertTrue(twin_rows[1303230]["mythicOnly"])
+        self.assertTrue(twin_rows[1303378]["mythicOnly"])
+        self.assertTrue(twin_rows[1308356]["mythicOnly"])
+        self.assertTrue(twin_rows[1308385]["mythicOnly"])
+        self.assertTrue(any(
+            "Visceral Burst" in note
+            for note in twinfangs["mythicDifferences"]
+        ))
+        bargained_rows = {
+            row["spellID"]: row for row in bargained["spells"]
+        }
+        self.assertFalse(bargained_rows[1285643]["mythicOnly"])
+        self.assertFalse(bargained_rows[1285911]["mythicOnly"])
+        self.assertFalse(bargained_rows[1304032]["mythicOnly"])
+        self.assertTrue(any(
+            "99% damage-reduction" in note
+            for note in bargained["mythicDifferences"]
+        ))
+
     def test_markdown_outputs_actual_spell_ids_and_evidence_categories(self):
         journal = {
             "spells": [

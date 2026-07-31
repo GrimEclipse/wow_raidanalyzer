@@ -1,0 +1,1978 @@
+{
+  "schemaVersion": 1,
+  "zoneID": 54,
+  "source": {
+    "url": "https://www.wowhead.com/news/preview-the-patch-12-1-dungeon-journal-raid-lair-and-dungeons-381960",
+    "kind": "datamined-dungeon-journal"
+  },
+  "referenceVideos": [
+    {
+      "boss": "nakzali",
+      "bvid": "BV1vETC6vEw2",
+      "title": "H1-盘魂者内克扎莉",
+      "url": "https://www.bilibili.com/video/BV1vETC6vEw2",
+      "subtitleTrackAvailable": false
+    },
+    {
+      "boss": "sentinels",
+      "bvid": "BV1Z3TC6uEdU",
+      "title": "H2-陵寝哨兵",
+      "url": "https://www.bilibili.com/video/BV1Z3TC6uEdU",
+      "subtitleTrackAvailable": false
+    },
+    {
+      "boss": "vashnik",
+      "bvid": "BV1Z3TC6uE38",
+      "title": "H3-万毒邪祟者瓦什尼克",
+      "url": "https://www.bilibili.com/video/BV1Z3TC6uE38",
+      "subtitleTrackAvailable": false
+    },
+    {
+      "boss": "lostexplorers",
+      "bvid": "BV1FuTC6rEcs",
+      "title": "H4-迷失的探险者",
+      "url": "https://www.bilibili.com/video/BV1FuTC6rEcs",
+      "subtitleTrackAvailable": false
+    },
+    {
+      "boss": "sszorak",
+      "bvid": "BV12rMJ6sEWh",
+      "title": "H5-斯索拉克",
+      "url": "https://www.bilibili.com/video/BV12rMJ6sEWh",
+      "subtitleTrackAvailable": false
+    },
+    {
+      "boss": "twinfangs",
+      "bvid": "BV12rMJ6sEg3",
+      "title": "H6-双子毒牙",
+      "url": "https://www.bilibili.com/video/BV12rMJ6sEg3",
+      "subtitleTrackAvailable": false
+    },
+    {
+      "boss": "bargained",
+      "bvid": "BV11rMJ6sEoc",
+      "title": "H7-盘卷祭坛",
+      "url": "https://www.bilibili.com/video/BV11rMJ6sEoc",
+      "subtitleTrackAvailable": false
+    }
+  ],
+  "bosses": {
+    "nakzali": {
+      "encounterID": 53470,
+      "name": "Nek'zali the Soulcoiler",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1284032,
+          "name": "Soulcoil Well",
+          "journalOccurrences": 8,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284033,
+          "name": "Soulcoil Rite",
+          "journalOccurrences": 6,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284034,
+          "name": "Uncoiled Rage",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284103,
+          "name": "Possession Barrage",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284109,
+          "name": "Hollowed",
+          "journalOccurrences": 8,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284110,
+          "name": "Sever",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285681,
+          "name": "Soulcoil Ignition",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1287198,
+          "name": "Latent Cultist",
+          "journalOccurrences": 5,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1287426,
+          "name": "Essence Rend",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1287533,
+          "name": "Gravebound Fury",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1288772,
+          "name": "Soulcoil Rite",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289683,
+          "name": "Ritual of Awakening",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289696,
+          "name": "Tethers of Awakening",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289855,
+          "name": "Hungering Pyre",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289875,
+          "name": "Cremation",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289919,
+          "name": "Restless Amani",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290003,
+          "name": "Uncoiling",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290361,
+          "name": "Soulcoiled",
+          "journalOccurrences": 7,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1292034,
+          "name": "Possession Barrage",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292248,
+          "name": "Soul Transfer",
+          "journalOccurrences": 3,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1293212,
+          "name": "Grasping Depths",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1293497,
+          "name": "Entwined Step",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1294729,
+          "name": "Corpse Blight",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1294742,
+          "name": "Slithering Flame",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1294846,
+          "name": "Anguished Echoes",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295263,
+          "name": "Vessels of Awakening",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297624,
+          "name": "Ritual Burn",
+          "journalOccurrences": 6,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298698,
+          "name": "Residual Toll",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299673,
+          "name": "Invoke",
+          "journalOccurrences": 2,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1299988,
+          "name": "Immortal Coil",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1300235,
+          "name": "Soul Exhaustion",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1300238,
+          "name": "Soulcoiler's Curse",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1300239,
+          "name": "Swirling Spirit",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        }
+      ],
+      "mythicDifferences": [
+        "Invoke : Nek'zali beckons for Ula'tek, invoking the Soulcoil Rite as the well reverberates her call, instructing several Latent Cultist s to begin Entwined Step . On Mythic Difficulty, interrupts all spell casts and silences interrupting players for 2 sec. (Mythic)"
+      ]
+    },
+    "sentinels": {
+      "encounterID": 53445,
+      "name": "Entombed Sentinels",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1284207,
+          "name": "Living Venom",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284208,
+          "name": "Blood Venom",
+          "journalOccurrences": 3,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1284251,
+          "name": "Venom Coagulation",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284257,
+          "name": "Contaminate",
+          "journalOccurrences": 3,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1284434,
+          "name": "Toxic Droplets",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284452,
+          "name": "Noxious Blast",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284458,
+          "name": "Empowering Slam",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284471,
+          "name": "Blighted Blood",
+          "journalOccurrences": 2,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1284487,
+          "name": "Bloodvenom Injection",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284494,
+          "name": "Mark of Acid",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284503,
+          "name": "Mark of Blood",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284588,
+          "name": "Vitriolic Stasis",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1284590,
+          "name": "Helical Toxins",
+          "journalOccurrences": 5,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1284941,
+          "name": "Cultivated Burst",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1288232,
+          "name": "Unstable Miasma",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1288297,
+          "name": "Clinging Murk",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290189,
+          "name": "Ula'tek's Dominance",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290193,
+          "name": "Ula'tek's Dominance",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296878,
+          "name": "Shifting Protovenom",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1296962,
+          "name": "Protovenom Eruption",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        }
+      ],
+      "mythicDifferences": []
+    },
+    "lostexplorers": {
+      "encounterID": 53497,
+      "name": "The Lost Explorers",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1286921,
+          "name": "Icebound Flames",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1291390,
+          "name": "Cataclysmic Invocation",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1291930,
+          "name": "Steady Strikes",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1291933,
+          "name": "Throw Junk",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292104,
+          "name": "Mushroom Toss",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292177,
+          "name": "Fungal Burst",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292388,
+          "name": "Evil Eyes",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292779,
+          "name": "Empowered Ascension",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292793,
+          "name": "Blink Nova",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295449,
+          "name": "Malevolent Presence",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295451,
+          "name": "Dark Whispers",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295854,
+          "name": "Shredding Shards",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295886,
+          "name": "Frostfire Volley",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295928,
+          "name": "Burning Flames",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295952,
+          "name": "Elemental Explosion",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295954,
+          "name": "Piercing Frost",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296025,
+          "name": "Blink Nova",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296061,
+          "name": "Shell Spin",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296092,
+          "name": "Mighty Thud",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296227,
+          "name": "Relentless Escalation",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296247,
+          "name": "Concussive Blast",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296252,
+          "name": "Smashing Shovel",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297022,
+          "name": "Binding Anguish",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297024,
+          "name": "Binding Anguish",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297075,
+          "name": "Empower",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297625,
+          "name": "Explosive Surprise",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297644,
+          "name": "Aura of Unity",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297645,
+          "name": "United Defense",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297646,
+          "name": "United Defense",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297648,
+          "name": "Frost Patch",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297649,
+          "name": "Fire Patch",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1297650,
+          "name": "Spreading Flames",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1305844,
+          "name": "Blast Wave",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        }
+      ],
+      "mythicDifferences": [
+        "Relic Rupture: On Mythic difficulty, breaking a crate also inflicts Shadow damage to players within 15 yards."
+      ],
+      "difficultySource": "https://www.wowhead.com/ptr/npc=267077/morzahi"
+    },
+    "vashnik": {
+      "encounterID": 53455,
+      "name": "Vashnik the Malignant",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1280189,
+          "name": "Malignant Reaction",
+          "journalOccurrences": 2,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1280935,
+          "name": "Plague Froth",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1281907,
+          "name": "Plague Froth",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1282116,
+          "name": "Adaptive Toxin",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282117,
+          "name": "Adaptive Infection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282525,
+          "name": "Malignant Catalyst",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282601,
+          "name": "Catalytic Bile",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1283164,
+          "name": "Imbibes",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1284670,
+          "name": "Imbibe",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1285979,
+          "name": "Caustic Surge",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286631,
+          "name": "Splitting Clot",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286737,
+          "name": "Umbral Ejection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1291530,
+          "name": "Sanginous Fortitude",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1293968,
+          "name": "Shadow Infusion",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1293969,
+          "name": "Blood Infusion",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1293971,
+          "name": "Fire Infusion",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295209,
+          "name": "Explode",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295229,
+          "name": "Siphon Blood",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295796,
+          "name": "Plague Waves",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295798,
+          "name": "Plague Wave",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1298582,
+          "name": "Hemo Expulsion",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298583,
+          "name": "Gloom Expulsion",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298587,
+          "name": "Conflagrating Expulsion",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299941,
+          "name": "Siphoning Infection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299949,
+          "name": "Exploding Infection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299950,
+          "name": "Stygian Infection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1302489,
+          "name": "Stygian Burst",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1304437,
+          "name": "Hardened Tumor",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1304459,
+          "name": "Tumor Burst",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1305833,
+          "name": "Congealing Bolt",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1305902,
+          "name": "Burning Presence",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        }
+      ],
+      "mythicDifferences": [
+        "Imbibe : Vashnik draws power from two fountains, causing a living venom to erupt forward, and granting a stack of Toxic Vapor . On Mythic difficulty, Imbibe additonally draws Malignant Tumors from the fountains",
+        "Plague Wave : Waves of plague venom erupt from a unit, inflicting 615772 Plague damage to all players hit. On Mythic difficulty, Plague Waves remove Hardened Tumor from Malignant Tumors"
+      ]
+    },
+    "sszorak": {
+      "encounterID": 53420,
+      "name": "Sszorak",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1277002,
+          "name": "Ravage",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1277025,
+          "name": "Apex Predator",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1277027,
+          "name": "Mutilate",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282869,
+          "name": "Corroding Venom",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285419,
+          "name": "Raging Crosswinds",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285447,
+          "name": "Turbulent Gusts",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285732,
+          "name": "Howling Maelstrom",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285961,
+          "name": "Ula'tek's Presence",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286033,
+          "name": "Dig In",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286997,
+          "name": "Venomous Surge",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1287008,
+          "name": "Viscous Cyst",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1287072,
+          "name": "Tempest",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296602,
+          "name": "Caustic Residue",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296898,
+          "name": "Unbound Ferocity",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1297367,
+          "name": "Serpent's Fury",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1297414,
+          "name": "To the Slaughter",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1297707,
+          "name": "Virulence",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1305959,
+          "name": "Venomous Surge",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1305998,
+          "name": "Caustic Claws",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        }
+      ],
+      "mythicDifferences": [
+        "Serpent's Fury: On Mythic difficulty, Sszorak marks a player and gains rage over time. When at least 14 players are within 8 yards of the marked player, Sszorak casts To the Slaughter and consumes his rage. At 100 rage he gains Unbound Ferocity."
+      ],
+      "difficultySource": "https://www.wowhead.com/ptr/npc=257347/sszorak"
+    },
+    "twinfangs": {
+      "encounterID": 53421,
+      "name": "The Twin Fangs",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1288538,
+          "name": "Stone Breaker",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289092,
+          "name": "Fractured",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289192,
+          "name": "Caustic Deluge",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289993,
+          "name": "Caustic Globule",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290336,
+          "name": "Eternal Venom",
+          "journalOccurrences": 8,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290516,
+          "name": "Ravenous Feast",
+          "journalOccurrences": 6,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1290809,
+          "name": "Coiling Toxins",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290956,
+          "name": "Stir the Depths",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1291404,
+          "name": "Venomous Emergence",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1291478,
+          "name": "Corrosive Spit",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292505,
+          "name": "Noxious Slick",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1293749,
+          "name": "Surge",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1293792,
+          "name": "Barrage",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1294293,
+          "name": "Surge",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295049,
+          "name": "Toxic Fumes",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295107,
+          "name": "Concentrated Spittle",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1295115,
+          "name": "Clotted Bolt",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1302013,
+          "name": "Bloody Expulsion",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1302499,
+          "name": "Frothing Mixture",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1303230,
+          "name": "Blood Torrent",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1303378,
+          "name": "Protected Gestation",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1306872,
+          "name": "Barrage",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1306922,
+          "name": "Congealed Gore",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1308356,
+          "name": "Rouse the Brood",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1308385,
+          "name": "Visceral Burst",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1308583,
+          "name": "Uncoiled Wrath",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        }
+      ],
+      "mythicDifferences": [
+        "Eternal Venom: On Mythic difficulty, a player who dies while afflicted creates additional Caustic Globules.",
+        "Blood Torrent: On Mythic difficulty, each Caustic Globule is protected by a Barbed Bulwark. Interrupting Protected Gestation destroys the bulwark.",
+        "Rouse the Brood: On Mythic difficulty, Ithraz summons Broodlings that repeatedly cast Visceral Burst. Interrupting the cast forces the Broodling to retreat.",
+        "Ravenous Feast: On Mythic difficulty, consumed Eternal Venom creates Tainted Blood founts that must have their healing absorption removed before they expire."
+      ],
+      "difficultySource": "https://www.wowhead.com/ptr/npc=257361/vexhul"
+    },
+    "bargained": {
+      "encounterID": 53429,
+      "name": "The Coiled Altar",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1243002,
+          "name": "Dreadmarch",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282287,
+          "name": "Venomfang",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282403,
+          "name": "Coalesced Venom",
+          "journalOccurrences": 8,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282419,
+          "name": "Volatile Venom",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1282487,
+          "name": "Fangs of the Crucible",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1283290,
+          "name": "Noxious Ground",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1283356,
+          "name": "Corrupted Toxin",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1283489,
+          "name": "Guillotine",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1283623,
+          "name": "Widow's Kiss",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1283631,
+          "name": "Widow's Touch",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1283832,
+          "name": "Axegrinder",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285643,
+          "name": "Dreadmarch",
+          "journalOccurrences": 7,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1285844,
+          "name": "Manifestations of Dread",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285847,
+          "name": "Unassailable",
+          "journalOccurrences": 6,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1285911,
+          "name": "Unnerving Fixation",
+          "journalOccurrences": 6,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1286324,
+          "name": "Shadowfang",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286399,
+          "name": "Wail of Terror",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1286441,
+          "name": "Spiritcackle",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1286573,
+          "name": "Soul Sever",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286620,
+          "name": "Soul Sever",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286837,
+          "name": "Gravebound",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286895,
+          "name": "Gloombomb",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286912,
+          "name": "Veil of Twilight",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286918,
+          "name": "Eternal Nightfall",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286947,
+          "name": "Suffocating Darkness",
+          "journalOccurrences": 2,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1287587,
+          "name": "Severed Connection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1287718,
+          "name": "Reclaim Essence",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1287722,
+          "name": "Spirit Erasure",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1288624,
+          "name": "Dreadful Presence",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289802,
+          "name": "Soulbound",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298381,
+          "name": "Defilement of the Crucible",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298591,
+          "name": "Defiled Ground",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298795,
+          "name": "Corrupted Toxin",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299267,
+          "name": "Grim Guillotine",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299396,
+          "name": "Death's Embrace",
+          "journalOccurrences": 2,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1299401,
+          "name": "Death's Whisper",
+          "journalOccurrences": 1,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1299680,
+          "name": "Sever",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299838,
+          "name": "Venom Rupture",
+          "journalOccurrences": 7,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299960,
+          "name": "Toxic Deluge",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1300322,
+          "name": "Twinfang Toxin",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1304028,
+          "name": "Deathguard",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1304032,
+          "name": "Soulbinding",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1304033,
+          "name": "Ghastly Regeneration",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1307009,
+          "name": "Despair",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1307184,
+          "name": "Dread Bolt",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1307279,
+          "name": "Blighted Sever",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1307425,
+          "name": "Guillotined",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1307652,
+          "name": "Guillotined",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1308323,
+          "name": "Retaliatory Malice",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        }
+      ],
+      "mythicDifferences": [
+        "Manifestation of Dread : A terrifying being manifests, fixating on a random player. On Mythic difficulty, Manifestations of Dread can only be seen by the target they are fixating",
+        "Spirit Erasure : The fragment is violently erased from existence when stepped on, inflicting 192429 Shadow damage to all players. The fragment attempts to drag down its desecrator, increasing their damage taken from Spirit Erasure by 20 % for 5 sec. This effect stacks. On Mythic difficulty, stepping on a fragment increases damage taken from Spirit Erasure by 20 % for 5 sec",
+        "Toxic Deluge: On Mythic difficulty, venom mutations can detonate nearby Coalesced Venom and create additional chain-reaction pressure.",
+        "Guillotine: On Mythic difficulty, Guillotined is permanent for the remainder of the encounter.",
+        "Axegrinder: On Mythic difficulty, Axegrinders do not despawn and permanently reduce usable arena space.",
+        "Manifestation of Dread: On Mythic difficulty, each manifestation is visible only to its fixated player and periodically refixates; contact triggers Malevolent Resonance.",
+        "Spiritcackle: On Mythic difficulty, the summoned spirit has a 99% damage-reduction Spirit Shield that must be weakened with Gloombomb.",
+        "Spirit Erasure: On Mythic difficulty, intercepting a fragment increases Spirit Erasure damage taken by 20% for 5 seconds."
+      ],
+      "difficultySource": "https://www.wowhead.com/ptr/guide/midnight/raids/venomous-abyss-coiled-altar-boss-strategy-abilities"
+    },
+    "ulatek": {
+      "encounterID": 53492,
+      "name": "Ula'tek",
+      "available": true,
+      "spells": [
+        {
+          "spellID": 1286834,
+          "name": "Necrotic Vapors",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1286860,
+          "name": "Rage of the Shackled",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286885,
+          "name": "Falling Debris",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286905,
+          "name": "Fury Unleashed",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1286945,
+          "name": "Unchecked Rage",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1287036,
+          "name": "Poisonous Bite",
+          "journalOccurrences": 26,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1287265,
+          "name": "Shattering Coil",
+          "journalOccurrences": 6,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1288879,
+          "name": "Surging Fang",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1289962,
+          "name": "Slithering Clutch",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1290779,
+          "name": "Malice",
+          "journalOccurrences": 3,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1290990,
+          "name": "Writhing Gestation",
+          "journalOccurrences": 5,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1292403,
+          "name": "Caustic Wingfall",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1295360,
+          "name": "Malignant Shell",
+          "journalOccurrences": 5,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1295905,
+          "name": "Serpent's Bite",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1296301,
+          "name": "Mephitic Thrash",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298367,
+          "name": "Mother's Wrath",
+          "journalOccurrences": 3,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1298417,
+          "name": "Stone Venom",
+          "journalOccurrences": 4,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1298559,
+          "name": "Gore Rattler",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299206,
+          "name": "Rattler Slam",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299526,
+          "name": "Exposed Heart",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1299650,
+          "name": "Hardened",
+          "journalOccurrences": 10,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1299757,
+          "name": "Toxic Incubation",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1300265,
+          "name": "Doomscale Pheromones",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1300312,
+          "name": "Doomscale Shell",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1300743,
+          "name": "Venom Bubbles",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1300751,
+          "name": "Call of the Serpent",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1301117,
+          "name": "Grasping Fangs",
+          "journalOccurrences": 4,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1301213,
+          "name": "Shadow Molt",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1301268,
+          "name": "Putrid Membrane",
+          "journalOccurrences": 7,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1301510,
+          "name": "Demolish",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1301800,
+          "name": "Acidic Burst",
+          "journalOccurrences": 22,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1302505,
+          "name": "Ula'tek's Bond",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1302982,
+          "name": "Virulent Spit",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1303410,
+          "name": "Defect: Weakened",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1303414,
+          "name": "Petrifying Sting",
+          "journalOccurrences": 30,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1304012,
+          "name": "Call of the Serpent",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1304888,
+          "name": "Vengeance",
+          "journalOccurrences": 3,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1305650,
+          "name": "Anguished Cry",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1305709,
+          "name": "Desperate Thrash",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1305775,
+          "name": "Dread Roar",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1306086,
+          "name": "Volatile Purge",
+          "journalOccurrences": 2,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1306119,
+          "name": "Calcified Corpse",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1306858,
+          "name": "Warden's Protection",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1306862,
+          "name": "Scent of Prey",
+          "journalOccurrences": 1,
+          "mythicOnly": false,
+          "mythicMentioned": false
+        },
+        {
+          "spellID": 1307612,
+          "name": "Noxious Shell",
+          "journalOccurrences": 10,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1307635,
+          "name": "Noxious Splash",
+          "journalOccurrences": 5,
+          "mythicOnly": true,
+          "mythicMentioned": true
+        },
+        {
+          "spellID": 1308038,
+          "name": "Mass Gestation",
+          "journalOccurrences": 2,
+          "mythicOnly": false,
+          "mythicMentioned": true
+        }
+      ],
+      "mythicDifferences": [
+        "Devourer's Spawn : The endless spawn of Ula'tek. These hardened eggs go through rapid gestation and hatch the creatures within whenever they come into contact with the venom that fills Ula'tek's prison. On Mythic difficulty, Devourer's Spawn are and cast on players that pick them up",
+        "Doomscale Egg : On Mythic difficulty, Doomscale Eggs use on all remaining Devourer's Spawn on their side",
+        "Volatile Purge : Ula'tek's venom inflicts 53880 Nature damage every 1 sec for 6 sec. On expiration, the poison erupts from the affected players inflicting 75 Nature damage to players within 7 yards of the purge. On Mythic difficulty, waves erupt from the player when their aura expires. (Mythic)",
+        "Frost Barrage : Nymrissa hurls icy volleys at players, inflicting 18 Frost damage every 1sec. On Mythic difficulty, Lingering Frost can be remove by Water Jet . (Heroic)",
+        "Lingering Frost : Inflicting 23101 Frost damage every 1 sec and causes players to slide. On Mythic difficulty, Lingering Frost can be remove by Water Jet",
+        "Water Jet : Nymrissa condenses surrounding water into a high-pressure jet, blasting her target for 40 Frost damage every 1 sec and gradually pushing affected players away. The surging water washes away icy patches on the ground. The power of water increases damage taken from Water Jet by 45 % and Frost damage taken by 15 % for 40 sec. On Mythic difficulty, ice ground can be removed by Water Jet",
+        "Ritual Venom : Dormant toxins fill the player for 45 sec. Upon expiration, the venom bursts inflicting 40 Nature damage. On Mythic difficulty, this effect stacks. (Mythic+, Mythic)",
+        "Bedrock Slam : Meittik strikes their primary target with immense force, inflicting 20 Nature damage and 449313 Physical damage. The force of the impact ruptures nearby topsoil, creating patches of Fertile Loam . On Mythic difficulty, Bedrock Slam causes a Bedrock Surge. (Mythic+, Mythic)",
+        "Thornblade : Lekshi ambushes a player and backstabs them, inflicting 10 Nature damage and causing them to bleed for 4 Physical damage every 2 sec for 8 sec. On Mythic difficulty, Lekshi casts Fan Of Thorns immediately after impaling their target. (Mythic+, Mythic)",
+        "Verdant Stomp : Ikuzz stomps, inflicting 134794 Physical damage to all players and knocking them back. After 4 sec, Bloodthorn Roots emerge at players' locations. On Mythic difficulty, Bloodthorn Roots emerge at players' locations after Verdant Stomp. (Mythic+, Mythic)",
+        "Burnout : When its health is depleted, the Blazebound Firestorm goes out with a bang, inflicting 449313 Fire damage to players within 20 yards. On Mythic difficulty, this ability leaves behind Scorched Earth. (Heroic, Mythic+, Mythic)",
+        "Molten Boulder : Kokia slams a molten boulder into the ground in front of her, inflicting 30 Fire damage to players within 6 yards. Any player it touches takes 269588 Fire damage and gets knocked back. The boulder rolls forward up to 40 yards and then explodes, inflicting 60 damage to players within 12 yards. On Mythic difficulty, this ability leaves behind Scorched Earth",
+        "Stormslam : Erkhart delivers a massive blow to a player, inflicting 359451 Physical damage and 16 Nature damage , and additionally increasing Nature damage taken by 100 % for 30 sec. This effect stacks. On Mythic difficulty additionally applies a vulnerability to targets. (Mythic+, Mythic)",
+        "Tempest Winds : Aspix targets players with furious winds that build over time. These winds coalesce into tempest zones, inflicting 197698 Nature damage and knocking back any players struck. On Mythic difficulty, Aspix targets two players with Tempest Winds",
+        "Invoke : Nek'zali beckons for Ula'tek, invoking the Soulcoil Rite as the well reverberates her call, instructing several Latent Cultist s to begin Entwined Step . On Mythic Difficulty, interrupts all spell casts and silences interrupting players for 2 sec. (Mythic)",
+        "Imbibe : Vashnik draws power from two fountains, causing a living venom to erupt forward, and granting a stack of Toxic Vapor . On Mythic difficulty, Imbibe additonally draws Malignant Tumors from the fountains",
+        "Plague Wave : Waves of plague venom erupt from a unit, inflicting 615772 Plague damage to all players hit. On Mythic difficulty, Plague Waves remove Hardened Tumor from Malignant Tumors",
+        "Manifestation of Dread : A terrifying being manifests, fixating on a random player. On Mythic difficulty, Manifestations of Dread can only be seen by the target they are fixating",
+        "Spirit Erasure : The fragment is violently erased from existence when stepped on, inflicting 192429 Shadow damage to all players. The fragment attempts to drag down its desecrator, increasing their damage taken from Spirit Erasure by 20 % for 5 sec. This effect stacks. On Mythic difficulty, stepping on a fragment increases damage taken from Spirit Erasure by 20 % for 5 sec"
+      ]
+    }
+  }
+}

@@ -1,0 +1,1308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="../../../../../">
+  <title>奥蕾莉亚单场开庭分析</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b12;
+      --panel: #101622;
+      --line: #263244;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --blue: #60a5fa;
+      --green: #22c55e;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #0c111b;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 20px; }
+    .muted { color: var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .layout {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .panel h2 {
+      margin: 0;
+      padding: 12px 14px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .event-list {
+      max-height: calc(100vh - 170px);
+      overflow: auto;
+    }
+    button.event {
+      width: 100%;
+      display: block;
+      text-align: left;
+      border: 0;
+      border-bottom: 1px solid #1e293b;
+      background: transparent;
+      color: var(--text);
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+    button.event:hover, button.event.active { background: #172033; }
+    button.event.active {
+      box-shadow: inset 3px 0 0 var(--amber);
+    }
+    button.event.anchor-target {
+      animation: anchor-pulse 1.2s ease-out 1;
+    }
+    @keyframes anchor-pulse {
+      0% { background: rgba(245, 158, 11, .34); }
+      100% { background: #172033; }
+    }
+    .event-title { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13px; }
+    .event-sub { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .phase-pulls {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      padding: 0 14px 14px;
+    }
+    .phase-card {
+      min-height: 76px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(145deg, #121a28, #0a0f18);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+    .phase-card:hover { border-color: #64748b; }
+    .phase-card.active {
+      border-color: var(--amber);
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .24);
+    }
+    .phase-card strong { display: block; color: #fff; font-size: 15px; }
+    .phase-card span { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
+    .stage {
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    .map-wrap {
+      width: min(100%, 980px);
+      margin: 0 auto;
+      position: relative;
+      aspect-ratio: 873 / 794;
+      background: #05070b;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      touch-action: none;
+      cursor: grab;
+    }
+    .map-wrap .overlay.dragging { cursor: grabbing; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .map-controls {
+      position: absolute;
+      z-index: 8;
+      right: 10px;
+      top: 10px;
+      display: flex;
+      gap: 5px;
+      padding: 5px;
+      border: 1px solid rgba(148, 163, 184, .32);
+      border-radius: 7px;
+      background: rgba(2, 6, 23, .82);
+      backdrop-filter: blur(5px);
+    }
+    .map-controls button {
+      min-width: 30px;
+      height: 28px;
+      padding: 0 8px;
+      border: 1px solid #334155;
+      border-radius: 5px;
+      background: #111827;
+      color: #e2e8f0;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .map-controls button:hover { border-color: #94a3b8; }
+    .map-zoom-value { min-width: 46px; color: #cbd5e1; font: 11px/28px ui-monospace, monospace; text-align: center; }
+    .player-tooltip {
+      position: absolute;
+      z-index: 12;
+      display: none;
+      width: max-content;
+      min-width: 210px;
+      max-width: 290px;
+      padding: 10px 12px;
+      border: 1px solid var(--tooltip-color, #f59e0b);
+      border-radius: 5px;
+      background: linear-gradient(160deg, rgba(5, 10, 20, .98), rgba(11, 18, 32, .98));
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .62), inset 0 0 18px rgba(255, 255, 255, .025);
+      color: #e5e7eb;
+      pointer-events: none;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .player-tooltip.visible { display: block; }
+    .tooltip-head { display: flex; align-items: center; gap: 9px; padding-bottom: 7px; border-bottom: 1px solid #273244; }
+    .tooltip-head img { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--tooltip-color, #f59e0b); }
+    .tooltip-name { color: var(--tooltip-color, #fff); font-weight: 800; font-size: 13px; }
+    .tooltip-id { color: #94a3b8; font-family: ui-monospace, monospace; }
+    .tooltip-body { padding-top: 7px; color: #cbd5e1; }
+    .tooltip-vitals { margin-top: 7px; padding-top: 7px; border-top: 1px solid #273244; }
+    .tooltip-vitals-row { display: flex; justify-content: space-between; gap: 12px; }
+    .tooltip-health-track { height: 5px; margin: 5px 0 6px; overflow: hidden; border-radius: 999px; background: #1e293b; }
+    .tooltip-health-fill { height: 100%; background: var(--tooltip-color, #22c55e); box-shadow: 0 0 8px var(--tooltip-color, #22c55e); }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #0b1220;
+    }
+    .skill-focus { display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px 4px; }
+    .skill-focus button { border:1px solid var(--line); background:#0b1220; color:var(--muted); border-radius:999px; padding:4px 10px; font-size:12px; cursor:pointer; }
+    .skill-focus button.active { border-color:var(--amber); color:#fde68a; background:#1a2333; font-weight:700; }
+    .details {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      background: #0c1220;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 13px; color: #fde68a; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { border-bottom: 1px solid #1e293b; padding: 7px 6px; text-align: left; vertical-align: top; }
+    th { color: #cbd5e1; font-weight: 700; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      padding: 12px;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: #0c1220;
+    }
+    .stat strong { display: block; font-size: 20px; }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 0 14px 14px;
+    }
+    .detail-tabs {
+      display: flex;
+      gap: 6px;
+      margin: 0 14px 14px;
+      padding: 6px;
+    }
+    .detail-tabs button {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .detail-tabs button.active {
+      border-color: #475569;
+      background: #172033;
+      color: #f8fafc;
+    }
+    [hidden] { display: none !important; }
+    label.toggle { font-size: 12px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+    @media (max-width: 980px) {
+      .layout, .details, .footer-grid { grid-template-columns: 1fr; }
+      .phase-pulls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .event-list { max-height: 420px; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>奥蕾莉亚单场开庭分析</h1>
+      <div class="muted">可读取单场审计 JSON，也可从全天汇总 JSON 中按 Report / Fight 打开对应战斗。</div>
+    </div>
+    <a id="sourceLink" class="muted" target="_blank" rel="noreferrer">WCL 原始记录</a>
+  </header>
+
+  <main id="app">
+    <section class="stats panel">
+      <div class="stat"><strong id="statDuration">-</strong><span class="muted">战斗时长</span></div>
+      <div class="stat"><strong id="statBows">-</strong><span class="muted">拉弓组</span></div>
+      <div class="stat"><strong id="statWater">-</strong><span class="muted">放水点</span></div>
+      <div class="stat"><strong id="statDeaths">-</strong><span class="muted">空虚之握死亡</span></div>
+    </section>
+
+    <section id="phasePulls" class="phase-pulls" aria-label="阶段化 Pull 导航"></section>
+
+    <section class="layout">
+      <aside class="panel">
+        <h2>重要技能逐场推演</h2>
+        <div class="skill-focus" id="skillFocus">
+          <button type="button" data-focus="all" class="active">全部</button>
+          <button type="button" data-focus="water">放水</button>
+          <button type="button" data-focus="p1Silver">P1银锋箭</button>
+          <button type="button" data-focus="bow">拉弓</button>
+        </div>
+        <div id="eventList" class="event-list"></div>
+      </aside>
+
+      <section class="panel stage">
+        <div class="legend">
+          <span class="chip">橙线：remove 时从玩家当前位置射向固定方尖碑</span>
+          <span class="chip">红线：玩家死亡时提前触发的崩裂空无</span>
+          <span class="chip">红点：apply 时固定方尖碑</span>
+          <span class="chip">紫点：银色幻影</span>
+          <span class="chip">蓝/金：奥蕾莉亚与 add</span>
+          <span class="chip">青圈：此前放水污染，半径 25 码</span>
+        </div>
+        <div class="map-wrap">
+          <svg id="mapSvg" class="overlay" aria-label="战斗场地雷达"></svg>
+          <div class="map-controls" aria-label="场地缩放控制">
+            <button type="button" data-map-action="out" title="缩小">−</button>
+            <span id="mapZoomValue" class="map-zoom-value">100%</span>
+            <button type="button" data-map-action="in" title="放大">+</button>
+            <button type="button" data-map-action="reset" title="重置视图">重置</button>
+          </div>
+          <div id="playerTooltip" class="player-tooltip" role="tooltip"></div>
+        </div>
+        <div id="selectedDetails" class="details"></div>
+      </section>
+    </section>
+
+    <nav id="detailTabs" class="detail-tabs panel" aria-label="单场明细分类">
+      <button type="button" data-detail-tab="deaths" class="active">阵亡与治疗</button>
+      <button type="button" data-detail-tab="mechanics">机制统计</button>
+    </nav>
+
+    <section class="footer-grid">
+      <section class="panel" data-detail-panel="deaths">
+        <h2>死于空虚之握前 6 秒治疗</h2>
+        <div style="padding:10px 12px">
+          <label class="toggle"><input id="includeExempt" type="checkbox"> 包括场上银色幻影 >= 4 的不追究样本</label>
+        </div>
+        <div id="deathHealing"></div>
+      </section>
+      <section class="panel" data-detail-panel="mechanics" hidden>
+        <h2>P2 失败统计</h2>
+        <div id="p2Stats"></div>
+      </section>
+      <section class="panel" data-detail-panel="mechanics" hidden>
+        <h2>各阶段放水偏离 &gt; 15 码</h2>
+        <div id="waterStats"></div>
+      </section>
+      <section class="panel" data-detail-panel="mechanics" hidden>
+        <h2>阶段拉弓组数</h2>
+        <div id="phaseStats"></div>
+      </section>
+      <section class="panel" data-detail-panel="mechanics" style="grid-column:1/-1" hidden>
+        <h2>P3 重力坍缩时序统计</h2>
+        <div id="gravityStats"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="./assets/vendor/wcl_hardcore_api.js"></script>
+  <script src="./assets/vendor/offline-data-loader.js"></script>
+  <script>
+    const ROUTE = new URLSearchParams(window.location.search);
+    const DATA_URL = ROUTE.get('source') || 'data/wcl_hardcore_api.json';
+    const ROUTE_PHASE = ROUTE.get('phase');
+    const ROUTE_TAG = ROUTE.get('tag');
+    const ICON_SIZE = 32;
+    const PLAYER_ICON_SIZE = 18;
+    const PLAYER_ICON_ASSET_REVISION = '20260728';
+    const PHASE_ORDER = ['P1', 'P1.5', 'P2', 'P2.5', 'P3'];
+    const CLASS_COLORS = {
+      deathknight: '#C41E3A', demonhunter: '#A330C9', druid: '#FF7C0A',
+      evoker: '#33937F', hunter: '#AAD372', mage: '#3FC7EB', monk: '#00FF98',
+      paladin: '#F48CBA', priest: '#FFFFFF', rogue: '#FFF468',
+      shaman: '#0070DD', warlock: '#8788EE', warrior: '#C69B6D',
+    };
+    const state = {
+      data: null,
+      selectedKey: null,
+      includeExempt: false,
+      pendingRouteScroll: false,
+      skillFocus: 'all',
+      phaseFocus: ROUTE_PHASE || 'all',
+      detailTab: 'deaths',
+      mapView: { zoom: 1, x: 0, y: 0, dragging: false, pointerID: null, startX: 0, startY: 0, originX: 0, originY: 0 },
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    function worldToPixel(point) {
+      const cfg = state.data.arena;
+      const center = cfg.center;
+      const phase = selectedEvent()?.phase || 'P1';
+      const pxPerYard = cfg.pixelsPerYardByPhase?.[phase] || cfg.pixelsPerYard || 4.6;
+      const centerPx = { x: 436.5, y: 397 };
+      return {
+        x: centerPx.x + ((point.x - center.x) / 100) * pxPerYard,
+        y: centerPx.y - ((point.y - center.y) / 100) * pxPerYard,
+      };
+    }
+
+    function svgPoint(point) {
+      const p = worldToPixel(point);
+      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+    }
+
+    function auditEvents() {
+      const bows = (state.data.bowGroups || []).map(group => ({
+        ...group,
+        eventType: 'bow',
+        key: `bow:${group.id}`,
+        sortMs: group.fireTimeMs,
+        displayTime: group.fireTime,
+      }));
+      const waters = (state.data.waterEvents || []).map(event => ({
+        ...event,
+        eventType: 'water',
+        key: `water:${event.id}`,
+        sortMs: event.timeMs,
+        displayTime: event.time,
+      }));
+      const arrows = (state.data.silverArrows || []).map(event => ({
+        ...event,
+        eventType: 'silverArrow',
+        key: `silverArrow:${event.id}`,
+        sortMs: event.timeMs,
+        displayTime: event.time,
+      }));
+      const p3Events = (state.data.p3Events || []).map(event => ({
+        ...event, key: `${event.eventType}:${event.id}`, sortMs: event.timeMs, displayTime: event.time,
+      }));
+      const gravities = (state.data.gravityRounds || []).map((event, index) => {
+        const id = event.id || event.index || index + 1;
+        return {
+          ...event,
+          id,
+          phase: event.phase || 'P3',
+          eventType: 'gravity',
+          key: `gravity:${id}`,
+          sortMs: event.applyTimeMs ?? event.timeMs ?? 0,
+          displayTime: event.applyTime || event.time || '-',
+        };
+      });
+      return [...bows, ...waters, ...arrows, ...p3Events, ...gravities].sort((a, b) => (a.sortMs || 0) - (b.sortMs || 0));
+    }
+
+    function eventMatchesFocus(event, focus) {
+      if (!focus || focus === 'all') return true;
+      if (focus === 'water') return event.eventType === 'water';
+      if (focus === 'bow') return event.eventType === 'bow';
+      if (focus === 'p1Silver') return event.eventType === 'silverArrow' && event.phase === 'P1';
+      return true;
+    }
+
+    function focusedEvents() {
+      return auditEvents().filter(event =>
+        eventMatchesFocus(event, state.skillFocus)
+        && (state.phaseFocus === 'all' || event.phase === state.phaseFocus)
+      );
+    }
+
+    function selectedEvent() {
+      const all = auditEvents();
+      const focused = focusedEvents();
+      const pool = focused.length ? focused : all;
+      return pool.find(event => event.key === state.selectedKey) || pool[0] || all[0];
+    }
+
+    function eventAnchorId(key) {
+      return `event-${String(key || 'unknown').replace(/[^a-zA-Z0-9_-]+/g, '-')}`;
+    }
+
+    function phaseCards() {
+      const grouped = new Map();
+      for (const event of auditEvents()) {
+        const phase = event.phase || '未知';
+        if (!grouped.has(phase)) grouped.set(phase, []);
+        grouped.get(phase).push(event);
+      }
+      return [...grouped.entries()]
+        .map(([phase, events]) => ({
+          phase,
+          count: events.length,
+          start: events[0]?.displayTime || '-',
+          end: events[events.length - 1]?.displayTime || '-',
+        }))
+        .sort((a, b) => {
+          const ai = PHASE_ORDER.indexOf(a.phase);
+          const bi = PHASE_ORDER.indexOf(b.phase);
+          return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+        });
+    }
+
+    function renderPhasePulls() {
+      const holder = document.getElementById('phasePulls');
+      const cards = phaseCards();
+      holder.innerHTML = cards.map(card => `
+        <button type="button" class="phase-card${state.phaseFocus === card.phase ? ' active' : ''}" data-phase="${escapeHtml(card.phase)}">
+          <strong>${escapeHtml(card.phase)}</strong>
+          <span>${card.count} 个关键事件 · ${card.start}${card.end !== card.start ? ` — ${card.end}` : ''}</span>
+        </button>
+      `).join('');
+      holder.querySelectorAll('button[data-phase]').forEach(button => {
+        button.addEventListener('click', () => {
+          state.phaseFocus = state.phaseFocus === button.dataset.phase ? 'all' : button.dataset.phase;
+          state.selectedKey = null;
+          render();
+        });
+      });
+    }
+
+    function renderStats() {
+      document.getElementById('sourceLink').href = state.data.meta?.sourceURL || '#';
+      document.getElementById('sourceLink').textContent = `Fight ${state.data.meta?.fightID ?? '-'}`;
+      document.getElementById('statDuration').textContent = state.data.fight?.duration || '-';
+      document.getElementById('statBows').textContent = (state.data.bowGroups || []).length;
+      document.getElementById('statWater').textContent = (state.data.waterDrops || []).length;
+      document.getElementById('statDeaths').textContent = (state.data.voidDeaths || []).length;
+    }
+
+    function renderEventList() {
+      const holder = document.getElementById('eventList');
+      const current = selectedEvent();
+      holder.innerHTML = focusedEvents().map(event => {
+        const isBow = event.eventType === 'bow';
+        const isWater = event.eventType === 'water';
+        const isArrow = event.eventType === 'silverArrow';
+        const isP3Special = event.eventType === 'cosmicDevour' || event.eventType === 'portal';
+        const isGravity = event.eventType === 'gravity';
+        const players = isBow ? event.players.map(player => player.player).join(' / ')
+          : isWater ? event.drops.map(drop => drop.player).join(' / ')
+          : isP3Special ? `${event.snapshot?.players?.length || 0} 人坐标`
+          : isGravity ? (event.targets || []).join(' / ')
+          : (event.markedPlayers || []).join(' / ');
+        const miss = isBow ? event.players.filter(player => player.missedPhantom).map(player => player.player) : [];
+        const outliers = isWater ? event.drops.filter(drop => drop.isOutlier).map(drop => drop.player) : [];
+        const cls = event.key === current?.key ? 'event active' : 'event';
+        const title = isBow ? `${event.phase} 拉弓 ${event.displayTime}`
+          : isWater ? `${event.phase} 放水 ${event.displayTime}`
+          : isArrow ? `${event.phase} ${event.phase === 'P2' ? '银锋弹射' : '银锋箭'} ${event.displayTime}`
+          : isGravity ? `P3 重力坍缩 ${event.displayTime}`
+          : `${event.phase} ${event.eventType === 'portal' ? '宇宙传送门' : '噬灭宇宙'} ${event.displayTime}`;
+        const sub = isBow
+          ? `${event.phase === 'P2' ? `幻影 ${event.activePhantomCount} 个` : ''}${miss.length ? ` · 未射中：${escapeHtml(miss.join('、'))}` : ''}`
+          : isWater ? `本轮 ${event.drops.length} 人${outliers.length ? ` · 偏离：${escapeHtml(outliers.join('、'))}` : ''}`
+          : isArrow ? (event.phase === 'P1' ? `实际命中 ${event.actualHits?.length || 0}` : `点名来源 ${event.sourceAssignments?.length || 0} · ${event.bossEnergyDrained ? '已消能' : '未消能'}`)
+          : isGravity ? `违规 ${event.violations?.length || 0} · 死亡 ${event.deathCount || 0}`
+          : `Boss 能量 ${event.bossEnergy?.amount ?? '未知'}`;
+        return `<button id="${eventAnchorId(event.key)}" class="${cls}" data-id="${event.key}">
+          <div class="event-title"><span>${title}</span><span>#${event.index}</span></div>
+          <div class="event-sub">${escapeHtml(players)}<br>${sub}</div>
+        </button>`;
+      }).join('');
+      holder.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', () => {
+          state.selectedKey = button.dataset.id;
+          history.replaceState(null, '', `${location.pathname}${location.search}#${eventAnchorId(button.dataset.id)}`);
+          render();
+        });
+      });
+      if (state.pendingRouteScroll) {
+        state.pendingRouteScroll = false;
+        requestAnimationFrame(() => {
+          const active = holder.querySelector('button.event.active');
+          if (active) {
+            active.classList.add('anchor-target');
+            active.scrollIntoView({ block: 'center', inline: 'nearest' });
+            active.focus({ preventScroll: true });
+          }
+        });
+      }
+    }
+
+    function drawCircle(svg, point, radius, color, opacity, label, title) {
+      if (!point) return;
+      const p = worldToPixel(point);
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', p.x);
+      circle.setAttribute('cy', p.y);
+      circle.setAttribute('r', radius);
+      circle.setAttribute('fill', color);
+      circle.setAttribute('opacity', opacity);
+      circle.setAttribute('stroke', color);
+      circle.setAttribute('stroke-width', 1);
+      if (title) {
+        const titleNode = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        titleNode.textContent = title;
+        circle.appendChild(titleNode);
+      }
+      svg.appendChild(circle);
+      if (label) drawText(svg, p.x, p.y + radius + 12, label, color, 'middle');
+    }
+
+    function drawText(svg, x, y, text, color = '#e5e7eb', anchor = 'start') {
+      const node = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      node.setAttribute('x', x);
+      node.setAttribute('y', y);
+      node.setAttribute('fill', color);
+      node.setAttribute('font-size', '11');
+      node.setAttribute('text-anchor', anchor);
+      node.setAttribute('paint-order', 'stroke');
+      node.setAttribute('stroke', '#020617');
+      node.setAttribute('stroke-width', '3');
+      node.style.pointerEvents = 'none';
+      node.textContent = text;
+      svg.appendChild(node);
+    }
+
+    function drawIcon(svg, point, href, title, offsetX = 0, offsetY = 0, size = ICON_SIZE, circular = false) {
+      if (!point || !href) return;
+      const p = worldToPixel(point);
+      const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      image.setAttribute('href', href);
+      image.setAttribute('x', p.x - size / 2 + offsetX);
+      image.setAttribute('y', p.y - size / 2 + offsetY);
+      image.setAttribute('width', size);
+      image.setAttribute('height', size);
+      image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+      if (circular) image.style.clipPath = 'circle(50%)';
+      if (title) {
+        const titleNode = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        titleNode.textContent = title;
+        image.appendChild(titleNode);
+      }
+      svg.appendChild(image);
+      return image;
+    }
+
+    function playerDisplayName(player) {
+      return String(player?.name || '未知玩家').split('-')[0];
+    }
+
+    function playerSpec(player) {
+      const specs = state.data.playerSpecs || {};
+      return specs[String(player?.id)]
+        || specs[playerDisplayName(player)]
+        || specs[String(player?.name || '')]
+        || null;
+    }
+
+    function playerClassColor(spec) {
+      return spec?.classColor || CLASS_COLORS[spec?.classSlug] || '#f8ff4a';
+    }
+
+    function playerIconHref(spec) {
+      const href = String(spec?.icon || '');
+      if (!href || !href.startsWith('assets/specs/') || href.includes('?')) return href;
+      return `${href}?v=${PLAYER_ICON_ASSET_REVISION}`;
+    }
+
+    const PLAYER_LOCALE = 'zhCN';
+    const LEGACY_SPEC_LABELS_ZHCN = {
+      62:'奥术',63:'火焰',64:'冰霜',65:'神圣',66:'防护',70:'惩戒',71:'武器',72:'狂怒',73:'防护',
+      102:'平衡',103:'野性',104:'守护',105:'恢复',250:'鲜血',251:'冰霜',252:'邪恶',
+      253:'野兽控制',254:'射击',255:'生存',256:'戒律',257:'神圣',258:'暗影',
+      259:'奇袭',260:'狂徒',261:'敏锐',262:'元素',263:'增强',264:'恢复',
+      265:'痛苦',266:'恶魔学识',267:'毁灭',268:'酒仙',269:'踏风',270:'织雾',
+      577:'浩劫',581:'复仇',1467:'湮灭',1468:'恩护',1473:'增辉',1480:'吞噬'
+    };
+    const LEGACY_CLASS_LABELS_ZHCN = {
+      deathknight:'死亡骑士',demonhunter:'恶魔猎手',druid:'德鲁伊',evoker:'唤魔师',
+      hunter:'猎人',mage:'法师',monk:'武僧',paladin:'圣骑士',priest:'牧师',
+      rogue:'潜行者',shaman:'萨满祭司',warlock:'术士',warrior:'战士'
+    };
+    const LEGACY_ROLE_LABELS_ZHCN = {tank:'坦克',healer:'治疗',dps:'输出',unknown:'未知'};
+
+    function basicPlayerRole(role) {
+      if (role === 'tank') return 'tank';
+      if (role === 'melee-healer' || role === 'range-healer' || role === 'healer') return 'healer';
+      if (role === 'melee-dps' || role === 'range-dps' || role === 'dps') return 'dps';
+      return 'unknown';
+    }
+
+    function localizedSpecSummary(spec) {
+      if (!spec) return '专精数据缺失';
+      const labels = spec.labels || {};
+      const specName = labels.spec?.[PLAYER_LOCALE] || LEGACY_SPEC_LABELS_ZHCN[Number(spec.specID)] || spec.slug || '未知专精';
+      const className = labels.class?.[PLAYER_LOCALE] || LEGACY_CLASS_LABELS_ZHCN[spec.classSlug] || spec.classSlug || '未知职业';
+      const basicRole = basicPlayerRole(spec.role);
+      const roleName = labels.role?.[PLAYER_LOCALE] || LEGACY_ROLE_LABELS_ZHCN[basicRole] || basicRole;
+      return `${specName} ${className}·${roleName}`;
+    }
+
+    function playerMarkerTransform(x, y) {
+      return `translate(${x} ${y}) scale(${(1 / state.mapView.zoom).toFixed(5)})`;
+    }
+
+    function movePlayerTooltip(event) {
+      const tooltip = document.getElementById('playerTooltip');
+      const wrap = document.querySelector('.map-wrap');
+      if (!tooltip || !wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const left = Math.min(rect.width - tooltip.offsetWidth - 10, Math.max(10, event.clientX - rect.left + 14));
+      const top = Math.min(rect.height - tooltip.offsetHeight - 10, Math.max(10, event.clientY - rect.top + 14));
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    }
+
+    function showPlayerTooltip(event, player, spec) {
+      const tooltip = document.getElementById('playerTooltip');
+      if (!tooltip) return;
+      const color = playerClassColor(spec);
+      const name = playerDisplayName(player);
+      const point = player.position || {};
+      const positionEvidence = player.positionSource === 'interpolated'
+        ? `位置为线性插值；最近邻点 ${Math.abs(Number(player.deltaMs || 0))}ms${player.positionBracketSpanMs == null ? '' : `，两侧跨度 ${player.positionBracketSpanMs}ms`}`
+        : `最近坐标样本偏移 ${Math.abs(Number(player.deltaMs || 0))}ms`;
+      const vitals = player.vitals || null;
+      const healthPercent = vitals?.healthPercent == null ? null : Math.max(0, Math.min(100, Number(vitals.healthPercent)));
+      const vitalsHtml = vitals ? `
+          <div class="tooltip-vitals">
+            <div class="tooltip-vitals-row"><span>生命值</span><strong>${healthPercent == null ? '无快照' : `${healthPercent.toFixed(1)}%`}</strong></div>
+            ${healthPercent == null ? '' : `<div class="tooltip-health-track"><div class="tooltip-health-fill" style="width:${healthPercent}%"></div></div>`}
+            ${vitals.hitPoints != null && vitals.maxHitPoints != null ? `<div class="tooltip-vitals-row"><span>当前 / 最大</span><span>${Number(vitals.hitPoints).toLocaleString()} / ${Number(vitals.maxHitPoints).toLocaleString()}</span></div>` : ''}
+            <div class="tooltip-vitals-row"><span>护盾</span><span>${vitals.absorb == null ? 'WCL 无当前值' : Number(vitals.absorb).toLocaleString()}</span></div>
+            <div class="tooltip-vitals-row"><span>治疗吸收</span><span>${vitals.healAbsorb == null ? '未配置取证' : `${Number(vitals.healAbsorb).toLocaleString()}${vitals.healAbsorbSource === 'derived' ? '（推算）' : ''}`}</span></div>
+            ${vitals.sampleDeltaMs != null ? `<div class="tooltip-id">生命采样偏移 ${escapeHtml(vitals.sampleDeltaMs)}ms · ${escapeHtml(vitals.confidence || 'unknown')}</div>` : ''}
+          </div>` : `
+          <div class="tooltip-vitals">
+            <div class="tooltip-id">当前 JSON 未包含生命值 / 护盾快照</div>
+          </div>`;
+      tooltip.style.setProperty('--tooltip-color', color);
+      tooltip.innerHTML = `
+        <div class="tooltip-head">
+          ${spec?.icon ? `<img src="${escapeHtml(playerIconHref(spec))}" alt="">` : ''}
+          <div>
+            <div class="tooltip-name">${escapeHtml(name)}</div>
+            <div class="tooltip-id">${escapeHtml(localizedSpecSummary(spec))}</div>
+          </div>
+        </div>
+        <div class="tooltip-body">
+          <div>坐标 ${escapeHtml(point.yardX ?? '-')}，${escapeHtml(point.yardY ?? '-')}</div>
+          ${player.deltaMs != null ? `<div>${escapeHtml(positionEvidence)}</div>` : ''}
+          ${vitalsHtml}
+        </div>`;
+      tooltip.classList.add('visible');
+      movePlayerTooltip(event);
+    }
+
+    function hidePlayerTooltip() {
+      document.getElementById('playerTooltip')?.classList.remove('visible');
+    }
+
+    function drawPlayerIcon(svg, player) {
+      if (!player?.position || player.confidence === 'low') return;
+      const p = worldToPixel(player.position);
+      const spec = playerSpec(player);
+      const color = playerClassColor(spec);
+      const name = playerDisplayName(player);
+      const marker = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      marker.setAttribute('class', 'player-marker');
+      marker.dataset.mapX = p.x;
+      marker.dataset.mapY = p.y;
+      marker.setAttribute('transform', playerMarkerTransform(p.x, p.y));
+      marker.style.cursor = 'help';
+      svg.appendChild(marker);
+
+      const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      ring.setAttribute('cx', 0);
+      ring.setAttribute('cy', 0);
+      ring.setAttribute('r', spec?.icon ? PLAYER_ICON_SIZE / 2 + 1.5 : 4.5);
+      ring.setAttribute('fill', spec?.icon ? '#020617' : '#f8ff4a');
+      ring.setAttribute('stroke', color);
+      ring.setAttribute('stroke-width', spec?.icon ? 2 : 1);
+      ring.addEventListener('mouseover', event => showPlayerTooltip(event, player, spec));
+      ring.addEventListener('mousemove', movePlayerTooltip);
+      ring.addEventListener('mouseout', hidePlayerTooltip);
+      ring.addEventListener('click', event => showPlayerTooltip(event, player, spec));
+      marker.appendChild(ring);
+
+      if (spec?.icon) {
+        const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+        image.setAttribute('href', playerIconHref(spec));
+        image.setAttribute('x', -PLAYER_ICON_SIZE / 2);
+        image.setAttribute('y', -PLAYER_ICON_SIZE / 2);
+        image.setAttribute('width', PLAYER_ICON_SIZE);
+        image.setAttribute('height', PLAYER_ICON_SIZE);
+        image.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+        image.style.clipPath = 'circle(50%)';
+        image.style.pointerEvents = 'none';
+        marker.appendChild(image);
+      }
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', 0);
+      label.setAttribute('y', spec?.icon ? PLAYER_ICON_SIZE / 2 + 12 : 17);
+      label.setAttribute('fill', color);
+      label.setAttribute('font-size', 9);
+      label.setAttribute('font-weight', 700);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('paint-order', 'stroke');
+      label.setAttribute('stroke', '#020617');
+      label.setAttribute('stroke-width', 3);
+      label.style.pointerEvents = 'none';
+      label.textContent = name;
+      marker.appendChild(label);
+    }
+
+    function applyMapTransform() {
+      const scene = document.getElementById('mapScene');
+      if (!scene) return;
+      const view = state.mapView;
+      scene.setAttribute('transform', `translate(${view.x} ${view.y}) scale(${view.zoom})`);
+      scene.querySelectorAll('.player-marker').forEach(marker => {
+        marker.setAttribute('transform', playerMarkerTransform(Number(marker.dataset.mapX), Number(marker.dataset.mapY)));
+      });
+      document.getElementById('mapZoomValue').textContent = `${Math.round(view.zoom * 100)}%`;
+    }
+
+    function resetMapView() {
+      Object.assign(state.mapView, { zoom: 1, x: 0, y: 0 });
+      applyMapTransform();
+    }
+
+    function setMapZoom(nextZoom, focusX = 436.5, focusY = 397) {
+      const view = state.mapView;
+      const zoom = Math.max(1, Math.min(4, nextZoom));
+      const worldX = (focusX - view.x) / view.zoom;
+      const worldY = (focusY - view.y) / view.zoom;
+      view.x = focusX - worldX * zoom;
+      view.y = focusY - worldY * zoom;
+      view.zoom = zoom;
+      applyMapTransform();
+    }
+
+    function drawLine(svg, start, end, color, width = 3, dash = '', opacity = 1) {
+      if (!start || !end) return;
+      const a = worldToPixel(start);
+      const b = worldToPixel(end);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', a.x);
+      line.setAttribute('y1', a.y);
+      line.setAttribute('x2', b.x);
+      line.setAttribute('y2', b.y);
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', width);
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('opacity', opacity);
+      if (dash) line.setAttribute('stroke-dasharray', dash);
+      line.style.pointerEvents = 'none';
+      svg.appendChild(line);
+    }
+
+    function renderAggregatedFight(root) {
+      const reportID = ROUTE.get('report');
+      const fightID = Number(ROUTE.get('fight'));
+      const fight = (root?.data?.page1_wipeAnalysis || []).find(row => String(row.reportID) === String(reportID) && Number(row.fightID) === fightID);
+      if (!fight) throw new Error(`汇总文件中未找到 ${reportID} / Fight ${fightID}`);
+      const crown = fight.crownOfTheCosmos || {};
+      const sections = [
+        ['P1 银锋箭', crown.p1ArrowAudit || []],
+        ['空虚之握 / 崩裂空无', crown.voidGraspRays || []],
+        ['空虚之握治疗', crown.voidGraspHealing || []],
+        ['P2 幻影未处理', crown.missedShadows || []],
+        ['P2 银锋弹射消能', crown.missedEnergy || []],
+        ['P3 重力坍缩', crown.gravityRows || []],
+        ['P3 宇宙传送门召唤', crown.p3PortalSummons || []],
+        ['干扰震荡打断', crown.interferenceShockRows || []],
+      ];
+      const drops = (crown.voidRepulsionRecords || []).filter(row => row.hasPosition && row.x != null && row.y != null);
+      const cx = drops[0]?.originX != null ? 0 : -363.85;
+      const cy = drops[0]?.originY != null ? 0 : 4788.22;
+      const dotHtml = drops.map(row => {
+        const x = 50 + ((Number(row.x) - cx) / 100 / 170 * 100);
+        const y = 50 - ((Number(row.y) - cy) / 100 / 170 * 100);
+        return `<span title="${escapeHtml(row.phase)} ${escapeHtml(row.time)} ${escapeHtml(row.player)}" style="position:absolute;left:${x}%;top:${y}%;width:10px;height:10px;margin:-5px;border-radius:50%;background:${row.status === '偏散' ? '#fb7185' : '#f0abfc'};box-shadow:0 0 8px currentColor"></span>`;
+      }).join('');
+      const sectionHtml = sections.map(([title, rows]) => `<section class="panel"><h2>${title} <span class="muted">${rows.length} 条</span></h2>${rows.length ? `<div style="overflow:auto"><table><tbody>${rows.map(row => `<tr><td class="mono">${escapeHtml(row.time || row.fireTime || '-')}</td><td>${escapeHtml(row.text || JSON.stringify(row))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">本场无记录</div>'}</section>`).join('');
+      document.getElementById('app').innerHTML = `<header><div><h1>宇宙之冕 · Fight ${fight.fightID} 明细断案</h1><div class="muted">${escapeHtml(fight.startDateTime)} · ${escapeHtml(fight.duration)} · ${escapeHtml(fight.fightStatus)}</div></div><a href="https://cn.warcraftlogs.com/reports/${encodeURIComponent(fight.reportID)}#fight=${fight.fightID}&view=replay" target="_blank">打开 WCL Replay</a></header><main><section class="panel"><h2>场地快照（已获取放水坐标）</h2><div style="position:relative;max-width:873px;aspect-ratio:873/794;margin:auto;background:url('./assets/crown_of_cosmos_arena.png') center/100% 100%;border:1px solid #334155;border-radius:8px;overflow:hidden">${dotHtml}</div><div class="muted" style="margin-top:8px">亮紫点为放水坐标，红点为 15 码离组判定。完整技能快照数据列于下方。</div></section><section class="grid">${sectionHtml}</section></main>`;
+    }
+
+    function drawPolygon(svg, points, color, opacity) {
+      const node = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      node.setAttribute('points', points);
+      node.setAttribute('fill', color);
+      node.setAttribute('opacity', opacity);
+      node.setAttribute('stroke', '#c084fc');
+      node.setAttribute('stroke-width', 2);
+      node.setAttribute('stroke-dasharray', '8 6');
+      svg.appendChild(node);
+    }
+
+    function renderMap() {
+      const event = selectedEvent();
+      const svgRoot = document.getElementById('mapSvg');
+      svgRoot.setAttribute('viewBox', '0 0 873 794');
+      svgRoot.innerHTML = '';
+      hidePlayerTooltip();
+      if (!event) return;
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      svg.setAttribute('id', 'mapScene');
+      svgRoot.appendChild(svg);
+      const arena = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      arena.setAttribute('href', state.data.arena.imageByPhase?.[event.phase] || state.data.arena.image);
+      arena.setAttribute('x', 0);
+      arena.setAttribute('y', 0);
+      arena.setAttribute('width', 873);
+      arena.setAttribute('height', 794);
+      arena.setAttribute('preserveAspectRatio', 'none');
+      arena.setAttribute('opacity', 0.86);
+      arena.style.pointerEvents = 'none';
+      svg.appendChild(arena);
+
+      const eventMs = event.sortMs ?? event.timeMs ?? 0;
+      const currentDropIds = new Set(event.eventType === 'water' ? (event.drops || []).map(drop => drop.id) : []);
+      for (const drop of state.data.waterDrops || []) {
+        if (drop.phase !== event.phase || drop.timeMs > eventMs || currentDropIds.has(drop.id)) continue;
+        if (!drop.position) continue;
+        const pxPerYard = state.data.arena.pixelsPerYardByPhase?.[event.phase] || state.data.arena.pixelsPerYard || 4.6;
+        const nextWater = (state.data.waterEvents || []).find(item => item.phase === drop.phase && item.timeMs > drop.timeMs);
+        const startAt = drop.roundTimeMs ?? drop.timeMs;
+        const fullAt = drop.maturesAtMs ?? nextWater?.timeMs ?? (startAt + 25_000);
+        const growth = Math.max(0, Math.min(1, (eventMs - startAt) / Math.max(1, fullAt - startAt)));
+        drawCircle(svg, drop.position, 25 * growth * pxPerYard, '#06b6d4', 0.13, '', `${drop.player} 放水 ${drop.time} · ${(growth * 100).toFixed(0)}%`);
+      }
+
+      if (event.phase === 'P3') {
+        const shapes = {
+          top: '436.5,397 75,190 160,10 713,10 800,175',
+          lowerLeft: '436.5,397 75,190 0,620 310,794',
+          lowerRight: '436.5,397 800,175 873,620 565,794',
+        };
+        for (const contamination of state.data.p3Contaminations || []) {
+          if (contamination.activeTimeMs <= eventMs && shapes[contamination.platform]) {
+            drawPolygon(svg, shapes[contamination.platform], '#6b21a8', 0.34);
+          }
+        }
+      }
+
+      for (const player of event.snapshot?.players || []) {
+        if (!player.position) continue;
+        drawPlayerIcon(svg, player);
+      }
+
+      for (const marked of event.markedPlayerPositions || []) {
+        if (!marked.position) continue;
+        drawCircle(svg, marked.position, 8, '#d946ef', 0.98, '', `${marked.player} · 银锋箭射出位置`);
+      }
+
+      const icons = state.data.icons || {};
+      for (const actor of event.actors || event.snapshot?.bosses || []) {
+        if (!actor.position) continue;
+        if (actor.gameID === 240430 || actor.name.includes('奥蕾莉亚') || actor.name.includes('Alleria')) {
+          drawIcon(svg, actor.position, icons.alleria || 'boss_plugins/assets/alleria_windrunner.png', actor.name);
+        } else {
+          drawCircle(svg, actor.position, 8, '#fb923c', 0.95, actor.name, actor.name);
+        }
+      }
+
+      let phantoms = [];
+      if (event.phase === 'P2') {
+        const alive = (state.data.phantomInstances || []).filter(item =>
+          item.position && item.spawnTimeMs != null && item.spawnTimeMs <= eventMs && item.lastTimeMs + 2200 >= eventMs
+        ).map(item => ({...item, sourceInstance: item.sourceInstance}));
+        const candidates = [...alive, ...(event.sourcePhantoms || []), ...(event.phantoms || [])];
+        phantoms = [...new Map(candidates.map(item => [item.sourceInstance, item])).values()];
+      }
+      const phantomLocations = new Map();
+      for (const phantom of phantoms) {
+        if (!phantom.position) continue;
+        const key = `${phantom.position.x.toFixed(1)},${phantom.position.y.toFixed(1)}`;
+        if (!phantomLocations.has(key)) phantomLocations.set(key, {position: phantom.position, instances: []});
+        phantomLocations.get(key).instances.push(phantom.sourceInstance ?? phantom.sourceID);
+      }
+      for (const location of phantomLocations.values()) {
+        const label = `银色幻影 ${location.instances.map(item => `#${item}`).join('/')}`;
+        drawIcon(svg, location.position, icons.silverPhantom || 'boss_plugins/assets/silver_phantom.png', label);
+        const pixel = worldToPixel(location.position);
+        drawText(svg, pixel.x, pixel.y + 25, location.instances.map(item => `#${item}`).join('/'), '#e9d5ff', 'middle');
+      }
+
+      applyMapTransform();
+
+      if (event.eventType !== 'bow') {
+        if (event.eventType === 'water') {
+          for (const drop of event.drops || []) {
+            if (!drop.position) continue;
+            drawCircle(svg, drop.position, 8, '#d946ef', 1, '', `${drop.player} · 本轮放水落点（下一轮才形成污染圈）`);
+          }
+        }
+        return;
+      }
+      for (const player of event.players || []) {
+        if (player.applyState?.point) drawCircle(svg, player.applyState.point, 5, '#22c55e', 0.9, '', `${player.player} 空虚之握施加`);
+        if (player.fadeState?.point) drawCircle(svg, player.fadeState.point, 5, player.deathTriggeredRay ? '#ff1744' : '#38bdf8', 0.98, '', `${player.player} ${player.deathTriggeredRay ? '死亡触发' : ''}崩裂空无发射`);
+        for (const obelisk of player.obelisks || []) {
+          drawCircle(svg, obelisk.point, 5, '#ef4444', 0.95, '', `${player.player} 方尖碑 ${obelisk.label}`);
+        }
+        for (const ray of player.rays || []) {
+          if (player.deathTriggeredRay) {
+            drawLine(svg, ray.start, ray.end, '#7f1d1d', 10, '', 0.62);
+            drawLine(svg, ray.start, ray.end, '#ff1744', 4);
+          } else {
+            if (event.phase === 'P2') drawLine(svg, ray.start, ray.end, '#fde68a', 8, '7 7', 0.38);
+            drawLine(svg, ray.start, ray.end, '#f59e0b', 3);
+            drawLine(svg, ray.start, ray.through, '#ef4444', 1, '4 4');
+          }
+        }
+      }
+      applyMapTransform();
+    }
+
+    function renderDetails() {
+      const group = selectedEvent();
+      const holder = document.getElementById('selectedDetails');
+      if (!group) {
+        holder.innerHTML = '<section class="card muted">本场没有可回放的关键机制事件。</section>';
+        return;
+      }
+      const actors = (group.actors || group.snapshot?.bosses || []).filter(actor => actor.position).map(actor => `
+        <tr><td>${escapeHtml(actor.name)}</td><td>${actor.position.yardX}, ${actor.position.yardY}</td><td>${actor.confidence || 'unknown'}</td></tr>
+      `).join('');
+      if (group.eventType === 'gravity') {
+        const breaks = (group.breaks || []).map(item => `<tr>
+          <td>${item.order}</td><td>${escapeHtml(item.player)}</td><td>${item.time}</td><td>${(item.delayMs / 1000).toFixed(3)}s</td>
+          <td>${item.rule}</td><td>${item.deathTriggered ? '<span style="color:#f59e0b;font-weight:700">死亡触发（不归责）</span>' : (item.compliant ? '合规' : '<span style="color:#ef4444;font-weight:700">违反</span>')}</td>
+        </tr>`).join('');
+        const collapseText = group.collapseTrigger
+          ? (group.deathTriggeredCollapse || group.collapseTrigger.deathTriggered
+            ? ` · 由 ${escapeHtml(group.collapseTrigger.player)} 死亡直接触发（不归责）`
+            : ` · 团血崩于 ${escapeHtml(group.collapseTrigger.player)} 拉断`)
+          : '';
+        const casualtyText = group.compensationCount
+          ? `实际死亡 ${group.deathCount || 0} 人 · 代偿 ${group.compensationCount} 次（按有效减员计）`
+          : `死亡 ${group.deathCount || 0} 人`;
+        holder.innerHTML = `<section class="card"><h3>P3 重力坍缩 #${group.index} ${group.applyTime}</h3>
+          <div class="muted">点名：${escapeHtml((group.targets || []).join(' / '))} · ${casualtyText}${collapseText}</div>
+          <table><thead><tr><th>棒次</th><th>玩家</th><th>拉断时间</th><th>间隔</th><th>规则</th><th>判定</th></tr></thead><tbody>${breaks}</tbody></table>
+        </section>`;
+        return;
+      }
+      if (group.eventType === 'cosmicDevour' || group.eventType === 'portal') {
+        holder.innerHTML = `<section class="card">
+          <h3>P3 ${group.eventType === 'portal' ? '宇宙传送门' : '噬灭宇宙'} ${group.time}</h3>
+          <div class="muted">Boss 能量：${group.bossEnergy?.amount ?? '未获取'}${group.bossEnergy?.max ? ` / ${group.bossEnergy.max}` : ''}</div>
+          <div class="muted">全团坐标已在地图以亮点显示；噬灭宇宙对应板块在 10 秒后标记为彻底污染。</div>
+        </section><section class="card"><h3>全部 Boss 坐标</h3><table><tbody>${actors}</tbody></table></section>`;
+        return;
+      }
+      if (group.eventType === 'silverArrow') {
+        const hits = (group.actualHits || []).map(hit => `
+          <tr${hit.isMarked ? '' : ' style="color:#ef4444;font-weight:700"'}><td>${escapeHtml(hit.target)}${hit.isMarked ? '' : '（误伤）'}</td><td>${hit.amount}</td></tr>
+        `).join('');
+        const bossAttribution = (group.p1BossAttribution || []).map(item => `${escapeHtml(item.player)}→${item.hitBoss ? escapeHtml(item.bosses.join('、')) : '未命中小Boss'}`).join('；');
+        const ricochetRows = (group.sourceAssignments || []).map(item => `<tr><td>银色幻影${item.sourceInstance}</td><td>${escapeHtml(item.players?.[0] || '-')}</td><td>${escapeHtml(item.players?.[1] || '-')}</td><td>${item.bossEnergyDrained ? '是' : '否'}</td></tr>`).join('');
+        holder.innerHTML = `
+          <section class="card">
+            <h3>${group.phase} ${group.phase === 'P2' ? '银锋弹射' : '银锋箭'} #${group.index} ${group.time}</h3>
+            <div class="muted">点名：${escapeHtml((group.markedPlayers || []).join(' / '))}${group.phase === 'P2' ? ` · ${group.bossEnergyDrained ? '成功消能' : '未消能'}` : ''}</div>
+            ${group.phase === 'P1' ? `<div class="muted">射中小Boss判定：${bossAttribution || '两人均未命中（问题）'}</div><table><thead><tr><th>实际命中对象</th><th>伤害</th></tr></thead><tbody>${hits || '<tr><td colspan="2">无命中记录</td></tr>'}</tbody></table>` : `<table><thead><tr><th>点名来源</th><th>点名玩家A</th><th>点名玩家B</th><th>是否消能</th></tr></thead><tbody>${ricochetRows}</tbody></table>`}
+          </section>
+          <section class="card"><h3>当时 Boss 坐标</h3><table><tbody>${actors}</tbody></table></section>`;
+        return;
+      }
+      if (group.eventType === 'water') {
+        const drops = (group.drops || []).map(drop => `
+          <tr>
+            <td>${escapeHtml(drop.player)}</td>
+            <td>${drop.time}</td>
+            <td>${drop.position ? `${drop.position.yardX}, ${drop.position.yardY}` : '-'}</td>
+            <td>${drop.distanceFromGroupYards ?? '-'}</td>
+            <td>${drop.isOutlier ? '<span style="color:#ef4444;font-weight:700">是</span>' : '否'}</td>
+          </tr>
+        `).join('');
+        holder.innerHTML = `
+          <section class="card">
+            <h3>${group.phase} 放水 #${group.index} ${group.time}</h3>
+            <div class="muted">只展示本阶段已发生的污染，转阶段后重置。</div>
+            ${group.remoteStackCheck?.exempt ? '<div class="muted">本轮为 P2 首轮，远程集中度豁免。</div>' : group.remoteStackCheck?.eligible ? `<div class="muted">远程集中度：${group.remoteStackCheck.stacked ? '集中' : '不集中'} · 最远离质心 ${group.remoteStackCheck.maxDistanceFromCentroidYards ?? '-'} 码 · 阈值 15 码${group.remoteStackCheck.outliers?.length ? ` · 离群：${group.remoteStackCheck.outliers.map(item => `${escapeHtml(item.player)} ${item.distanceYards}码`).join('、')}` : ''}</div>` : ''}
+            <table><thead><tr><th>玩家</th><th>时间</th><th>坐标</th><th>离组距离</th><th>过偏</th></tr></thead><tbody>${drops}</tbody></table>
+          </section>
+          <section class="card">
+            <h3>当时 Boss / Add 坐标</h3>
+            <table><thead><tr><th>对象</th><th>坐标</th><th>置信度</th></tr></thead><tbody>${actors || '<tr><td colspan="3" class="muted">未拿到可用坐标</td></tr>'}</tbody></table>
+          </section>`;
+        return;
+      }
+      const players = group.players.map(player => `
+        <tr>
+          <td>${escapeHtml(player.player)}</td>
+          <td>${player.applyTime}<br><span class="muted">${player.applyState?.confidence || 'unknown'}</span></td>
+          <td>${player.triggerTime || player.fadeTime}<br><span class="muted">${player.deathTriggeredRay ? '死亡时提前触发（红色射线）' : (player.fadeState?.confidence || 'unknown')}</span></td>
+          <td>${player.actualPhantomHitCount || 0}</td>
+          <td>${player.predictedPhantomHits?.length || 0}</td>
+          <td>${(player.shotAttribution || []).map(item => `幻影${item.phantom}：${item.verdict}（${item.confidence}，${item.basis}）`).join('<br>') || '-'}</td>
+          <td>${player.allHealing?.totalHealing ?? 0}<br><span class="muted">${(player.allHealing?.healingByHealer || []).map(item => `${escapeHtml(item.healer)} ${item.amount}`).join(' / ') || '无治疗记录'}</span></td>
+          <td>${player.missedPhantom ? '<span style="color:#ef4444;font-weight:700">是</span>' : '否'}</td>
+        </tr>`).join('');
+      const phantoms = (group.phantoms || []).map(phantom => `
+        <tr><td>幻影 ${phantom.sourceInstance ?? phantom.sourceID}</td><td>${phantom.firstTime}</td><td>${phantom.lastTime}</td><td>${phantom.position ? `${phantom.position.yardX}, ${phantom.position.yardY}` : '-'}</td></tr>
+      `).join('');
+      holder.innerHTML = `
+        <section class="card">
+          <h3>${group.phase} #${group.index} ${group.fireTime}</h3>
+          <div class="muted">apply ${group.applyStart}${group.phase === 'P2' ? `，active phantom ${group.activePhantomCount}` : ''}</div>
+          <table><thead><tr><th>玩家</th><th>apply</th><th>remove/fire</th><th>实际命中幻影</th><th>几何命中幻影</th><th>事件/职责归因</th><th>空虚之握全程治疗</th><th>P2 未射中</th></tr></thead><tbody>${players}</tbody></table>
+        </section>
+        ${group.phase === 'P2' ? `<section class="card">
+          <h3>当前场上银色幻影</h3>
+          <table><thead><tr><th>对象</th><th>首次伤害</th><th>末次伤害</th><th>坐标</th></tr></thead><tbody>${phantoms || '<tr><td colspan="4" class="muted">无</td></tr>'}</tbody></table>
+        </section>` : ''}
+        <section class="card">
+          <h3>当时 Boss / Add 坐标</h3>
+          <table><thead><tr><th>对象</th><th>坐标</th><th>置信度</th></tr></thead><tbody>${actors || '<tr><td colspan="3" class="muted">未拿到可用坐标</td></tr>'}</tbody></table>
+        </section>`;
+    }
+
+    function renderDeathHealing() {
+      const holder = document.getElementById('deathHealing');
+      const rows = (state.data.voidDeaths || []).filter(row => state.includeExempt || !row.exemptByPhantoms);
+      holder.innerHTML = `<table><thead><tr><th>时间</th><th>死亡玩家</th><th>幻影数</th><th>6秒治疗总量</th><th>治疗拆分</th><th>不追究</th></tr></thead><tbody>${
+        rows.map(row => `<tr>
+          <td>${row.time}</td>
+          <td>${escapeHtml(row.player)}</td>
+          <td>${row.activePhantomCount}</td>
+          <td>${row.totalHealing}</td>
+          <td>${row.healingByHealer.map(item => `${escapeHtml(item.healer)} ${item.amount}`).join('<br>') || '-'}</td>
+          <td>${row.exemptByPhantoms ? '是' : '否'}</td>
+        </tr>`).join('') || '<tr><td colspan="6" class="muted">本场没有死于空虚之握/崩裂空无的玩家。</td></tr>'
+      }</tbody></table>`;
+    }
+
+    function renderP2Stats() {
+      const holder = document.getElementById('p2Stats');
+      holder.closest('.panel').style.display = '';
+      const missPhantom = state.data.summary?.p2MissedPhantomByPlayer || [];
+      const missEnergy = state.data.summary?.p2MissedEnergyByPlayer || [];
+      holder.innerHTML = `
+        <div class="card"><h3>没有射到银色幻影</h3><table><thead><tr><th>玩家</th><th>P2被点名</th><th>未命中</th></tr></thead><tbody>${missPhantom.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.markedCount || 0}</td><td>${row.count}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">无</td></tr>'}</tbody></table></div>
+        <div class="card"><h3>没有成功消 Boss 能量</h3><table><tbody>${missEnergy.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('') || '<tr><td class="muted">无</td></tr>'}</tbody></table></div>`;
+    }
+
+    function renderWaterStats() {
+      const allRows = state.data.summary?.waterOutliersByPhase || {};
+      const rows = allRows;
+      document.getElementById('waterStats').innerHTML = Object.keys(rows).length
+        ? Object.entries(rows).map(([phase, players]) => `<div class="card"><h3>${phase}</h3><table><tbody>${players.map(row => `<tr><td>${escapeHtml(row.player)}</td><td>${row.count}</td></tr>`).join('')}</tbody></table></div>`).join('')
+        : '<div class="card muted">没有识别到超过 15 码的放水偏离。</div>';
+    }
+
+    function renderPhaseStats() {
+      const allRows = state.data.summary?.bowGroupsByPhase || {};
+      const rows = allRows;
+      document.getElementById('phaseStats').innerHTML = `<table><tbody>${Object.entries(rows).map(([phase, count]) => `<tr><td>${phase}</td><td>${count}</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    function renderGravityStats() {
+      const holder = document.getElementById('gravityStats');
+      holder.closest('.panel').style.display = '';
+      const rows = state.data.gravityRounds || [];
+      holder.innerHTML = `<table><thead><tr><th>轮次</th><th>点名</th><th>1棒</th><th>2棒间隔</th><th>3棒间隔</th><th>违规</th><th>死亡/归因</th></tr></thead><tbody>${rows.map(row => {
+        const breaks = row.breaks || [];
+        const violation = (row.violations || []).map(item => `${escapeHtml(item.player)}：${item.rule}（${(item.delayMs / 1000).toFixed(3)}秒）`).join('<br>') || '无';
+        const breakText = item => item
+          ? `${escapeHtml(item.player)} ${(item.delayMs / 1000).toFixed(3)}s${item.deathTriggered ? '（死亡触发，不归责）' : ''}`
+          : '-';
+        const attribution = row.collapseTrigger
+          ? (row.deathTriggeredCollapse || row.collapseTrigger.deathTriggered
+            ? ` · ${escapeHtml(row.collapseTrigger.player)}死亡触发（不归责）`
+            : ` · ${escapeHtml(row.collapseTrigger.player)}`)
+          : '';
+        return `<tr><td>#${row.index} ${row.applyTime}</td><td>${escapeHtml((row.targets || []).join(' / '))}</td>
+          <td>${breakText(breaks[0])}</td>
+          <td>${breakText(breaks[1])}</td>
+          <td>${breakText(breaks[2])}</td>
+          <td>${violation}</td><td>${row.deathCount || 0} 人${row.compensationCount ? ` + 代偿 ${row.compensationCount}` : ''}${attribution}</td></tr>`;
+      }).join('')}</tbody></table>`;
+    }
+
+    function renderSkillFocus() {
+      document.querySelectorAll('#skillFocus button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.focus === state.skillFocus);
+      });
+    }
+
+    function renderDetailTabs() {
+      document.querySelectorAll('#detailTabs button[data-detail-tab]').forEach(button => {
+        button.classList.toggle('active', button.dataset.detailTab === state.detailTab);
+      });
+      document.querySelectorAll('[data-detail-panel]').forEach(panel => {
+        panel.hidden = panel.dataset.detailPanel !== state.detailTab;
+      });
+    }
+
+    function render() {
+      const events = focusedEvents();
+      const all = auditEvents();
+      if (!state.selectedKey && events.length) state.selectedKey = events[0].key;
+      if (state.selectedKey && events.length && !events.some(e => e.key === state.selectedKey)) {
+        // 切换筛选后若当前选中不在列表，切到该筛选项第一条；定位 Tag 路由选中不受影响（路由完成后再改筛选）
+        if (!state.pendingRouteScroll) state.selectedKey = events[0].key;
+      }
+      if (!events.length && all.length && !state.selectedKey) state.selectedKey = all[0].key;
+      renderSkillFocus();
+      renderPhasePulls();
+      renderStats();
+      renderEventList();
+      renderMap();
+      renderDetails();
+      renderDeathHealing();
+      renderP2Stats();
+      renderWaterStats();
+      renderPhaseStats();
+      renderGravityStats();
+      renderDetailTabs();
+    }
+
+
+    document.getElementById('skillFocus')?.addEventListener('click', event => {
+      const btn = event.target.closest('button[data-focus]');
+      if (!btn) return;
+      state.skillFocus = btn.dataset.focus || 'all';
+      state.pendingRouteScroll = false;
+      render();
+    });
+
+    document.getElementById('includeExempt').addEventListener('change', event => {
+      state.includeExempt = event.target.checked;
+      renderDeathHealing();
+    });
+
+    document.getElementById('detailTabs')?.addEventListener('click', event => {
+      const button = event.target.closest('button[data-detail-tab]');
+      if (!button) return;
+      state.detailTab = button.dataset.detailTab;
+      renderDetailTabs();
+    });
+
+    document.querySelector('.map-controls')?.addEventListener('click', event => {
+      const button = event.target.closest('button[data-map-action]');
+      if (!button) return;
+      if (button.dataset.mapAction === 'reset') resetMapView();
+      if (button.dataset.mapAction === 'in') setMapZoom(state.mapView.zoom * 1.25);
+      if (button.dataset.mapAction === 'out') setMapZoom(state.mapView.zoom / 1.25);
+    });
+
+    const mapSvg = document.getElementById('mapSvg');
+    mapSvg.addEventListener('wheel', event => {
+      event.preventDefault();
+      const rect = mapSvg.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * 873 / rect.width;
+      const y = (event.clientY - rect.top) * 794 / rect.height;
+      setMapZoom(state.mapView.zoom * (event.deltaY < 0 ? 1.16 : 1 / 1.16), x, y);
+    }, { passive: false });
+    mapSvg.addEventListener('pointerdown', event => {
+      if (event.button !== 0 || event.target.closest?.('.player-marker')) return;
+      const view = state.mapView;
+      const rect = mapSvg.getBoundingClientRect();
+      Object.assign(view, {
+        dragging: true,
+        pointerID: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: view.x,
+        originY: view.y,
+        scaleX: 873 / rect.width,
+        scaleY: 794 / rect.height,
+      });
+      mapSvg.setPointerCapture(event.pointerId);
+      mapSvg.classList.add('dragging');
+    });
+    mapSvg.addEventListener('pointermove', event => {
+      const view = state.mapView;
+      if (!view.dragging || view.pointerID !== event.pointerId) return;
+      view.x = view.originX + (event.clientX - view.startX) * view.scaleX;
+      view.y = view.originY + (event.clientY - view.startY) * view.scaleY;
+      applyMapTransform();
+    });
+    const stopMapDrag = event => {
+      const view = state.mapView;
+      if (!view.dragging || view.pointerID !== event.pointerId) return;
+      view.dragging = false;
+      mapSvg.classList.remove('dragging');
+      if (mapSvg.hasPointerCapture(event.pointerId)) mapSvg.releasePointerCapture(event.pointerId);
+      view.pointerID = null;
+    };
+    mapSvg.addEventListener('pointerup', stopMapDrag);
+    mapSvg.addEventListener('pointercancel', stopMapDrag);
+
+    window.OfflineDataLoader.loadJson(DATA_URL)
+      .then(data => {
+        if (data?.data?.page1_wipeAnalysis) {
+          const reportID = ROUTE.get('report');
+          const fightID = Number(ROUTE.get('fight'));
+          const fight = (data.data.page1_wipeAnalysis || []).find(row => String(row.reportID) === String(reportID) && Number(row.fightID) === fightID);
+          const audit = fight?.crownOfTheCosmos?.fieldAudit;
+          if (!audit) {
+            renderAggregatedFight(data);
+            return;
+          }
+          data = audit;
+        }
+        state.data = data;
+        if (ROUTE_TAG) {
+          const match = auditEvents().find(event => event.key === ROUTE_TAG);
+          state.selectedKey = match?.key || null;
+          if (match?.phase) state.phaseFocus = match.phase;
+          state.pendingRouteScroll = Boolean(match);
+        } else if (ROUTE_PHASE) {
+          state.selectedKey = auditEvents().find(event => event.phase === ROUTE_PHASE)?.key || null;
+          state.pendingRouteScroll = Boolean(state.selectedKey);
+        }
+        render();
+      })
+      .catch(error => {
+        document.getElementById('app').innerHTML = `<div class="panel" style="margin:16px;padding:16px;color:#fecaca">读取 ${DATA_URL} 失败：${escapeHtml(error.message)}。</div>`;
+      });
+  </script>
+</body>
+</html>

@@ -17,7 +17,7 @@ from urllib.parse import unquote, urlparse
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
-import notebook_db
+from analyzer_core import notebook_store
 
 
 ROOT = Path(__file__).resolve().parent
@@ -209,14 +209,14 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/jobs/") and path.endswith("/result"):
             return self.handle_result(path)
         if path in {"/api/notebook", "/api/scoreboard"}:
-            return self.send_response_body(*json_bytes(notebook_db.load_store()))
+            return self.send_response_body(*json_bytes(notebook_store.load_store()))
         if path in {"/api/data/list", "/api/data-files"}:
-            files = notebook_db.list_data_files()
+            files = notebook_store.list_data_files()
             if path == "/api/data-files":
                 return self.send_response_body(*json_bytes({"schemaVersion": 1, "files": files}))
             return self.send_response_body(*json_bytes(files))
         if path in {"/api/data/latest"}:
-            data = notebook_db.read_latest_data()
+            data = notebook_store.read_latest_data()
             if data is None:
                 return self.send_response_body(*json_bytes({"error": "no data json"}, HTTPStatus.NOT_FOUND))
             return self.send_response_body(*json_bytes(data))
@@ -237,7 +237,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return None
         day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
         if day_match:
-            day = notebook_db.get_day(day_match.group(1))
+            day = notebook_store.get_day(day_match.group(1))
             if day is None:
                 return self.send_response_body(*json_bytes({"error": "day not found"}, HTTPStatus.NOT_FOUND))
             return self.send_response_body(*json_bytes(day))
@@ -254,7 +254,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
         day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
         if day_match:
-            return self.send_response_body(*json_bytes(notebook_db.delete_day(day_match.group(1))))
+            return self.send_response_body(*json_bytes(notebook_store.delete_day(day_match.group(1))))
         return self.send_error(HTTPStatus.NOT_FOUND)
 
     def read_json_body(self):
@@ -278,11 +278,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 )
             if path in {"/api/notebook", "/api/scoreboard", "/api/notebook/store", "/api/scoreboard/store"}:
                 payload = self.read_json_body()
-                return self.send_response_body(*json_bytes(notebook_db.save_store(payload)))
+                return self.send_response_body(*json_bytes(notebook_store.save_store(payload)))
             day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
             if day_match:
                 payload = self.read_json_body()
-                return self.send_response_body(*json_bytes(notebook_db.put_day(day_match.group(1), payload)))
+                return self.send_response_body(*json_bytes(notebook_store.put_day(day_match.group(1), payload)))
             if path != "/api/analyze":
                 return self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -346,7 +346,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 raise ValueError("progressDate 必须是 YYYY-MM-DD")
             # Prefer notebook DB day upsert when payload looks like scoreboard day
             if payload.get("players") and any(isinstance(p, dict) and p.get("mechanics") for p in payload.get("players") or []):
-                return self.send_response_body(*json_bytes(notebook_db.put_day(date, payload)))
+                return self.send_response_body(*json_bytes(notebook_store.put_day(date, payload)))
             slim = {
                 "schemaVersion": 2,
                 "module": "final_verdict",
@@ -371,7 +371,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             }
             path = VERDICT_DIR / f"verdict-{date}.json"
             path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
-            notebook_db.put_day(date, {
+            notebook_store.put_day(date, {
                 "date": date,
                 "sourceReports": slim["sourceReports"],
                 "pointsPerCount": slim["pointsPerCount"],
@@ -435,12 +435,14 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
     def handle_static(self, path):
         route_map = {
             "/": "/index.html",
-            "/online": "/online.html",
-            "/report": "/report.html",
-            "/scoreboard": "/scoreboard.html",
-            "/verdict": "/scoreboard.html",
-            "/cooldowns": "/raid-cooldowns.html",
-            "/LuraJudgement.html": "/report.html",
+            "/online": "/frontend/tools/analysis-runner/index.html",
+            "/report": "/frontend/report/index.html",
+            "/scoreboard": "/frontend/tools/iq-notebook/index.html",
+            "/verdict": "/frontend/tools/iq-notebook/index.html",
+            "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
+            "/raid-guide": "/frontend/tools/raid-guide/index.html",
+            "/audit": "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
+            "/LuraJudgement.html": "/frontend/report/index.html",
         }
         path = route_map.get(path, path)
         target = (ROOT / path.lstrip("/")).resolve()

@@ -9,7 +9,6 @@ tools/tmp/
 
 # Local generated WCL output, private report snapshots, and release artifacts.
 .analysis_jobs/
-/wcl_hardcore_api.json
 /verdict_data.json
 /data/*
 !/data/.gitkeep

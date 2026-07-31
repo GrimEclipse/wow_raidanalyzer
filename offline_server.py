@@ -11,10 +11,13 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 ROUTES = {
-    "/": "offline_index.html" if (ROOT / "offline_index.html").exists() else "index.html",
-    "/report": "report.html",
-    "/audit": "crown-fight-audit.html",
-    "/cooldowns": "raid-cooldowns.html",
+    "/": "frontend/offline/index.html" if (ROOT / "frontend/offline/index.html").exists() else "index.html",
+    "/report": "frontend/report/index.html",
+    "/audit": "frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
+    "/scoreboard": "frontend/tools/iq-notebook/index.html",
+    "/verdict": "frontend/tools/iq-notebook/index.html",
+    "/cooldowns": "frontend/tools/raid-cooldowns/index.html",
+    "/raid-guide": "frontend/tools/raid-guide/index.html",
 }
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
@@ -117,16 +120,6 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
     def _list_data_files_fallback(self):
         files = []
-        legacy = ROOT / "wcl_hardcore_api.json"
-        if legacy.is_file():
-            stat = legacy.stat()
-            files.append({
-                "path": "wcl_hardcore_api.json",
-                "name": legacy.name,
-                "label": "wcl_hardcore_api.json（兼容默认）",
-                "size": stat.st_size,
-                "mtime": int(stat.st_mtime),
-            })
         data_dir = ROOT / "data"
         if data_dir.is_dir():
             for path in sorted(data_dir.glob("wcl_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):

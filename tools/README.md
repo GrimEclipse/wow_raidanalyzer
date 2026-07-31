@@ -44,7 +44,7 @@ py -3 tools\<脚本名>.py ...
 py -3 tools/reprocess_crown_json.py data/wcl_<reportId>_crown_of_the_cosmos_<YYYYMMDD>.json
 ```
 
-- 参数 `path`：输入 JSON 路径；默认 `wcl_hardcore_api.json`。
+- 参数 `path`：输入 JSON 路径；默认 `data/wcl_hardcore_api.json`。
 - **原地覆盖**写入（先写 `.tmp` 再替换）。
 - 控制台会输出 `Bow repair` 统计（拉弓玩家恢复情况）。
 
@@ -167,7 +167,7 @@ py -3 tools/export_verdict_excel.py
 py -3 tools/reprocess_crown_json.py data/wcl_pZg3NDa6JkY1yqz7_crown_of_the_cosmos_20260715.json
 ```
 
-然后在浏览器打开 `report.html?json=data/wcl_....json` 核对开庭板与智商同步。
+然后在浏览器打开 `/report?json=data/wcl_....json` 核对开庭板与智商同步。
 
 ### 深挖单场机制
 

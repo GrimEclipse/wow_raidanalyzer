@@ -6,19 +6,26 @@ from tools.build_zone54_raid_guide import build_document, infer_tags
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SOURCE_DATA = (
+    ROOT
+    / "skills"
+    / "venomous-abyss-raid-development"
+    / "references"
+    / "source-data"
+)
 
 
 class Zone54RaidGuideTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         discovery = json.loads(
-            (ROOT / "docs/zone54_spell_discovery.json").read_text(encoding="utf-8")
+            (SOURCE_DATA / "spell-discovery.json").read_text(encoding="utf-8")
         )
         authored = json.loads(
-            (ROOT / "docs/zone54_raid_guide_source.json").read_text(encoding="utf-8")
+            (SOURCE_DATA / "raid-guide-source.json").read_text(encoding="utf-8")
         )
         timelines = json.loads(
-            (ROOT / "docs/zone54_boss_timelines.json").read_text(encoding="utf-8")
+            (SOURCE_DATA / "boss-timelines.json").read_text(encoding="utf-8")
         )
         cls.document = build_document(discovery, authored, timelines)
 
@@ -60,7 +67,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn("伤害", tags)
 
     def test_static_page_uses_ptr_tooltips_and_generated_payload(self):
-        page = (ROOT / "zone54-raid-guide.html").read_text(encoding="utf-8")
+        page = (ROOT / "frontend" / "tools" / "raid-guide" / "index.html").read_text(encoding="utf-8")
         self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
         self.assertIn("data-wowhead=\"domain=ptr&amp;dd=15\"", page)
         self.assertIn('class="spell-icon-link"', page)
@@ -70,6 +77,11 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn("background-size: cover !important", page)
         self.assertIn(".mechanic-card.mythic", page)
         self.assertIn('<span class="spell-id">ID: ${spellID}</span>', page)
+        self.assertIn("function mechanicSpellCluster", page)
+        self.assertIn("related-spell-ids", page)
+        self.assertIn("mythic-note", page)
+        self.assertIn("timeline-combo", page)
+        self.assertIn("sourceColor", page)
         self.assertNotIn("function evidenceCell", page)
         self.assertIn("assets/vendor/zone54-raid-guide-data.js", page)
         self.assertIn("Boss 切换", page)
@@ -195,6 +207,264 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertFalse(mythic["kill"])
         self.assertEqual(heroic["phaseMarkers"][1]["timeMs"], 24107)
         self.assertEqual(mythic["phaseMarkers"][1]["timeMs"], 24083)
+
+    def test_lost_explorers_keeps_authored_flow_and_evidence_boundaries(self):
+        boss = next(
+            row for row in self.document["bosses"]
+            if row["key"] == "lostexplorers"
+        )
+        self.assertEqual(boss["reviewStatus"], "reviewed")
+        self.assertEqual(boss["energy"]["maximum"], 4)
+        self.assertEqual(len(boss["phases"]), 3)
+        self.assertEqual(len(boss["mechanics"]), 10)
+
+        fish = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "result-only-interaction-cycle"
+        )
+        self.assertTrue(any("WCL" in row for row in fish["details"]))
+        self.assertTrue(any("1296975" in row for row in fish["details"]))
+        self.assertIn("1296975/1297022/1297024", fish["verification"])
+
+        heroic = boss["timelines"]["heroic"]
+        mythic = boss["timelines"]["mythic"]
+        self.assertTrue(heroic["kill"])
+        self.assertFalse(mythic["kill"])
+        fourth = next(
+            marker for marker in mythic["phaseMarkers"]
+            if marker["phase"] == "cycle-4"
+        )
+        enrage = next(
+            marker for marker in mythic["phaseMarkers"]
+            if marker["phase"] == "enrage"
+        )
+        self.assertEqual(fourth["timeMs"], 374994)
+        self.assertEqual(enrage["timeMs"], 439232)
+        self.assertFalse(any(event["timeMs"] == 332337 for event in mythic["events"]))
+        crate = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "mythic-crate-proximity-burst"
+        )
+        self.assertEqual(crate["priority"], "mythic")
+        self.assertIn(1311587, crate["spellIDs"])
+
+    def test_lost_explorers_preserves_only_confirmed_chinese_spell_names(self):
+        boss = next(
+            row for row in self.document["bosses"]
+            if row["key"] == "lostexplorers"
+        )
+        icebound = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1286922
+        )
+        blink = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1296021
+        )
+        blast_wave = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1305844
+        )
+        self.assertEqual(icebound["nameZh"], "\u51b0\u5c01\u70c8\u7130")
+        self.assertEqual(blink["nameZh"], "\u95ea\u73b0\u65b0\u661f")
+        self.assertIsNone(blast_wave["nameZh"])
+
+    def test_sszorak_keeps_fixed_wind_cycle_and_mythic_rage_failure(self):
+        boss = next(
+            row for row in self.document["bosses"] if row["key"] == "sszorak"
+        )
+        self.assertEqual(boss["reviewStatus"], "reviewed")
+        self.assertEqual(boss["energy"]["maximum"], 3)
+        self.assertEqual(len(boss["mechanics"]), 7)
+
+        cysts = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "two-target-cyst-resource"
+        )
+        self.assertIn(1305959, cysts["spellIDs"])
+        self.assertIn(1287205, cysts["spellIDs"])
+
+        fury = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "mythic-minimum-stack-rage-check"
+        )
+        self.assertEqual(fury["priority"], "mythic")
+        self.assertIn(1296898, fury["spellIDs"])
+        self.assertIn("1296898", fury["verification"])
+
+        heroic = boss["timelines"]["heroic"]
+        mythic = boss["timelines"]["mythic"]
+        self.assertTrue(heroic["kill"])
+        self.assertFalse(mythic["kill"])
+        first_maelstrom = next(
+            marker for marker in heroic["phaseMarkers"]
+            if marker["phase"] == "maelstrom-1"
+        )
+        enrage = next(
+            marker for marker in mythic["phaseMarkers"]
+            if marker["phase"] == "enrage"
+        )
+        self.assertEqual(first_maelstrom["timeMs"], 111095)
+        self.assertEqual(enrage["spellID"], 1296898)
+        self.assertEqual(enrage["timeMs"], 157996)
+        self.assertIn("30% 易伤", boss["energy"]["rules"][3])
+        heroic_combos = [
+            event for event in heroic["events"]
+            if event["spellID"] == 1277025
+        ]
+        mythic_combos = [
+            event for event in mythic["events"]
+            if event["spellID"] == 1277025
+        ]
+        self.assertEqual(len(heroic_combos), 6)
+        self.assertEqual(len(mythic_combos), 3)
+        self.assertEqual(heroic_combos[0]["timeMs"], 5566)
+        self.assertEqual(
+            [child["spellID"] for child in heroic_combos[0]["children"]],
+            [1277002, 1277027, 1287072, 1277002, 1277027],
+        )
+        self.assertEqual(mythic_combos[0]["timeMs"], 5038)
+
+    def test_sszorak_confirmed_names_keep_unconfirmed_damage_names_english(self):
+        boss = next(
+            row for row in self.document["bosses"] if row["key"] == "sszorak"
+        )
+        ravage = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1277002
+        )
+        sidewind = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1297096
+        )
+        gash = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1285998
+        )
+        self.assertEqual(ravage["nameZh"], "\u52ab\u63a0")
+        self.assertEqual(sidewind["nameZh"], "\u72c2\u6012\u4fa7\u98ce")
+        self.assertIsNone(gash["nameZh"])
+
+    def test_twin_fangs_keeps_stack_cycle_and_verified_mythic_interrupts(self):
+        boss = next(
+            row for row in self.document["bosses"] if row["key"] == "twinfangs"
+        )
+        self.assertEqual(boss["reviewStatus"], "reviewed")
+        self.assertEqual(boss["energy"]["maximum"], 10)
+        self.assertEqual(len(boss["phases"]), 4)
+        self.assertEqual(len(boss["mechanics"]), 11)
+
+        venom = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "permanent-stack-death-threshold"
+        )
+        self.assertIn(1290336, venom["spellIDs"])
+        self.assertTrue(any("9 层" in row for row in venom["details"]))
+
+        brood = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "mythic-repeating-interrupt-retreat"
+        )
+        self.assertEqual(brood["priority"], "mythic")
+        self.assertIn(1308356, brood["spellIDs"])
+        self.assertIn(1308385, brood["spellIDs"])
+        self.assertTrue(any("56 次" in row for row in brood["details"]))
+
+        heroic = boss["timelines"]["heroic"]
+        mythic = boss["timelines"]["mythic"]
+        self.assertTrue(heroic["kill"])
+        self.assertFalse(mythic["kill"])
+        self.assertEqual(heroic["phaseMarkers"][1]["timeMs"], 154466)
+        self.assertEqual(heroic["phaseMarkers"][3]["timeMs"], 324000)
+        self.assertEqual(mythic["phaseMarkers"][1]["timeMs"], 140001)
+        self.assertEqual(
+            mythic["events"][1]["spellID"], 1308356
+        )
+
+    def test_twin_fangs_preserves_user_confirmed_chinese_names(self):
+        boss = next(
+            row for row in self.document["bosses"] if row["key"] == "twinfangs"
+        )
+        eternal = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1290336
+        )
+        feast = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1290516
+        )
+        emergence = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1291404
+        )
+        self.assertEqual(eternal["nameZh"], "永恒毒液")
+        self.assertEqual(feast["nameZh"], "贪婪盛宴")
+        self.assertIsNone(emergence["nameZh"])
+
+    def test_coiled_altar_keeps_four_stage_flow_and_evidence_boundaries(self):
+        boss = next(
+            row for row in self.document["bosses"] if row["key"] == "bargained"
+        )
+        self.assertEqual(boss["reviewStatus"], "reviewed")
+        self.assertEqual(len(boss["phases"]), 5)
+        self.assertEqual(len(boss["mechanics"]), 12)
+
+        transition = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "fixed-regeneration-fragment-intermission"
+        )
+        self.assertIn(1304032, transition["spellIDs"])
+        self.assertTrue(any("35 秒" in row for row in transition["details"]))
+        self.assertTrue(any("3%" in row for row in transition["summary"].splitlines()))
+        self.assertTrue(any("20%" in row for row in transition["mythicNotes"]))
+
+        manifestation = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "facing-controlled-fixate"
+        )
+        self.assertIn(1310744, manifestation["spellIDs"])
+        self.assertIn("不自动判定", manifestation["verification"])
+
+        heroic = boss["timelines"]["heroic"]
+        mythic = boss["timelines"]["mythic"]
+        self.assertFalse(heroic["kill"])
+        self.assertFalse(mythic["kill"])
+        self.assertEqual(heroic["phaseMarkers"][1]["timeMs"], 192693)
+        self.assertEqual(heroic["phaseMarkers"][3]["timeMs"], 526182)
+        self.assertEqual(mythic["phaseMarkers"][1]["timeMs"], 184405)
+        self.assertEqual(
+            len([row for row in heroic["events"] if row["spellID"] == 1299684]),
+            8,
+        )
+        for spell_id in (1285643, 1286441, 1286895, 1286620):
+            self.assertEqual(
+                len([row for row in heroic["events"] if row["spellID"] == spell_id]),
+                7,
+            )
+        self.assertEqual(
+            len([row for row in mythic["events"] if row["spellID"] == 1299684]),
+            8,
+        )
+        sever = next(row for row in heroic["events"] if row["spellID"] == 1299684)
+        deathmarch = next(row for row in heroic["events"] if row["spellID"] == 1285643)
+        self.assertEqual(sever["sourceName"], "Zul'jan")
+        self.assertEqual(deathmarch["sourceName"], "Hex Lord Malacrass")
+        self.assertTrue(any(
+            row.get("value") == "仅开场约 14.5 秒"
+            for row in heroic["stats"]
+        ))
+
+    def test_coiled_altar_preserves_user_confirmed_chinese_names(self):
+        boss = next(
+            row for row in self.document["bosses"] if row["key"] == "bargained"
+        )
+        guillotine = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1283489
+        )
+        dreadmarch = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1285643
+        )
+        nightfall = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1286918
+        )
+        self.assertEqual(guillotine["nameZh"], "处斩")
+        self.assertEqual(dreadmarch["nameZh"], "死亡进军")
+        self.assertEqual(nightfall["nameZh"], "永恒夜幕")
+        spiritcackle = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1286441
+        )
+        self.assertEqual(spiritcackle["nameZh"], "精魂狂啸")
 
 
 if __name__ == "__main__":

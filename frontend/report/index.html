@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../../">
+  <title>战斗分析 · 报告入口</title>
+  <style>
+    :root{color-scheme:dark;--bg:#070b13;--panel:#111827;--line:#293548;--muted:#94a3b8;--ink:#e5e7eb;--blue:#60a5fa}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 500px at 10% -20%,#172554,transparent),var(--bg);color:var(--ink);font:14px/1.6 system-ui,"Microsoft YaHei",sans-serif}
+    main{max-width:980px;margin:auto;padding:42px 22px}header{display:flex;justify-content:space-between;gap:20px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:20px}
+    h1{margin:0;font-size:30px}p{color:var(--muted)}a{color:var(--blue);text-decoration:none}.panel{margin-top:22px;padding:20px;border:1px solid var(--line);border-radius:14px;background:rgba(17,24,39,.9)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}select,input,button,.button{border:1px solid #3b4b63;background:#0b1220;color:var(--ink);border-radius:8px;padding:9px 12px;font:inherit}
+    button,.button{cursor:pointer}.button{display:inline-block}.primary{border-color:#2563eb;background:#1d4ed8;font-weight:700}.status{min-height:24px;margin-top:12px;color:var(--muted)}
+    .route{display:none;margin-top:16px;padding:16px;border-left:3px solid #22c55e;background:#071711}.route strong{display:block;font-size:17px;margin-bottom:8px}
+  </style>
+</head>
+<body>
+<main>
+  <header><div><div style="color:#93c5fd;font-size:12px">FRONTEND PLUGIN ROUTER</div><h1>战斗分析</h1><p>读取分析身份后，只加载该 Boss 的前端插件。</p></div><a href="index.html">返回功能首页</a></header>
+  <section class="panel">
+    <h2>选择已生成的分析</h2>
+    <div class="row"><select id="source"><option value="">正在读取列表…</option></select><button id="open" class="primary">打开报告</button></div>
+    <div id="status" class="status"></div>
+    <div id="route" class="route"><strong id="route-name"></strong><span id="route-kind"></span><div style="margin-top:12px"><a id="route-link" class="button primary" href="#">进入对应报告</a></div></div>
+  </section>
+  <section class="panel">
+    <h2>本地 JSON</h2>
+    <p>文件不会上传；入口只检查 Boss 身份。识别后请进入对应页面，再使用该页面的文件导入功能。</p>
+    <input id="file" type="file" accept=".json,application/json">
+  </section>
+</main>
+<script src="frontend/core/report-plugin-runtime.js"></script>
+<script>
+  const source = document.getElementById("source");
+  const status = document.getElementById("status");
+  const route = document.getElementById("route");
+
+  async function listSources(){
+    let files=[];
+    try{
+      const response=await fetch("/api/data-files",{cache:"no-store"});
+      if(response.ok) files=(await response.json()).files||[];
+    }catch(_){}
+    if(!files.length){
+      try{
+        const response=await fetch("data/manifest.json",{cache:"no-store"});
+        if(response.ok) files=(await response.json()).files||[];
+      }catch(_){}
+    }
+    source.innerHTML='<option value="">选择分析文件</option>'+files.map(file=>`<option value="${escapeHtml(file.path)}">${escapeHtml(file.label||file.name||file.path)}</option>`).join("");
+  }
+
+  function escapeHtml(value){
+    return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+  }
+
+  async function resolvePayload(payload,path,autoOpen=false){
+    const identity=window.MythicReportRuntime.identityOf(payload);
+    status.textContent=`已识别：${identity.bossName}（${identity.raidKey}/${identity.bossKey}）`;
+    let descriptor;
+    try{ descriptor=await window.MythicReportRuntime.loadDescriptor(payload); }
+    catch(error){
+      descriptor={renderer:"generic",reportPage:"frontend/report/generic.html"};
+      status.textContent+=`；未找到专用描述，使用通用报告。`;
+    }
+    const url=window.MythicReportRuntime.reportUrl(descriptor,path);
+    document.getElementById("route-name").textContent=identity.bossName;
+    document.getElementById("route-kind").textContent=descriptor.renderer==="generic"?"通用战斗报告":"Boss 专用分析插件";
+    document.getElementById("route-link").href=url;
+    route.style.display="block";
+    if(autoOpen) location.replace(url);
+  }
+
+  async function openPath(path,autoOpen=false){
+    if(!path){status.textContent="请先选择分析文件。";return}
+    status.textContent="正在识别 Boss…";
+    const response=await fetch(path,{cache:"no-store"});
+    if(!response.ok) throw new Error(`读取失败：HTTP ${response.status}`);
+    await resolvePayload(await response.json(),path,autoOpen);
+  }
+
+  document.getElementById("open").addEventListener("click",()=>openPath(source.value,true).catch(error=>status.textContent=error.message));
+  document.getElementById("file").addEventListener("change",async event=>{
+    const file=event.target.files[0]; if(!file)return;
+    try{await resolvePayload(JSON.parse(await file.text()),"",false)}
+    catch(error){status.textContent=`无法识别文件：${error.message}`}
+  });
+
+  listSources().then(()=>{
+    const params=new URLSearchParams(location.search);
+    const path=params.get("json")||params.get("source");
+    if(path){source.value=path;openPath(path,true).catch(error=>status.textContent=error.message)}
+  });
+</script>
+</body>
+</html>

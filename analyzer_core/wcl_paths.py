@@ -16,7 +16,7 @@ from typing import Iterable, List, Optional, Union
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data"
-LEGACY_WCL_JSON = PROJECT_ROOT / "wcl_hardcore_api.json"
+LEGACY_WCL_JSON = DATA_DIR / "wcl_hardcore_api.json"
 MANIFEST_PATH = DATA_DIR / "manifest.json"
 
 CN_TZ = timezone(timedelta(hours=8))

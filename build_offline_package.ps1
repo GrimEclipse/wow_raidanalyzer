@@ -35,10 +35,6 @@ New-Item -ItemType Directory -Force -Path (Join-Path $target "scoreboard") | Out
 # —— 前端与入口页 ——
 $files = @(
     "index.html",
-    "report.html",
-    "scoreboard.html",
-    "verdict.html",
-    "crown-fight-audit.html",
     "boss_catalog.json",
     "README_OFFLINE.txt"
 )
@@ -52,7 +48,9 @@ foreach ($file in $files) {
     }
 }
 
-# —— 静态资源 / Boss 图标 ——
+# —— 前端插件 / 独立工具 / 静态资源 ——
+Copy-Item -LiteralPath (Join-Path $root "frontend") -Destination (Join-Path $target "frontend") -Recurse -Force
+Write-Host "  + frontend\"
 Copy-Item -LiteralPath (Join-Path $root "assets") -Destination (Join-Path $target "assets") -Recurse -Force
 Write-Host "  + assets\"
 New-Item -ItemType Directory -Force -Path (Join-Path $target "boss_plugins") | Out-Null
@@ -72,13 +70,6 @@ if (Test-Path -LiteralPath $dataSrc) {
         Write-Host "  + data\manifest.json"
     }
 }
-$wcl = Join-Path $root "wcl_hardcore_api.json"
-if (Test-Path -LiteralPath $wcl) {
-    Copy-Item -LiteralPath $wcl -Destination (Join-Path $target "data\wcl_hardcore_api.json") -Force
-    Copy-Item -LiteralPath $wcl -Destination (Join-Path $target "wcl_hardcore_api.json") -Force
-    Write-Host "  + wcl_hardcore_api.json"
-}
-
 # —— 终审 Excel：浏览器端 verdict-xlsx.js 已随 assets\ 复制；再附带 Python 导出器供本机有 Python+openpyxl 时由宿主调用 ——
 # 注意：离线包本身不内嵌 openpyxl；最终用户无需安装 Python。openpyxl 仅本机 server.py / OfflineHost 调 Python 时需要。
 New-Item -ItemType Directory -Force -Path (Join-Path $target "tools\templates") | Out-Null

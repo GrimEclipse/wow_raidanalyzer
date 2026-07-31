@@ -121,7 +121,7 @@ namespace WowRaidAnalyzer
                 var req = ctx.Request;
                 var res = ctx.Response;
                 string path = Uri.UnescapeDataString(req.Url.AbsolutePath);
-                if (string.IsNullOrEmpty(path) || path == "/") path = "/index.html";
+                if (string.IsNullOrEmpty(path) || path == "/") path = "/frontend/offline/index.html";
 
                 if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
                 {
@@ -130,10 +130,12 @@ namespace WowRaidAnalyzer
                 }
 
                 // Friendly routes
-                if (path.Equals("/report", StringComparison.OrdinalIgnoreCase)) path = "/report.html";
-                else if (path.Equals("/scoreboard", StringComparison.OrdinalIgnoreCase)) path = "/scoreboard.html";
-                else if (path.Equals("/verdict", StringComparison.OrdinalIgnoreCase)) path = "/scoreboard.html";
-                else if (path.Equals("/audit", StringComparison.OrdinalIgnoreCase)) path = "/crown-fight-audit.html";
+                if (path.Equals("/report", StringComparison.OrdinalIgnoreCase)) path = "/frontend/report/index.html";
+                else if (path.Equals("/scoreboard", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/iq-notebook/index.html";
+                else if (path.Equals("/verdict", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/iq-notebook/index.html";
+                else if (path.Equals("/audit", StringComparison.OrdinalIgnoreCase)) path = "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html";
+                else if (path.Equals("/cooldowns", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-cooldowns/index.html";
+                else if (path.Equals("/raid-guide", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-guide/index.html";
 
                 ServeFile(res, path);
             }
@@ -157,19 +159,6 @@ namespace WowRaidAnalyzer
             if (path.Equals("/api/data-files", StringComparison.OrdinalIgnoreCase) && req.HttpMethod == "GET")
             {
                 var items = new List<string>();
-                string rootWcl = Path.Combine(Root, "wcl_hardcore_api.json");
-                if (File.Exists(rootWcl))
-                {
-                    var info = new FileInfo(rootWcl);
-                    items.Add(string.Format(
-                        "{{\"path\":{0},\"name\":{1},\"label\":{2},\"size\":{3},\"mtime\":{4}}}",
-                        JsonString("wcl_hardcore_api.json"),
-                        JsonString(info.Name),
-                        JsonString("wcl_hardcore_api.json（兼容默认）"),
-                        info.Length,
-                        (long)(info.LastWriteTimeUtc - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalSeconds
-                    ));
-                }
                 if (Directory.Exists(DataDir))
                 {
                     foreach (var file in Directory.GetFiles(DataDir, "wcl_*.json"))
@@ -230,13 +219,6 @@ namespace WowRaidAnalyzer
                 foreach (var file in Directory.GetFiles(DataDir, "*.json"))
                 {
                     var info = new FileInfo(file);
-                    if (latest == null || info.LastWriteTimeUtc > latest.LastWriteTimeUtc) latest = info;
-                }
-                // Also accept root wcl_hardcore_api.json next to exe for convenience
-                string rootWcl = Path.Combine(Root, "wcl_hardcore_api.json");
-                if (File.Exists(rootWcl))
-                {
-                    var info = new FileInfo(rootWcl);
                     if (latest == null || info.LastWriteTimeUtc > latest.LastWriteTimeUtc) latest = info;
                 }
                 if (latest == null) { WriteJson(res, 404, "{\"error\":\"no data json\"}"); return; }

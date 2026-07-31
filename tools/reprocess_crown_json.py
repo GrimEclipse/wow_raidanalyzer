@@ -1929,7 +1929,7 @@ def reprocess(root):
 
 def main():
     parser = argparse.ArgumentParser(description="Reprocess an existing Crown JSON without making WCL requests.")
-    parser.add_argument("path", nargs="?", default="wcl_hardcore_api.json")
+    parser.add_argument("path", nargs="?", default="data/wcl_hardcore_api.json")
     args = parser.parse_args()
     path = Path(args.path).resolve()
     root = json.loads(path.read_text(encoding="utf-8"))
