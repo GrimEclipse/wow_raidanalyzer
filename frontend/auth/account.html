@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>账号与权限 · 团本分析工具</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080d17;--panel:#111a2a;--line:#26344d;--text:#edf4ff;--muted:#91a1ba;--accent:#5ee0a0;--danger:#ff8090}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px/1.5 system-ui,"Microsoft YaHei",sans-serif;color:var(--text)}main{width:min(1000px,calc(100% - 32px));margin:32px auto 70px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.top h1{margin:0}.links{display:flex;gap:8px;flex-wrap:wrap}a,button{font:inherit}.links a,.links button{border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--text);background:#0b1321;text-decoration:none;cursor:pointer}
+    section{padding:22px;margin:16px 0;border:1px solid var(--line);border-radius:14px;background:var(--panel)}h2{margin:0 0 14px;font-size:19px}.muted{color:var(--muted)}.status{min-height:24px;color:var(--accent)}.status.error{color:var(--danger)}form{display:grid;gap:13px;max-width:560px}label{display:grid;gap:6px;color:#c9d6ea}input,select,button{border:1px solid var(--line);border-radius:9px;padding:10px 11px;background:#0b1321;color:var(--text)}button{cursor:pointer;font-weight:650}.primary{background:var(--accent);border-color:var(--accent);color:#062116}.danger{border-color:#693445;color:#ffb3bd}.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.row>*{flex:1}.row button{flex:0 0 auto}.badge{display:inline-block;margin-left:8px;border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--accent);font-size:13px}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line)}td select{min-width:100px}.hidden{display:none}@media(max-width:700px){table,thead,tbody,tr,th,td{display:block}thead{display:none}tr{padding:12px 0;border-bottom:1px solid var(--line)}td{border:0;padding:5px 0}}
+  </style>
+</head>
+<body><main>
+  <div class="top"><div><h1>账号与权限</h1><div id="identity" class="muted">正在读取账号…</div></div><div class="links"><a href="/">返回首页</a><button id="logout">退出登录</button></div></div>
+  <div id="status" class="status" role="status"></div>
+  <section><h2>我的 WCL 凭据</h2><p class="muted">凭据只绑定到当前账号，并在本机加密保存。其他用户与管理员都不能查看明文。</p><div id="wclState" class="muted"></div><form id="wclForm"><label>Client ID<input name="clientId" autocomplete="off" required></label><label>Client Secret<input name="clientSecret" type="password" autocomplete="new-password" required></label><div class="row"><button class="primary">保存凭据</button><button type="button" id="deleteWcl" class="danger">删除已有凭据</button></div></form></section>
+  <section><h2>修改密码</h2><form id="passwordForm"><label>当前密码<input name="currentPassword" type="password" autocomplete="current-password" required></label><label>新密码<input name="newPassword" type="password" autocomplete="new-password" minlength="12" required></label><button class="primary">更新密码</button></form></section>
+  <section id="adminPanel" class="hidden"><h2>账号权限管理</h2><p class="muted">只读可查看；可修改还可以发起分析并处理记事本；管理员可以管理所有账号权限。</p><div style="overflow:auto"><table><thead><tr><th>账号</th><th>权限</th><th>状态</th><th></th></tr></thead><tbody id="users"></tbody></table></div></section>
+</main><script>
+  let me;
+  const statusBox = document.querySelector('#status');
+  function status(message, error=false){statusBox.textContent=message;statusBox.classList.toggle('error',error)}
+  async function api(path, options={}){const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401){location.href='/login?next=/account';throw new Error('请先登录')}if(!response.ok)throw new Error(data.error||'操作失败');return data}
+  async function load(){const data=await api('/api/auth/me');me=data.user;document.querySelector('#identity').innerHTML=`${me.username}<span class="badge">${{viewer:'只读',editor:'可修改',admin:'管理员'}[me.role]}</span>`;document.querySelector('#wclState').textContent=data.wcl.configured?`已配置：${data.wcl.clientIdHint}`:'尚未配置';if(me.isAdmin){document.querySelector('#adminPanel').classList.remove('hidden');await loadUsers()}}
+  async function loadUsers(){const data=await api('/api/admin/users');const host=document.querySelector('#users');host.innerHTML='';for(const user of data.users){const tr=document.createElement('tr');tr.innerHTML=`<td>${escapeHtml(user.username)}</td><td><select data-role><option value="viewer">只读</option><option value="editor">可修改</option><option value="admin">管理员</option></select></td><td><label><input data-disabled type="checkbox"> 禁用</label></td><td><button data-save>保存</button></td>`;tr.querySelector('[data-role]').value=user.role;tr.querySelector('[data-disabled]').checked=user.disabled;tr.querySelector('[data-save]').onclick=async()=>{try{await api('/api/admin/users/'+user.id,{method:'PUT',body:JSON.stringify({role:tr.querySelector('[data-role]').value,disabled:tr.querySelector('[data-disabled]').checked})});status(`已更新 ${user.username} 的权限`);await loadUsers()}catch(error){status(error.message,true)}};host.appendChild(tr)}}
+  function escapeHtml(value){const span=document.createElement('span');span.textContent=value;return span.innerHTML}
+  document.querySelector('#wclForm').onsubmit=async event=>{event.preventDefault();try{await api('/api/auth/wcl-credentials',{method:'PUT',body:JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))});event.currentTarget.reset();status('WCL 凭据已加密保存');await load()}catch(error){status(error.message,true)}};
+  document.querySelector('#deleteWcl').onclick=async()=>{if(!confirm('确定删除当前账号的 WCL 凭据？'))return;try{await api('/api/auth/wcl-credentials',{method:'DELETE'});status('WCL 凭据已删除');await load()}catch(error){status(error.message,true)}};
+  document.querySelector('#passwordForm').onsubmit=async event=>{event.preventDefault();try{await api('/api/auth/password',{method:'PUT',body:JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))});event.currentTarget.reset();status('密码已更新，其他登录会话已退出')}catch(error){status(error.message,true)}};
+  document.querySelector('#logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'}).catch(()=>{});location.href='/login'};
+  load().catch(error=>status(error.message,true));
+</script></body></html>

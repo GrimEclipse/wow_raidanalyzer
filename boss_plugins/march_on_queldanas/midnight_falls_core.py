@@ -7,6 +7,7 @@ import requests
 import urllib3
 
 from analyzer_core.concurrency import MAX_REQUEST_THREADS, request_post, run_parallel_indexed
+from analyzer_core.wcl_context import resolve_wcl_credentials
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -120,10 +121,11 @@ def progress_bar(current, total, width=18):
 
 # ================= 2. WCL API =================
 def get_token():
-    if not CLIENT_ID or not CLIENT_SECRET:
+    credentials = resolve_wcl_credentials(CLIENT_ID, CLIENT_SECRET)
+    if not credentials.client_id or not credentials.client_secret:
         raise RuntimeError("请先在项目 .env 或系统环境变量中设置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET。")
     url = f"{WCL_BASE_URL}/oauth/token"
-    res = request_post(url, data={"grant_type": "client_credentials"}, auth=(CLIENT_ID, CLIENT_SECRET),
+    res = request_post(url, data={"grant_type": "client_credentials"}, auth=(credentials.client_id, credentials.client_secret),
                         proxies=PROXIES, verify=False, timeout=30)
     if res.status_code == 401:
         raise RuntimeError(

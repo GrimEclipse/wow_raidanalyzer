@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登录 · 团本分析工具</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080d17;--panel:#111a2a;--line:#26344d;--text:#edf4ff;--muted:#91a1ba;--accent:#5ee0a0;--danger:#ff8090}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 20% 0,#17243b 0,transparent 38%),var(--bg);font:15px/1.5 system-ui,"Microsoft YaHei",sans-serif;color:var(--text)}
+    main{width:min(440px,calc(100% - 32px));padding:32px;border:1px solid var(--line);border-radius:18px;background:rgba(17,26,42,.96);box-shadow:0 24px 80px #0008}h1{margin:0 0 6px;font-size:26px}p{color:var(--muted);margin:0 0 24px}
+    .tabs{display:flex;gap:8px;margin-bottom:20px}.tabs button{flex:1}.tabs button.active{border-color:var(--accent);color:var(--accent)}form{display:grid;gap:14px}label{display:grid;gap:6px;color:#c9d6ea}input,button{font:inherit;border-radius:9px;border:1px solid var(--line);background:#0b1321;color:var(--text);padding:11px 12px}input:focus{outline:2px solid #5ee0a055;border-color:var(--accent)}button{cursor:pointer;font-weight:650}button.primary{background:var(--accent);border-color:var(--accent);color:#062116}button:disabled{opacity:.6;cursor:wait}.hidden{display:none}.message{min-height:24px;margin-top:14px;color:var(--danger)}.hint{font-size:13px;color:var(--muted)}
+  </style>
+</head>
+<body>
+<main>
+  <h1>团本分析工具</h1>
+  <p>登录后才能访问记录、时间轴与记事本。</p>
+  <div class="tabs">
+    <button type="button" class="active" data-mode="login">登录</button>
+    <button type="button" data-mode="register">注册</button>
+  </div>
+  <form id="loginForm">
+    <label>用户名<input name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
+    <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="primary">登录</button>
+  </form>
+  <form id="registerForm" class="hidden">
+    <label>用户名<input name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
+    <label>密码<input name="password" type="password" autocomplete="new-password" required minlength="12"></label>
+    <div class="hint">至少 12 位，并同时包含大写字母、小写字母和数字。新注册账号默认只有只读权限。</div>
+    <button class="primary">创建只读账号</button>
+  </form>
+  <div id="message" class="message" role="alert"></div>
+</main>
+<script>
+  const message = document.querySelector('#message');
+  document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-mode]').forEach(item => item.classList.toggle('active', item === button));
+    document.querySelector('#loginForm').classList.toggle('hidden', button.dataset.mode !== 'login');
+    document.querySelector('#registerForm').classList.toggle('hidden', button.dataset.mode !== 'register');
+    message.textContent = '';
+  }));
+  async function submit(event, endpoint) {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button');
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    button.disabled = true;
+    message.textContent = '';
+    try {
+      const response = await fetch(endpoint, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || '操作失败');
+      const next = new URLSearchParams(location.search).get('next');
+      location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+  document.querySelector('#loginForm').addEventListener('submit', event => submit(event, '/api/auth/login'));
+  document.querySelector('#registerForm').addEventListener('submit', event => submit(event, '/api/auth/register'));
+</script>
+</body>
+</html>

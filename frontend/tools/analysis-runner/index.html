@@ -83,7 +83,7 @@
 const state = {
     catalog: { versions: [] },
     apiAvailable: false,
-    eventSource: null,
+    pollTimer: null,
     selectedVersion: '',
     selectedRaid: '',
     selectedBoss: '',
@@ -418,36 +418,41 @@ async function submitAnalyze(event) {
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || '任务提交失败');
-        watchJob(payload.eventsUrl, payload.resultUrl);
+        watchJob(payload.statusUrl, payload.resultUrl);
     } catch (error) {
         el.formMessage.textContent = error.message;
         el.submit.disabled = false;
     }
 }
 
-function watchJob(eventsUrl, resultUrl) {
-    if (state.eventSource) state.eventSource.close();
-    state.eventSource = new EventSource(eventsUrl);
-    state.eventSource.onmessage = event => {
-        const data = JSON.parse(event.data);
-        setProgress(data);
-        if (data.type === 'done') {
-            state.eventSource.close();
-            const reportUrl = `/report?version=${encodeURIComponent(state.selectedVersion)}&raid=${encodeURIComponent(state.selectedRaid)}&boss=${encodeURIComponent(state.selectedBoss)}&json=${encodeURIComponent(data.resultUrl || resultUrl)}`;
-            el.resultLink.href = reportUrl;
-            el.resultLink.classList.remove('hidden');
-            el.submit.disabled = false;
-            window.location.href = reportUrl;
-        }
-        if (data.type === 'error') {
-            state.eventSource.close();
-            el.formMessage.textContent = data.message || '分析失败';
-            el.submit.disabled = false;
+function watchJob(statusUrl, resultUrl) {
+    if (state.pollTimer) clearTimeout(state.pollTimer);
+    const poll = async () => {
+        try {
+            const response = await fetch(statusUrl, { cache: 'no-store' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || '无法读取任务进度');
+            setProgress(data);
+            if (data.type === 'done') {
+                const reportUrl = `/report?version=${encodeURIComponent(state.selectedVersion)}&raid=${encodeURIComponent(state.selectedRaid)}&boss=${encodeURIComponent(state.selectedBoss)}&json=${encodeURIComponent(data.resultUrl || resultUrl)}`;
+                el.resultLink.href = reportUrl;
+                el.resultLink.classList.remove('hidden');
+                el.submit.disabled = false;
+                window.location.href = reportUrl;
+                return;
+            }
+            if (data.type === 'error') {
+                el.formMessage.textContent = data.message || '分析失败';
+                el.submit.disabled = false;
+                return;
+            }
+            state.pollTimer = setTimeout(poll, 1200);
+        } catch (error) {
+            el.formMessage.textContent = `${error.message}，正在重试。`;
+            state.pollTimer = setTimeout(poll, 3000);
         }
     };
-    state.eventSource.onerror = () => {
-        el.formMessage.textContent = '进度连接中断，任务可能仍在后台运行。';
-    };
+    poll();
 }
 
 el.version.addEventListener('change', () => {

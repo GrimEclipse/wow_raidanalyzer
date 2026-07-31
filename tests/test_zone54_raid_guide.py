@@ -93,6 +93,10 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn("boss-test-note", page)
         self.assertIn("assets/vendor/zone54-raid-guide-data.js", page)
         self.assertIn("Boss 切换", page)
+        self.assertLess(
+            page.index('<section id="mechanics"'),
+            page.index('<section id="timeline"'),
+        )
 
     def test_nakzali_contains_observed_heroic_and_mythic_timeline_markers(self):
         nakzali = next(
