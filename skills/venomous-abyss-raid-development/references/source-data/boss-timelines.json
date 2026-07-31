@@ -321,25 +321,12 @@
           {"phase": "cycle", "label": "Imbibe 8", "timeMs": 612183, "spellID": 1284663, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "kill", "label": "击杀", "timeMs": 647054, "source": "fightEnd", "confidence": "observed"}
         ],
-        "events": [
-          {"timeMs": 10086, "spellID": 1280935, "label": "Plague Froth", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 24107, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 35034, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 48532, "spellID": 1282114, "label": "Adaptive Infection", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 107994, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 119086, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 192201, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 203093, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 276086, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 287096, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 360125, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 371158, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 444175, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 455168, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 528180, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 539186, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 612183, "spellID": 1284663, "label": "Imbibe", "kind": "phase", "phase": "cycle"},
-          {"timeMs": 623227, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"}
+        "events": [],
+        "eventSeries": [
+          {"spellID": 1280935, "label": "瘟疫泡沫", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [10086, 37105, 58997, 89015, 121082, 143033, 173048, 205169, 227072, 257078, 289168, 311115, 341100, 373217, 395143, 425132, 457207, 479160, 509154, 541260, 563186, 593186, 625215]},
+          {"spellID": 1282114, "label": "适应性感染", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [48532, 72522, 102482, 132550, 156559, 186536, 216632, 240596, 270557, 300628, 324624, 354624, 384661, 408648, 438640, 468642, 492671, 522659, 552676, 576667, 606679, 636723]},
+          {"spellID": 1282516, "label": "恶性催化剂", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [35034, 78981, 119086, 163043, 203093, 247071, 287096, 331103, 371158, 415126, 455168, 499160, 539186, 583179, 623227]},
+          {"spellID": 1284663, "label": "痛饮", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [24107, 107994, 192201, 276086, 360125, 444175, 528180, 612183]}
         ],
         "codingSignals": [
           {"label": "循环锚点", "spellID": 1284663, "eventType": "cast", "timeMs": 24107, "rule": "每次 1284663 cast 完成即进入下一固定循环；不得用生命值覆盖。"},
@@ -372,21 +359,13 @@
           {"phase": "cycle", "label": "Imbibe 6", "timeMs": 444079, "spellID": 1284663, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "wipe", "label": "灭团", "timeMs": 497012, "source": "fightEnd", "confidence": "observed"}
         ],
-        "events": [
-          {"timeMs": 10046, "spellID": 1280935, "label": "Plague Froth", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 24083, "spellID": 1284663, "label": "Imbibe + Tumors", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 24443, "spellID": 1304437, "label": "Hardened Tumor", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 35023, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 108001, "spellID": 1284663, "label": "Imbibe + Tumors", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 119080, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 192069, "spellID": 1284663, "label": "Imbibe + Tumors", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 203076, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 276058, "spellID": 1284663, "label": "Imbibe + Tumors", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 287050, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 360137, "spellID": 1284663, "label": "Imbibe + Tumors", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 371087, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"},
-          {"timeMs": 444079, "spellID": 1284663, "label": "Imbibe + Tumors", "kind": "mythic", "phase": "cycle"},
-          {"timeMs": 455111, "spellID": 1282516, "label": "Malignant Catalyst", "kind": "raid", "phase": "cycle"}
+        "events": [],
+        "eventSeries": [
+          {"spellID": 1280935, "label": "瘟疫泡沫", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [10046, 37049, 62034, 87000, 121070, 146032, 171034, 205113, 230052, 255052, 289109, 314101, 339052, 373139, 398062, 423071, 457130, 484800]},
+          {"spellID": 1282114, "label": "适应性感染", "kind": "debuff", "eventType": "applydebuff", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [42129, 101156, 126283, 185262, 210193, 269204, 294621, 353174, 378462, 437251, 462538]},
+          {"spellID": 1282516, "label": "恶性催化剂", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [35023, 74003, 119080, 158061, 203076, 242045, 287050, 326065, 371087, 410095, 455111, 494094]},
+          {"spellID": 1284663, "label": "痛饮", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Vashnik", "timesMs": [24083, 108001, 192069, 276058, 360137, 444079]},
+          {"spellID": 1304437, "label": "硬化肿瘤", "kind": "cast", "eventType": "cast", "phase": "cycle", "sourceName": "Malignant Tumor", "timesMs": [24443, 108503, 192166, 276180, 360564, 444602]}
         ],
         "codingSignals": [
           {"label": "固定循环", "spellID": 1284663, "eventType": "cast", "timeMs": 24083, "rule": "M 前六轮与 H 对齐；1284663 是唯一阶段锚点。"},
@@ -414,18 +393,26 @@
         "phaseMarkers": [
           {"phase": "cycle-1", "label": "强化 1", "timeMs": 11, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-1", "label": "束缚结果 1：大副", "timeMs": 61916, "spellID": 1296975, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
-          {"phase": "cycle-2", "label": "强化 2", "timeMs": 121903, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
+          {"phase": "cycle-2", "label": "强化 2", "timeMs": 122728, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-2", "label": "束缚结果 2：商人", "timeMs": 188014, "spellID": 1297024, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "cycle-3", "label": "强化 3", "timeMs": 248293, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-3", "label": "束缚结果 3：书卷贤者", "timeMs": 306596, "spellID": 1297022, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "kill", "label": "击杀", "timeMs": 333328, "source": "fightEnd", "confidence": "observed"}
         ],
-        "events": [
-          {"timeMs": 67757, "spellID": 1296094, "label": "Mighty Thud", "kind": "special", "phase": "special-1"},
-          {"timeMs": 192616, "spellID": 1292104, "label": "Mushroom Toss", "kind": "special", "phase": "special-2"},
-          {"timeMs": 202650, "spellID": 1296249, "label": "Explosive Surprise", "kind": "special", "phase": "special-2"},
-          {"timeMs": 313316, "spellID": 1295891, "label": "Frostfire Volley window begins", "kind": "special", "phase": "special-3"},
-          {"timeMs": 331293, "spellID": 1295891, "label": "Frostfire Volley window ends (3 casts)", "kind": "special", "phase": "special-3"}
+        "events": [],
+        "eventSeries": [
+          {"spellID": 1292104, "label": "投掷蘑菇", "kind": "cast", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [199627, 231606]},
+          {"spellID": 1292779, "label": "强化升腾", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [186900]},
+          {"spellID": 1295891, "label": "霜火连射", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [318317]},
+          {"spellID": 1296021, "label": "闪现新星", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [19032, 50037, 143811, 174802, 268611, 299609]},
+          {"spellID": 1296062, "label": "旋壳", "kind": "cast", "eventType": "cast", "sourceName": "First Mate Nama", "timesMs": [22025, 38000, 53042, 146792, 162779, 177804, 204624, 222623, 236628, 271620, 287606, 302625, 325243]},
+          {"spellID": 1296094, "label": "巨力猛击", "kind": "cast", "eventType": "cast", "sourceName": "First Mate Nama", "timesMs": [77784, 97755, 116813]},
+          {"spellID": 1296249, "label": "爆炸惊喜", "kind": "cast", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [212660, 244643]},
+          {"spellID": 1296975, "label": "莫尔扎希的命令", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [61916]},
+          {"spellID": 1297022, "label": "束缚苦痛", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [306596]},
+          {"spellID": 1297024, "label": "束缚苦痛", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [188014]},
+          {"spellID": 1297075, "label": "强化", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [11, 122728, 248293]},
+          {"spellID": 1306145, "label": "丢鱼（特殊投掷）", "kind": "interaction", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [31029, 155808, 280622]}
         ],
         "codingSignals": [
           {"label": "强化开始", "spellID": 1297075, "eventType": "cast", "timeMs": 11, "rule": "每次 1297075 建立约一分钟的交鱼处理窗口。"},
@@ -452,21 +439,28 @@
         "phaseMarkers": [
           {"phase": "cycle-1", "label": "强化 1", "timeMs": 65, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-1", "label": "束缚结果 1：商人", "timeMs": 64329, "spellID": 1297024, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
-          {"phase": "cycle-2", "label": "强化 2", "timeMs": 124347, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
+          {"phase": "cycle-2", "label": "强化 2", "timeMs": 125399, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-2", "label": "束缚结果 2：大副", "timeMs": 189016, "spellID": 1296975, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
-          {"phase": "cycle-3", "label": "强化 3", "timeMs": 249026, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
+          {"phase": "cycle-3", "label": "强化 3", "timeMs": 249743, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-3", "label": "束缚结果 3：书卷贤者", "timeMs": 314234, "spellID": 1297022, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "cycle-4", "label": "强化 4：无合法重复目标", "timeMs": 374994, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "enrage", "label": "强化升腾结算", "timeMs": 439232, "spellID": 1292779, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "wipe", "label": "灭团", "timeMs": 451182, "source": "fightEnd", "confidence": "observed"}
         ],
-        "events": [
-          {"timeMs": 69381, "spellID": 1292104, "label": "Mushroom Toss", "kind": "special", "phase": "special-1"},
-          {"timeMs": 79401, "spellID": 1296249, "label": "Explosive Surprise", "kind": "special", "phase": "special-1"},
-          {"timeMs": 194052, "spellID": 1296094, "label": "Mighty Thud", "kind": "special", "phase": "special-2"},
-          {"timeMs": 324333, "spellID": 1295891, "label": "Frostfire Volley window begins", "kind": "special", "phase": "special-3"},
-          {"timeMs": 356348, "spellID": 1295891, "label": "Frostfire Volley window ends (3 casts)", "kind": "special", "phase": "special-3"},
-          {"timeMs": 440258, "spellID": 1292780, "label": "Final Ascension damage", "kind": "enrage", "phase": "enrage"}
+        "events": [],
+        "eventSeries": [
+          {"spellID": 1292104, "label": "投掷蘑菇", "kind": "cast", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [76374, 108374]},
+          {"spellID": 1292779, "label": "强化升腾", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [314051, 439232]},
+          {"spellID": 1295891, "label": "霜火连射", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [329341, 356348]},
+          {"spellID": 1296021, "label": "闪现新星", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [17014, 48030, 143378, 174389, 268077, 299077, 393299, 424339]},
+          {"spellID": 1296062, "label": "旋壳", "kind": "cast", "eventType": "cast", "sourceName": "First Mate Nama", "timesMs": [22020, 38067, 53005, 77361, 109385, 148368, 164367, 179380, 273078, 289097, 304090, 337302, 364310, 398320, 414317, 429304]},
+          {"spellID": 1296094, "label": "巨力猛击", "kind": "cast", "eventType": "cast", "sourceName": "First Mate Nama", "timesMs": [204059, 236070]},
+          {"spellID": 1296249, "label": "爆炸惊喜", "kind": "cast", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [89403, 121385]},
+          {"spellID": 1296975, "label": "莫尔扎希的命令", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [189016]},
+          {"spellID": 1297022, "label": "束缚苦痛", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [314234]},
+          {"spellID": 1297024, "label": "束缚苦痛", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [64329]},
+          {"spellID": 1297075, "label": "强化", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [65, 125399, 249743, 374994]},
+          {"spellID": 1306145, "label": "丢鱼（特殊投掷）", "kind": "interaction", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [30989, 157383, 282121, 407322]}
         ],
         "codingSignals": [
           {"label": "成功转化", "spellID": 1297024, "eventType": "cast", "timeMs": 64329, "rule": "三种命令/束缚实例只确认成功结果；拾鱼者仍不可见。"},
@@ -516,7 +510,6 @@
             ]
           },
           {"timeMs": 32198, "spellID": 1305959, "label": "毒液激流 1 / 囊肿 1—2", "kind": "resource", "phase": "cycle-1"},
-          {"timeMs": 43360, "spellID": 1285419, "label": "首轮狂怒侧风", "kind": "direction", "phase": "cycle-1"},
           {
             "timeMs": 57811,
             "spellID": 1277025,
@@ -596,6 +589,9 @@
           {"timeMs": 360706, "spellID": 1305959, "label": "毒液激流 6 / 囊肿 3—4", "kind": "resource", "phase": "cycle-3"},
           {"timeMs": 387390, "spellID": 1286033, "label": "第三次三轮吹风", "kind": "transition", "phase": "maelstrom-3"}
         ],
+        "eventSeries": [
+          {"spellID": 1285419, "label": "狂怒侧风", "kind": "direction", "eventType": "cast", "sourceName": "Environment", "timesMs": [43360, 95554, 181450, 233679, 319656, 371826]}
+        ],
         "codingSignals": [
           {"label": "囊肿资源生成", "spellID": 1305959, "eventType": "applybuff", "timeMs": 32198, "rule": "每个大循环取前两次 1305959，每次代表两名点名与两个待生成囊肿。"},
           {"label": "呼啸漩涡开始", "spellID": 1286033, "eventType": "applybuff", "timeMs": 111095, "rule": "1286033 的 25 秒 Aura 是可靠转阶段边界；风口 1—2—3 方向不在 WCL 事件中直接给出。"},
@@ -643,7 +639,6 @@
           },
           {"timeMs": 29009, "spellID": 1305959, "label": "毒液激流 1", "kind": "resource", "phase": "fury-1"},
           {"timeMs": 33821, "spellID": 1297707, "label": "To the Slaughter 后剧毒链 1", "kind": "mythic", "phase": "fury-1"},
-          {"timeMs": 39007, "spellID": 1285419, "label": "狂怒侧风 1", "kind": "direction", "phase": "fury-1"},
           {"timeMs": 40006, "spellID": 1305621, "label": "毒蛇之怒点名 2", "kind": "mythic", "phase": "fury-2"},
           {
             "timeMs": 52018,
@@ -661,7 +656,6 @@
           },
           {"timeMs": 76005, "spellID": 1305959, "label": "毒液激流 2", "kind": "resource", "phase": "fury-2"},
           {"timeMs": 80700, "spellID": 1297707, "label": "To the Slaughter 后剧毒链 2", "kind": "mythic", "phase": "fury-2"},
-          {"timeMs": 86764, "spellID": 1285425, "label": "狂怒侧风 2", "kind": "direction", "phase": "fury-2"},
           {"timeMs": 86997, "spellID": 1305621, "label": "毒蛇之怒点名 3", "kind": "mythic", "phase": "fury-3"},
           {"timeMs": 100016, "spellID": 1286033, "label": "三轮吹风开始", "kind": "transition", "phase": "maelstrom-1"},
           {
@@ -680,6 +674,9 @@
           },
           {"timeMs": 156037, "spellID": 1305959, "label": "毒液激流 3", "kind": "resource", "phase": "fury-3"},
           {"timeMs": 157996, "spellID": 1296898, "label": "无拘狂暴", "kind": "enrage", "phase": "enrage"}
+        ],
+        "eventSeries": [
+          {"spellID": 1285419, "label": "狂怒侧风", "kind": "direction", "eventType": "cast", "sourceName": "Environment", "timesMs": [39007, 86010, 166044]}
         ],
         "codingSignals": [
           {"label": "史诗点名", "spellID": 1305621, "eventType": "applydebuff", "timeMs": 11, "rule": "每次 1305621 建立一轮毒蛇之怒；移除后若出现全团 1297707/1299899，可确认本轮进入冲锋/剧毒结算。"},

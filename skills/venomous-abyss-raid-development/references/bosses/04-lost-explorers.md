@@ -31,7 +31,8 @@ Status: raid-leader flow authored; WCL evidence mapped; analysis plugin remains 
 
 ## Evidence boundaries
 
-- WCL exposes the successful result through `莫尔扎希的命令` / `束缚苦痛` anchors, but does not expose a stable event identifying the player who picked up or threw the fish. Analysis may prove success, target, and timing only.
+- WCL distinguishes the fish-producing throw from ordinary junk: `1306145` is its cast and `1306137` is the same throw's completion/result. The observed Heroic kill completes it at 00:31.029 / 02:35.808 / 04:40.622; the Mythic sample completes it at 00:30.989 / 02:37.383 / 04:42.121 / 06:47.322.
+- WCL exposes the successful delivery through `莫尔扎希的命令` / `束缚苦痛` anchors, but does not expose a stable event identifying the player who picked up or threw the fish. Analysis may prove fish generation, success, target, and timing only.
 - Mythic crate breaking adds a 15-yard Relic Rupture burst. WCL records the result through `1310028` and damage instances `1310027` / `1311587`; without crate coordinates it should not infer who stood too close.
 - Frostfire Volley is known to cast three times. The timeline records the observed first/last cast window and must not invent an exact timestamp for the middle cast.
 - Confirmed Chinese names come from the user's PTR observations. Unconfirmed damage-only spell names remain English until a reliable localized source exists.

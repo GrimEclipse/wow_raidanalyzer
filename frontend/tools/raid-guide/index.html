@@ -135,6 +135,15 @@
         .boss-name span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6f7d90; font-size: 10px; }
         .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #5e6878; }
         .status-dot.reviewed { background: var(--green); box-shadow: 0 0 10px rgba(79, 209, 165, .7); }
+        .boss-status { display: flex; align-items: center; gap: 7px; }
+        .boss-test-note {
+            color: #e5b95c;
+            font-size: 9px;
+            font-weight: 800;
+            line-height: 1.25;
+            text-align: right;
+            white-space: nowrap;
+        }
         .sidebar-note { margin: 18px 6px 4px; color: #657286; font-size: 11px; line-height: 1.6; }
         .main { min-width: 0; padding: 24px clamp(18px, 4vw, 60px) 70px; }
         .content { max-width: 1320px; margin: 0 auto; }
@@ -349,7 +358,14 @@
         .timeline-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 17px; }
         .timeline-stat { padding: 10px 12px; border: 1px solid #293345; border-radius: 8px; background: #090e16; }
         .timeline-stat b { display: block; color: #77859a; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
-        .timeline-stat span { display: block; margin-top: 3px; color: #d9e1ec; font: 700 13px/1.4 ui-monospace, monospace; }
+        .timeline-stat span {
+            display: block;
+            margin-top: 3px;
+            color: #d9e1ec;
+            font: 700 13px/1.4 Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .02em;
+        }
         .timeline-track {
             position: relative;
             height: 70px;
@@ -367,7 +383,11 @@
         .phase-band.cycle { background: rgba(42, 117, 98, .27); }
         .phase-band.stasis { background: rgba(113, 76, 163, .42); }
         .phase-band strong { display: block; overflow: hidden; color: #eef3fa; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-        .phase-band span { color: #9aa8bb; font: 9px/1.4 ui-monospace, monospace; }
+        .phase-band span {
+            color: #9aa8bb;
+            font: 600 9px/1.4 Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font-variant-numeric: tabular-nums;
+        }
         .event-tick { position: absolute; bottom: 0; width: 1px; height: 20px; background: var(--source-color, rgba(255, 255, 255, .5)); }
         .timeline-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 15px; }
         .timeline-events, .signal-list { display: grid; gap: 7px; align-content: start; }
@@ -383,7 +403,12 @@
             background: #0a0f17;
         }
         .timeline-event.source-coded { border-left: 3px solid var(--source-color); }
-        .timeline-time { color: #edc86b; font: 700 10px/1 ui-monospace, monospace; }
+        .timeline-time {
+            color: #edc86b;
+            font: 700 11px/1 Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .025em;
+        }
         .timeline-event .spell-ref { display: contents; }
         .timeline-event .spell-copy { align-self: center; }
         .event-meta { display: grid; justify-items: end; gap: 3px; }
@@ -466,32 +491,24 @@
         .chip.role { border-color: #345777; color: #96c8f5; }
         .mechanic-details { margin: 13px 0 0; padding-left: 20px; color: #9fabbb; }
         .mechanic-details li { margin: 6px 0; }
-        .mechanic-spell-cluster { min-width: min(320px, 44%); }
-        .mechanic-spell-cluster > .spell-ref { justify-content: end; }
-        .related-spell-ids {
-            margin-top: 8px;
-            border: 1px solid #303a4c;
-            border-radius: 7px;
-            background: #090e16;
-        }
-        .related-spell-ids summary {
-            padding: 7px 9px;
-            cursor: pointer;
-            color: #7f8da1;
+        .mechanic-spell-cluster { min-width: min(280px, 40%); }
+        .mechanic-icon-label {
+            display: block;
+            margin-bottom: 7px;
+            color: #718098;
             font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .08em;
             text-align: right;
+            text-transform: uppercase;
         }
-        .related-id-list { display: grid; gap: 4px; padding: 0 8px 8px; }
-        .related-id {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto auto;
-            gap: 8px;
-            align-items: center;
-            color: #aeb8c7;
-            font-size: 9px;
+        .mechanic-spell-icons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 7px;
         }
-        .related-id code { color: #d3b766; font: 9px/1 ui-monospace, monospace; }
-        .related-id em { color: #657388; font-style: normal; }
+        .mechanic-spell-icons .spell-icon-link { width: 34px; height: 34px; }
         .mythic-note {
             margin-top: 13px;
             padding: 11px 13px;
@@ -624,7 +641,7 @@
         <div class="side-label">Encounter index</div>
         <nav id="bossList" class="boss-list" aria-label="Boss 切换"></nav>
         <p class="sidebar-note">
-            绿色表示已有人工复核的带团明细；灰色表示流程仍待复核。
+            绿色表示已有人工复核的带团明细；乌拉特克未经过测试，阶段未知。
             鼠标悬停技能图标可查看完整说明。
         </p>
     </aside>
@@ -807,23 +824,25 @@
 
     function mechanicSpellCluster(boss, mechanic) {
         const allIDs = [...new Set((mechanic.spellIDs || []).map(Number).filter(Boolean))];
-        const primaryID = Number((mechanic.leaderSpellIDs || [])[0] || allIDs[0] || 0);
-        if (!primaryID) return "";
-        const relatedRows = allIDs.map(spellID => {
-            const spell = spellById(boss, spellID);
-            const label = spell?.nameZh || spell?.nameEn || `Spell ${spellID}`;
-            return `<div class="related-id">
-                <span>${escapeHtml(label)}</span>
-                <code>${spellID}</code>
-                <em>${escapeHtml(spellCategoryLabel(spell))}</em>
-            </div>`;
+        const relatedSpells = allIDs
+            .map(spellID => spellById(boss, spellID))
+            .filter(spell => (spell?.categories || []).some(category =>
+                category === "enemyCasts" || category === "playerDebuffs"
+            ));
+        if (!relatedSpells.length) return "";
+        const icons = relatedSpells.map(spell => {
+            const label = spell.nameZh || spell.nameEn || `Spell ${spell.spellID}`;
+            const tooltip = `${label} · ${spellCategoryLabel(spell)} · ID: ${spell.spellID}`;
+            return `<a class="spell-icon-link" href="${escapeHtml(spell.wowheadUrl)}"
+                data-wowhead="domain=ptr&amp;dd=15" data-wh-icon-size="small"
+                target="_blank" rel="noreferrer"
+                aria-label="${escapeHtml(tooltip)}" title="${escapeHtml(tooltip)}">
+                <span class="spell-icon-fallback">?</span>
+            </a>`;
         }).join("");
         return `<div class="mechanic-spell-cluster">
-            ${leaderSpellLink(boss, primaryID, "", true)}
-            ${relatedRows ? `<details class="related-spell-ids">
-                <summary>Cast / Debuff / 结算 ID · ${allIDs.length}</summary>
-                <div class="related-id-list">${relatedRows}</div>
-            </details>` : ""}
+            <span class="mechanic-icon-label">Cast / Debuff · ${relatedSpells.length}</span>
+            <div class="mechanic-spell-icons">${icons}</div>
         </div>`;
     }
 
@@ -832,7 +851,10 @@
             <button class="boss-button ${boss.key === state.bossKey ? "active" : ""}" data-boss="${escapeHtml(boss.key)}">
                 <span class="boss-order">${String(boss.order).padStart(2, "0")}</span>
                 <span class="boss-name"><strong>${escapeHtml(boss.nameZh)}</strong><span>${escapeHtml(boss.nameEn)}</span></span>
-                <span class="status-dot ${boss.reviewStatus === "reviewed" ? "reviewed" : ""}"></span>
+                <span class="boss-status">
+                    <span class="status-dot ${boss.reviewStatus === "reviewed" ? "reviewed" : ""}"></span>
+                    ${boss.expectedUntested ? '<span class="boss-test-note">未测试<br>阶段未知</span>' : ""}
+                </span>
             </button>
         `).join("");
         document.querySelectorAll("[data-boss]").forEach(button => {
@@ -842,19 +864,13 @@
 
     function renderHero(boss) {
         $("hero").style.backgroundImage = boss.image ? `url("${boss.image}")` : "";
-        $("bossEyebrow").textContent = `Encounter ${String(boss.order).padStart(2, "0")} · ${boss.difficulty}`;
+        $("bossEyebrow").textContent = `Encounter ${String(boss.order).padStart(2, "0")}`;
         $("bossName").textContent = boss.nameZh;
         $("bossEnglish").textContent = boss.nameEn;
         $("bossSummary").textContent = boss.summary;
-        const status = boss.reviewStatus === "reviewed"
-            ? '<span class="pill good">● 人工明细已复核</span>'
-            : '<span class="pill warn">● 流程与分类待复核</span>';
-        $("bossMeta").innerHTML = `
-            ${status}
-            <span class="pill">${escapeHtml(boss.difficulty)}</span>
-            <span class="pill">${(boss.phases || []).length} 个流程阶段</span>
-            ${boss.expectedUntested ? '<span class="pill warn">尾王惯例不公开测试</span>' : ""}
-        `;
+        $("bossMeta").innerHTML = boss.expectedUntested
+            ? '<span class="pill warn">未经过测试 · 阶段未知</span>'
+            : "";
     }
 
     function renderEnergy(boss) {
@@ -960,6 +976,10 @@
             green: "绿场",
             red: "红场",
             mythic: "史诗",
+            cast: "施法",
+            debuff: "Debuff",
+            interaction: "流程物件",
+            direction: "方向机制",
             combo: "组合技"
         };
         const eventRows = timelineEvents.map(event => {

@@ -177,9 +177,10 @@ def phase_rows(key):
     ]
 
 
-def enrich_timelines(timelines, evidence_boss):
+def enrich_timelines(timelines, evidence_boss, confirmed_source_names=None):
     if not timelines:
         return {}
+    confirmed_source_names = confirmed_source_names or {}
     result = json.loads(json.dumps(timelines))
     source_index = {"heroic": {}, "mythic": {}}
     catalog = evidence_boss.get("spellCatalog") or {}
@@ -199,6 +200,25 @@ def enrich_timelines(timelines, evidence_boss):
     for difficulty, timeline in result.items():
         if difficulty not in source_index:
             continue
+        expanded_events = list(timeline.get("events") or [])
+        for series in timeline.pop("eventSeries", []) or []:
+            template = {
+                key: value
+                for key, value in series.items()
+                if key != "timesMs"
+            }
+            expanded_events.extend(
+                {**template, "timeMs": int(time_ms)}
+                for time_ms in series.get("timesMs") or []
+            )
+        deduplicated = {}
+        for event in expanded_events:
+            key = (int(event.get("timeMs") or 0), int(event.get("spellID") or 0))
+            deduplicated[key] = event
+        timeline["events"] = sorted(
+            deduplicated.values(),
+            key=lambda event: int(event.get("timeMs") or 0),
+        )
         for event in timeline.get("events") or []:
             spell_id = int(event.get("spellID") or 0)
             names = sorted(source_index[difficulty].get(spell_id) or [])
@@ -219,12 +239,18 @@ def enrich_timelines(timelines, evidence_boss):
                 }
                 if len(child_sources) == 1:
                     event["sourceName"] = child_sources.pop()
+            if event.get("sourceName") in confirmed_source_names:
+                event["sourceName"] = confirmed_source_names[event["sourceName"]]
+            for child in event.get("children") or []:
+                if child.get("sourceName") in confirmed_source_names:
+                    child["sourceName"] = confirmed_source_names[child["sourceName"]]
     return result
 
 
 def build_document(discovery, authored, timelines=None):
     authored_bosses = authored.get("bosses") or {}
     confirmed_spell_names = authored.get("confirmedSpellNames") or {}
+    confirmed_source_names = authored.get("confirmedSourceNames") or {}
     timeline_bosses = (timelines or {}).get("bosses") or {}
     bosses = []
     order_by_key = {
@@ -256,6 +282,7 @@ def build_document(discovery, authored, timelines=None):
             "timelines": enrich_timelines(
                 timeline_bosses.get(key) or {},
                 evidence_boss,
+                confirmed_source_names=confirmed_source_names,
             ),
             "spells": build_spell_rows(
                 evidence_boss,

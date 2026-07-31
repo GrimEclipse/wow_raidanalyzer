@@ -78,11 +78,19 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn(".mechanic-card.mythic", page)
         self.assertIn('<span class="spell-id">ID: ${spellID}</span>', page)
         self.assertIn("function mechanicSpellCluster", page)
-        self.assertIn("related-spell-ids", page)
+        self.assertIn("mechanic-spell-icons", page)
+        self.assertNotIn("related-spell-ids", page)
+        self.assertIn('category === "enemyCasts" || category === "playerDebuffs"', page)
+        self.assertIn("font-variant-numeric: tabular-nums", page)
         self.assertIn("mythic-note", page)
         self.assertIn("timeline-combo", page)
         self.assertIn("sourceColor", page)
         self.assertNotIn("function evidenceCell", page)
+        self.assertNotIn("人工明细已复核", page)
+        self.assertNotIn("流程与分类待复核", page)
+        self.assertNotIn("个流程阶段", page)
+        self.assertIn("未经过测试 · 阶段未知", page)
+        self.assertIn("boss-test-note", page)
         self.assertIn("assets/vendor/zone54-raid-guide-data.js", page)
         self.assertIn("Boss 切换", page)
 
@@ -207,6 +215,22 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertFalse(mythic["kill"])
         self.assertEqual(heroic["phaseMarkers"][1]["timeMs"], 24107)
         self.assertEqual(mythic["phaseMarkers"][1]["timeMs"], 24083)
+        self.assertEqual(
+            len([row for row in heroic["events"] if row["spellID"] == 1280935]),
+            23,
+        )
+        self.assertEqual(
+            len([row for row in heroic["events"] if row["spellID"] == 1282114]),
+            22,
+        )
+        self.assertEqual(
+            len([row for row in mythic["events"] if row["spellID"] == 1282114]),
+            11,
+        )
+        self.assertTrue(all(
+            row["sourceName"] == "万毒邪祟者瓦什尼克"
+            for row in heroic["events"]
+        ))
 
     def test_lost_explorers_keeps_authored_flow_and_evidence_boundaries(self):
         boss = next(
@@ -224,6 +248,8 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         self.assertTrue(any("WCL" in row for row in fish["details"]))
         self.assertTrue(any("1296975" in row for row in fish["details"]))
+        self.assertIn(1306145, fish["spellIDs"])
+        self.assertIn(1306137, fish["spellIDs"])
         self.assertIn("1296975/1297022/1297024", fish["verification"])
 
         heroic = boss["timelines"]["heroic"]
@@ -241,6 +267,52 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertEqual(fourth["timeMs"], 374994)
         self.assertEqual(enrage["timeMs"], 439232)
         self.assertFalse(any(event["timeMs"] == 332337 for event in mythic["events"]))
+        self.assertFalse(any(
+            row["spellID"] in {1286922, 1291933}
+            for row in heroic["events"] + mythic["events"]
+        ))
+        expected_counts = {
+            1292104: 2,
+            1292779: 1,
+            1295891: 1,
+            1296021: 6,
+            1296062: 13,
+            1296094: 3,
+            1296249: 2,
+            1306145: 3,
+        }
+        for spell_id, count in expected_counts.items():
+            self.assertEqual(
+                len([row for row in heroic["events"] if row["spellID"] == spell_id]),
+                count,
+            )
+        source_by_spell = {
+            row["spellID"]: row["sourceName"]
+            for row in heroic["events"]
+        }
+        self.assertEqual(source_by_spell[1296062], "大副纳玛")
+        self.assertEqual(source_by_spell[1306145], "商人盖博")
+        self.assertEqual(
+            [row["timeMs"] for row in heroic["events"] if row["spellID"] == 1306145],
+            [31029, 155808, 280622],
+        )
+        self.assertTrue(all(row["eventType"] == "cast" for row in heroic["events"]))
+        mythic_counts = {
+            1292104: 2,
+            1292779: 2,
+            1295891: 2,
+            1296021: 8,
+            1296062: 16,
+            1296094: 2,
+            1296249: 2,
+            1306145: 4,
+        }
+        for spell_id, count in mythic_counts.items():
+            self.assertEqual(
+                len([row for row in mythic["events"] if row["spellID"] == spell_id]),
+                count,
+            )
+        self.assertTrue(all(row["eventType"] == "cast" for row in mythic["events"]))
         crate = next(
             mechanic for mechanic in boss["mechanics"]
             if mechanic["evidenceType"] == "mythic-crate-proximity-burst"
@@ -305,6 +377,14 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertEqual(enrage["spellID"], 1296898)
         self.assertEqual(enrage["timeMs"], 157996)
         self.assertIn("30% 易伤", boss["energy"]["rules"][3])
+        self.assertEqual(
+            [row["timeMs"] for row in heroic["events"] if row["spellID"] == 1285419],
+            [43360, 95554, 181450, 233679, 319656, 371826],
+        )
+        self.assertEqual(
+            [row["timeMs"] for row in mythic["events"] if row["spellID"] == 1285419],
+            [39007, 86010, 166044],
+        )
         heroic_combos = [
             event for event in heroic["events"]
             if event["spellID"] == 1277025
@@ -438,8 +518,8 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         sever = next(row for row in heroic["events"] if row["spellID"] == 1299684)
         deathmarch = next(row for row in heroic["events"] if row["spellID"] == 1285643)
-        self.assertEqual(sever["sourceName"], "Zul'jan")
-        self.assertEqual(deathmarch["sourceName"], "Hex Lord Malacrass")
+        self.assertEqual(sever["sourceName"], "祖尔加")
+        self.assertEqual(deathmarch["sourceName"], "妖术领主玛拉卡斯")
         self.assertTrue(any(
             row.get("value") == "仅开场约 14.5 秒"
             for row in heroic["stats"]

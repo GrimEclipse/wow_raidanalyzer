@@ -14,8 +14,21 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from boss_plugins.void_spire.crown_of_the_cosmos import fetch_events_all, get_token
-from tools.wcl_zone54_discovery import ability_id, actor_maps, report_index
+from boss_plugins.void_spire.crown_of_the_cosmos import (
+    fetch_events_all,
+    get_token,
+    graphql,
+)
+from tools import wcl_zone54_discovery as discovery
+
+
+# The discovery module keeps its optional WCL client lazy for offline rebuilds.
+# This probe is explicitly online, so provide the client before using its
+# report-index helper.
+discovery.graphql = graphql
+ability_id = discovery.ability_id
+actor_maps = discovery.actor_maps
+report_index = discovery.report_index
 
 
 TABLES = {
