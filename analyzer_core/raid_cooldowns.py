@@ -438,7 +438,7 @@ def _candidate_fights(
         zone_reports = {"codes": [], "total": 0, "page": 1, "lastPage": 1, "hasMorePages": False}
     zone_codes = zone_reports["codes"]
     source_codes = (
-        [*zone_codes, *discovery_codes, *ranked_codes]
+        [*discovery_codes, *ranked_codes, *zone_codes]
         if raid_key == "venomous_abyss"
         else [*ranked_codes, *zone_codes, *discovery_codes]
     )

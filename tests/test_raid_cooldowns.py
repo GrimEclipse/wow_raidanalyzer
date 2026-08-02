@@ -30,6 +30,7 @@ class RaidCooldownTests(unittest.TestCase):
 
     def test_ptr_discovery_fallback_uses_checked_in_reports(self):
         self.assertIn("xBt6r2LqHzdfkZN7", _discovery_report_codes("venomous_abyss", 4))
+        self.assertIn("g2Cm9dXRjxAT61Dw", _discovery_report_codes("venomous_abyss", 4))
         self.assertIn("HPrGLV84XRJjCykN", _discovery_report_codes("venomous_abyss", 5))
         self.assertEqual(_discovery_report_codes("void_spire", 5), [])
 
