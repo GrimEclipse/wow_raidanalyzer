@@ -52,17 +52,16 @@
             <div id="healer-slots" class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
         </div>
         <div class="mt-5 flex flex-wrap items-end gap-3 border-t border-slate-800 pt-4">
-            <label class="text-xs text-slate-400">开始时间（秒）
+            <label class="text-xs text-slate-400">战斗时长下限（秒）
                 <input id="range-start" type="number" min="0" step="1" placeholder="0"
                        class="mt-1 block w-32 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
             </label>
             <span class="pb-2 text-slate-600">至</span>
-            <label class="text-xs text-slate-400">结束时间（秒）
-                <input id="range-end" type="number" min="0" step="1" placeholder="全程"
+            <label class="text-xs text-slate-400">战斗时长上限（秒）
+                <input id="range-end" type="number" min="0" step="1" placeholder="不限"
                        class="mt-1 block w-32 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
             </label>
-            <button id="apply-range" class="rounded border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-200">应用到当前结果</button>
-            <p class="pb-2 text-xs text-slate-500">只截取对应秒数内的技能安排，不会重新请求 WCL。结果最多返回 5 份。</p>
+            <p class="pb-2 text-xs text-slate-500">筛选整场击杀耗时，避免过快的 rush 样本影响策略。结果最多返回 5 份。</p>
         </div>
     </section>
 
@@ -145,18 +144,8 @@
         return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     };
     const classColor = name => classColors[String(name || '').toLowerCase()] || '#cbd5e1';
-    const currentRange = () => {
-        const start = Math.max(0, Number(rangeStart.value) || 0);
-        const end = rangeEnd.value === '' ? Infinity : Math.max(0, Number(rangeEnd.value) || 0);
-        if (end < start) throw new Error('结束时间不能小于开始时间。');
-        return { startMs:start * 1000, endMs:end * 1000 };
-    };
-    const processedTimeline = match => {
-        const range = currentRange();
-        return (match.timeline || [])
-            .filter(row => Number(row.timeMs) >= range.startMs && Number(row.timeMs) <= range.endMs)
-            .map(row => ({...row, player:state.renameMap[row.player] || row.player}));
-    };
+    const processedTimeline = match => (match.timeline || [])
+        .map(row => ({...row, player:state.renameMap[row.player] || row.player}));
     const exportMrt = timeline => {
         const lines = [];
         let currentPhase = null;
@@ -346,6 +335,8 @@
                     difficulty: Number(difficulty.value),
                     healerCount: Number(healerCount.value),
                     healerSpecs: [...healerSlots.querySelectorAll('select')].map(node => node.value).filter(Boolean),
+                    minFightDurationSeconds: rangeStart.value === '' ? null : Number(rangeStart.value),
+                    maxFightDurationSeconds: rangeEnd.value === '' ? null : Number(rangeEnd.value),
                 }),
             });
             const payload = await response.json();
@@ -354,7 +345,8 @@
             const elapsedSeconds = ((selection.elapsedMs || Date.now() - startedAt) / 1000).toFixed(1);
             const stopped = selection.stoppedEarly ? `检查到第 ${selection.compositionCheckedCount} 场后已达到 ${selection.resultLimit} 份上限并停止` : `已检查 ${selection.compositionCheckedCount || 0} 场候选记录`;
             const sources = `最近公开报告 ${selection.zoneReportCodeCount || 0} 份、排名候选 ${selection.rankedReportCodeCount || 0} 份、PTR 取证报告 ${selection.discoveryReportCodeCount || 0} 份`;
-            showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。候选来源：${sources}；去重后最多读取其中 ${selection.inspectedReportCount || 0} 份报告，共得到 ${selection.candidateFightCount || 0} 场符合首领与难度的有效击杀。按战斗时长从短到长筛选，${stopped}。`, payload.status === 'ok' ? 'ok' : 'info');
+            const rangeLabel = `${selection.minDurationSeconds ?? 0}–${selection.maxDurationSeconds ?? '不限'} 秒`;
+            showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。候选来源：${sources}；去重后读取 ${selection.inspectedReportCount || 0} 份报告，得到 ${selection.encounterDifficultyKillCount || 0} 场指定首领与难度的击杀，其中 ${selection.durationFilteredFightCount || 0} 场符合 ${rangeLabel} 战斗时长。再按耗时从短到长检查治疗构成，${stopped}。`, payload.status === 'ok' ? 'ok' : 'info');
             state.results = payload.matches || [];
             renderRenameFields();
             renderResults();
@@ -399,15 +391,6 @@
     healerCount.addEventListener('change', renderSlots);
     el('search').addEventListener('click', runSearch);
     el('demo').addEventListener('click', renderDemo);
-    el('apply-range').addEventListener('click', () => {
-        try {
-            currentRange();
-            renderResults();
-            showStatus(`已按 ${rangeStart.value || 0} 秒至 ${rangeEnd.value || '战斗结束'} 秒截取技能安排。`, 'ok');
-        } catch (error) {
-            showStatus(error.message, 'error');
-        }
-    });
     el('apply-renames').addEventListener('click', () => {
         state.renameMap = Object.fromEntries([...renameFields.querySelectorAll('input')]
             .map(input => [input.dataset.original, input.value.trim()])

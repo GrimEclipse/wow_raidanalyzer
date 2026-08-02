@@ -12,6 +12,7 @@ from analyzer_core.raid_cooldowns import (
     export_mrt,
     export_nsrt,
     export_timestamp_tsv,
+    fight_duration_matches,
     options_document,
 )
 
@@ -78,6 +79,23 @@ class RaidCooldownTests(unittest.TestCase):
             actual,
             healer_count=5,
             required_spec_keys=[],
+        ))
+
+    def test_fight_duration_filter_uses_complete_kill_length(self):
+        self.assertTrue(fight_duration_matches(
+            360_000,
+            min_duration_seconds=300,
+            max_duration_seconds=420,
+        ))
+        self.assertFalse(fight_duration_matches(
+            240_000,
+            min_duration_seconds=300,
+            max_duration_seconds=420,
+        ))
+        self.assertFalse(fight_duration_matches(
+            480_000,
+            min_duration_seconds=300,
+            max_duration_seconds=420,
         ))
 
     def test_timeline_filters_unconfigured_casts_and_exports(self):

@@ -421,6 +421,20 @@ def composition_matches(
     return all(actual_counts[key] >= count for key, count in required_counts.items())
 
 
+def fight_duration_matches(
+    duration_ms: int,
+    *,
+    min_duration_seconds: float | None = None,
+    max_duration_seconds: float | None = None,
+) -> bool:
+    duration_seconds = max(0, int(duration_ms)) / 1000
+    if min_duration_seconds is not None and duration_seconds < float(min_duration_seconds):
+        return False
+    if max_duration_seconds is not None and duration_seconds > float(max_duration_seconds):
+        return False
+    return True
+
+
 def _candidate_fights(
     token: str,
     *,
@@ -429,6 +443,8 @@ def _candidate_fights(
     difficulty: int,
     healer_count: int,
     required_spec_keys: list[str],
+    min_duration_seconds: float | None,
+    max_duration_seconds: float | None,
 ) -> dict:
     ranked_codes = _ranked_report_codes(token, encounter_id, difficulty)
     discovery_codes = _discovery_report_codes(raid_key, difficulty)
@@ -484,6 +500,15 @@ def _candidate_fights(
                 "phaseTransitions": fight.get("phaseTransitions") or [],
                 "phaseMetadata": phase_document.get("phases") or [],
             })
+    encounter_difficulty_kills = len(raw_candidates)
+    raw_candidates = [
+        row for row in raw_candidates
+        if fight_duration_matches(
+            row["durationMs"],
+            min_duration_seconds=min_duration_seconds,
+            max_duration_seconds=max_duration_seconds,
+        )
+    ]
     raw_candidates.sort(key=lambda row: row["durationMs"])
 
     matches = []
@@ -525,6 +550,8 @@ def _candidate_fights(
             "reportLimit": MAX_REPORT_OVERVIEWS,
             "inspectedReportCount": min(len(report_codes), MAX_REPORT_OVERVIEWS),
             "readableReportCount": len(overviews),
+            "encounterDifficultyKillCount": encounter_difficulty_kills,
+            "durationFilteredFightCount": len(raw_candidates),
             "candidateFightCount": len(raw_candidates),
             "compositionCheckedCount": checked_count,
             "rosterRequestCount": roster_request_count,
@@ -532,6 +559,8 @@ def _candidate_fights(
             "returnedCount": len(matches[:RESULT_LIMIT]),
             "stoppedEarly": len(matches) >= RESULT_LIMIT and checked_count < len(raw_candidates),
             "order": "duration_ascending",
+            "minDurationSeconds": min_duration_seconds,
+            "maxDurationSeconds": max_duration_seconds,
         },
     }
 
@@ -821,6 +850,10 @@ def search_raid_cooldowns(payload: dict) -> dict:
         for value in payload.get("healerSpecs") or []
         if str(value).strip()
     ]
+    min_duration_raw = payload.get("minFightDurationSeconds")
+    max_duration_raw = payload.get("maxFightDurationSeconds")
+    min_duration_seconds = None if min_duration_raw is None or min_duration_raw == "" else float(min_duration_raw)
+    max_duration_seconds = None if max_duration_raw is None or max_duration_raw == "" else float(max_duration_raw)
     boss = _boss(raid_key, boss_key)
     if difficulty not in {4, 5}:
         raise ValueError("难度必须是英雄或史诗。")
@@ -831,6 +864,16 @@ def search_raid_cooldowns(payload: dict) -> dict:
         raise ValueError(f"未知治疗专精：{', '.join(unknown_specs)}")
     if len(required_specs) > healer_count:
         raise ValueError("指定治疗构成数量不能超过治疗人数。")
+    if min_duration_seconds is not None and min_duration_seconds < 0:
+        raise ValueError("战斗时长下限不能小于 0 秒。")
+    if max_duration_seconds is not None and max_duration_seconds < 0:
+        raise ValueError("战斗时长上限不能小于 0 秒。")
+    if (
+        min_duration_seconds is not None
+        and max_duration_seconds is not None
+        and max_duration_seconds < min_duration_seconds
+    ):
+        raise ValueError("战斗时长上限不能小于下限。")
 
     token = get_token()
     candidate_result = _candidate_fights(
@@ -840,6 +883,8 @@ def search_raid_cooldowns(payload: dict) -> dict:
         difficulty=difficulty,
         healer_count=healer_count,
         required_spec_keys=required_specs,
+        min_duration_seconds=min_duration_seconds,
+        max_duration_seconds=max_duration_seconds,
     )
     matches = candidate_result["matches"]
     selection = candidate_result["selection"]
@@ -855,6 +900,8 @@ def search_raid_cooldowns(payload: dict) -> dict:
                 "difficulty": difficulty,
                 "healerCount": healer_count,
                 "healerSpecs": required_specs,
+                "minFightDurationSeconds": min_duration_seconds,
+                "maxFightDurationSeconds": max_duration_seconds,
             },
             "selection": selection,
             "matches": [],
@@ -927,6 +974,8 @@ def search_raid_cooldowns(payload: dict) -> dict:
             "difficulty": difficulty,
             "healerCount": healer_count,
             "healerSpecs": required_specs,
+            "minFightDurationSeconds": min_duration_seconds,
+            "maxFightDurationSeconds": max_duration_seconds,
         },
         "selection": selection,
         "matches": result_matches,
