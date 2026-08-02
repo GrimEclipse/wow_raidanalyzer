@@ -1,15 +1,36 @@
 import unittest
 
 from analyzer_core.raid_cooldowns import (
+    _discovery_report_codes,
+    _reference_phase_data,
+    apply_phase_segments,
+    build_phase_segments,
     build_cooldown_timeline,
     composition_matches,
     export_mrt,
     export_nsrt,
     export_timestamp_tsv,
+    options_document,
 )
 
 
 class RaidCooldownTests(unittest.TestCase):
+    def test_options_include_live_12_0_and_ptr_boss_lists(self):
+        options = options_document()
+        self.assertEqual([row["key"] for row in options["versions"]], ["12.0", "12.1 PTR"])
+        raids = {row["key"]: row for row in options["raids"]}
+        self.assertEqual(raids["void_spire"]["version"], "12.0")
+        self.assertEqual(
+            [row["encounterID"] for row in raids["void_spire"]["bosses"]],
+            [3176, 3177, 3179, 3178, 3180, 3181],
+        )
+        self.assertEqual(len(raids["venomous_abyss"]["bosses"]), 8)
+
+    def test_ptr_discovery_fallback_uses_checked_in_reports(self):
+        self.assertIn("xBt6r2LqHzdfkZN7", _discovery_report_codes("venomous_abyss", 4))
+        self.assertIn("HPrGLV84XRJjCykN", _discovery_report_codes("venomous_abyss", 5))
+        self.assertEqual(_discovery_report_codes("void_spire", 5), [])
+
     def test_composition_preserves_duplicate_specs(self):
         actual = [
             "discipline-priest",
@@ -75,7 +96,56 @@ class RaidCooldownTests(unittest.TestCase):
         )
         self.assertIn("EncounterID:53455;Difficulty:Mythic", nsrt)
         self.assertIn("time:30;ph:1;tag:奶萨;spellid:98008;", nsrt)
-        self.assertIn("00:30\t奶萨\t灵魂链接图腾\t98008", export_timestamp_tsv(timeline))
+        self.assertIn("00:30\tP1\t00:30\t奶萨\t灵魂链接图腾\t98008", export_timestamp_tsv(timeline))
+
+    def test_phase_exports_use_wcl_transition_and_phase_relative_nsrt_time(self):
+        timeline = [
+            {"timeMs": 30_000, "player": "牧师", "spellID": 62618, "spell": "真言术：障", "categoryLabel": "团队减伤"},
+            {"timeMs": 150_000, "player": "萨满", "spellID": 98008, "spell": "灵魂链接图腾", "categoryLabel": "团队减伤"},
+        ]
+        phases = build_phase_segments(
+            fight_start=1_000_000,
+            fight_end=1_240_000,
+            phase_transitions=[
+                {"id": 1, "startTime": 1_000_000},
+                {"id": 2, "startTime": 1_120_000},
+            ],
+            phase_metadata=[
+                {"id": 1, "name": "Stage One", "isIntermission": False},
+                {"id": 2, "name": "Intermission", "isIntermission": True},
+            ],
+        )
+        timeline = apply_phase_segments(timeline, phases)
+        self.assertEqual(phases["source"], "wcl")
+        self.assertEqual(timeline[0]["phaseLabel"], "P1")
+        self.assertEqual(timeline[1]["phaseLabel"], "P1.5")
+        self.assertEqual(timeline[1]["phaseTimeMs"], 30_000)
+        nsrt = export_nsrt(timeline, encounter_id=3181, difficulty=5, encounter_name="Crown")
+        self.assertIn("time:30;ph:2;tag:萨满;spellid:98008;", nsrt)
+        mrt = export_mrt(timeline)
+        self.assertIn("[P1.5] Intermission", mrt)
+        self.assertIn("{time:02:30}", mrt)
+
+    def test_ptr_reference_phases_are_available_without_wcl_transitions(self):
+        reference = _reference_phase_data("nakzali", 4)
+        phases = build_phase_segments(
+            fight_start=2_000_000,
+            fight_end=2_481_612,
+            phase_transitions=[],
+            phase_metadata=[
+                {"id": 1, "name": "Stage One", "isIntermission": False},
+                {"id": 2, "name": "Intermission", "isIntermission": True},
+                {"id": 3, "name": "Stage Two", "isIntermission": False},
+            ],
+            reference=reference,
+            report_id=reference["reportID"],
+            fight_id=reference["fightID"],
+        )
+        self.assertEqual(phases["source"], "ptr_reference")
+        self.assertEqual(
+            [row["phaseLabel"] for row in phases["segments"][:3]],
+            ["P1", "P1.5", "P2"],
+        )
 
 
 if __name__ == "__main__":

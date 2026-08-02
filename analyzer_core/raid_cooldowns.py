@@ -12,6 +12,7 @@ import threading
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterable
 
@@ -26,10 +27,55 @@ from boss_plugins.void_spire.crown_of_the_cosmos import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ZONE54_DISCOVERY = ROOT / "docs" / "zone54_spell_discovery.json"
+ZONE54_DISCOVERY_PATHS = (
+    ROOT / "skills" / "venomous-abyss-raid-development" / "references" / "source-data" / "spell-discovery.json",
+    ROOT / "docs" / "zone54_spell_discovery.json",
+)
+ZONE54_TIMELINES_PATH = (
+    ROOT / "skills" / "venomous-abyss-raid-development" / "references" / "source-data" / "boss-timelines.json"
+)
 
 RAIDS = {
+    "dream_rift": {
+        "version": "12.0",
+        "zoneID": 46,
+        "name": "梦境裂隙",
+        "bosses": [
+            {"key": "chimaerus", "name": "奇美鲁斯，未梦之神", "encounterID": 3306},
+        ],
+    },
+    "void_spire": {
+        "version": "12.0",
+        "zoneID": 46,
+        "name": "虚影尖塔",
+        "bosses": [
+            {"key": "imperator_averzian", "name": "元首阿福扎恩", "encounterID": 3176},
+            {"key": "vorasius", "name": "弗拉希乌斯", "encounterID": 3177},
+            {"key": "fallen_king_salhadaar", "name": "陨落之王萨哈达尔", "encounterID": 3179},
+            {"key": "vaelgor_ezzorak", "name": "威厄高尔和艾佐拉克", "encounterID": 3178},
+            {"key": "lightblinded_vanguard", "name": "光盲先锋军", "encounterID": 3180},
+            {"key": "crown_of_the_cosmos", "name": "宇宙之冕", "encounterID": 3181},
+        ],
+    },
+    "march_on_queldanas": {
+        "version": "12.0",
+        "zoneID": 46,
+        "name": "进军奎尔丹纳斯",
+        "bosses": [
+            {"key": "beloren", "name": "贝洛朗，奥的子嗣", "encounterID": 3182},
+            {"key": "midnight_falls", "name": "至暗之夜降临", "encounterID": 3183},
+        ],
+    },
+    "sporefall": {
+        "version": "12.0",
+        "zoneID": 50,
+        "name": "暮孢陨坠",
+        "bosses": [
+            {"key": "rotmire", "name": "腐沼", "encounterID": 3159},
+        ],
+    },
     "venomous_abyss": {
+        "version": "12.1 PTR",
         "zoneID": 54,
         "name": "烈毒之渊",
         "bosses": [
@@ -74,6 +120,7 @@ CATEGORY_LABELS = {
 _CACHE_LOCK = threading.Lock()
 _CACHE = {}
 _CACHE_TTL_SECONDS = 15 * 60
+MAX_REPORT_OVERVIEWS = 24
 
 
 def _cached(key):
@@ -107,11 +154,17 @@ def _client_graphql(token: str, query: str, variables: dict) -> dict:
 
 
 def options_document() -> dict:
+    versions = list(dict.fromkeys(raid["version"] for raid in RAIDS.values()))
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
+        "versions": [
+            {"key": value, "label": value}
+            for value in versions
+        ],
         "raids": [
             {
                 "key": key,
+                "version": raid["version"],
                 "name": raid["name"],
                 "zoneID": raid["zoneID"],
                 "bosses": raid["bosses"],
@@ -137,7 +190,7 @@ def _boss(raid_key: str, boss_key: str) -> dict:
         raise ValueError("未知副本。")
     for boss in raid["bosses"]:
         if boss["key"] == boss_key:
-            return boss
+            return {**boss, "raidKey": raid_key, "version": raid["version"]}
     raise ValueError("未知 Boss。")
 
 
@@ -174,12 +227,30 @@ def _ranked_report_codes(token: str, encounter_id: int, difficulty: int) -> list
     return _store_cache(cache_key, list(dict.fromkeys(codes)))
 
 
-def _discovery_report_codes(difficulty: int) -> list[str]:
-    if not ZONE54_DISCOVERY.is_file():
+def _discovery_report_codes(raid_key: str, difficulty: int) -> list[str]:
+    if raid_key != "venomous_abyss":
         return []
-    data = json.loads(ZONE54_DISCOVERY.read_text(encoding="utf-8"))
+    discovery_path = next((path for path in ZONE54_DISCOVERY_PATHS if path.is_file()), None)
+    if discovery_path is None:
+        return []
+    data = json.loads(discovery_path.read_text(encoding="utf-8"))
     key = "mythic" if int(difficulty) == 5 else "heroic"
     return [str(value) for value in (data.get("reports") or {}).get(key) or []]
+
+
+@lru_cache(maxsize=1)
+def _reference_timelines() -> dict:
+    if not ZONE54_TIMELINES_PATH.is_file():
+        return {}
+    return json.loads(ZONE54_TIMELINES_PATH.read_text(encoding="utf-8"))
+
+
+def _reference_phase_data(boss_key: str, difficulty: int) -> dict:
+    difficulty_key = "mythic" if int(difficulty) == 5 else "heroic"
+    return (
+        ((_reference_timelines().get("bosses") or {}).get(boss_key) or {}).get(difficulty_key)
+        or {}
+    )
 
 
 def _report_overview(token: str, report_code: str) -> dict:
@@ -201,6 +272,22 @@ def _report_overview(token: str, report_code: str) -> dict:
             kill
             startTime
             endTime
+            lastPhase
+            lastPhaseAsAbsoluteIndex
+            lastPhaseIsIntermission
+            phaseTransitions {
+              id
+              startTime
+            }
+          }
+          phases {
+            encounterID
+            separatesWipes
+            phases {
+              id
+              name
+              isIntermission
+            }
           }
           masterData {
             actors {
@@ -291,6 +378,7 @@ def composition_matches(
 def _candidate_fights(
     token: str,
     *,
+    raid_key: str,
     encounter_id: int,
     difficulty: int,
     healer_count: int,
@@ -298,22 +386,33 @@ def _candidate_fights(
 ) -> list[dict]:
     report_codes = list(dict.fromkeys([
         *_ranked_report_codes(token, encounter_id, difficulty),
-        *_discovery_report_codes(difficulty),
+        *_discovery_report_codes(raid_key, difficulty),
     ]))
     overviews = []
+    overview_errors = []
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
             executor.submit(_report_overview, token, code): code
-            for code in report_codes[:60]
+            for code in report_codes[:MAX_REPORT_OVERVIEWS]
         }
         for future in as_completed(futures):
             try:
                 overviews.append(future.result())
-            except Exception:
-                continue
+            except Exception as exc:
+                overview_errors.append(exc)
+
+    if report_codes and not overviews and overview_errors:
+        raise RuntimeError(
+            "WCL 报告暂时无法读取；请检查 API 凭据、报告可见性或稍后再试。"
+        ) from overview_errors[0]
 
     raw_candidates = []
     for report in overviews:
+        phase_document = next((
+            row
+            for row in report.get("phases") or []
+            if int(row.get("encounterID") or 0) == int(encounter_id)
+        ), {})
         for fight in report.get("fights") or []:
             if not fight.get("kill") or int(fight.get("difficulty") or 0) != int(difficulty):
                 continue
@@ -327,6 +426,8 @@ def _candidate_fights(
                 "durationMs": int(fight["endTime"] - fight["startTime"]),
                 "name": fight.get("name"),
                 "actors": (report.get("masterData") or {}).get("actors") or [],
+                "phaseTransitions": fight.get("phaseTransitions") or [],
+                "phaseMetadata": phase_document.get("phases") or [],
             })
     raw_candidates.sort(key=lambda row: row["durationMs"])
 
@@ -400,16 +501,193 @@ def build_cooldown_timeline(
     return sorted(rows, key=lambda row: (row["timeMs"], row["player"], row["spellID"]))
 
 
+def _phase_display_labels(phase_metadata: Iterable[dict]) -> dict[int, str]:
+    labels = {}
+    stage_number = 0
+    for fallback_index, phase in enumerate(phase_metadata or [], start=1):
+        phase_id = int(phase.get("id") or fallback_index)
+        if phase.get("isIntermission"):
+            labels[phase_id] = f"P{max(1, stage_number)}.5"
+        else:
+            stage_number += 1
+            labels[phase_id] = f"P{stage_number}"
+    return labels
+
+
+def _reference_phase_id(phase_key: str, phase_metadata: list[dict]) -> int:
+    """Map PTR discovery labels onto WCL's encounter phase ids.
+
+    PTR reports currently expose phase metadata but no per-fight phaseTransitions.
+    The checked-in discovery timeline therefore supplies the transition times.
+    """
+    metadata = list(phase_metadata or [])
+    ids = [int(row.get("id") or index) for index, row in enumerate(metadata, start=1)]
+    if not ids:
+        return 1
+    key = str(phase_key or "").strip().lower()
+    if key in {"intermission", "stasis"}:
+        intermission = next((
+            int(row.get("id") or index)
+            for index, row in enumerate(metadata, start=1)
+            if row.get("isIntermission")
+        ), None)
+        return intermission or ids[min(1, len(ids) - 1)]
+    if key.startswith("p") and key[1:].isdigit():
+        stage_index = max(0, int(key[1:]) - 1)
+        stage_ids = [
+            int(row.get("id") or index)
+            for index, row in enumerate(metadata, start=1)
+            if not row.get("isIntermission")
+        ]
+        return stage_ids[min(stage_index, len(stage_ids) - 1)] if stage_ids else ids[0]
+    if key.startswith("special-") and key.rsplit("-", 1)[-1].isdigit():
+        special_index = int(key.rsplit("-", 1)[-1])
+        return ids[min(special_index, len(ids) - 1)]
+    return ids[0]
+
+
+def build_phase_segments(
+    *,
+    fight_start: int,
+    fight_end: int,
+    phase_transitions: Iterable[dict] = (),
+    phase_metadata: Iterable[dict] = (),
+    reference: dict | None = None,
+    report_id: str = "",
+    fight_id: int = 0,
+) -> dict:
+    """Return normalized, ordered phase segments for one fight.
+
+    Live 12.0 fights use WCL phaseTransitions. PTR fights fall back to the
+    repository's observed phase markers because WCL currently returns null
+    transitions for those reports.
+    """
+    metadata = list(phase_metadata or [])
+    metadata_by_id = {
+        int(row.get("id") or index): row
+        for index, row in enumerate(metadata, start=1)
+    }
+    display_labels = _phase_display_labels(metadata)
+    duration_ms = max(0, int(fight_end) - int(fight_start))
+    segments = []
+    source = "single_phase"
+    confidence = "fallback"
+
+    for transition in phase_transitions or []:
+        phase_id = int(transition.get("id") or 1)
+        raw_start = int(transition.get("startTime") or fight_start)
+        relative_start = raw_start - int(fight_start) if raw_start >= int(fight_start) else raw_start
+        phase = metadata_by_id.get(phase_id) or {}
+        segments.append({
+            "phaseIndex": phase_id,
+            "phaseLabel": display_labels.get(phase_id, f"P{phase_id}"),
+            "phaseName": str(phase.get("name") or f"Phase {phase_id}"),
+            "startTimeMs": max(0, min(duration_ms, relative_start)),
+        })
+    if segments:
+        source = "wcl"
+        confidence = "exact"
+    elif reference:
+        reference_duration = max(1, int(reference.get("durationMs") or duration_ms or 1))
+        exact_reference = (
+            str(reference.get("reportID") or "") == str(report_id or "")
+            and int(reference.get("fightID") or 0) == int(fight_id or 0)
+        )
+        scale = 1.0 if exact_reference else duration_ms / reference_duration
+        for marker in reference.get("phaseMarkers") or []:
+            phase_key = str(marker.get("phase") or "")
+            if phase_key.lower() in {"kill", "wipe", "enrage"} or marker.get("source") == "fightEnd":
+                continue
+            phase_id = _reference_phase_id(phase_key, metadata)
+            phase = metadata_by_id.get(phase_id) or {}
+            segments.append({
+                "phaseIndex": phase_id,
+                "phaseLabel": display_labels.get(phase_id, phase_key.upper() or f"P{phase_id}"),
+                "phaseName": str(marker.get("label") or phase.get("name") or phase_key or f"Phase {phase_id}"),
+                "startTimeMs": max(0, min(duration_ms, round(int(marker.get("timeMs") or 0) * scale))),
+            })
+        if segments:
+            source = "ptr_reference" if exact_reference else "ptr_reference_scaled"
+            confidence = "observed" if exact_reference else "estimated"
+
+    if not segments:
+        first_phase = metadata_by_id.get(1) or (metadata[0] if metadata else {})
+        first_id = int(first_phase.get("id") or 1)
+        segments = [{
+            "phaseIndex": first_id,
+            "phaseLabel": display_labels.get(first_id, "P1"),
+            "phaseName": str(first_phase.get("name") or "全程"),
+            "startTimeMs": 0,
+        }]
+    segments.sort(key=lambda row: row["startTimeMs"])
+    if segments[0]["startTimeMs"] > 0:
+        first_phase = metadata_by_id.get(1) or {}
+        segments.insert(0, {
+            "phaseIndex": 1,
+            "phaseLabel": display_labels.get(1, "P1"),
+            "phaseName": str(first_phase.get("name") or "开场"),
+            "startTimeMs": 0,
+        })
+    deduplicated = []
+    for segment in segments:
+        if deduplicated and segment == deduplicated[-1]:
+            continue
+        deduplicated.append(segment)
+    for index, segment in enumerate(deduplicated):
+        segment["endTimeMs"] = (
+            deduplicated[index + 1]["startTimeMs"]
+            if index + 1 < len(deduplicated)
+            else duration_ms
+        )
+    return {
+        "source": source,
+        "confidence": confidence,
+        "segments": deduplicated,
+    }
+
+
+def apply_phase_segments(timeline: Iterable[dict], phase_document: dict) -> list[dict]:
+    segments = list((phase_document or {}).get("segments") or [])
+    if not segments:
+        return list(timeline or [])
+    rows = []
+    for row in timeline or []:
+        time_ms = max(0, int(row.get("timeMs") or 0))
+        segment = segments[0]
+        for candidate in segments:
+            if int(candidate.get("startTimeMs") or 0) <= time_ms:
+                segment = candidate
+            else:
+                break
+        rows.append({
+            **row,
+            "phaseIndex": int(segment.get("phaseIndex") or 1),
+            "phaseLabel": segment.get("phaseLabel") or "P1",
+            "phaseName": segment.get("phaseName") or "全程",
+            "phaseTimeMs": max(0, time_ms - int(segment.get("startTimeMs") or 0)),
+        })
+    return rows
+
+
 def _clock(time_ms: int) -> str:
     total_seconds = max(0, int(time_ms) // 1000)
     return f"{total_seconds // 60:02d}:{total_seconds % 60:02d}"
 
 
 def export_mrt(timeline: Iterable[dict]) -> str:
-    return "\n".join(
-        f"{{time:{_clock(row['timeMs'])}}} {{spell:{row['spellID']}}} {row['player']} - {row['spell']}"
-        for row in timeline
-    )
+    lines = []
+    current_phase = None
+    for row in timeline:
+        phase = row.get("phaseLabel") or "P1"
+        if phase != current_phase:
+            if lines:
+                lines.append("")
+            lines.append(f"[{phase}] {row.get('phaseName') or '阶段'}")
+            current_phase = phase
+        lines.append(
+            f"{{time:{_clock(row['timeMs'])}}} {{spell:{row['spellID']}}} {row['player']} - {row['spell']}"
+        )
+    return "\n".join(lines)
 
 
 def export_nsrt(
@@ -424,19 +702,19 @@ def export_nsrt(
         f"EncounterID:{int(encounter_id)};Difficulty:{difficulty_name};Name:{encounter_name};"
     ]
     for row in timeline:
-        seconds = round(max(0, int(row["timeMs"])) / 1000, 1)
+        seconds = round(max(0, int(row.get("phaseTimeMs", row["timeMs"]))) / 1000, 1)
         time_value = str(int(seconds)) if seconds.is_integer() else str(seconds)
         lines.append(
-            f"time:{time_value};ph:1;tag:{row['player']};spellid:{row['spellID']};"
+            f"time:{time_value};ph:{int(row.get('phaseIndex') or 1)};tag:{row['player']};spellid:{row['spellID']};"
         )
     return "\n".join(lines)
 
 
 def export_timestamp_tsv(timeline: Iterable[dict]) -> str:
     """Return a stable human-readable table for spreadsheets and dashboards."""
-    lines = ["时间\t玩家\t技能\t法术ID\t类别"]
+    lines = ["全场时间\t阶段\t阶段内时间\t玩家\t技能\t法术ID\t类别"]
     lines.extend(
-        f"{_clock(row['timeMs'])}\t{row['player']}\t{row['spell']}\t{row['spellID']}\t{row['categoryLabel']}"
+        f"{_clock(row['timeMs'])}\t{row.get('phaseLabel') or 'P1'}\t{_clock(row.get('phaseTimeMs', row['timeMs']))}\t{row['player']}\t{row['spell']}\t{row['spellID']}\t{row['categoryLabel']}"
         for row in timeline
     )
     return "\n".join(lines)
@@ -466,6 +744,7 @@ def search_raid_cooldowns(payload: dict) -> dict:
     token = get_token()
     matches = _candidate_fights(
         token,
+        raid_key=raid_key,
         encounter_id=boss["encounterID"],
         difficulty=difficulty,
         healer_count=healer_count,
@@ -505,6 +784,16 @@ def search_raid_cooldowns(payload: dict) -> dict:
             fight_start=candidate["startTime"],
             players=candidate["roster"]["players"],
         )
+        phase_document = build_phase_segments(
+            fight_start=candidate["startTime"],
+            fight_end=candidate["endTime"],
+            phase_transitions=candidate.get("phaseTransitions") or [],
+            phase_metadata=candidate.get("phaseMetadata") or [],
+            reference=_reference_phase_data(boss_key, difficulty),
+            report_id=candidate["reportID"],
+            fight_id=candidate["fightID"],
+        )
+        timeline = apply_phase_segments(timeline, phase_document)
         result_matches.append({
             "reportID": candidate["reportID"],
             "fightID": candidate["fightID"],
@@ -512,6 +801,7 @@ def search_raid_cooldowns(payload: dict) -> dict:
             "durationMs": candidate["durationMs"],
             "wclUrl": f"{WCL_BASE_URL}/reports/{candidate['reportID']}#fight={candidate['fightID']}&type=casts",
             "healers": candidate["roster"]["healers"],
+            "phases": phase_document,
             "timeline": timeline,
             "exports": {
                 "mrt": export_mrt(timeline),

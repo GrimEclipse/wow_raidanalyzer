@@ -3,63 +3,173 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>登录 · 团本分析工具</title>
+  <meta name="theme-color" content="#050816">
+  <title>登录 · 开荒工具包</title>
   <style>
-    :root{color-scheme:dark;--bg:#080d17;--panel:#111a2a;--line:#26344d;--text:#edf4ff;--muted:#91a1ba;--accent:#5ee0a0;--danger:#ff8090}
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 20% 0,#17243b 0,transparent 38%),var(--bg);font:15px/1.5 system-ui,"Microsoft YaHei",sans-serif;color:var(--text)}
-    main{width:min(440px,calc(100% - 32px));padding:32px;border:1px solid var(--line);border-radius:18px;background:rgba(17,26,42,.96);box-shadow:0 24px 80px #0008}h1{margin:0 0 6px;font-size:26px}p{color:var(--muted);margin:0 0 24px}
-    .tabs{display:flex;gap:8px;margin-bottom:20px}.tabs button{flex:1}.tabs button.active{border-color:var(--accent);color:var(--accent)}form{display:grid;gap:14px}label{display:grid;gap:6px;color:#c9d6ea}input,button{font:inherit;border-radius:9px;border:1px solid var(--line);background:#0b1321;color:var(--text);padding:11px 12px}input:focus{outline:2px solid #5ee0a055;border-color:var(--accent)}button{cursor:pointer;font-weight:650}button.primary{background:var(--accent);border-color:var(--accent);color:#062116}button:disabled{opacity:.6;cursor:wait}.hidden{display:none}.message{min-height:24px;margin-top:14px;color:var(--danger)}.hint{font-size:13px;color:var(--muted)}
+    :root{color-scheme:dark;--ink:#f6f7ff;--muted:#9aa3bc;--line:rgba(165,180,252,.16);--cyan:#67e8f9;--violet:#a78bfa;--rose:#fb7185;--success:#5ee6b3}
+    *{box-sizing:border-box}
+    html{min-width:320px;background:#050816}
+    body{margin:0;min-height:100vh;overflow-x:hidden;background:
+      radial-gradient(circle at 18% 18%,rgba(56,189,248,.08),transparent 30rem),
+      radial-gradient(circle at 82% 16%,rgba(139,92,246,.09),transparent 32rem),
+      linear-gradient(145deg,#040711,#090d1d 52%,#050713 100%);font:15px/1.5 "Microsoft YaHei",system-ui,sans-serif;color:var(--ink)}
+    #starfield{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+    .aurora{position:fixed;width:30rem;height:30rem;border-radius:50%;filter:blur(110px);opacity:.07;pointer-events:none}.aurora.a{left:-16rem;bottom:-18rem;background:#22d3ee}.aurora.b{right:-18rem;top:-18rem;background:#8b5cf6}
+    .shell{position:relative;z-index:1;min-height:100vh;width:min(980px,100%);margin:auto;padding:40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(350px,420px);align-items:center;gap:72px;animation:arrive .55s ease-out both;transition:opacity .35s ease,transform .35s ease,filter .35s ease}
+    .brand{padding:18px 0}.brand::before{content:"";display:block;width:36px;height:3px;margin-bottom:24px;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--violet))}
+    h1{margin:0;font-size:clamp(42px,6vw,68px);line-height:1.08;letter-spacing:-.045em;font-weight:790}
+    .lede{max-width:520px;margin:22px 0 0;color:#a8b0c7;font-size:17px;line-height:1.9}
+    .credit{margin:30px 0 0;color:#69738f;font-size:12px;letter-spacing:.03em}
+    .card{position:relative;padding:32px;border:1px solid var(--line);border-radius:22px;background:rgba(10,14,32,.78);box-shadow:0 28px 80px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.04);backdrop-filter:blur(22px)}.card-head{margin-bottom:24px}.card-head strong{display:block;font-size:20px}.card-head span{display:block;margin-top:6px;color:#737d99;font-size:12px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin-bottom:25px;border:1px solid rgba(148,163,184,.12);border-radius:14px;background:rgba(2,6,23,.55)}button,input{font:inherit}.tabs button{height:40px;border:0;border-radius:10px;background:transparent;color:#747e9e;cursor:pointer;font-weight:700;transition:.2s}.tabs button.active{background:linear-gradient(135deg,rgba(30,41,83,.95),rgba(38,30,78,.95));color:#eef2ff;box-shadow:0 5px 18px rgba(0,0,0,.2)}
+    form{display:grid;gap:17px}.field{display:grid;gap:8px}.label-row{display:flex;justify-content:space-between;align-items:center;color:#b8c0da;font-size:12px;font-weight:650}.field-wrap{position:relative}.field input{width:100%;height:49px;padding:0 44px 0 15px;border:1px solid rgba(148,163,184,.18);border-radius:13px;outline:0;background:rgba(2,6,23,.58);color:#f7f8ff;transition:border-color .2s,box-shadow .2s,background .2s}.field input::placeholder{color:#4e5878}.field input:hover{border-color:rgba(165,180,252,.3)}.field input:focus{border-color:rgba(103,232,249,.62);background:rgba(3,7,24,.78);box-shadow:0 0 0 4px rgba(34,211,238,.08),0 0 25px rgba(34,211,238,.05)}.reveal{position:absolute;right:8px;top:7px;width:35px;height:35px;border:0;border-radius:9px;background:transparent;color:#74809f;cursor:pointer}.reveal:hover{background:rgba(148,163,184,.08);color:#dce5ff}
+    .hint{margin:-4px 0 0;color:#737d9e;font-size:11px;line-height:1.7}.primary{position:relative;height:50px;margin-top:3px;border:1px solid rgba(165,180,252,.3);border-radius:13px;background:linear-gradient(115deg,#67d6f5,#8b8ff0);color:#071020;cursor:pointer;font-weight:800;box-shadow:0 12px 26px rgba(99,102,241,.18);transition:transform .2s,filter .2s}.primary:hover{filter:brightness(1.07);transform:translateY(-1px)}.primary:disabled{opacity:.62;cursor:wait;transform:none}.message{min-height:22px;margin-top:15px;color:var(--rose);font-size:12px}.message.success{color:var(--success)}.hidden{display:none!important}
+    .transition-layer{position:fixed;z-index:10;inset:0;display:grid;place-items:center;background:rgba(4,7,17,.72);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease}.transition-box{display:grid;justify-items:center;gap:15px;color:#dbe3f7;font-size:13px}.loader{width:34px;height:34px;border:2px solid rgba(148,163,184,.18);border-top-color:var(--cyan);border-right-color:var(--violet);border-radius:50%;animation:spin .85s linear infinite}
+    body.is-waiting .transition-layer{opacity:1;visibility:visible}body.is-leaving .shell{opacity:0;transform:scale(.985);filter:blur(7px)}
+    @keyframes arrive{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:800px){.shell{grid-template-columns:1fr;gap:30px;padding:30px 20px}.brand{padding:8px 6px 0}.brand::before{margin-bottom:18px}h1{font-size:clamp(38px,12vw,56px)}.lede{margin-top:15px;font-size:15px}.credit{margin-top:18px}.card{width:min(460px,100%);justify-self:center}}
+    @media(max-width:500px){.shell{padding:20px 14px}.brand{padding:4px 6px}.card{padding:25px 20px;border-radius:18px}}
+    @media(prefers-reduced-motion:reduce){.shell,.loader,.primary,.tabs button,.field input,.transition-layer{animation:none;transition:none}body.is-leaving .shell{filter:none}}
   </style>
 </head>
 <body>
-<main>
-  <h1>团本分析工具</h1>
-  <p>登录后才能访问记录、时间轴与记事本。</p>
-  <div class="tabs">
-    <button type="button" class="active" data-mode="login">登录</button>
-    <button type="button" data-mode="register">注册</button>
-  </div>
-  <form id="loginForm">
-    <label>用户名<input name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
-    <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
-    <button class="primary">登录</button>
-  </form>
-  <form id="registerForm" class="hidden">
-    <label>用户名<input name="username" autocomplete="username" required minlength="3" maxlength="32"></label>
-    <label>密码<input name="password" type="password" autocomplete="new-password" required minlength="12"></label>
-    <div class="hint">至少 12 位，并同时包含大写字母、小写字母和数字。新注册账号默认只有只读权限。</div>
-    <button class="primary">创建只读账号</button>
-  </form>
-  <div id="message" class="message" role="alert"></div>
+<canvas id="starfield" aria-hidden="true"></canvas>
+<div class="aurora a"></div><div class="aurora b"></div>
+<main class="shell">
+  <section class="brand" aria-labelledby="hero-title">
+    <h1 id="hero-title">开荒工具包</h1>
+    <p class="lede">旨在快速帮团长完成团本开荒中问题的定位</p>
+    <p class="credit">edit by 爬爬</p>
+  </section>
+
+  <section class="card" aria-labelledby="auth-title">
+    <header class="card-head"><strong id="auth-title">登录</strong><span>使用账号进入工具</span></header>
+    <div class="tabs" role="tablist" aria-label="账号操作">
+      <button type="button" class="active" role="tab" aria-selected="true" data-mode="login">登录</button>
+      <button type="button" role="tab" aria-selected="false" data-mode="register">注册</button>
+    </div>
+
+    <form id="loginForm">
+      <label class="field"><span class="label-row">用户名</span><span class="field-wrap"><input name="username" autocomplete="username" required minlength="3" maxlength="32" placeholder="输入你的账号"></span></label>
+      <label class="field"><span class="label-row">密码</span><span class="field-wrap"><input name="password" type="password" autocomplete="current-password" required placeholder="输入登录密码"><button class="reveal" type="button" aria-label="显示密码" data-reveal>◉</button></span></label>
+      <button class="primary" type="submit"><span>登录</span></button>
+    </form>
+
+    <form id="registerForm" class="hidden">
+      <label class="field"><span class="label-row">用户名</span><span class="field-wrap"><input name="username" autocomplete="username" required minlength="3" maxlength="32" placeholder="3–32 位字母或数字"></span></label>
+      <label class="field"><span class="label-row">密码</span><span class="field-wrap"><input name="password" type="password" autocomplete="new-password" required minlength="12" placeholder="设置高强度密码"><button class="reveal" type="button" aria-label="显示密码" data-reveal>◉</button></span></label>
+      <label id="inviteField" class="field hidden"><span class="label-row">邀请码</span><span class="field-wrap"><input name="inviteCode" autocomplete="off" placeholder="向管理员索取邀请码"></span></label>
+      <p id="registerHint" class="hint">密码至少 12 位，并同时包含大写字母、小写字母和数字。新账号默认为只读权限。</p>
+      <button class="primary" type="submit"><span>创建只读账号　→</span></button>
+    </form>
+    <div id="message" class="message" role="alert" aria-live="polite"></div>
+  </section>
 </main>
+<div class="transition-layer" aria-hidden="true"><div class="transition-box"><span class="loader"></span><span id="transitionText">正在登录…</span></div></div>
 <script>
+(() => {
+  const canvas = document.querySelector('#starfield');
+  const context = canvas.getContext('2d');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let stars = [];
+  let width = 0;
+  let height = 0;
+  let ratio = 1;
+  const resize = () => {
+    ratio = Math.min(devicePixelRatio || 1, 2);
+    width = innerWidth;
+    height = innerHeight;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const count = Math.max(35, Math.min(90, Math.round(width * height / 18000)));
+    stars = Array.from({length:count}, () => ({x:Math.random()*width,y:Math.random()*height,r:Math.random()*.9+.2,a:Math.random()*.4+.12,s:Math.random()*.004+.001,p:Math.random()*Math.PI*2}));
+  };
+  const draw = time => {
+    context.clearRect(0,0,width,height);
+    stars.forEach(star => {
+      const alpha = reducedMotion ? star.a : star.a * (.68 + Math.sin(time*star.s+star.p)*.32);
+      context.beginPath(); context.arc(star.x,star.y,star.r,0,Math.PI*2); context.fillStyle=`rgba(210,226,255,${alpha})`; context.fill();
+    });
+    if (!reducedMotion) requestAnimationFrame(draw);
+  };
+  addEventListener('resize', resize, {passive:true}); resize(); requestAnimationFrame(draw);
+
   const message = document.querySelector('#message');
-  document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => {
-    document.querySelectorAll('[data-mode]').forEach(item => item.classList.toggle('active', item === button));
-    document.querySelector('#loginForm').classList.toggle('hidden', button.dataset.mode !== 'login');
-    document.querySelector('#registerForm').classList.toggle('hidden', button.dataset.mode !== 'register');
+  const loginForm = document.querySelector('#loginForm');
+  const registerForm = document.querySelector('#registerForm');
+  const inviteField = document.querySelector('#inviteField');
+  const inviteInput = inviteField.querySelector('input');
+  const registerHint = document.querySelector('#registerHint');
+  const transitionText = document.querySelector('#transitionText');
+  const setMode = mode => {
+    document.querySelectorAll('[data-mode]').forEach(button => {
+      const active = button.dataset.mode === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    loginForm.classList.toggle('hidden', mode !== 'login');
+    registerForm.classList.toggle('hidden', mode !== 'register');
     message.textContent = '';
+    message.className = 'message';
+    (mode === 'login' ? loginForm : registerForm).querySelector('input')?.focus();
+  };
+  document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+  document.querySelectorAll('[data-reveal]').forEach(button => button.addEventListener('click', () => {
+    const input = button.parentElement.querySelector('input');
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    button.setAttribute('aria-label', reveal ? '隐藏密码' : '显示密码');
+    button.textContent = reveal ? '◌' : '◉';
   }));
+
+  const next = new URLSearchParams(location.search).get('next') || '';
+  const safeClientTarget = value => value && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') ? value : '/online';
   async function submit(event, endpoint) {
     event.preventDefault();
-    const button = event.currentTarget.querySelector('button');
-    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const form = event.currentTarget;
+    const button = form.querySelector('.primary');
+    const data = {...Object.fromEntries(new FormData(form)), next};
     button.disabled = true;
+    const registering = endpoint.endsWith('register');
+    transitionText.textContent = registering ? '正在创建账号…' : '正在登录…';
+    document.body.classList.add('is-waiting');
     message.textContent = '';
+    message.className = 'message success';
+    let succeeded = false;
     try {
-      const response = await fetch(endpoint, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+      const response = await fetch(endpoint, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'});
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || '操作失败');
-      const next = new URLSearchParams(location.search).get('next');
-      location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+      if (!response.ok) throw new Error(result.error || '操作失败，请稍后重试');
+      succeeded = true;
+      transitionText.textContent = registering ? '账号创建成功，正在进入…' : '登录成功，正在进入…';
+      document.body.classList.add('is-leaving');
+      setTimeout(() => location.replace(safeClientTarget(result.redirectTo || next)), reducedMotion ? 0 : 380);
     } catch (error) {
       message.textContent = error.message;
+      message.className = 'message';
     } finally {
       button.disabled = false;
+      if (!succeeded) document.body.classList.remove('is-waiting');
     }
   }
-  document.querySelector('#loginForm').addEventListener('submit', event => submit(event, '/api/auth/login'));
-  document.querySelector('#registerForm').addEventListener('submit', event => submit(event, '/api/auth/register'));
+  loginForm.addEventListener('submit', event => submit(event, '/api/auth/login'));
+  registerForm.addEventListener('submit', event => submit(event, '/api/auth/register'));
+  fetch('/api/auth/config', {cache:'no-store'})
+    .then(response => response.ok ? response.json() : Promise.reject())
+    .then(config => {
+      const required = Boolean(config.registrationRequiresInvite);
+      inviteField.classList.toggle('hidden', !required);
+      inviteInput.required = required;
+      registerHint.textContent = required
+        ? '密码至少 12 位，并同时包含大写字母、小写字母和数字。注册需要管理员邀请码。'
+        : '密码至少 12 位，并同时包含大写字母、小写字母和数字。新账号默认为只读权限。';
+    })
+    .catch(() => {});
+  if (new URLSearchParams(location.search).get('mode') === 'register') setMode('register');
+})();
 </script>
 </body>
 </html>

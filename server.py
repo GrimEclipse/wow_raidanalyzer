@@ -1,7 +1,9 @@
 import argparse
 from http.cookies import SimpleCookie
+import hmac
 import json
 import mimetypes
+import os
 import queue
 import re
 import threading
@@ -24,6 +26,24 @@ from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def environment_setting(key, default=""):
+    """Read one setting from the process environment or the project .env."""
+    if key in os.environ:
+        return str(os.environ.get(key) or "").strip()
+    env_path = ROOT / ".env"
+    if env_path.is_file():
+        for raw_line in env_path.read_text(encoding="utf-8-sig").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            if name.strip() == key:
+                return value.strip().strip('"').strip("'")
+    return str(default or "").strip()
+
+
 JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
 VERDICT_DIR = ROOT / "verdicts"
@@ -41,6 +61,7 @@ LOGIN_ATTEMPTS: Dict[str, List[float]] = {}
 LOGIN_ATTEMPTS_LOCK = threading.Lock()
 REGISTRATION_ATTEMPTS: Dict[str, List[float]] = {}
 REGISTRATION_ATTEMPTS_LOCK = threading.Lock()
+INVITE_CODE = environment_setting("APP_INVITE_CODE")
 
 FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
@@ -205,6 +226,21 @@ def json_bytes(data, status=HTTPStatus.OK):
     return status, "application/json; charset=utf-8", body
 
 
+def safe_redirect_target(value, default="/online"):
+    target = str(value or "").strip()
+    parsed = urlparse(target)
+    if (
+        target.startswith("/")
+        and not target.startswith("//")
+        and "\\" not in target
+        and not any(ord(char) < 32 for char in target)
+        and not parsed.scheme
+        and not parsed.netloc
+    ):
+        return target
+    return default
+
+
 class AnalyzerHandler(BaseHTTPRequestHandler):
     server_version = "MythicAnalyzer/0.2"
 
@@ -212,8 +248,13 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         path = self.request_path()
         if path == "/login":
             if self.current_user():
-                return self.redirect("/")
+                return self.redirect("/online")
             return self.handle_static(path, public=True)
+
+        if path == "/api/auth/config":
+            return self.send_response_body(*json_bytes({
+                "registrationRequiresInvite": bool(INVITE_CODE),
+            }))
 
         user = self.require_user(path)
         if not user:
@@ -406,7 +447,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 remote_address=self.remote_address(),
                 user_agent=self.headers.get("User-Agent", ""),
             )
-            return self.send_response_body(*json_bytes({"ok": True, "user": user}), cookie=self.cookie_value(token))
+            return self.send_response_body(*json_bytes({
+                "ok": True,
+                "user": user,
+                "redirectTo": safe_redirect_target(payload.get("next")),
+            }), cookie=self.cookie_value(token))
         except (AuthError, ValueError, json.JSONDecodeError) as error:
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
@@ -424,6 +469,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                     return self.json_error("注册次数过多，请一小时后再试。", HTTPStatus.TOO_MANY_REQUESTS)
                 REGISTRATION_ATTEMPTS[address] = attempts + [now]
             payload = self.read_json_body()
+            if INVITE_CODE:
+                supplied = str(payload.get("inviteCode") or payload.get("invite_code") or "").strip()
+                if not supplied:
+                    return self.json_error("请填写邀请码。", HTTPStatus.FORBIDDEN)
+                if not hmac.compare_digest(supplied, INVITE_CODE):
+                    return self.json_error("邀请码不正确。", HTTPStatus.FORBIDDEN)
             user = AUTH.create_user(
                 str(payload.get("username") or ""),
                 str(payload.get("password") or ""),
@@ -435,7 +486,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 user_agent=self.headers.get("User-Agent", ""),
             )
             return self.send_response_body(
-                *json_bytes({"ok": True, "user": user}, HTTPStatus.CREATED),
+                *json_bytes({
+                    "ok": True,
+                    "user": user,
+                    "redirectTo": safe_redirect_target(payload.get("next")),
+                }, HTTPStatus.CREATED),
                 cookie=self.cookie_value(token),
             )
         except (AuthError, ValueError, json.JSONDecodeError) as error:
