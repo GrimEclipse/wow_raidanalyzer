@@ -121,6 +121,9 @@ _CACHE_LOCK = threading.Lock()
 _CACHE = {}
 _CACHE_TTL_SECONDS = 15 * 60
 MAX_REPORT_OVERVIEWS = 24
+RESULT_LIMIT = 5
+ROSTER_BATCH_SIZE = 4
+CAST_FETCH_WORKERS = 3
 
 
 def _cached(key):
@@ -225,6 +228,49 @@ def _ranked_report_codes(token: str, encounter_id: int, difficulty: int) -> list
         if code:
             codes.append(str(code))
     return _store_cache(cache_key, list(dict.fromkeys(codes)))
+
+
+def _zone_report_codes(token: str, zone_id: int) -> dict:
+    """Return the latest public zone reports shown by WCL's report listing.
+
+    PTR encounters often have no fight rankings yet, even though the zone report
+    browser already contains many public kills. This is therefore a candidate
+    source, not proof that a report contains the requested encounter or difficulty.
+    """
+    cache_key = ("zone-reports", int(zone_id), 1)
+    cached = _cached(cache_key)
+    if cached is not None:
+        return cached
+    query = """
+    query($zoneID: Int!, $page: Int!, $limit: Int!) {
+      reportData {
+        reports(zoneID: $zoneID, page: $page, limit: $limit) {
+          total
+          current_page
+          last_page
+          has_more_pages
+          data { code }
+        }
+      }
+    }
+    """
+    pagination = (
+        (_client_graphql(token, query, {"zoneID": int(zone_id), "page": 1, "limit": 100}).get("reportData") or {})
+        .get("reports")
+        or {}
+    )
+    result = {
+        "codes": list(dict.fromkeys(
+            str(row.get("code"))
+            for row in pagination.get("data") or []
+            if row.get("code")
+        )),
+        "total": int(pagination.get("total") or 0),
+        "page": int(pagination.get("current_page") or 1),
+        "lastPage": int(pagination.get("last_page") or 1),
+        "hasMorePages": bool(pagination.get("has_more_pages")),
+    }
+    return _store_cache(cache_key, result)
 
 
 def _discovery_report_codes(raid_key: str, difficulty: int) -> list[str]:
@@ -383,11 +429,20 @@ def _candidate_fights(
     difficulty: int,
     healer_count: int,
     required_spec_keys: list[str],
-) -> list[dict]:
-    report_codes = list(dict.fromkeys([
-        *_ranked_report_codes(token, encounter_id, difficulty),
-        *_discovery_report_codes(raid_key, difficulty),
-    ]))
+) -> dict:
+    ranked_codes = _ranked_report_codes(token, encounter_id, difficulty)
+    discovery_codes = _discovery_report_codes(raid_key, difficulty)
+    try:
+        zone_reports = _zone_report_codes(token, RAIDS[raid_key]["zoneID"])
+    except Exception:
+        zone_reports = {"codes": [], "total": 0, "page": 1, "lastPage": 1, "hasMorePages": False}
+    zone_codes = zone_reports["codes"]
+    source_codes = (
+        [*zone_codes, *discovery_codes, *ranked_codes]
+        if raid_key == "venomous_abyss"
+        else [*ranked_codes, *zone_codes, *discovery_codes]
+    )
+    report_codes = list(dict.fromkeys(source_codes))
     overviews = []
     overview_errors = []
     with ThreadPoolExecutor(max_workers=4) as executor:
@@ -432,19 +487,53 @@ def _candidate_fights(
     raw_candidates.sort(key=lambda row: row["durationMs"])
 
     matches = []
-    for candidate in raw_candidates:
-        roster = _summary_roster(token, candidate["reportID"], candidate["fightID"])
-        healer_keys = [row["specKey"] for row in roster["healers"]]
-        if not composition_matches(
-            healer_keys,
-            healer_count=healer_count,
-            required_spec_keys=required_spec_keys,
-        ):
-            continue
-        matches.append({**candidate, "roster": roster})
-        if len(matches) >= 5:
+    checked_count = 0
+    roster_request_count = 0
+    for offset in range(0, len(raw_candidates), ROSTER_BATCH_SIZE):
+        batch = raw_candidates[offset:offset + ROSTER_BATCH_SIZE]
+        with ThreadPoolExecutor(max_workers=min(ROSTER_BATCH_SIZE, len(batch))) as executor:
+            futures = [
+                executor.submit(_summary_roster, token, candidate["reportID"], candidate["fightID"])
+                for candidate in batch
+            ]
+            roster_request_count += len(futures)
+            rosters = [future.result() for future in futures]
+        for candidate, roster in zip(batch, rosters):
+            checked_count += 1
+            healer_keys = [row["specKey"] for row in roster["healers"]]
+            if not composition_matches(
+                healer_keys,
+                healer_count=healer_count,
+                required_spec_keys=required_spec_keys,
+            ):
+                continue
+            matches.append({**candidate, "roster": roster})
+            if len(matches) >= RESULT_LIMIT:
+                break
+        if len(matches) >= RESULT_LIMIT:
             break
-    return matches
+    return {
+        "matches": matches[:RESULT_LIMIT],
+        "selection": {
+            "rankingPage": 1,
+            "zoneReportPage": zone_reports["page"],
+            "zoneReportTotal": zone_reports["total"],
+            "zoneReportCodeCount": len(zone_codes),
+            "rankedReportCodeCount": len(ranked_codes),
+            "discoveryReportCodeCount": len(discovery_codes),
+            "sourceReportCount": len(report_codes),
+            "reportLimit": MAX_REPORT_OVERVIEWS,
+            "inspectedReportCount": min(len(report_codes), MAX_REPORT_OVERVIEWS),
+            "readableReportCount": len(overviews),
+            "candidateFightCount": len(raw_candidates),
+            "compositionCheckedCount": checked_count,
+            "rosterRequestCount": roster_request_count,
+            "resultLimit": RESULT_LIMIT,
+            "returnedCount": len(matches[:RESULT_LIMIT]),
+            "stoppedEarly": len(matches) >= RESULT_LIMIT and checked_count < len(raw_candidates),
+            "order": "duration_ascending",
+        },
+    }
 
 
 def _ability_id(event: dict):
@@ -491,6 +580,7 @@ def build_cooldown_timeline(
             "sourceID": int(source_id),
             "player": player.get("name") or f"Actor {source_id}",
             "role": player.get("role") or "unknown",
+            "class": player.get("class") or "",
             "specKey": player.get("specKey") or "",
             "specLabel": player.get("specLabel") or "",
             "spellID": spell_id,
@@ -721,6 +811,7 @@ def export_timestamp_tsv(timeline: Iterable[dict]) -> str:
 
 
 def search_raid_cooldowns(payload: dict) -> dict:
+    started_at = time.perf_counter()
     raid_key = str(payload.get("raid") or "").strip()
     boss_key = str(payload.get("boss") or "").strip()
     difficulty = int(payload.get("difficulty") or 0)
@@ -742,7 +833,7 @@ def search_raid_cooldowns(payload: dict) -> dict:
         raise ValueError("指定治疗构成数量不能超过治疗人数。")
 
     token = get_token()
-    matches = _candidate_fights(
+    candidate_result = _candidate_fights(
         token,
         raid_key=raid_key,
         encounter_id=boss["encounterID"],
@@ -750,9 +841,12 @@ def search_raid_cooldowns(payload: dict) -> dict:
         healer_count=healer_count,
         required_spec_keys=required_specs,
     )
+    matches = candidate_result["matches"]
+    selection = candidate_result["selection"]
     if not matches:
+        selection["elapsedMs"] = round((time.perf_counter() - started_at) * 1000)
         return {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "status": "no_match",
             "message": "现有公开过本记录中没有对应的治疗人数与治疗构成。",
             "query": {
@@ -762,11 +856,11 @@ def search_raid_cooldowns(payload: dict) -> dict:
                 "healerCount": healer_count,
                 "healerSpecs": required_specs,
             },
+            "selection": selection,
             "matches": [],
         }
 
-    result_matches = []
-    for candidate in matches:
+    def build_result(candidate):
         fight = {
             "id": candidate["fightID"],
             "startTime": candidate["startTime"],
@@ -794,7 +888,7 @@ def search_raid_cooldowns(payload: dict) -> dict:
             fight_id=candidate["fightID"],
         )
         timeline = apply_phase_segments(timeline, phase_document)
-        result_matches.append({
+        return {
             "reportID": candidate["reportID"],
             "fightID": candidate["fightID"],
             "fightName": candidate["name"],
@@ -803,6 +897,11 @@ def search_raid_cooldowns(payload: dict) -> dict:
             "healers": candidate["roster"]["healers"],
             "phases": phase_document,
             "timeline": timeline,
+            "exportContext": {
+                "encounterID": boss["encounterID"],
+                "difficulty": difficulty,
+                "encounterName": candidate["name"] or boss["name"],
+            },
             "exports": {
                 "mrt": export_mrt(timeline),
                 "nsrt": export_nsrt(
@@ -813,9 +912,13 @@ def search_raid_cooldowns(payload: dict) -> dict:
                 ),
                 "timestampTsv": export_timestamp_tsv(timeline),
             },
-        })
+        }
+
+    with ThreadPoolExecutor(max_workers=min(CAST_FETCH_WORKERS, len(matches))) as executor:
+        result_matches = list(executor.map(build_result, matches))
+    selection["elapsedMs"] = round((time.perf_counter() - started_at) * 1000)
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "status": "ok",
         "message": f"找到 {len(result_matches)} 份同治疗构成的公开过本记录。",
         "query": {
@@ -825,5 +928,6 @@ def search_raid_cooldowns(payload: dict) -> dict:
             "healerCount": healer_count,
             "healerSpecs": required_specs,
         },
+        "selection": selection,
         "matches": result_matches,
     }

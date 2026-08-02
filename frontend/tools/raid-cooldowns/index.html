@@ -51,9 +51,33 @@
             <div class="text-sm font-medium text-slate-300">治疗构成（指定包含）</div>
             <div id="healer-slots" class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
         </div>
+        <div class="mt-5 flex flex-wrap items-end gap-3 border-t border-slate-800 pt-4">
+            <label class="text-xs text-slate-400">开始时间（秒）
+                <input id="range-start" type="number" min="0" step="1" placeholder="0"
+                       class="mt-1 block w-32 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+            </label>
+            <span class="pb-2 text-slate-600">至</span>
+            <label class="text-xs text-slate-400">结束时间（秒）
+                <input id="range-end" type="number" min="0" step="1" placeholder="全程"
+                       class="mt-1 block w-32 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+            </label>
+            <button id="apply-range" class="rounded border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-200 hover:border-cyan-500 hover:text-cyan-200">应用到当前结果</button>
+            <p class="pb-2 text-xs text-slate-500">只截取对应秒数内的技能安排，不会重新请求 WCL。结果最多返回 5 份。</p>
+        </div>
     </section>
 
     <div id="status" class="mt-5 hidden rounded border px-4 py-3 text-sm"></div>
+    <details id="rename-panel" class="mt-5 hidden rounded-xl border border-slate-800 bg-slate-900/70">
+        <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-200">批量更改导出中的治疗玩家名</summary>
+        <div class="border-t border-slate-800 px-5 py-4">
+            <p class="mb-4 text-xs text-slate-500">填写自己团队内的玩家名。只影响 MRT、NSRT 和表格导出，不改动原始日志。</p>
+            <div id="rename-fields" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
+            <div class="mt-4 flex gap-2">
+                <button id="apply-renames" class="rounded bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400">应用到全部导出</button>
+                <button id="reset-renames" class="rounded border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:border-slate-500">清空更名</button>
+            </div>
+        </div>
+    </details>
     <section id="results" class="mt-6 space-y-6"></section>
 </main>
 
@@ -91,7 +115,7 @@
 
 <script>
 (() => {
-    const state = { options: null, results: [] };
+    const state = { options: null, results: [], renameMap: {}, timer: null };
     const el = id => document.getElementById(id);
     const version = el('version');
     const raid = el('raid');
@@ -102,7 +126,16 @@
     const status = el('status');
     const results = el('results');
     const searchButton = el('search');
+    const rangeStart = el('range-start');
+    const rangeEnd = el('range-end');
+    const renamePanel = el('rename-panel');
+    const renameFields = el('rename-fields');
     const serviceHelp = '抄轴工具需要 Python 服务访问 WCL。请运行 start_app.bat，然后打开 http://127.0.0.1:8765/cooldowns；如果服务已经开着，请重启一次以加载新接口。';
+    const classColors = {
+        deathknight:'#c41e3a', demonhunter:'#a330c9', druid:'#ff7c0a', evoker:'#33937f',
+        hunter:'#aad372', mage:'#3fc7eb', monk:'#00ff98', paladin:'#f48cba', priest:'#ffffff',
+        rogue:'#fff468', shaman:'#0070dd', warlock:'#8788ee', warrior:'#c69b6d'
+    };
 
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -110,6 +143,51 @@
     const clock = ms => {
         const seconds = Math.floor(Math.max(0, Number(ms) || 0) / 1000);
         return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    };
+    const classColor = name => classColors[String(name || '').toLowerCase()] || '#cbd5e1';
+    const currentRange = () => {
+        const start = Math.max(0, Number(rangeStart.value) || 0);
+        const end = rangeEnd.value === '' ? Infinity : Math.max(0, Number(rangeEnd.value) || 0);
+        if (end < start) throw new Error('结束时间不能小于开始时间。');
+        return { startMs:start * 1000, endMs:end * 1000 };
+    };
+    const processedTimeline = match => {
+        const range = currentRange();
+        return (match.timeline || [])
+            .filter(row => Number(row.timeMs) >= range.startMs && Number(row.timeMs) <= range.endMs)
+            .map(row => ({...row, player:state.renameMap[row.player] || row.player}));
+    };
+    const exportMrt = timeline => {
+        const lines = [];
+        let currentPhase = null;
+        timeline.forEach(row => {
+            const phase = row.phaseLabel || 'P1';
+            if (phase !== currentPhase) {
+                if (lines.length) lines.push('');
+                lines.push(`[${phase}] ${row.phaseName || '阶段'}`);
+                currentPhase = phase;
+            }
+            lines.push(`{time:${clock(row.timeMs)}} {spell:${row.spellID}} ${row.player} - ${row.spell}`);
+        });
+        return lines.join('\n');
+    };
+    const exportNsrt = (match, timeline) => {
+        const context = match.exportContext || {};
+        const difficultyName = Number(context.difficulty) === 5 ? 'Mythic' : 'Heroic';
+        const lines = [`EncounterID:${Number(context.encounterID) || 0};Difficulty:${difficultyName};Name:${context.encounterName || match.fightName || ''};`];
+        timeline.forEach(row => {
+            const seconds = Math.round(Math.max(0, Number(row.phaseTimeMs ?? row.timeMs)) / 100) / 10;
+            lines.push(`time:${seconds};ph:${Number(row.phaseIndex) || 1};tag:${row.player};spellid:${row.spellID};`);
+        });
+        return lines.join('\n');
+    };
+    const exportTsv = timeline => [
+        '全场时间\t阶段\t阶段内时间\t玩家\t技能\t法术ID\t类别',
+        ...timeline.map(row => `${clock(row.timeMs)}\t${row.phaseLabel || 'P1'}\t${clock(row.phaseTimeMs ?? row.timeMs)}\t${row.player}\t${row.spell}\t${row.spellID}\t${row.categoryLabel}`)
+    ].join('\n');
+    const exportText = (match, type) => {
+        const timeline = processedTimeline(match);
+        return type === 'nsrt' ? exportNsrt(match, timeline) : type === 'tsv' ? exportTsv(timeline) : exportMrt(timeline);
     };
     const showStatus = (message, kind = 'info') => {
         status.className = `mt-5 rounded border px-4 py-3 text-sm ${
@@ -148,72 +226,97 @@
     const renderMatch = (match, index) => {
         const fragment = el('result-template').content.cloneNode(true);
         const article = fragment.querySelector('article');
+        const visibleTimeline = processedTimeline(match);
         article.querySelector('.result-title').textContent = `样本 ${index + 1} · ${match.fightName}`;
         article.querySelector('.result-meta').textContent =
-            `${clock(match.durationMs)} · ${match.reportID} / 战斗 ${match.fightID} · ${match.timeline.length} 次团队技能 · ${
+            `${clock(match.durationMs)} · ${match.reportID} / 战斗 ${match.fightID} · ${visibleTimeline.length}/${match.timeline.length} 次团队技能 · ${
                 ({wcl:'WCL 实际阶段',ptr_reference:'PTR 实测阶段',ptr_reference_scaled:'PTR 参考阶段（按战斗时长校准）',single_phase:'单阶段'})[match.phases?.source] || '阶段待确认'
             }`;
         article.querySelector('.result-wcl').href = match.wclUrl;
-        article.querySelector('.result-healers').innerHTML = match.healers.map(row =>
-            `<span class="rounded-full border border-cyan-900 bg-cyan-950/50 px-3 py-1 text-xs text-cyan-200">${escapeHtml(row.name)} · ${escapeHtml(row.specLabel)}</span>`
+        article.querySelector('.result-healers').innerHTML = match.healers.map(row => {
+            const color = classColor(row.class);
+            const replacement = state.renameMap[row.name];
+            return `<span class="rounded-full border px-3 py-1 text-xs" style="color:${color};border-color:${color}55;background:${color}12">${escapeHtml(row.name)}${replacement ? ` → ${escapeHtml(replacement)}` : ''} · ${escapeHtml(row.specLabel)}</span>`;
+        }
         ).join('');
         article.querySelector('.result-phases').innerHTML = (match.phases?.segments || []).map(row =>
             `<span class="phase-chip">${escapeHtml(row.phaseLabel)} · ${escapeHtml(row.phaseName)} · ${clock(row.startTimeMs)}</span>`
         ).join('');
-        article.querySelector('.result-timeline').innerHTML = match.timeline.length
-            ? match.timeline.map(row => `
+        article.querySelector('.result-timeline').innerHTML = visibleTimeline.length
+            ? visibleTimeline.map(row => `
                 <tr class="hover:bg-slate-800/45">
                     <td class="px-4 py-3"><div class="font-mono text-cyan-300">${clock(row.timeMs)}</div><div class="mt-1 text-[11px] text-fuchsia-300">${escapeHtml(row.phaseLabel || 'P1')} +${clock(row.phaseTimeMs ?? row.timeMs)}</div></td>
-                    <td class="px-4 py-3 font-medium text-white">${escapeHtml(row.player)}</td>
+                    <td class="px-4 py-3 font-medium" style="color:${classColor(row.class)}">${escapeHtml(row.player)}</td>
                     <td class="px-4 py-3 text-slate-400">${escapeHtml(row.specLabel || '—')}</td>
                     <td class="px-4 py-3"><span class="text-slate-200">${escapeHtml(row.spell)}</span> <span class="ml-1 font-mono text-xs text-slate-600">${row.spellID}</span></td>
                     <td class="px-4 py-3 text-slate-400">${escapeHtml(row.categoryLabel)}</td>
                 </tr>
             `).join('')
-            : '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">本场没有检测到已配置的团队技能。</td></tr>';
+            : '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">当前时间范围内没有检测到团队技能。</td></tr>';
         const preview = article.querySelector('.result-export');
-        preview.textContent = match.exports.mrt;
+        preview.textContent = exportText(match, 'mrt');
         article.querySelector('[data-export="mrt"]').addEventListener('click', async event => {
-            await navigator.clipboard.writeText(match.exports.mrt);
-            preview.textContent = match.exports.mrt;
+            const value = exportText(match, 'mrt');
+            await navigator.clipboard.writeText(value);
+            preview.textContent = value;
             event.currentTarget.textContent = '已复制 MRT';
         });
         article.querySelector('[data-export="nsrt"]').addEventListener('click', async event => {
-            await navigator.clipboard.writeText(match.exports.nsrt);
-            preview.textContent = match.exports.nsrt;
+            const value = exportText(match, 'nsrt');
+            await navigator.clipboard.writeText(value);
+            preview.textContent = value;
             event.currentTarget.textContent = '已复制 NSRT';
         });
         article.querySelector('[data-export="tsv"]').addEventListener('click', async event => {
-            await navigator.clipboard.writeText(match.exports.timestampTsv);
-            preview.textContent = match.exports.timestampTsv;
+            const value = exportText(match, 'tsv');
+            await navigator.clipboard.writeText(value);
+            preview.textContent = value;
             event.currentTarget.textContent = '已复制 TSV';
         });
         return fragment;
     };
+    const renderResults = () => {
+        results.innerHTML = '';
+        state.results.forEach((match, index) => results.appendChild(renderMatch(match, index)));
+    };
+    const renderRenameFields = () => {
+        const players = new Map();
+        state.results.forEach(match => (match.healers || []).forEach(row => players.set(row.name, row)));
+        renamePanel.classList.toggle('hidden', players.size === 0);
+        renameFields.innerHTML = [...players.values()].map(row => {
+            const color = classColor(row.class);
+            return `<label class="text-xs" style="color:${color}">${escapeHtml(row.name)} · ${escapeHtml(row.specLabel)}
+                <input data-original="${escapeHtml(row.name)}" value="${escapeHtml(state.renameMap[row.name] || '')}" placeholder="替换为团内玩家名"
+                       class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+            </label>`;
+        }).join('');
+    };
     const renderDemo = () => {
         const timeline = [
-            {timeMs:30000,phaseIndex:1,phaseLabel:'P1',phaseName:'第一阶段',phaseTimeMs:30000,player:'云岚',specLabel:'戒律 牧师',spell:'真言术：障',spellID:62618,categoryLabel:'团队减伤'},
-            {timeMs:118000,phaseIndex:2,phaseLabel:'P1.5',phaseName:'转阶段',phaseTimeMs:5000,player:'星野',specLabel:'恢复 萨满祭司',spell:'灵魂链接图腾',spellID:98008,categoryLabel:'团队减伤'},
-            {timeMs:151000,phaseIndex:3,phaseLabel:'P2',phaseName:'第二阶段',phaseTimeMs:12000,player:'月白',specLabel:'神圣 圣骑士',spell:'光环掌握',spellID:31821,categoryLabel:'团队减伤'},
-            {timeMs:224000,phaseIndex:3,phaseLabel:'P2',phaseName:'第二阶段',phaseTimeMs:85000,player:'青禾',specLabel:'恢复 德鲁伊',spell:'宁静',spellID:740,categoryLabel:'治疗大技能'},
+            {timeMs:30000,phaseIndex:1,phaseLabel:'P1',phaseName:'第一阶段',phaseTimeMs:30000,player:'云岚',class:'Priest',specLabel:'戒律 牧师',spell:'真言术：障',spellID:62618,categoryLabel:'团队减伤'},
+            {timeMs:118000,phaseIndex:2,phaseLabel:'P1.5',phaseName:'转阶段',phaseTimeMs:5000,player:'星野',class:'Shaman',specLabel:'恢复 萨满祭司',spell:'灵魂链接图腾',spellID:98008,categoryLabel:'团队减伤'},
+            {timeMs:151000,phaseIndex:3,phaseLabel:'P2',phaseName:'第二阶段',phaseTimeMs:12000,player:'月白',class:'Paladin',specLabel:'神圣 圣骑士',spell:'光环掌握',spellID:31821,categoryLabel:'团队减伤'},
+            {timeMs:224000,phaseIndex:3,phaseLabel:'P2',phaseName:'第二阶段',phaseTimeMs:85000,player:'青禾',class:'Druid',specLabel:'恢复 德鲁伊',spell:'宁静',spellID:740,categoryLabel:'治疗大技能'},
         ];
         const sample = {
             fightName:'宇宙之冕 · 阶段化导出演示',reportID:'LOCAL-DEMO',fightID:1,durationMs:260000,wclUrl:'#',
-            healers:[{name:'云岚',specLabel:'戒律 牧师'},{name:'星野',specLabel:'恢复 萨满祭司'},{name:'月白',specLabel:'神圣 圣骑士'},{name:'青禾',specLabel:'恢复 德鲁伊'}],
+            healers:[{name:'云岚',class:'Priest',specLabel:'戒律 牧师'},{name:'星野',class:'Shaman',specLabel:'恢复 萨满祭司'},{name:'月白',class:'Paladin',specLabel:'神圣 圣骑士'},{name:'青禾',class:'Druid',specLabel:'恢复 德鲁伊'}],
             phases:{source:'wcl',confidence:'exact',segments:[
                 {phaseIndex:1,phaseLabel:'P1',phaseName:'第一阶段',startTimeMs:0},
                 {phaseIndex:2,phaseLabel:'P1.5',phaseName:'转阶段',startTimeMs:113000},
                 {phaseIndex:3,phaseLabel:'P2',phaseName:'第二阶段',startTimeMs:139000},
             ]},
             timeline,
+            exportContext:{encounterID:3181,difficulty:5,encounterName:'宇宙之冕'},
             exports:{
                 mrt:"[P1] 第一阶段\n{time:00:30} {spell:62618} 云岚 - 真言术：障\n\n[P1.5] 转阶段\n{time:01:58} {spell:98008} 星野 - 灵魂链接图腾\n\n[P2] 第二阶段\n{time:02:31} {spell:31821} 月白 - 光环掌握\n{time:03:44} {spell:740} 青禾 - 宁静",
                 nsrt:"EncounterID:3181;Difficulty:Mythic;Name:Crown of the Cosmos;\ntime:30;ph:1;tag:云岚;spellid:62618;\ntime:5;ph:2;tag:星野;spellid:98008;\ntime:12;ph:3;tag:月白;spellid:31821;\ntime:85;ph:3;tag:青禾;spellid:740;",
                 timestampTsv:"全场时间\t阶段\t阶段内时间\t玩家\t技能\n00:30\tP1\t00:30\t云岚\t真言术：障\n01:58\tP1.5\t00:05\t星野\t灵魂链接图腾\n02:31\tP2\t00:12\t月白\t光环掌握\n03:44\tP2\t01:25\t青禾\t宁静",
             },
         };
-        results.innerHTML = '';
-        results.appendChild(renderMatch(sample, 0));
+        state.results = [sample];
+        renderRenameFields();
+        renderResults();
         const link = results.querySelector('.result-wcl');
         link.textContent = '纯本地示例';
         link.removeAttribute('href');
@@ -222,9 +325,17 @@
     const runSearch = async () => {
         const button = el('search');
         button.disabled = true;
-        button.textContent = '正在匹配阵容与读取技能记录…';
+        const startedAt = Date.now();
+        button.textContent = '查询中 · 0.0 秒';
         results.innerHTML = '';
-        showStatus('正在读取公开过本记录并核对治疗构成。首次查询可能需要几十秒，后续会命中缓存。');
+        renamePanel.classList.add('hidden');
+        showStatus('正在读取公开过本记录并核对治疗构成，已等待 0.0 秒。');
+        clearInterval(state.timer);
+        state.timer = setInterval(() => {
+            const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+            button.textContent = `查询中 · ${seconds} 秒`;
+            showStatus(`正在读取公开过本记录并核对治疗构成，已等待 ${seconds} 秒。`);
+        }, 250);
         try {
             const response = await fetch('/api/raid-cooldowns/search', {
                 method: 'POST',
@@ -239,15 +350,22 @@
             });
             const payload = await response.json();
             if (!response.ok || payload.error) throw new Error(payload.error || `HTTP ${response.status}`);
-            showStatus(payload.message, payload.status === 'ok' ? 'ok' : 'info');
+            const selection = payload.selection || {};
+            const elapsedSeconds = ((selection.elapsedMs || Date.now() - startedAt) / 1000).toFixed(1);
+            const stopped = selection.stoppedEarly ? `检查到第 ${selection.compositionCheckedCount} 场后已达到 ${selection.resultLimit} 份上限并停止` : `已检查 ${selection.compositionCheckedCount || 0} 场候选记录`;
+            const sources = `最近公开报告 ${selection.zoneReportCodeCount || 0} 份、排名候选 ${selection.rankedReportCodeCount || 0} 份、PTR 取证报告 ${selection.discoveryReportCodeCount || 0} 份`;
+            showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。候选来源：${sources}；去重后最多读取其中 ${selection.inspectedReportCount || 0} 份报告，共得到 ${selection.candidateFightCount || 0} 场符合首领与难度的有效击杀。按战斗时长从短到长筛选，${stopped}。`, payload.status === 'ok' ? 'ok' : 'info');
             state.results = payload.matches || [];
-            state.results.forEach((match, index) => results.appendChild(renderMatch(match, index)));
+            renderRenameFields();
+            renderResults();
         } catch (error) {
             const message = error instanceof TypeError && /fetch/i.test(error.message)
                 ? serviceHelp
                 : (error.message || String(error));
             showStatus(message, 'error');
         } finally {
+            clearInterval(state.timer);
+            state.timer = null;
             button.disabled = false;
             button.textContent = '查找公开过本记录';
         }
@@ -281,6 +399,28 @@
     healerCount.addEventListener('change', renderSlots);
     el('search').addEventListener('click', runSearch);
     el('demo').addEventListener('click', renderDemo);
+    el('apply-range').addEventListener('click', () => {
+        try {
+            currentRange();
+            renderResults();
+            showStatus(`已按 ${rangeStart.value || 0} 秒至 ${rangeEnd.value || '战斗结束'} 秒截取技能安排。`, 'ok');
+        } catch (error) {
+            showStatus(error.message, 'error');
+        }
+    });
+    el('apply-renames').addEventListener('click', () => {
+        state.renameMap = Object.fromEntries([...renameFields.querySelectorAll('input')]
+            .map(input => [input.dataset.original, input.value.trim()])
+            .filter(([, value]) => value));
+        renderResults();
+        showStatus(`已将 ${Object.keys(state.renameMap).length} 个玩家名应用到全部导出。`, 'ok');
+    });
+    el('reset-renames').addEventListener('click', () => {
+        state.renameMap = {};
+        renderRenameFields();
+        renderResults();
+        showStatus('已恢复日志中的原始玩家名。', 'ok');
+    });
 })();
 </script>
 </body>

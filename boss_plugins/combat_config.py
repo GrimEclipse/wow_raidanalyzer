@@ -71,7 +71,7 @@ RAID_DEFENSIVES = {
     31821: {"name": "光环掌握", "class": "Paladin", "effectKind": "aura_amplification", "durationMs": 8_000},
     62618: {"name": "真言术：障", "class": "Priest", "effectKind": "damage_reduction", "durationMs": 10_000},
     98008: {"name": "灵魂链接图腾", "class": "Shaman", "effectKind": "damage_reduction", "durationMs": 6_000},
-    374227: {"name": "微风拂面", "class": "Evoker", "effectKind": "aoe_reduction", "durationMs": 8_000},
+    374227: {"name": "微风", "class": "Evoker", "effectKind": "aoe_reduction", "durationMs": 8_000},
     414660: {"name": "群体屏障", "class": "Mage", "effectKind": "absorb", "durationMs": 60_000},
     740: {"name": "宁静", "class": "Druid", "effectKind": "raid_healing", "durationMs": 8_000},
     115310: {"name": "还魂术", "class": "Monk", "effectKind": "raid_healing", "durationMs": 0},
@@ -193,7 +193,7 @@ TEAM_COOLDOWNS = {
     359816: {"name": "梦境飞行", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
     370537: {"name": "静滞", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
     357170: {"name": "时间膨胀", "class": "Evoker", "category": "external", "specKeys": ["preservation-evoker"]},
-    374227: {"name": "微风拂面", "class": "Evoker", "category": "raid_defensive", "specKeys": ["preservation-evoker", "augmentation-evoker"]},
+    374227: {"name": "微风", "class": "Evoker", "category": "raid_defensive", "specKeys": ["preservation-evoker", "augmentation-evoker"]},
     # Cross-role raid defensives
     97462: {"name": "命令怒吼", "class": "Warrior", "category": "raid_defensive", "specKeys": []},
     51052: {"name": "反魔法领域", "class": "DeathKnight", "category": "raid_defensive", "specKeys": []},

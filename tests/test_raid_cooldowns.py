@@ -1,5 +1,7 @@
 import unittest
+from unittest.mock import patch
 
+from analyzer_core import raid_cooldowns
 from analyzer_core.raid_cooldowns import (
     _discovery_report_codes,
     _reference_phase_data,
@@ -30,6 +32,21 @@ class RaidCooldownTests(unittest.TestCase):
         self.assertIn("xBt6r2LqHzdfkZN7", _discovery_report_codes("venomous_abyss", 4))
         self.assertIn("HPrGLV84XRJjCykN", _discovery_report_codes("venomous_abyss", 5))
         self.assertEqual(_discovery_report_codes("void_spire", 5), [])
+
+    def test_zone_report_listing_adds_public_ptr_candidates(self):
+        raid_cooldowns._CACHE.clear()
+        with patch.object(raid_cooldowns, "_client_graphql", return_value={
+            "reportData": {"reports": {
+                "total": 27,
+                "current_page": 1,
+                "last_page": 1,
+                "has_more_pages": False,
+                "data": [{"code": "PTR-PUBLIC-1"}, {"code": "PTR-PUBLIC-2"}],
+            }}
+        }):
+            result = raid_cooldowns._zone_report_codes("token", 54)
+        self.assertEqual(result["codes"], ["PTR-PUBLIC-1", "PTR-PUBLIC-2"])
+        self.assertEqual(result["total"], 27)
 
     def test_composition_preserves_duplicate_specs(self):
         actual = [
@@ -97,6 +114,22 @@ class RaidCooldownTests(unittest.TestCase):
         self.assertIn("EncounterID:53455;Difficulty:Mythic", nsrt)
         self.assertIn("time:30;ph:1;tag:奶萨;spellid:98008;", nsrt)
         self.assertIn("00:30\tP1\t00:30\t奶萨\t灵魂链接图腾\t98008", export_timestamp_tsv(timeline))
+
+    def test_timeline_keeps_player_class_and_uses_short_breeze_name(self):
+        timeline = build_cooldown_timeline(
+            [{"type": "cast", "timestamp": 15_000, "sourceID": 9, "abilityGameID": 374227}],
+            fight_start=0,
+            players=[{
+                "id": 9,
+                "name": "龙希尔",
+                "class": "Evoker",
+                "role": "healer",
+                "specKey": "preservation-evoker",
+                "specLabel": "恩护 唤魔师",
+            }],
+        )
+        self.assertEqual(timeline[0]["class"], "Evoker")
+        self.assertEqual(timeline[0]["spell"], "微风")
 
     def test_phase_exports_use_wcl_transition_and_phase_relative_nsrt_time(self):
         timeline = [
