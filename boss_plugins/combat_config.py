@@ -75,7 +75,7 @@ RAID_DEFENSIVES = {
     414660: {"name": "群体屏障", "class": "Mage", "effectKind": "absorb", "durationMs": 60_000},
     740: {"name": "宁静", "class": "Druid", "effectKind": "raid_healing", "durationMs": 8_000},
     115310: {"name": "还魂术", "class": "Monk", "effectKind": "raid_healing", "durationMs": 0},
-    388615: {"name": "祛病延年", "class": "Monk", "effectKind": "raid_healing", "durationMs": 0},
+    388615: {"name": "还阳术", "class": "Monk", "effectKind": "raid_healing", "durationMs": 0},
 }
 
 PERSONAL_DEFENSIVE_COOLDOWNS_MS = {
@@ -184,7 +184,7 @@ TEAM_COOLDOWNS = {
     207399: {"name": "先祖护佑图腾", "class": "Shaman", "category": "raid_defensive", "specKeys": ["restoration-shaman"]},
     # Mistweaver Monk
     115310: {"name": "还魂术", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
-    388615: {"name": "祛病延年", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
+    388615: {"name": "还阳术", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
     322118: {"name": "召唤青龙玉珑", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
     325197: {"name": "召唤朱鹤赤精", "class": "Monk", "category": "healing", "specKeys": ["mistweaver-monk"]},
     116849: {"name": "作茧缚命", "class": "Monk", "category": "external", "specKeys": ["mistweaver-monk"]},
