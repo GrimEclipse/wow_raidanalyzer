@@ -14,6 +14,7 @@ from analyzer_core.raid_cooldowns import (
     export_timestamp_tsv,
     fight_duration_matches,
     options_document,
+    parse_report_codes,
 )
 
 
@@ -49,6 +50,93 @@ class RaidCooldownTests(unittest.TestCase):
             result = raid_cooldowns._zone_report_codes("token", 54)
         self.assertEqual(result["codes"], ["PTR-PUBLIC-1", "PTR-PUBLIC-2"])
         self.assertEqual(result["total"], 27)
+
+    def test_report_codes_accept_wcl_urls_and_plain_codes(self):
+        self.assertEqual(parse_report_codes(
+            "https://www.warcraftlogs.com/reports/pJvx3ArdFNXmk4j1?fight=9\n"
+            "g2Cm9dXRjxAT61Dw"
+        ), ["pJvx3ArdFNXmk4j1", "g2Cm9dXRjxAT61Dw"])
+
+    def test_embedded_report_roster_distinguishes_ambiguous_healer_specs(self):
+        report = {
+            "masterData": {"actors": [
+                {"id": 1, "name": "牧师", "type": "Player", "subType": "Priest"},
+                {"id": 2, "name": "萨满", "type": "Player", "subType": "Shaman"},
+                {"id": 3, "name": "德鲁伊", "type": "Player", "subType": "Druid"},
+            ]},
+        }
+        fight = {
+            "friendlyPlayers": [1, 2, 3],
+            "friendlySpecs": ["Holy", "Restoration", "Restoration"],
+        }
+        roster = raid_cooldowns._embedded_roster(report, fight)
+        self.assertEqual(
+            [row["specKey"] for row in roster["healers"]],
+            ["holy-priest", "restoration-shaman", "restoration-druid"],
+        )
+
+    def test_candidate_search_keeps_speed_rankings_ahead_of_public_fallback(self):
+        healer_characters = [
+            {"class": "Priest", "spec": "Discipline"},
+            {"class": "Priest", "spec": "Discipline"},
+            {"class": "Monk", "spec": "Mistweaver"},
+            {"class": "Druid", "spec": "Restoration"},
+        ]
+        rankings = []
+        for index in range(5):
+            rankings.append({
+                "duration": 500_000 + index,
+                "startTime": 2_000_000 + index * 600_000,
+                "healers": 4,
+                "allCharacters": healer_characters,
+                "report": {
+                    "code": f"RANKEDREPORT{index:04d}",
+                    "fightID": 9,
+                    "startTime": 1_000_000 + index * 600_000,
+                },
+            })
+        roster = {
+            "players": [],
+            "healers": [
+                {"specKey": "discipline-priest"},
+                {"specKey": "discipline-priest"},
+                {"specKey": "mistweaver-monk"},
+                {"specKey": "restoration-druid"},
+            ],
+        }
+        with (
+            patch.object(raid_cooldowns, "_discovery_report_codes", return_value=[]),
+            patch.object(raid_cooldowns, "_ranked_fight_page", return_value={
+                "rankings": rankings,
+                "page": 1,
+                "count": 5,
+                "hasMorePages": True,
+            }),
+            patch.object(raid_cooldowns, "_summary_roster", return_value=roster),
+            patch.object(raid_cooldowns, "_complete_candidate_overview", side_effect=lambda token, row, encounter_id: row),
+            patch.object(raid_cooldowns, "_zone_report_page") as zone_page,
+        ):
+            result = raid_cooldowns._candidate_fights(
+                "token",
+                raid_key="march_on_queldanas",
+                boss_name="至暗之夜降临",
+                encounter_id=3183,
+                difficulty=5,
+                healer_count=4,
+                required_spec_keys=[
+                    "discipline-priest",
+                    "discipline-priest",
+                    "mistweaver-monk",
+                    "restoration-druid",
+                ],
+                min_duration_seconds=None,
+                max_duration_seconds=None,
+            )
+        self.assertEqual(len(result["matches"]), 5)
+        self.assertEqual(result["selection"]["rankingPagesScanned"], 1)
+        self.assertEqual(result["selection"]["zoneReportPagesScanned"], 0)
+        self.assertEqual(result["selection"]["rosterRequestCount"], 0)
+        zone_page.assert_not_called()
 
     def test_composition_preserves_duplicate_specs(self):
         actual = [

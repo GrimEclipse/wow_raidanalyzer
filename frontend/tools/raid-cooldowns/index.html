@@ -63,6 +63,10 @@
             </label>
             <p class="pb-2 text-xs text-slate-500">筛选整场击杀耗时，避免过快的 rush 样本影响策略。结果最多返回 5 份。</p>
         </div>
+        <label class="mt-4 block text-xs text-slate-400">补充 WCL 日志（可选）
+            <textarea id="report-codes" rows="2" placeholder="粘贴 WCL 报告链接或报告编号；奇特治疗构成在速度榜中不足时再核对"
+                      class="mt-1 block w-full resize-y rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"></textarea>
+        </label>
     </section>
 
     <div id="status" class="mt-5 hidden rounded border px-4 py-3 text-sm"></div>
@@ -127,6 +131,7 @@
     const searchButton = el('search');
     const rangeStart = el('range-start');
     const rangeEnd = el('range-end');
+    const reportCodes = el('report-codes');
     const renamePanel = el('rename-panel');
     const renameFields = el('rename-fields');
     const serviceHelp = '抄轴工具需要 Python 服务访问 WCL。请运行 start_app.bat，然后打开 http://127.0.0.1:8765/cooldowns；如果服务已经开着，请重启一次以加载新接口。';
@@ -318,12 +323,12 @@
         button.textContent = '查询中 · 0.0 秒';
         results.innerHTML = '';
         renamePanel.classList.add('hidden');
-        showStatus('正在读取公开过本记录并核对治疗构成，已等待 0.0 秒。');
+        showStatus('正在从速度榜前列开始核对治疗构成，已等待 0.0 秒。');
         clearInterval(state.timer);
         state.timer = setInterval(() => {
             const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
             button.textContent = `查询中 · ${seconds} 秒`;
-            showStatus(`正在读取公开过本记录并核对治疗构成，已等待 ${seconds} 秒。`);
+            showStatus(`正在从速度榜前列逐页核对治疗构成，已等待 ${seconds} 秒。`);
         }, 250);
         try {
             const response = await fetch('/api/raid-cooldowns/search', {
@@ -337,16 +342,18 @@
                     healerSpecs: [...healerSlots.querySelectorAll('select')].map(node => node.value).filter(Boolean),
                     minFightDurationSeconds: rangeStart.value === '' ? null : Number(rangeStart.value),
                     maxFightDurationSeconds: rangeEnd.value === '' ? null : Number(rangeEnd.value),
+                    reportCodes: reportCodes.value,
                 }),
             });
             const payload = await response.json();
             if (!response.ok || payload.error) throw new Error(payload.error || `HTTP ${response.status}`);
             const selection = payload.selection || {};
             const elapsedSeconds = ((selection.elapsedMs || Date.now() - startedAt) / 1000).toFixed(1);
-            const stopped = selection.stoppedEarly ? `检查到第 ${selection.compositionCheckedCount} 场后已达到 ${selection.resultLimit} 份上限并停止` : `已检查 ${selection.compositionCheckedCount || 0} 场候选记录`;
-            const sources = `最近公开报告 ${selection.zoneReportCodeCount || 0} 份、排名候选 ${selection.rankedReportCodeCount || 0} 份、PTR 取证报告 ${selection.discoveryReportCodeCount || 0} 份`;
+            const stopped = selection.stoppedEarly ? `找到 ${selection.resultLimit} 份后停止继续翻页` : `已核对 ${selection.compositionCheckedCount || 0} 场治疗构成`;
+            const sources = `速度榜 ${selection.rankingPagesScanned || 0} 页 / ${selection.rankedReportCodeCount || 0} 场，公开报告 ${selection.zoneReportPagesScanned || 0} 页 / ${selection.zoneReportCodeCount || 0} 份，补充日志 ${selection.providedReportCodeCount || 0} 份，PTR 取证 ${selection.discoveryReportCodeCount || 0} 份`;
             const rangeLabel = `${selection.minDurationSeconds ?? 0}–${selection.maxDurationSeconds ?? '不限'} 秒`;
-            showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。候选来源：${sources}；去重后读取 ${selection.inspectedReportCount || 0} 份报告，得到 ${selection.encounterDifficultyKillCount || 0} 场指定首领与难度的击杀，其中 ${selection.durationFilteredFightCount || 0} 场符合 ${rangeLabel} 战斗时长。再按耗时从短到长检查治疗构成，${stopped}。`, payload.status === 'ok' ? 'ok' : 'info');
+            const capped = selection.automaticSearchCapped ? ' 已达到本次自动检索上限；可粘贴已知 WCL 日志继续核对。' : '';
+            showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。按速度榜优先检索：${sources}；发现 ${selection.encounterDifficultyKillCount || 0} 场指定首领与难度的击杀，其中 ${selection.durationFilteredFightCount || 0} 场符合 ${rangeLabel} 战斗时长，${stopped}。${capped}`, payload.status === 'ok' ? 'ok' : 'info');
             state.results = payload.matches || [];
             renderRenameFields();
             renderResults();
