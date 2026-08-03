@@ -938,6 +938,93 @@
           "该样本在 P2 首轮灵魂撕裂后灭团，没有到达永恒夜幕、被夺取的容器或 P3；这些阶段不使用该日志生成虚假史诗时间轴。"
         ]
       }
+    },
+    "nymrissa_wavecaller": {
+      "heroic": {
+        "reportID": "zpRDdcafg7hCrT9Y",
+        "fightID": 1,
+        "kill": true,
+        "durationMs": 408055,
+        "stats": [
+          {"label": "英雄击杀", "timeMs": 408055},
+          {"label": "鱼人转场", "value": "3 轮"},
+          {"label": "无尽潮汐", "timeMs": 356052}
+        ],
+        "phaseMarkers": [
+          {"phase": "normal-1", "label": "常态 1", "timeMs": 0, "source": "fightStart", "confidence": "observed"},
+          {"phase": "bubble-1", "label": "鱼人转场 1", "timeMs": 27127, "spellID": 1284015, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "normal-2", "label": "常态 2", "timeMs": 77185, "spellID": 1258150, "eventType": "cast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "bubble-2", "label": "鱼人转场 2", "timeMs": 144032, "spellID": 1284015, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "normal-3", "label": "常态 3", "timeMs": 194052, "spellID": 1258150, "eventType": "cast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "bubble-3", "label": "鱼人转场 3", "timeMs": 261044, "spellID": 1284015, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "normal-4", "label": "常态 4", "timeMs": 311055, "spellID": 1258150, "eventType": "cast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "enrage", "label": "无尽潮汐", "timeMs": 356052, "spellID": 1295086, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "kill", "label": "击杀", "timeMs": 408055, "source": "fightEnd", "confidence": "observed"}
+        ],
+        "eventSeries": [
+          {"spellID": 1260837, "label": "深渊之雨", "kind": "raid", "phase": "normal", "sourceName": "Nymrissa Wavecaller", "timesMs": [3010, 120018, 237042]},
+          {"spellID": 1282937, "label": "Water Flurry", "kind": "tank", "phase": "normal", "sourceName": "Nymrissa Wavecaller", "timesMs": [13020, 43020, 92028, 130018, 160025, 209007, 247054, 277032, 326053]},
+          {"spellID": 1284015, "label": "诱惑水泡", "kind": "transition", "phase": "bubble", "sourceName": "Nymrissa Wavecaller", "timesMs": [27127, 144032, 261044]},
+          {"spellID": 1263301, "label": "鱼人波次", "kind": "adds", "phase": "bubble", "sourceName": "Nymrissa Wavecaller", "timesMs": [32102, 149077, 266039]},
+          {"spellID": 1257614, "label": "Frost Barrage", "kind": "placement", "phase": "normal", "sourceName": "Nymrissa Wavecaller", "timesMs": [33042, 53018, 104025, 150034, 170011, 221004, 267028, 287071, 338040]},
+          {"spellID": 1258673, "label": "Tidepiercer's Rush", "kind": "transition", "phase": "bubble", "sourceName": "Nymrissa Wavecaller", "timesMs": [64007, 181011, 298041]},
+          {"spellID": 1258150, "label": "Pop!", "kind": "raid", "phase": "bubble", "sourceName": "Environment", "timesMs": [77185, 194052, 311055]},
+          {"spellID": 1295086, "label": "无尽潮汐", "kind": "enrage", "phase": "enrage", "sourceName": "Nymrissa Wavecaller", "timesMs": [356052]}
+        ],
+        "codingSignals": [
+          {"label": "鱼人转场开始", "spellID": 1284015, "eventType": "begincast", "timeMs": 27127, "rule": "每轮 1284015 begincast 是 Boss 进中场、生成水泡与鱼人转火的稳定起点。"},
+          {"label": "转场结束", "spellID": 1258150, "eventType": "cast", "timeMs": 77185, "rule": "Pop! 结算全团伤害与击退，标记返回常态循环。"},
+          {"label": "硬狂暴", "spellID": 1295086, "eventType": "begincast", "timeMs": 356052, "rule": "首次 1295086 begincast 是无尽潮汐硬狂暴起点。"}
+        ],
+        "cycleNotes": [
+          "英雄样本三次鱼人转场开始于约 00:27 / 02:24 / 04:21，相邻间隔稳定为约 117 秒。",
+          "每轮转场约 50 秒后由 Pop! 结束；鱼人波次在水泡读条完成时出现。",
+          "无尽潮汐固定在约 05:56 开始读条；该团队在 06:48 完成击杀。"
+        ]
+      },
+      "mythic": {
+        "reportID": "ZmYa6M2QV4hbLCry",
+        "fightID": 10,
+        "kill": false,
+        "durationMs": 385302,
+        "bossPercentage": 17.79,
+        "stats": [
+          {"label": "史诗低血量样本", "timeMs": 385302},
+          {"label": "结束血量", "value": "17.79%"},
+          {"label": "鱼人转场", "value": "3 轮"}
+        ],
+        "phaseMarkers": [
+          {"phase": "normal-1", "label": "常态 1", "timeMs": 0, "source": "fightStart", "confidence": "observed"},
+          {"phase": "bubble-1", "label": "鱼人转场 1", "timeMs": 26979, "spellID": 1284015, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "normal-2", "label": "常态 2", "timeMs": 81073, "spellID": 1258150, "eventType": "cast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "bubble-2", "label": "鱼人转场 2", "timeMs": 144006, "spellID": 1284015, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "normal-3", "label": "常态 3", "timeMs": 198067, "spellID": 1258150, "eventType": "cast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "bubble-3", "label": "鱼人转场 3", "timeMs": 261042, "spellID": 1284015, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "normal-4", "label": "常态 4", "timeMs": 315149, "spellID": 1258150, "eventType": "cast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "enrage", "label": "无尽潮汐", "timeMs": 356061, "spellID": 1295086, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "wipe", "label": "17.79% 灭团", "timeMs": 385302, "source": "fightEnd", "confidence": "observed"}
+        ],
+        "eventSeries": [
+          {"spellID": 1257614, "label": "Frost Barrage", "kind": "placement", "phase": "normal", "sourceName": "Nymrissa Wavecaller", "timesMs": [3010, 34012, 58021, 104015, 119986, 151035, 175024, 221012, 237047, 268052, 292061, 338046]},
+          {"spellID": 1260837, "label": "深渊之雨", "kind": "raid", "phase": "normal", "sourceName": "Nymrissa Wavecaller", "timesMs": [9026, 126002, 243043]},
+          {"spellID": 1281951, "label": "Water Jet", "kind": "mythic-tank", "phase": "normal", "sourceName": "Nymrissa Wavecaller", "timesMs": [16994, 45985, 85980, 134007, 162985, 203015, 251076, 280042, 320040]},
+          {"spellID": 1284015, "label": "诱惑水泡", "kind": "transition", "phase": "bubble", "sourceName": "Nymrissa Wavecaller", "timesMs": [26979, 144006, 261042]},
+          {"spellID": 1263301, "label": "鱼人波次", "kind": "adds", "phase": "bubble", "sourceName": "Nymrissa Wavecaller", "timesMs": [32022, 149014, 266111]},
+          {"spellID": 1258673, "label": "Tidepiercer's Rush", "kind": "transition", "phase": "bubble", "sourceName": "Nymrissa Wavecaller", "timesMs": [68016, 185014, 302069]},
+          {"spellID": 1258150, "label": "Pop!", "kind": "raid", "phase": "bubble", "sourceName": "Environment", "timesMs": [81073, 198067, 315149]},
+          {"spellID": 1295086, "label": "无尽潮汐", "kind": "enrage", "phase": "enrage", "sourceName": "Nymrissa Wavecaller", "timesMs": [356061]}
+        ],
+        "codingSignals": [
+          {"label": "史诗鱼人护盾", "spellID": 1273091, "eventType": "applydebuff", "timeMs": 35192, "rule": "按 Bubblefin Frostscale 来源检查 1273091/1273150，确认附近鱼人的减伤窗口。"},
+          {"label": "鱼人转场开始", "spellID": 1284015, "eventType": "begincast", "timeMs": 26979, "rule": "史诗与英雄均以 1284015 begincast 作为转火起点。"},
+          {"label": "硬狂暴", "spellID": 1295086, "eventType": "begincast", "timeMs": 356061, "rule": "史诗样本与英雄样本均在约 05:56 进入无尽潮汐。"}
+        ],
+        "cycleNotes": [
+          "史诗三次鱼人转场开始于约 00:27 / 02:24 / 04:21，与英雄击杀样本几乎重合，可按固定时间轴处理。",
+          "史诗 Water Jet 约每 29–40 秒一次，必须同时规划坦克易伤、击退方向与冰地清理。",
+          "该样本在无尽潮汐开始后灭团，Boss 剩余 17.79%；报告内还有 14.54% 与 11.62% 尝试，循环时点一致。"
+        ]
+      }
     }
   }
 }

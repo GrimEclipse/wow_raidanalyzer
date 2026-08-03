@@ -3,6 +3,21 @@
   "zoneID": 54,
   "raidNameZh": "烈毒之渊",
   "raidNameEn": "The Venomous Abyss",
+  "guideNameZh": "12.1 团长战斗手册",
+  "raids": [
+    {"key": "venomous_abyss", "nameZh": "烈毒之渊", "nameEn": "The Venomous Abyss"},
+    {"key": "tidebound_grotto", "nameZh": "潮缚石窟", "nameEn": "The Tidebound Grotto"}
+  ],
+  "extraBosses": [
+    {
+      "key": "nymrissa_wavecaller",
+      "raidKey": "tidebound_grotto",
+      "order": 1,
+      "nameZh": "尼姆瑞莎·唤潮者",
+      "nameEn": "Nymrissa Wavecaller",
+      "encounterID": 3379
+    }
+  ],
   "confirmedSourceNames": {
     "Environment": "环境",
     "Nek'zali the Soulcoiler": "缠魂者内克扎莉",
@@ -20,7 +35,8 @@
     "Vexhul": "维克苏尔",
     "Broodling of Ithraz": "伊斯拉兹幼体",
     "Zul'jan": "祖尔加",
-    "Hex Lord Malacrass": "妖术领主玛拉卡斯"
+    "Hex Lord Malacrass": "妖术领主玛拉卡斯",
+    "Nymrissa Wavecaller": "尼姆瑞莎·唤潮者"
   },
   "confirmedSpellNames": {
     "1277002": "劫掠",
@@ -215,7 +231,7 @@
           "label": "P1",
           "title": "缠魂者启蒙",
           "trigger": "开场 → Boss 50% 生命",
-          "goal": "阻止灵魂进入井，在 100 能量前把 Boss 压入 50%。",
+          "goal": "处理无眠的阿曼尼，规划精华撕裂产生的黑水；在 Boss 50% 前保持井口和转场区域干净。",
           "spellIDs": [1284032, 1285681, 1284033, 1288772, 1297624, 1289919, 1287426, 1284103]
         },
         {
@@ -223,7 +239,7 @@
           "label": "转场",
           "title": "苏醒仪式",
           "trigger": "Boss 到达 50% 生命",
-          "goal": "击杀两侧架瓦埃的回响，处理坦克分摊与尸体焚烧；继续防止漏怪入井。",
+          "goal": "击杀两只贾瓦埃的回响，完成噬灭烈焰分摊，并用追踪火焰焚烧尸体。",
           "spellIDs": [1289683, 1289696, 1292248, 1289855, 1294742]
         },
         {
@@ -231,7 +247,7 @@
           "label": "P2",
           "title": "解缚",
           "trigger": "两只架瓦埃的回响死亡",
-          "goal": "在自然回能和祈求把能量推至 100 前击杀 Boss，并持续躲避加速移动的场地黑水。",
+          "goal": "继续处理小怪与移动黑水，全力击杀 Boss；必须在能量达到 100 前结束战斗。",
           "spellIDs": [1290003, 1299673, 1293497, 1284034]
         }
       ],
@@ -2024,6 +2040,184 @@
           "verification": "以 1298381 的施加/层数追踪污染扩大，关联 1307279 的清理结果、墓缚和 1299267/1307652 的分摊者治疗吸收；只报告实际命中与状态。"
         }
       ]
+    },
+    "nymrissa_wavecaller": {
+      "reviewStatus": "reviewed",
+      "difficulty": "英雄 / 史诗 PTR · WCL Zone 57 与指定报告已取样",
+      "summary": "单目标常态阶段与固定鱼人转场交替的循环战。深渊之雨会给全团叠加永久持续伤害；Frost Barrage 点名玩家持续放下冰球，团队需要有节奏地撞掉。固定时间轴到达后 Boss 进入中场召唤鱼人，全团停 Boss 转火，阻止鱼人靠近水泡。",
+      "phases": [
+        {
+          "key": "p1",
+          "label": "P1",
+          "title": "常态阶段：放球与消球",
+          "trigger": "开场 → 固定时间轴转场",
+          "goal": "处理深渊之雨叠加的永久全团 DOT 和对坦伤害；Frost Barrage 点名者沿规划路线连续放球，由指定玩家按节奏撞掉，不能让冰球自然爆炸。",
+          "spellIDs": [1260837, 1277386, 1257614, 1257644, 1257651, 1282937, 1281951]
+        },
+        {
+          "key": "intermission",
+          "label": "转场",
+          "title": "诱惑水泡：鱼人转火",
+          "trigger": "固定时间轴到达后，Boss 进入场地中央",
+          "goal": "立即转火从场边靠近 Boss 的鱼人；在鱼人进入诱惑水泡并被强化前完成击杀，同时避开向水泡移动的漩涡。",
+          "spellIDs": [1284015, 1263301, 1258673, 1258150, 1273091, 1258894]
+        },
+        {
+          "key": "cycle",
+          "label": "循环",
+          "title": "返回常态阶段",
+          "trigger": "水泡破裂、转场结束",
+          "goal": "回到放球、消球和对坦技能循环；浸湿层数不会清除，直到下一次鱼人转场或击杀。",
+          "spellIDs": [1260837, 1277386, 1257614, 1257651]
+        }
+      ],
+      "mechanics": [
+        {
+          "phase": "p1",
+          "title": "深渊之雨：永久浸湿层数",
+          "priority": "critical",
+          "roles": ["治疗", "全团"],
+          "tags": ["全团 AOE", "永久 DOT", "层数压力"],
+          "spellIDs": [1260837, 1260843, 1277386, 1307352, 1282404],
+          "leaderSpellIDs": [1260837],
+          "summary": "Boss 引导深渊之雨，连续对全团造成冰霜伤害，并给每名玩家叠加一层永久持续的浸湿。每轮 AOE 都会让后续的全团掉血更快，是这场战斗的软狂暴。",
+          "leaderDetails": [
+            "治疗轴应围绕深渊之雨及其后续浸湿伤害安排，不能只看单次 AOE。",
+            "浸湿不会随鱼人转场清除；越晚进入下一轮，冰球爆炸、鱼人脉动和对坦技能的容错越低。"
+          ],
+          "wipePoints": [
+            "高层浸湿与冰球爆炸或鱼人脉动重叠，造成连续减员。"
+          ],
+          "evidenceType": "permanent-frost-damage-escalation",
+          "verification": "WCL 实测：Abyssal Rain cast 1260837、damage 1260843；Drenched 层数 1277386、持续伤害 1307352。当前手册另链接 Drenched 1282404。"
+        },
+        {
+          "phase": "p1",
+          "title": "Frost Barrage：点名放冰与指定消球",
+          "priority": "critical",
+          "roles": ["被点名玩家", "消球组", "治疗"],
+          "tags": ["点名 DOT", "连续放球", "撞球", "场地管理"],
+          "spellIDs": [1257614, 1257608, 1257644, 1257651, 1281393, 1282537, 1257654, 1313393, 1313402, 1313456, 1313450],
+          "leaderSpellIDs": [1257614],
+          "summary": "Frost Barrage 点名若干玩家施加持续伤害，效果期间每隔一段时间在玩家脚下放下一颗 Drifting Globule。冰球必须由玩家主动碰撞消除；若 30 秒无人处理，就会自行爆炸并将高额持续伤害扩散给全团。",
+          "leaderDetails": [
+            "点名者沿预定方向移动，按间距依次放球，禁止把球留在转场集合点或坦克路线。",
+            "指定消球玩家按治疗节奏逐个撞球；接触者会承受直接伤害与持续伤害，并在原地留下残留冰霜。",
+            "先检查消球者当前层数和血线，再决定是否继续撞下一颗，不能多人无序抢球。"
+          ],
+          "mythicNotes": [
+            "史诗实测中，碰球会用 Drifting Globules 1281393 对全团造成额外伤害，并给碰球者留下 20 秒 DOT；必须分批处理。",
+            "Water Jet 实测 cast 1281951 可以清除残留冰霜，可把对坦技能的路线纳入场地清理规划。"
+          ],
+          "wipePoints": [
+            "冰球超过 30 秒无人接触，爆炸后将持续伤害施加给全团。",
+            "连续消球过快，碰球全团伤害、消球者自身 DOT 与深渊之雨重叠。",
+            "放球位置错误，残留冰霜封锁下一轮转场与鱼人转火路线。"
+          ],
+          "evidenceType": "timed-orb-placement-and-consumption",
+          "verification": "WCL 实测链：Frost Barrage cast 1257614、点名 1257608、DOT 1257644 → Drifting Globules 1257651（英雄）/1281393、1282537（史诗）→ Lingering Frost 1257654。手册新版候选链 1313393/1313402/1313456/1313450 保留作版本对照。"
+        },
+        {
+          "phase": "p1",
+          "title": "对坦技能：Water Flurry / Water Jet",
+          "priority": "high",
+          "roles": ["坦克", "治疗"],
+          "tags": ["持续对坦伤害", "换坦", "击退"],
+          "spellIDs": [1282937, 1282945, 1281951, 1271458, 1258901],
+          "leaderSpellIDs": [1282937, 1281951],
+          "summary": "Boss 会对当前坦克引导持续伤害。英雄实测为 Water Flurry 1282937；史诗实测为 Water Jet 1281951，连续命中会增加后续 Water Jet 与冰霜伤害，并把坦克向后推。",
+          "leaderDetails": [
+            "坦克提前规划减伤和换坦层数，治疗在深渊之雨附近注意对坦持续伤害重叠。",
+            "史诗水流喷射期间保持背后安全距离，利用射线经过的路线清理残留冰霜，但不能为清场把喷射带过大团。"
+          ],
+          "mythicNotes": ["每次水流喷射命中使后续同技能伤害提高 45%，持续 40 秒并可叠加。"],
+          "wipePoints": [
+            "高层水流喷射易伤继续硬吃整段引导，或击退方向错误导致坦克离开场地。",
+            "为清除冰地改变面向时扫到其他玩家。"
+          ],
+          "evidenceType": "stacking-tank-channel",
+          "verification": "WCL 实测：英雄 Water Flurry cast 1282937 / damage 1282945；史诗 Water Jet cast 1281951 / damage 1271458。当前手册主条目为 1258901。"
+        },
+        {
+          "phase": "intermission",
+          "title": "诱惑水泡：中场鱼人转火",
+          "priority": "critical",
+          "roles": ["全团", "DPS", "控制组"],
+          "tags": ["固定转场", "中场", "鱼人转火", "漩涡"],
+          "spellIDs": [1284015, 1257717, 1263301, 1258673, 1258668, 1258150, 1273091, 1273150, 1258894, 1271380],
+          "leaderSpellIDs": [1284015],
+          "summary": "固定时间轴到达后，Boss 进入场地中央并形成诱惑水泡，鱼人从场边向 Boss 靠近。团队必须立刻转火并控制鱼人；进入水泡的鱼人会变为狂暴鱼人并持续对全团造成脉动伤害。",
+          "leaderDetails": [
+            "转场前收拢站位并预留场边到中场的转火路线，鱼人出现后立即停 Boss 转火。",
+            "漩涡会向诱惑水泡移动并最终使水泡破裂；避开漩涡路径，同时在水泡破裂前尽量清掉鱼人。",
+            "水泡破裂会造成全团伤害并击退，转场末尾提前回到安全站位。"
+          ],
+          "mythicNotes": [
+            "史诗难度会额外出现 Bubblefin Frostscale；其 Waterfog Shield 1273091/1273150 使附近鱼人减伤 98%，必须优先处理护盾来源。"
+          ],
+          "wipePoints": [
+            "鱼人进入诱惑水泡并转化为狂暴鱼人，Pulsing Tides 与深渊之雨叠加。",
+            "没有优先处理史诗护盾鱼人，导致整组鱼人获得 98% 减伤。",
+            "水泡破裂击退前站位错误，玩家被推入冰地或场外。"
+          ],
+          "evidenceType": "fixed-add-intermission",
+          "verification": "WCL 转场读条 1284015，水泡主效果 1257717/1258038，鱼人波次 1263301，Tidepiercer's Rush 1258673，Pop! 1258150，Pulsing Tides 1258894/1271380，史诗护盾 1273091/1273150。"
+        },
+        {
+          "phase": "enrage",
+          "title": "无尽潮汐：狂暴",
+          "priority": "critical",
+          "roles": ["全团"],
+          "tags": ["狂暴", "全团伤害"],
+          "spellIDs": [1294867, 1295086],
+          "leaderSpellIDs": [1295086],
+          "summary": "战斗时间耗尽后，Boss 释放无尽潮汐，每秒对全团造成灾难性的冰霜伤害，视为硬狂暴。",
+          "leaderDetails": ["永久冰霜增伤是软狂暴，无尽潮汐是最终硬狂暴；输出规划必须覆盖完整鱼人转火损失。"],
+          "wipePoints": ["转场鱼人处理过慢导致 Boss 本体输出不足，最终进入无尽潮汐。"],
+          "evidenceType": "hard-enrage",
+          "verification": "Unending Tides 1294867/1295086。"
+        }
+      ],
+      "spellOverrides": {
+        "1260837": {"nameEn": "Abyssal Rain", "categories": ["enemyCasts"], "tags": ["全团 AOE", "WCL 实测"], "observedIn": {"heroic": {"eventCount": 6, "uniqueTargetCount": 0, "firstMs": 3010, "lastMs": 239038, "eventTypes": {"begincast": 3, "cast": 3}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "zpRDdcafg7hCrT9Y", "fightID": 1}}, "mythic": {"eventCount": 6, "uniqueTargetCount": 0, "firstMs": 9026, "lastMs": 245050, "eventTypes": {"begincast": 3, "cast": 3}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "ZmYa6M2QV4hbLCry", "fightID": 10}}}},
+        "1260843": {"nameEn": "Abyssal Rain", "categories": ["damageAbilities"], "tags": ["全团 AOE", "WCL 实测"]},
+        "1277386": {"nameEn": "Drenched", "categories": ["playerDebuffs"], "tags": ["永久 DOT", "层数"]},
+        "1307352": {"nameEn": "Drenched", "categories": ["damageAbilities"], "tags": ["永久 DOT", "WCL 实测"]},
+        "1282404": {"nameEn": "Drenched", "categories": ["journalOnly"], "tags": ["当前手册候选 ID"]},
+
+        "1257614": {"nameEn": "Frost Barrage", "categories": ["enemyCasts"], "tags": ["点名", "连续放球", "WCL 实测"], "observedIn": {"heroic": {"eventCount": 18, "uniqueTargetCount": 0, "firstMs": 33042, "lastMs": 340059, "eventTypes": {"begincast": 9, "cast": 9}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "zpRDdcafg7hCrT9Y", "fightID": 1}}, "mythic": {"eventCount": 24, "uniqueTargetCount": 0, "firstMs": 3010, "lastMs": 340064, "eventTypes": {"begincast": 12, "cast": 12}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "ZmYa6M2QV4hbLCry", "fightID": 10}}}},
+        "1257608": {"nameEn": "Frost Barrage", "categories": ["playerDebuffs"], "tags": ["点名标记", "WCL 实测"]},
+        "1257644": {"nameEn": "Frost Barrage", "categories": ["playerDebuffs", "damageAbilities"], "tags": ["点名 DOT", "WCL 实测"]},
+        "1257651": {"nameEn": "Drifting Globules", "categories": ["playerDebuffs", "damageAbilities"], "tags": ["英雄", "撞球", "30 秒"]},
+        "1281393": {"nameEn": "Drifting Globules", "categories": ["damageAbilities"], "tags": ["史诗", "撞球 AOE"]},
+        "1282537": {"nameEn": "Drifting Globules", "categories": ["playerDebuffs"], "tags": ["史诗", "撞球者 DOT"]},
+        "1257654": {"nameEn": "Lingering Frost", "categories": ["playerDebuffs", "damageAbilities"], "tags": ["残留冰霜", "滑行"]},
+        "1313393": {"nameEn": "Chilling Frost", "categories": ["journalOnly"], "tags": ["手册新版候选"]},
+        "1313402": {"nameEn": "Frost Orb", "categories": ["journalOnly"], "tags": ["手册新版候选"]},
+        "1313456": {"nameEn": "Shatter", "categories": ["journalOnly"], "tags": ["手册新版候选"]},
+        "1313450": {"nameEn": "Frost Burst", "categories": ["journalOnly"], "tags": ["手册新版候选", "史诗"]},
+
+        "1282937": {"nameEn": "Water Flurry", "categories": ["enemyCasts", "playerDebuffs"], "tags": ["英雄", "对坦技能"], "observedIn": {"heroic": {"eventCount": 18, "uniqueTargetCount": 0, "firstMs": 13020, "lastMs": 329032, "eventTypes": {"begincast": 9, "cast": 9}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "zpRDdcafg7hCrT9Y", "fightID": 1}}}},
+        "1282945": {"nameEn": "Water Flurry", "categories": ["damageAbilities"], "tags": ["英雄", "对坦伤害"]},
+        "1281951": {"nameEn": "Water Jet", "categories": ["enemyCasts"], "tags": ["史诗", "对坦技能", "清除冰地"], "observedIn": {"mythic": {"eventCount": 18, "uniqueTargetCount": 0, "firstMs": 16994, "lastMs": 323030, "eventTypes": {"begincast": 9, "cast": 9}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "ZmYa6M2QV4hbLCry", "fightID": 10}}}},
+        "1271458": {"nameEn": "Water Jet", "categories": ["damageAbilities"], "tags": ["史诗", "对坦伤害"]},
+        "1258901": {"nameEn": "Water Jet", "categories": ["journalOnly"], "tags": ["当前手册主条目"]},
+
+        "1284015": {"nameEn": "Alluring Bubble", "categories": ["enemyCasts"], "tags": ["固定转场", "召唤鱼人", "WCL 实测"], "observedIn": {"heroic": {"eventCount": 6, "uniqueTargetCount": 0, "firstMs": 27127, "lastMs": 266039, "eventTypes": {"begincast": 3, "cast": 3}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "zpRDdcafg7hCrT9Y", "fightID": 1}}, "mythic": {"eventCount": 6, "uniqueTargetCount": 0, "firstMs": 26979, "lastMs": 266055, "eventTypes": {"begincast": 3, "cast": 3}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "ZmYa6M2QV4hbLCry", "fightID": 10}}}},
+        "1257717": {"nameEn": "Alluring Bubble", "categories": ["bossAuras", "journalOnly"], "tags": ["转场主效果", "召唤鱼人"]},
+        "1258038": {"nameEn": "Alluring Bubble", "categories": ["bossAuras"], "tags": ["转场附属效果"]},
+        "1263301": {"nameEn": "[DNT] Murloc Wave", "categories": ["enemyCasts"], "tags": ["鱼人波次", "WCL 实测"]},
+        "1258673": {"nameEn": "Tidepiercer's Rush", "categories": ["enemyCasts"], "tags": ["转场", "移动风暴"]},
+        "1258668": {"nameEn": "Swirling Whirlpools", "categories": ["journalOnly", "damageAbilities"], "tags": ["当前手册候选", "移动漩涡"]},
+        "1258150": {"nameEn": "Pop!", "categories": ["enemyCasts", "damageAbilities"], "tags": ["全团伤害", "击退"]},
+        "1273091": {"nameEn": "Waterfog Shield", "categories": ["playerDebuffs"], "tags": ["史诗", "鱼人减伤"]},
+        "1273150": {"nameEn": "Waterfog Shield", "categories": ["playerDebuffs"], "tags": ["史诗", "鱼人减伤"]},
+        "1258894": {"nameEn": "Pulsing Tides", "categories": ["bossAuras", "enemyCasts"], "tags": ["狂暴鱼人", "全团伤害"]},
+        "1271380": {"nameEn": "Pulsing Tides", "categories": ["damageAbilities"], "tags": ["狂暴鱼人", "全团伤害"]},
+
+        "1294867": {"nameEn": "Unending Tides", "categories": ["enemyCasts"], "tags": ["硬狂暴附属施法"]},
+        "1295086": {"nameEn": "Unending Tides", "categories": ["enemyCasts", "damageAbilities"], "tags": ["硬狂暴", "WCL 实测"], "observedIn": {"heroic": {"eventCount": 2, "uniqueTargetCount": 0, "firstMs": 356052, "lastMs": 360063, "eventTypes": {"begincast": 1, "cast": 1}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "zpRDdcafg7hCrT9Y", "fightID": 1}}, "mythic": {"eventCount": 2, "uniqueTargetCount": 0, "firstMs": 356061, "lastMs": 360057, "eventTypes": {"begincast": 1, "cast": 1}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "ZmYa6M2QV4hbLCry", "fightID": 10}}}}
+      }
     }
   }
 }

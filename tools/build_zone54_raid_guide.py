@@ -34,6 +34,7 @@ ARENA_ASSETS = {
     "twinfangs": "assets/raids/venomous_abyss/06-twinfangs.jpg",
     "bargained": "assets/raids/venomous_abyss/07-bargained.jpg",
     "ulatek": "assets/raids/venomous_abyss/08-ulatek-arena.jpg",
+    "nymrissa_wavecaller": "assets/raids/tidebound_grotto/01-nymrissa.jpg",
 }
 
 
@@ -146,6 +147,8 @@ def build_spell_rows(boss, confirmed_spell_names=None, spell_overrides=None):
         for category in override.get("categories") or ["journalOnly"]:
             if category in CATEGORY_LABELS and category not in target["categories"]:
                 target["categories"].append(category)
+        for difficulty, item in (override.get("observedIn") or {}).items():
+            target["observedIn"][difficulty] = compact_observation(item)
         target["authoredTags"] = override.get("tags") or []
     rows = []
     for spell_id, row in aggregate.items():
@@ -253,23 +256,28 @@ def build_document(discovery, authored, timelines=None):
     confirmed_source_names = authored.get("confirmedSourceNames") or {}
     timeline_bosses = (timelines or {}).get("bosses") or {}
     bosses = []
-    order_by_key = {
-        metadata["key"]: index + 1
-        for index, metadata in enumerate(ENCOUNTERS.values())
-    }
-    metadata_by_key = {
-        metadata["key"]: metadata
-        for metadata in ENCOUNTERS.values()
-    }
-    for key in order_by_key:
+    metadata_rows = [
+        {**metadata, "encounterID": encounter_id, "order": index + 1, "raidKey": "venomous_abyss"}
+        for index, (encounter_id, metadata) in enumerate(ENCOUNTERS.items())
+    ]
+    metadata_rows.extend(authored.get("extraBosses") or [])
+    for metadata in metadata_rows:
+        key = metadata["key"]
         evidence_boss = (discovery.get("bosses") or {}).get(key) or {}
         source = authored_bosses.get(key) or {}
-        metadata = metadata_by_key[key]
+        raid = next(
+            (row for row in (authored.get("raids") or []) if row["key"] == metadata.get("raidKey")),
+            {},
+        )
         boss = {
             "key": key,
-            "order": order_by_key[key],
-            "nameZh": BOSS_ZH.get(key, metadata["name"]),
-            "nameEn": metadata["name"],
+            "order": int(metadata.get("order") or 1),
+            "raidKey": metadata.get("raidKey") or "venomous_abyss",
+            "raidNameZh": raid.get("nameZh") or authored.get("raidNameZh") or "烈毒之渊",
+            "raidNameEn": raid.get("nameEn") or authored.get("raidNameEn") or "The Venomous Abyss",
+            "encounterID": int(metadata.get("encounterID") or 0),
+            "nameZh": BOSS_ZH.get(key, metadata.get("nameZh") or metadata.get("name")),
+            "nameEn": metadata.get("nameEn") or metadata.get("name"),
             "image": ARENA_ASSETS.get(key),
             "reviewStatus": source.get("reviewStatus") or "draft",
             "difficulty": source.get("difficulty") or "英雄日志基线 / 史诗差异待复核",
@@ -290,8 +298,14 @@ def build_document(discovery, authored, timelines=None):
                 spell_overrides=source.get("spellOverrides") or {},
             ),
             "journalSpellCount": len((evidence_boss.get("journal") or {}).get("spells") or []),
-            "hasHeroicEvidence": bool((evidence_boss.get("evidence") or {}).get("heroic")),
-            "hasMythicEvidence": bool((evidence_boss.get("evidence") or {}).get("mythic")),
+            "hasHeroicEvidence": bool(
+                (evidence_boss.get("evidence") or {}).get("heroic")
+                or (timeline_bosses.get(key) or {}).get("heroic")
+            ),
+            "hasMythicEvidence": bool(
+                (evidence_boss.get("evidence") or {}).get("mythic")
+                or (timeline_bosses.get(key) or {}).get("mythic")
+            ),
             "expectedUntested": bool(metadata.get("expectedUntested")),
         }
         reviewed_ids = {
@@ -305,8 +319,10 @@ def build_document(discovery, authored, timelines=None):
         bosses.append(boss)
 
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "zoneID": int(authored.get("zoneID") or 54),
+        "guideNameZh": authored.get("guideNameZh") or "12.1 团长战斗手册",
+        "raids": authored.get("raids") or [],
         "raidNameZh": authored.get("raidNameZh") or "烈毒之渊",
         "raidNameEn": authored.get("raidNameEn") or "The Venomous Abyss",
         "generatedAt": datetime.now(timezone.utc).isoformat(),

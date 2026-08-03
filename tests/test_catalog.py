@@ -12,6 +12,24 @@ class BossCatalogTests(unittest.TestCase):
         self.assertEqual(crown.capabilities["avoidable"]["renderer"], "mistake-tracker")
         self.assertTrue(crown.capabilities["replay"]["enabled"])
 
+    def test_boss_without_dedicated_report_page_is_unsupported(self):
+        lightblinded = find_boss("12.0", "void_spire", "lightblinded_vanguard")
+        midnight = find_boss("12.0", "march_on_queldanas", "midnight_falls")
+        self.assertFalse(lightblinded.supported)
+        self.assertFalse(midnight.supported)
+
+        root = CATALOG_PATH.parent
+        runtime = (root / "frontend" / "core" / "report-plugin-runtime.js").read_text(
+            encoding="utf-8"
+        )
+        route_page = (root / "frontend" / "report" / "index.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('descriptor.renderer === "generic"', runtime)
+        self.assertIn('/generic.html', runtime)
+        self.assertIn("暂不支持", route_page)
+        self.assertNotIn("使用通用报告页", route_page)
+
     def test_venomous_abyss_order_and_external_keys(self):
         frontend = to_frontend_catalog()
         version = next(item for item in frontend["versions"] if item["version"] == "12.1")
@@ -29,13 +47,14 @@ class BossCatalogTests(unittest.TestCase):
         self.assertEqual(len(assets), 9)
         for asset in assets:
             self.assertTrue((root / asset["path"]).is_file(), asset["path"])
-            self.assertEqual((asset["width"], asset["height"]), (914, 514))
+            self.assertEqual((asset["width"], asset["height"]), (1997, 1118))
 
     def test_tidebound_grotto_reference_is_kept_separate(self):
         boss = find_boss("12.1", "tidebound_grotto", "nymrissa_wavecaller")
         self.assertEqual(boss.english_name, "Nymrissa Wavecaller")
-        self.assertEqual(boss.external_key, "")
-        self.assertEqual(boss.arena_assets, [])
+        self.assertEqual(boss.external_key, "wow.tidebound,01.nymrissa")
+        self.assertEqual(len(boss.arena_assets), 1)
+        self.assertTrue((CATALOG_PATH.parent / boss.arena_assets[0]["path"]).is_file())
 
     def test_duplicate_boss_identity_is_rejected(self):
         duplicate = {

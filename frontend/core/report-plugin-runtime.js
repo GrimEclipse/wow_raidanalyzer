@@ -39,15 +39,26 @@
       script.onerror = () => reject(new Error(`尚未找到 ${identity.raidKey}/${identity.bossKey} 的前端插件`));
       document.head.appendChild(script);
     });
-    return global.MythicReportPlugin || {
-      id: `${identity.raidKey}/${identity.bossKey}`,
-      reportPage: "frontend/report/generic.html",
-      renderer: "generic"
-    };
+    const descriptor = global.MythicReportPlugin;
+    if (!descriptor) {
+      throw new Error(`${identity.raidKey}/${identity.bossKey} 尚未提供前端插件描述`);
+    }
+    if (
+      descriptor.supported === false
+      || descriptor.renderer === "generic"
+      || String(descriptor.reportPage || "").endsWith("/generic.html")
+    ) {
+      throw new Error(descriptor.disabledReason || `${identity.bossName} 尚未提供 Boss 专属报告页面`);
+    }
+    if (!descriptor.reportPage) {
+      throw new Error(`${identity.bossName} 的前端插件缺少专属 reportPage`);
+    }
+    return descriptor;
   }
 
   function reportUrl(descriptor, sourcePath) {
-    const page = descriptor.reportPage || "frontend/report/generic.html";
+    const page = descriptor && descriptor.reportPage;
+    if (!page) throw new Error("该 Boss 尚未提供专属报告页面");
     if (!sourcePath) return page;
     const separator = page.includes("?") ? "&" : "?";
     return `${page}${separator}json=${encodeURIComponent(sourcePath)}`;

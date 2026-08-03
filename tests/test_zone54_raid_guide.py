@@ -30,13 +30,60 @@ class Zone54RaidGuideTests(unittest.TestCase):
         cls.document = build_document(discovery, authored, timelines)
 
     def test_guide_contains_all_bosses_and_keeps_ulatek_as_expected_untested(self):
-        self.assertEqual(len(self.document["bosses"]), 8)
+        self.assertEqual(len(self.document["bosses"]), 9)
         ulatek = next(
             boss for boss in self.document["bosses"] if boss["key"] == "ulatek"
         )
         self.assertTrue(ulatek["expectedUntested"])
         self.assertFalse(ulatek["hasHeroicEvidence"])
         self.assertFalse(ulatek["hasMythicEvidence"])
+        nymrissa = next(
+            boss for boss in self.document["bosses"]
+            if boss["key"] == "nymrissa_wavecaller"
+        )
+        self.assertEqual(nymrissa["raidKey"], "tidebound_grotto")
+        self.assertEqual(nymrissa["nameZh"], "尼姆瑞莎·唤潮者")
+        self.assertTrue(nymrissa["image"].endswith("01-nymrissa.jpg"))
+        self.assertTrue(nymrissa["hasHeroicEvidence"])
+        self.assertTrue(nymrissa["hasMythicEvidence"])
+
+    def test_nymrissa_uses_zone57_wcl_ids_and_fixed_transition_timeline(self):
+        nymrissa = next(
+            boss for boss in self.document["bosses"]
+            if boss["key"] == "nymrissa_wavecaller"
+        )
+        spells = {spell["spellID"]: spell for spell in nymrissa["spells"]}
+        self.assertIn(1257614, spells)
+        self.assertIn(1257651, spells)
+        self.assertIn(1284015, spells)
+        self.assertIn(1281951, spells)
+        self.assertIn("heroic", spells[1257614]["observedIn"])
+        self.assertIn("mythic", spells[1257614]["observedIn"])
+        self.assertEqual(
+            spells[1257614]["observedIn"]["mythic"]["provenance"]["fightID"],
+            10,
+        )
+
+        heroic = nymrissa["timelines"]["heroic"]
+        mythic = nymrissa["timelines"]["mythic"]
+        self.assertTrue(heroic["kill"])
+        self.assertEqual(heroic["reportID"], "zpRDdcafg7hCrT9Y")
+        self.assertEqual(mythic["bossPercentage"], 17.79)
+        self.assertEqual(mythic["reportID"], "ZmYa6M2QV4hbLCry")
+        self.assertEqual(
+            [
+                marker["timeMs"]
+                for marker in mythic["phaseMarkers"]
+                if marker["phase"].startswith("bubble-")
+            ],
+            [26979, 144006, 261042],
+        )
+        transition = next(
+            mechanic for mechanic in nymrissa["mechanics"]
+            if mechanic["evidenceType"] == "fixed-add-intermission"
+        )
+        self.assertEqual(transition["leaderSpellIDs"], [1284015])
+        self.assertIn(1263301, transition["spellIDs"])
 
     def test_reviewed_boss_keeps_authored_energy_and_mechanics(self):
         nakzali = next(
@@ -79,8 +126,11 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn('<span class="spell-id">ID: ${spellID}</span>', page)
         self.assertIn("function mechanicSpellCluster", page)
         self.assertIn("mechanic-spell-icons", page)
+        self.assertIn("mechanic-primary-spell", page)
+        self.assertIn("附属效果", page)
         self.assertNotIn("related-spell-ids", page)
-        self.assertIn('category === "enemyCasts" || category === "playerDebuffs"', page)
+        self.assertIn('includes("enemyCasts")', page)
+        self.assertIn('includes("playerDebuffs")', page)
         self.assertIn("font-variant-numeric: tabular-nums", page)
         self.assertIn("mythic-note", page)
         self.assertIn("timeline-combo", page)
@@ -93,6 +143,12 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn("boss-test-note", page)
         self.assertIn("assets/vendor/zone54-raid-guide-data.js", page)
         self.assertIn("Boss 切换", page)
+        self.assertIn("战斗大概时间分析（粗略时间轴）", page)
+        self.assertIn("开发 ID 明细", page)
+        self.assertNotIn('href="#overview"', page)
+        self.assertNotIn('id="overviewText"', page)
+        self.assertIn('id="energy"', page)
+        self.assertNotIn("用阶段目标说明这一场战斗怎么打，而不是复述单份 WCL。", page)
         self.assertLess(
             page.index('<section id="mechanics"'),
             page.index('<section id="timeline"'),

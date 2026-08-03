@@ -12,6 +12,8 @@
             radial-gradient(circle at 88% 16%,rgba(168,85,247,.11),transparent 30rem),#020617}
         .phase-chip{display:inline-flex;align-items:center;gap:.4rem;border:1px solid rgba(103,232,249,.18);border-radius:999px;background:rgba(8,47,73,.45);padding:.3rem .65rem;color:#a5f3fc;font-size:.72rem}
         .phase-chip::before{content:"";width:.38rem;height:.38rem;border-radius:50%;background:#22d3ee;box-shadow:0 0 12px #22d3ee}
+        .phase-transition-row td{padding:.55rem 1rem;background:linear-gradient(90deg,rgba(126,34,206,.2),rgba(8,47,73,.16));color:#e9d5ff;font-size:.75rem;font-weight:700;letter-spacing:.02em}
+        .phase-transition-row strong{color:#f0abfc;margin-right:.45rem}
     </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
@@ -151,6 +153,18 @@
     const classColor = name => classColors[String(name || '').toLowerCase()] || '#cbd5e1';
     const processedTimeline = match => (match.timeline || [])
         .map(row => ({...row, player:state.renameMap[row.player] || row.player}));
+    const displayTimeline = match => {
+        const cooldowns = processedTimeline(match).map(row => ({...row, eventType:'cooldown'}));
+        const transitions = (match.phases?.segments || []).slice(1).map(row => ({
+            eventType:'phase_transition',
+            timeMs:Number(row.startTimeMs) || 0,
+            phaseLabel:row.phaseLabel || '',
+            phaseName:row.phaseName || '',
+        }));
+        return [...cooldowns, ...transitions].sort((a, b) =>
+            a.timeMs - b.timeMs || (a.eventType === 'phase_transition' ? -1 : 1)
+        );
+    };
     const exportMrt = timeline => {
         const lines = [];
         let currentPhase = null;
@@ -220,10 +234,11 @@
     const renderMatch = (match, index) => {
         const fragment = el('result-template').content.cloneNode(true);
         const article = fragment.querySelector('article');
-        const visibleTimeline = processedTimeline(match);
+        const cooldownTimeline = processedTimeline(match);
+        const visibleTimeline = displayTimeline(match);
         article.querySelector('.result-title').textContent = `样本 ${index + 1} · ${match.fightName}`;
         article.querySelector('.result-meta').textContent =
-            `${clock(match.durationMs)} · ${match.reportID} / 战斗 ${match.fightID} · ${visibleTimeline.length}/${match.timeline.length} 次团队技能 · ${
+            `${clock(match.durationMs)} · ${match.reportID} / 战斗 ${match.fightID} · ${cooldownTimeline.length}/${match.timeline.length} 次团队技能 · ${
                 ({wcl:'WCL 实际阶段',ptr_reference:'PTR 实测阶段',ptr_reference_scaled:'PTR 参考阶段（按战斗时长校准）',single_phase:'单阶段'})[match.phases?.source] || '阶段待确认'
             }`;
         article.querySelector('.result-wcl').href = match.wclUrl;
@@ -237,9 +252,13 @@
             `<span class="phase-chip">${escapeHtml(row.phaseLabel)} · ${escapeHtml(row.phaseName)} · ${clock(row.startTimeMs)}</span>`
         ).join('');
         article.querySelector('.result-timeline').innerHTML = visibleTimeline.length
-            ? visibleTimeline.map(row => `
+            ? visibleTimeline.map(row => row.eventType === 'phase_transition' ? `
+                <tr class="phase-transition-row">
+                    <td colspan="5"><strong>阶段转换</strong>${escapeHtml(row.phaseLabel)} · ${escapeHtml(row.phaseName)} · ${clock(row.timeMs)}</td>
+                </tr>
+            ` : `
                 <tr class="hover:bg-slate-800/45">
-                    <td class="px-4 py-3"><div class="font-mono text-cyan-300">${clock(row.timeMs)}</div><div class="mt-1 text-[11px] text-fuchsia-300">${escapeHtml(row.phaseLabel || 'P1')} +${clock(row.phaseTimeMs ?? row.timeMs)}</div></td>
+                    <td class="px-4 py-3"><div class="font-mono text-cyan-300">${clock(row.timeMs)}</div><div class="mt-1 text-[11px] text-fuchsia-300">${escapeHtml(row.phaseLabel || 'P1')}（+${clock(row.phaseTimeMs ?? row.timeMs)}）</div></td>
                     <td class="px-4 py-3 font-medium" style="color:${classColor(row.class)}">${escapeHtml(row.player)}</td>
                     <td class="px-4 py-3 text-slate-400">${escapeHtml(row.specLabel || '—')}</td>
                     <td class="px-4 py-3"><span class="text-slate-200">${escapeHtml(row.spell)}</span> <span class="ml-1 font-mono text-xs text-slate-600">${row.spellID}</span></td>

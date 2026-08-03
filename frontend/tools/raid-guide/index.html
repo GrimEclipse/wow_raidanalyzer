@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="../../../">
-    <title>烈毒之渊 · 团长战斗手册</title>
+    <title>12.1 · 团长战斗手册</title>
     <script>
         const whTooltips = {
             colorLinks: false,
@@ -99,6 +99,7 @@
             text-transform: uppercase;
         }
         .boss-list { display: grid; gap: 7px; }
+        .boss-raid-label { margin: 13px 7px 3px; color: #8d9bb0; font-size: 10px; font-weight: 900; letter-spacing: .1em; }
         .boss-button {
             width: 100%;
             display: grid;
@@ -491,7 +492,9 @@
         .chip.role { border-color: #345777; color: #96c8f5; }
         .mechanic-details { margin: 13px 0 0; padding-left: 20px; color: #9fabbb; }
         .mechanic-details li { margin: 6px 0; }
-        .mechanic-spell-cluster { min-width: min(280px, 40%); }
+        .mechanic-spell-cluster { min-width: min(320px, 44%); }
+        .mechanic-primary-spell { display: flex; justify-content: flex-end; }
+        .mechanic-primary-spell .spell-ref { padding: 7px 9px; border: 1px solid #344055; border-radius: 8px; background: #0a0f18; }
         .mechanic-icon-label {
             display: block;
             margin-bottom: 7px;
@@ -509,6 +512,8 @@
             gap: 7px;
         }
         .mechanic-spell-icons .spell-icon-link { width: 34px; height: 34px; }
+        .mechanic-related { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 7px; }
+        .mechanic-related .mechanic-icon-label { margin: 0; }
         .mythic-note {
             margin-top: 13px;
             padding: 11px 13px;
@@ -628,10 +633,10 @@
 <div class="app">
     <aside class="sidebar">
         <div class="brand">
-            <div class="brand-mark">VA</div>
+            <div class="brand-mark">12.1</div>
             <div>
-                <h1>烈毒之渊 · 团长手册</h1>
-                <p>The Venomous Abyss / 12.1</p>
+                <h1>12.1 · 团长手册</h1>
+                <p>The Venomous Abyss / Tidebound Grotto</p>
             </div>
         </div>
         <div class="top-links">
@@ -659,20 +664,19 @@
             </header>
 
             <nav class="section-nav" aria-label="页面章节">
-                <a href="#energy">战斗总览</a>
-                <a href="#phases">阶段流程</a>
-                <a href="#mechanics">处理与灭团点</a>
-                <a href="#timeline">实战时间轴</a>
-                <a href="#evidence">开发数据</a>
+                <a href="#phases">粗略时间轴</a>
+                <a href="#mechanics">技能分析</a>
+                <a href="#timeline">详细时间轴</a>
+                <a href="#evidence">开发 ID 明细</a>
             </nav>
 
-            <section id="energy" class="guide-section"></section>
+            <div id="energy"></div>
 
             <section id="phases" class="guide-section">
                 <div class="section-heading">
                     <div>
-                        <h3>阶段流程</h3>
-                        <p>团长讲解顺序与血量、能量或击杀触发条件。</p>
+                        <h3>战斗大概时间分析（粗略时间轴）</h3>
+                        <p>团长讲解顺序、阶段目标与关键转场。</p>
                     </div>
                 </div>
                 <div id="phaseRail" class="phase-rail"></div>
@@ -681,7 +685,7 @@
             <section id="mechanics" class="guide-section">
                 <div class="section-heading">
                     <div>
-                        <h3>机制处理与常见灭团点</h3>
+                        <h3>技能分析</h3>
                         <p>这里只保留团长讲解需要的流程、处理方法和失败原因。</p>
                     </div>
                 </div>
@@ -691,7 +695,7 @@
             <section id="timeline" class="guide-section">
                 <div class="section-heading">
                     <div>
-                        <h3>代表击杀时间轴</h3>
+                        <h3>详细时间轴</h3>
                         <p>用于安排提醒与团队技能的实战节奏参考；不同团队会有少量时间偏差。</p>
                     </div>
                 </div>
@@ -701,7 +705,7 @@
             <section id="evidence" class="guide-section">
                 <div class="section-heading">
                     <div>
-                        <h3>法术 ID / 开发数据</h3>
+                        <h3>开发 ID 明细</h3>
                         <p>保留所有检测到的伤害、Debuff、Aura、Cast 和仅手册技能。自动分类均需人工复核。</p>
                     </div>
                     <span id="spellCount" class="spell-count"></span>
@@ -824,12 +828,23 @@
 
     function mechanicSpellCluster(boss, mechanic) {
         const allIDs = [...new Set((mechanic.spellIDs || []).map(Number).filter(Boolean))];
-        const relatedSpells = allIDs
-            .map(spellID => spellById(boss, spellID))
-            .filter(spell => (spell?.categories || []).some(category =>
-                category === "enemyCasts" || category === "playerDebuffs"
-            ));
-        if (!relatedSpells.length) return "";
+        const spells = allIDs.map(spellID => spellById(boss, spellID)).filter(Boolean);
+        if (!spells.length) return "";
+        const choosePrimary = candidates => candidates.find(spell => (spell.categories || []).includes("enemyCasts"))
+            || candidates.find(spell => (spell.categories || []).includes("playerDebuffs"))
+            || candidates[0];
+        const explicitSpells = (mechanic.leaderSpellIDs || [])
+            .map(spellID => spellById(boss, spellID)).filter(Boolean);
+        const primary = choosePrimary(explicitSpells) || choosePrimary(spells);
+        const semanticKey = spell => String(spell.nameZh || spell.nameEn || spell.spellID).trim().toLowerCase();
+        const seen = new Set([semanticKey(primary)]);
+        const relatedSpells = spells.filter(spell => {
+            if (spell.spellID === primary.spellID) return false;
+            const key = semanticKey(spell);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
         const icons = relatedSpells.map(spell => {
             const label = spell.nameZh || spell.nameEn || `Spell ${spell.spellID}`;
             const tooltip = `${label} · ${spellCategoryLabel(spell)} · ID: ${spell.spellID}`;
@@ -841,22 +856,30 @@
             </a>`;
         }).join("");
         return `<div class="mechanic-spell-cluster">
-            <span class="mechanic-icon-label">Cast / Debuff · ${relatedSpells.length}</span>
-            <div class="mechanic-spell-icons">${icons}</div>
+            <span class="mechanic-icon-label">主要技能 · ${escapeHtml(spellCategoryLabel(primary))}</span>
+            <div class="mechanic-primary-spell">${leaderSpellLink(boss, primary.spellID, "", true)}</div>
+            ${relatedSpells.length ? `<div class="mechanic-related">
+                <span class="mechanic-icon-label">附属效果</span>
+                <div class="mechanic-spell-icons">${icons}</div>
+            </div>` : ""}
         </div>`;
     }
 
     function renderBossList() {
-        $("bossList").innerHTML = guide.bosses.map(boss => `
-            <button class="boss-button ${boss.key === state.bossKey ? "active" : ""}" data-boss="${escapeHtml(boss.key)}">
-                <span class="boss-order">${String(boss.order).padStart(2, "0")}</span>
-                <span class="boss-name"><strong>${escapeHtml(boss.nameZh)}</strong><span>${escapeHtml(boss.nameEn)}</span></span>
-                <span class="boss-status">
-                    <span class="status-dot ${boss.reviewStatus === "reviewed" ? "reviewed" : ""}"></span>
-                    ${boss.expectedUntested ? '<span class="boss-test-note">未测试<br>阶段未知</span>' : ""}
-                </span>
-            </button>
-        `).join("");
+        const raids = guide.raids?.length ? guide.raids : [{key:"venomous_abyss", nameZh:guide.raidNameZh}];
+        $("bossList").innerHTML = raids.map(raid => {
+            const rows = guide.bosses.filter(boss => (boss.raidKey || "venomous_abyss") === raid.key);
+            if (!rows.length) return "";
+            return `<div class="boss-raid-label">${escapeHtml(raid.nameZh)}</div>${rows.map(boss => `
+                <button class="boss-button ${boss.key === state.bossKey ? "active" : ""}" data-boss="${escapeHtml(boss.key)}">
+                    <span class="boss-order">${String(boss.order).padStart(2, "0")}</span>
+                    <span class="boss-name"><strong>${escapeHtml(boss.nameZh)}</strong><span>${escapeHtml(boss.nameEn)}</span></span>
+                    <span class="boss-status">
+                        <span class="status-dot ${boss.reviewStatus === "reviewed" ? "reviewed" : ""}"></span>
+                        ${boss.expectedUntested ? '<span class="boss-test-note">未测试<br>阶段未知</span>' : ""}
+                    </span>
+                </button>`).join("")}`;
+        }).join("");
         document.querySelectorAll("[data-boss]").forEach(button => {
             button.addEventListener("click", () => selectBoss(button.dataset.boss));
         });
@@ -864,7 +887,7 @@
 
     function renderHero(boss) {
         $("hero").style.backgroundImage = boss.image ? `url("${boss.image}")` : "";
-        $("bossEyebrow").textContent = `Encounter ${String(boss.order).padStart(2, "0")}`;
+        $("bossEyebrow").textContent = `${boss.raidNameZh || "12.1"} · Encounter ${String(boss.order).padStart(2, "0")}`;
         $("bossName").textContent = boss.nameZh;
         $("bossEnglish").textContent = boss.nameEn;
         $("bossSummary").textContent = boss.summary;
@@ -1138,7 +1161,7 @@
         renderTimeline(boss);
         renderMechanics(boss);
         renderSpells(boss);
-        document.title = `${boss.nameZh} · 烈毒之渊团长手册`;
+        document.title = `${boss.nameZh} · 12.1团长手册`;
         refreshWowhead();
     }
 

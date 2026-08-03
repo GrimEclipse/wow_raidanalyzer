@@ -58,18 +58,20 @@
   async function resolvePayload(payload,path,autoOpen=false){
     const identity=window.MythicReportRuntime.identityOf(payload);
     status.textContent=`已识别：${identity.bossName}（${identity.raidKey}/${identity.bossKey}）`;
+    route.style.display="none";
     let descriptor;
     try{ descriptor=await window.MythicReportRuntime.loadDescriptor(payload); }
     catch(error){
-      descriptor={renderer:"generic",reportPage:"frontend/report/generic.html"};
-      status.textContent+=`；未找到专用描述，使用通用报告。`;
+      status.textContent+=`；暂不支持：${error.message}`;
+      return false;
     }
     const url=window.MythicReportRuntime.reportUrl(descriptor,path);
     document.getElementById("route-name").textContent=identity.bossName;
-    document.getElementById("route-kind").textContent=descriptor.renderer==="generic"?"通用战斗报告":"Boss 专用分析插件";
+    document.getElementById("route-kind").textContent="Boss 专用分析插件";
     document.getElementById("route-link").href=url;
     route.style.display="block";
     if(autoOpen) location.replace(url);
+    return true;
   }
 
   async function openPath(path,autoOpen=false){

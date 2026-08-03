@@ -1,3 +1,4 @@
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +20,16 @@ from analyzer_core.raid_cooldowns import (
 
 
 class RaidCooldownTests(unittest.TestCase):
+    def test_frontend_keeps_cooldowns_and_phase_transition_rows_separate(self):
+        page = (
+            Path(__file__).resolve().parents[1]
+            / "frontend" / "tools" / "raid-cooldowns" / "index.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn("const displayTimeline", page)
+        self.assertIn("phase-transition-row", page)
+        self.assertIn("阶段转换", page)
+        self.assertIn("（+${clock(row.phaseTimeMs ?? row.timeMs)}）", page)
+
     def test_options_include_live_12_0_and_ptr_boss_lists(self):
         options = options_document()
         self.assertEqual([row["key"] for row in options["versions"]], ["12.0", "12.1 PTR"])
@@ -29,12 +40,51 @@ class RaidCooldownTests(unittest.TestCase):
             [3176, 3177, 3179, 3178, 3180, 3181],
         )
         self.assertEqual(len(raids["venomous_abyss"]["bosses"]), 8)
+        self.assertEqual(
+            raids["tidebound_grotto"]["bosses"][0]["key"],
+            "nymrissa_wavecaller",
+        )
+        self.assertEqual(raids["tidebound_grotto"]["zoneID"], 57)
+        self.assertEqual(raids["tidebound_grotto"]["bosses"][0]["encounterID"], 3379)
+
+    def test_non_healer_specs_use_common_chinese_labels(self):
+        self.assertEqual(
+            raid_cooldowns.SPEC_LABEL_BY_KEY["elemental-shaman"],
+            "元素 萨满祭司",
+        )
+        self.assertEqual(
+            raid_cooldowns.SPEC_LABEL_BY_KEY["augmentation-evoker"],
+            "增辉 唤魔师",
+        )
+        self.assertNotIn("elemental-shaman", raid_cooldowns.HEALER_SPEC_KEYS)
+
+    def test_non_healer_team_utility_keeps_localized_spec_labels(self):
+        timeline = build_cooldown_timeline(
+            [
+                {"type": "cast", "timestamp": 110_000, "sourceID": 1, "abilityGameID": 192077},
+                {"type": "cast", "timestamp": 120_000, "sourceID": 2, "abilityGameID": 374968},
+            ],
+            fight_start=100_000,
+            players=[
+                {"id": 1, "name": "元素萨", "role": "dps", "class": "Shaman", "specKey": "elemental-shaman", "specLabel": "元素 萨满祭司"},
+                {"id": 2, "name": "增辉", "role": "dps", "class": "Evoker", "specKey": "augmentation-evoker", "specLabel": "增辉 唤魔师"},
+            ],
+        )
+        self.assertEqual([row["specLabel"] for row in timeline], ["元素 萨满祭司", "增辉 唤魔师"])
 
     def test_ptr_discovery_fallback_uses_checked_in_reports(self):
         self.assertIn("xBt6r2LqHzdfkZN7", _discovery_report_codes("venomous_abyss", 4))
         self.assertIn("g2Cm9dXRjxAT61Dw", _discovery_report_codes("venomous_abyss", 4))
         self.assertIn("HPrGLV84XRJjCykN", _discovery_report_codes("venomous_abyss", 5))
         self.assertEqual(_discovery_report_codes("void_spire", 5), [])
+        self.assertEqual(
+            _discovery_report_codes("tidebound_grotto", 4, 3379),
+            ["zpRDdcafg7hCrT9Y"],
+        )
+        self.assertEqual(
+            _discovery_report_codes("tidebound_grotto", 5, 3379),
+            ["ZmYa6M2QV4hbLCry"],
+        )
 
     def test_zone_report_listing_adds_public_ptr_candidates(self):
         raid_cooldowns._CACHE.clear()

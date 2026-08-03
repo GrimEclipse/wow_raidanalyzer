@@ -58,8 +58,8 @@
               "key": "lightblinded_vanguard",
               "name": "光盲先锋军",
               "plugin": "boss_plugins.void_spire.lightblinded_vanguard",
-              "supported": true,
-              "disabledReason": "",
+              "supported": false,
+              "disabledReason": "已有后端分析逻辑，但尚未完成光盲先锋军专属报告页面",
               "capabilities": {
                 "wipe": { "enabled": true, "renderer": "generic-wipe" },
                 "avoidable": { "enabled": true, "renderer": "generic-avoidable" },
@@ -216,8 +216,8 @@
               "key": "midnight_falls",
               "name": "至暗之夜降临",
               "plugin": "boss_plugins.march_on_queldanas.midnight_falls",
-              "supported": true,
-              "disabledReason": "",
+              "supported": false,
+              "disabledReason": "已有后端分析逻辑，但尚未完成至暗之夜降临专属报告页面",
               "capabilities": {
                 "wipe": { "enabled": true, "renderer": "generic-wipe" },
                 "avoidable": { "enabled": true, "renderer": "generic-avoidable" },
@@ -281,7 +281,7 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/01-nakzali.png", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/01-nakzali.png", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -296,7 +296,7 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/02-sentinels.png", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/02-sentinels.png", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -311,7 +311,7 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/03-vashnik.png", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/03-vashnik.png", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -326,7 +326,7 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/04-lostexplorers.jpg", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/04-lostexplorers.jpg", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -341,7 +341,7 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/05-sszorak.jpg", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/05-sszorak.jpg", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -356,7 +356,7 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/06-twinfangs.jpg", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/06-twinfangs.jpg", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -371,7 +371,7 @@
               "disabledReason": "12.1 中文名与机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/07-bargained.jpg", "width": 914, "height": 514 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/07-bargained.jpg", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -386,8 +386,8 @@
               "disabledReason": "12.1 机制数据待接入",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "arena", "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg", "width": 914, "height": 514 },
-                { "key": "broken", "path": "assets/raids/venomous_abyss/08-ulatek-broken.jpg", "width": 914, "height": 514 }
+                { "key": "arena", "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg", "width": 1997, "height": 1118 },
+                { "key": "broken", "path": "assets/raids/venomous_abyss/08-ulatek-broken.jpg", "width": 1997, "height": 1118 }
               ]
             }
           ]
@@ -401,14 +401,17 @@
             {
               "key": "nymrissa_wavecaller",
               "order": 1,
-              "name": "尼姆瑞莎·唤波者",
+              "name": "尼姆瑞莎·唤潮者",
               "englishName": "Nymrissa Wavecaller",
+              "externalKey": "wow.tidebound,01.nymrissa",
               "aliases": ["妮莉莎·唤浪者"],
               "plugin": "boss_plugins.tidebound_grotto.nymrissa_wavecaller",
               "supported": false,
-              "disabledReason": "12.1 外部唯一键、场地图与机制数据待接入",
+              "disabledReason": "12.1 战斗分析插件待接入",
               "configSchema": [],
-              "arenaAssets": []
+              "arenaAssets": [
+                { "key": "default", "path": "assets/raids/tidebound_grotto/01-nymrissa.jpg", "width": 1997, "height": 1118 }
+              ]
             }
           ]
         }

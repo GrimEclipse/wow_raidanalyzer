@@ -19,6 +19,7 @@ from typing import Iterable
 
 from analyzer_core.concurrency import request_post
 from boss_plugins.combat_config import TEAM_COOLDOWNS
+from boss_plugins.common import CLASS_NAMES, SPEC_ICON_SLUGS, SPEC_NAMES
 from boss_plugins.void_spire.crown_of_the_cosmos import (
     PROXIES,
     WCL_BASE_URL,
@@ -89,7 +90,17 @@ RAIDS = {
             {"key": "bargained", "name": "盘卷祭坛", "encounterID": 53429},
             {"key": "ulatek", "name": "乌拉特克", "encounterID": 53492},
         ],
-    }
+    },
+    "tidebound_grotto": {
+        "version": "12.1 PTR",
+        # PTR rankings are incomplete, so supplied reports remain the preferred
+        # source; Zone 57 is still useful for discovering additional samples.
+        "zoneID": 57,
+        "name": "潮缚石窟",
+        "bosses": [
+            {"key": "nymrissa_wavecaller", "name": "尼姆瑞莎·唤潮者", "encounterID": 3379},
+        ],
+    },
 }
 
 HEALER_SPECS = [
@@ -102,14 +113,26 @@ HEALER_SPECS = [
     {"key": "preservation-evoker", "label": "恩护 唤魔师", "class": "Evoker", "spec": "Preservation"},
 ]
 
+ALL_SPEC_ROWS = []
+for _spec_id, _icon_slug in SPEC_ICON_SLUGS.items():
+    _class_slug, _spec_slug = _icon_slug.split("-", 1)
+    _class_names = CLASS_NAMES.get(_class_slug) or {}
+    _spec_names = SPEC_NAMES.get(_spec_id) or {}
+    _class_en = _class_names.get("enUS") or _class_slug
+    _spec_en = _spec_names.get("enUS") or _spec_slug
+    ALL_SPEC_ROWS.append({
+        "key": f"{_spec_slug}-{_class_slug}",
+        "label": f"{_spec_names.get('zhCN') or _spec_en} {_class_names.get('zhCN') or _class_en}",
+        "class": _class_en,
+        "spec": _spec_en,
+    })
+
 SPEC_KEY_BY_PAIR = {
     (row["class"].lower(), row["spec"].lower()): row["key"]
-    for row in HEALER_SPECS
+    for row in ALL_SPEC_ROWS
 }
-SPEC_KEY_BY_PAIR.update({
-    ("evoker", "augmentation"): "augmentation-evoker",
-})
-SPEC_LABEL_BY_KEY = {row["key"]: row["label"] for row in HEALER_SPECS}
+SPEC_LABEL_BY_KEY = {row["key"]: row["label"] for row in ALL_SPEC_ROWS}
+HEALER_SPEC_KEYS = {row["key"] for row in HEALER_SPECS}
 HEALER_SPEC_NAME_BY_KEY = {row["key"]: row["spec"] for row in HEALER_SPECS}
 HEALER_SPEC_NAMES = {row["spec"].lower() for row in HEALER_SPECS}
 CATEGORY_LABELS = {
@@ -329,15 +352,29 @@ def parse_report_codes(value) -> list[str]:
     return list(dict.fromkeys(codes))[:MAX_PROVIDED_REPORTS]
 
 
-def _discovery_report_codes(raid_key: str, difficulty: int) -> list[str]:
-    if raid_key != "venomous_abyss":
-        return []
-    discovery_path = next((path for path in ZONE54_DISCOVERY_PATHS if path.is_file()), None)
-    if discovery_path is None:
-        return []
-    data = json.loads(discovery_path.read_text(encoding="utf-8"))
+def _discovery_report_codes(
+    raid_key: str,
+    difficulty: int,
+    encounter_id: int | None = None,
+) -> list[str]:
     key = "mythic" if int(difficulty) == 5 else "heroic"
-    return [str(value) for value in (data.get("reports") or {}).get(key) or []]
+    codes = []
+    if raid_key == "venomous_abyss":
+        discovery_path = next((path for path in ZONE54_DISCOVERY_PATHS if path.is_file()), None)
+        if discovery_path is not None:
+            data = json.loads(discovery_path.read_text(encoding="utf-8"))
+            codes.extend(str(value) for value in (data.get("reports") or {}).get(key) or [])
+
+    if encounter_id is not None:
+        boss_key = next((
+            boss["key"]
+            for boss in (RAIDS.get(raid_key) or {}).get("bosses", [])
+            if int(boss.get("encounterID") or 0) == int(encounter_id)
+        ), None)
+        reference = _reference_phase_data(boss_key, difficulty) if boss_key else {}
+        if reference.get("reportID"):
+            codes.append(str(reference["reportID"]))
+    return list(dict.fromkeys(codes))
 
 
 @lru_cache(maxsize=1)
@@ -486,7 +523,7 @@ def _embedded_roster(report: dict, fight: dict) -> dict | None:
         actor_subtype = str(actor.get("subType") or "").strip()
         class_name = actor_subtype if actor_type.lower() == "player" else (actor_subtype or actor_type)
         spec_key = SPEC_KEY_BY_PAIR.get((class_name.lower(), spec.lower()), "")
-        role = "healer" if spec_key in SPEC_LABEL_BY_KEY else "dps"
+        role = "healer" if spec_key in HEALER_SPEC_KEYS else "dps"
         players.append({
             "id": player_id,
             "name": str(actor.get("name") or f"玩家 {player_id}").split("#", 1)[0],
@@ -564,7 +601,7 @@ def _ranking_candidates(rankings: Iterable[dict], *, boss_name: str) -> list[dic
                 str(player.get("class") or "").lower(),
                 str(player.get("spec") or "").lower(),
             ), "")
-            if healer_spec_keys is not None and spec_key in SPEC_LABEL_BY_KEY:
+            if healer_spec_keys is not None and spec_key in HEALER_SPEC_KEYS:
                 healer_spec_keys.append(spec_key)
         start_time = max(0, absolute_start - report_start)
         candidates.append({
@@ -654,7 +691,7 @@ def _candidate_fights(
     max_duration_seconds: float | None,
     provided_report_codes: list[str] | None = None,
 ) -> dict:
-    discovery_codes = _discovery_report_codes(raid_key, difficulty)
+    discovery_codes = _discovery_report_codes(raid_key, difficulty, encounter_id)
     provided_codes = list(dict.fromkeys(provided_report_codes or []))[:MAX_PROVIDED_REPORTS]
     matches = []
     seen_fights = set()
@@ -796,12 +833,13 @@ def _candidate_fights(
                 except Exception as exc:
                     source_errors.append(exc)
 
-    zone_has_more = True
+    zone_id = RAIDS[raid_key].get("zoneID")
+    zone_has_more = bool(zone_id)
     for page_number in range(1, MAX_ZONE_REPORT_PAGES + 1):
         if len(matches) >= RESULT_LIMIT or not zone_has_more:
             break
         try:
-            page = _zone_report_page(token, RAIDS[raid_key]["zoneID"], page_number)
+            page = _zone_report_page(token, zone_id, page_number)
             successful_source_requests += 1
         except Exception as exc:
             source_errors.append(exc)
