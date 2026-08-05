@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "selectionRule": "highest completed public key first; Skyreach uses the user-selected report",
+  "samples": [
+    {
+      "key": "algethar_academy",
+      "name": "Algeth'ar Academy",
+      "nameZh": "艾杰斯亚学院",
+      "keystoneLevel": 24,
+      "completed": true,
+      "duration": "29:24.6",
+      "reportCode": "TaqLH6KvWAG3XVP8",
+      "fightId": 3,
+      "selectionPolicy": "highest-public",
+      "file": "/assets/samples/mythic_dungeon_algethar_academy_TaqLH6KvWAG3XVP8_fight3.json"
+    },
+    {
+      "key": "magisters_terrace",
+      "name": "Magisters' Terrace",
+      "nameZh": "魔导师平台",
+      "keystoneLevel": 25,
+      "completed": true,
+      "duration": "32:08.1",
+      "reportCode": "QTKp4CaWZydRjrwA",
+      "fightId": 3,
+      "selectionPolicy": "highest-public",
+      "file": "/assets/samples/mythic_dungeon_magisters_terrace_QTKp4CaWZydRjrwA_fight3.json"
+    },
+    {
+      "key": "maisara_caverns",
+      "name": "Maisara Caverns",
+      "nameZh": "迈萨拉洞窟",
+      "keystoneLevel": 25,
+      "completed": true,
+      "duration": "30:45.6",
+      "reportCode": "G2rmFDHLQRz1Y4Jw",
+      "fightId": 2,
+      "selectionPolicy": "highest-readable-public",
+      "file": "/assets/samples/mythic_dungeon_maisara_caverns_G2rmFDHLQRz1Y4Jw_fight2.json"
+    },
+    {
+      "key": "nexus_point_xenas",
+      "name": "Nexus-Point Xenas",
+      "nameZh": "节点希纳斯",
+      "keystoneLevel": 25,
+      "completed": true,
+      "duration": "28:18.5",
+      "reportCode": "frjtBDLW2AdnHQk4",
+      "fightId": 9,
+      "selectionPolicy": "highest-public",
+      "file": "/assets/samples/mythic_dungeon_nexus_point_xenas_frjtBDLW2AdnHQk4_fight9.json"
+    },
+    {
+      "key": "pit_of_saron",
+      "name": "Pit of Saron",
+      "nameZh": "萨隆矿坑",
+      "keystoneLevel": 25,
+      "completed": true,
+      "duration": "28:57.7",
+      "reportCode": "jm2JZ7RFqGB3VtPT",
+      "fightId": 14,
+      "selectionPolicy": "highest-public",
+      "file": "/assets/samples/mythic_dungeon_pit_of_saron_jm2JZ7RFqGB3VtPT_fight14.json"
+    },
+    {
+      "key": "seat_of_the_triumvirate",
+      "name": "The Seat of the Triumvirate",
+      "nameZh": "执政团之座",
+      "keystoneLevel": 24,
+      "completed": true,
+      "duration": "30:23.7",
+      "reportCode": "n1Y4X9wbHNqaQDgp",
+      "fightId": 1,
+      "selectionPolicy": "highest-public",
+      "file": "/assets/samples/mythic_dungeon_seat_of_the_triumvirate_n1Y4X9wbHNqaQDgp_fight1.json"
+    },
+    {
+      "key": "skyreach",
+      "name": "Skyreach",
+      "nameZh": "通天峰",
+      "keystoneLevel": 24,
+      "completed": true,
+      "duration": "25:33.9",
+      "reportCode": "xpYfcXrBnkP8W1Ka",
+      "fightId": 2,
+      "selectionPolicy": "user-selected",
+      "file": "/assets/samples/mythic_dungeon_skyreach_xpYfcXrBnkP8W1Ka_fight2.json"
+    },
+    {
+      "key": "windrunner_spire",
+      "name": "Windrunner Spire",
+      "nameZh": "风行者之塔",
+      "keystoneLevel": 25,
+      "completed": true,
+      "duration": "32:18.5",
+      "reportCode": "1B2NxWQCkXMVqTnt",
+      "fightId": 1,
+      "selectionPolicy": "highest-public",
+      "file": "/assets/samples/mythic_dungeon_windrunner_spire_1B2NxWQCkXMVqTnt_fight1.json"
+    }
+  ]
+}

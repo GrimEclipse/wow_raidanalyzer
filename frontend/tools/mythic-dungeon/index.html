@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>大秘境抄轴工具 · Mythic Analyzer</title>
+  <link rel="stylesheet" href="/frontend/tools/mythic-dungeon/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">MYTHIC ANALYZER</a>
+    <div class="top-actions">
+      <label class="sample-picker">
+        <span>真实样板</span>
+        <select id="sample-select" aria-label="选择副本真实样板">
+          <option value="">正在读取样板清单……</option>
+        </select>
+      </label>
+      <label class="import-button" for="json-input">导入分析 JSON</label>
+      <input id="json-input" type="file" accept="application/json,.json" hidden>
+      <a id="wcl-link" class="ghost-button" href="#" target="_blank" rel="noreferrer">打开 WCL</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="run-header">
+      <div>
+        <div class="eyebrow">国家队极限层 · 真实样板日志</div>
+        <h1><span id="dungeon-name">读取中</span> <span id="key-level"></span></h1>
+        <p id="run-meta" class="run-meta"></p>
+      </div>
+      <div id="team" class="team"></div>
+    </section>
+
+    <section class="workspace">
+      <aside class="pull-sidebar">
+        <div class="sidebar-title">
+          <span>全程路线</span>
+          <strong id="pull-count"></strong>
+        </div>
+        <nav id="pull-list" class="pull-list" aria-label="Pull 列表"></nav>
+      </aside>
+
+      <article class="pull-detail">
+        <div id="empty-state" class="empty-state">正在读取真实日志样板……</div>
+        <div id="pull-content" hidden>
+          <header class="pull-heading">
+            <div>
+              <div id="pull-kicker" class="eyebrow"></div>
+              <h2 id="pull-title"></h2>
+              <p id="pull-meta" class="run-meta"></p>
+            </div>
+            <div class="clock-switch" role="group" aria-label="时间基准">
+              <button type="button" data-clock="auto" class="active">智能时间</button>
+              <button type="button" data-clock="dungeon">全局</button>
+              <button type="button" data-clock="pull">本 Pull</button>
+            </div>
+          </header>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <h3>拉怪构成与开怪归属</h3>
+                <p>每个怪物实例取第一次敌对交互；召唤物按实际出现时间记录。</p>
+              </div>
+            </div>
+            <div id="enemy-summary" class="enemy-summary"></div>
+            <div class="table-scroll compact-table-wrap">
+              <table class="data-table compact-table">
+                <thead><tr><th>怪物实例</th><th>首次接触</th><th>玩家</th><th>证据</th></tr></thead>
+                <tbody id="opener-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel timeline-panel">
+            <div class="panel-heading timeline-heading">
+              <div>
+                <h3>技能时间轴</h3>
+                <p>敌方只展示 begincast；玩家只展示成功 cast。Boss 默认使用本场相对时间。</p>
+              </div>
+              <div id="filters" class="filters">
+                <button type="button" class="active" data-filter="all">全部</button>
+                <button type="button" data-filter="enemyBeginCast">怪物 / Boss</button>
+                <button type="button" data-filter="playerCast">玩家施法</button>
+                <button type="button" data-filter="playerState">状态还原</button>
+              </div>
+              <label class="related-filter">
+                <span>与我相关</span>
+                <select id="related-player">
+                  <option value="">全部玩家事件</option>
+                </select>
+              </label>
+            </div>
+            <div class="table-scroll timeline-scroll">
+              <table class="data-table timeline-table">
+                <thead><tr><th>时间</th><th>来源</th><th>技能</th><th>目标</th><th>事件依据</th></tr></thead>
+                <tbody id="timeline-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/frontend/tools/mythic-dungeon/app.js"></script>
+</body>
+</html>

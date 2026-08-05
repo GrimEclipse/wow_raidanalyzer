@@ -759,6 +759,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/scoreboard": "/frontend/tools/iq-notebook/index.html",
             "/verdict": "/frontend/tools/iq-notebook/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
+            "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",
             "/audit": "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
             "/LuraJudgement.html": "/frontend/report/index.html",

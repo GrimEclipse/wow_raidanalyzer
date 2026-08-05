@@ -21,6 +21,9 @@ from boss_plugins.void_spire.crown_of_the_cosmos import (
 )
 from tools import wcl_zone54_discovery as discovery
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 # The discovery module keeps its optional WCL client lazy for offline rebuilds.
 # This probe is explicitly online, so provide the client before using its
@@ -36,6 +39,7 @@ TABLES = {
     "damage": ("DamageTaken", None),
     "debuffs": ("Debuffs", "Friendlies"),
     "buffs": ("Buffs", "Enemies"),
+    "friendly-buffs": ("Buffs", "Friendlies"),
 }
 
 

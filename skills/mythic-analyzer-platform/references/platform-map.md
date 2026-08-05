@@ -19,13 +19,16 @@
 - `frontend/tools/raid-guide/`: raid leader handbook.
 - `frontend/tools/raid-cooldowns/`: raid cooldown timeline search/export.
 - `frontend/tools/analysis-runner/`: UI-driven WCL analysis.
+- `frontend/tools/mythic-dungeon/`: stable Mythic+ route samples and per-Pull timelines.
 - `frontend/tools/iq-notebook/`: cross-day mistake ledger and appeal state.
 - `frontend/offline/`: offline package landing page.
 
 ## Stable public routes
 
-Use `/report`, `/online`, `/scoreboard`, `/verdict`, `/cooldowns`, `/raid-guide`, and `/audit`. Physical paths may change; update all three hosts and offline packaging together.
+Use `/report`, `/online`, `/scoreboard`, `/verdict`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, and `/audit`. Physical paths may change; update all three hosts and offline packaging together.
 
 ## Data
 
 Generated WCL JSON belongs in `data/`. `data/wcl_hardcore_api.json` is the compatibility sample, not a root-level runtime file.
+
+Audited, frontend-shipped Mythic+ reference samples belong in `assets/samples/` and are indexed by `mythic_dungeon_manifest.json`; they are deliberately versioned rather than fetched on every page load.
