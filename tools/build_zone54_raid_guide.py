@@ -25,6 +25,18 @@ CATEGORY_LABELS = {
     "journalOnly": "仅手册",
 }
 
+HERO_ASSETS = {
+    "nakzali": "assets/raids/venomous_abyss/01-nakzali-hero.jpg",
+    "sentinels": "assets/raids/venomous_abyss/02-sentinels-hero.jpg",
+    "vashnik": "assets/raids/venomous_abyss/03-vashnik-hero.jpg",
+    "lostexplorers": "assets/raids/venomous_abyss/04-lostexplorers-hero.jpg",
+    "sszorak": "assets/raids/venomous_abyss/05-sszorak-hero.jpg",
+    "twinfangs": "assets/raids/venomous_abyss/06-twinfangs-hero.jpg",
+    "bargained": "assets/raids/venomous_abyss/07-bargained-hero.jpg",
+    "ulatek": "assets/raids/venomous_abyss/08-ulatek-hero.jpg",
+    "nymrissa_wavecaller": "assets/raids/tidebound_grotto/01-nymrissa.jpg",
+}
+
 ARENA_ASSETS = {
     "nakzali": "assets/raids/venomous_abyss/01-nakzali.png",
     "sentinels": "assets/raids/venomous_abyss/02-sentinels.png",
@@ -278,7 +290,8 @@ def build_document(discovery, authored, timelines=None):
             "encounterID": int(metadata.get("encounterID") or 0),
             "nameZh": BOSS_ZH.get(key, metadata.get("nameZh") or metadata.get("name")),
             "nameEn": metadata.get("nameEn") or metadata.get("name"),
-            "image": ARENA_ASSETS.get(key),
+            "image": HERO_ASSETS.get(key),
+            "arenaImage": ARENA_ASSETS.get(key),
             "reviewStatus": source.get("reviewStatus") or "draft",
             "difficulty": source.get("difficulty") or "英雄日志基线 / 史诗差异待复核",
             "summary": source.get("summary") or (

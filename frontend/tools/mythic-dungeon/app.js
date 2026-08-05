@@ -13,12 +13,34 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
 const CLASS_COLORS = {
+  Warrior: "#c69b6d",
+  Paladin: "#f48cba",
+  Hunter: "#aad372",
+  Rogue: "#fff468",
+  Priest: "#ffffff",
+  Shaman: "#0070dd",
+  Mage: "#3fc7eb",
+  Warlock: "#8788ee",
   Druid: "#ff7c0a",
   Monk: "#00ff98",
   DemonHunter: "#a330c9",
   Evoker: "#33937f",
   DeathKnight: "#c41e3a",
 };
+
+function actorClass(actor) {
+  if (!actor) return null;
+  return actor.class || state.document?.team?.find((member) => member.id === actor.id)?.class || null;
+}
+
+function actorName(actor, fallback = "未知来源") {
+  if (!actor) return escapeHtml(fallback);
+  const classColor = CLASS_COLORS[actorClass(actor)];
+  const style = classColor ? ` style="--actor-color:${classColor}"` : "";
+  const className = classColor ? "actor-name player-actor" : "actor-name";
+  const instance = actor.type !== "Player" && actor.instance ? actor.instance : "";
+  return `<span class="${className}"${style}>${escapeHtml(`${actor.name || fallback}${instance}`)}</span>`;
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -142,10 +164,13 @@ function renderPull() {
   $("#enemy-summary").innerHTML = pull.enemySummary.map((row) => `<span class="enemy-pill">${escapeHtml(row.name)}<strong>×${row.count}</strong></span>`).join("");
   $("#opener-body").innerHTML = pull.enemies.map((enemy) => {
     const opener = enemy.opener;
+    const death = enemy.death;
     return `<tr>
       <td>${escapeHtml(enemy.label)}</td>
       <td class="timecode">${opener ? escapeHtml(opener.pullTime) : "—"}</td>
-      <td>${opener?.player ? escapeHtml(opener.player.name) : '<span class="unknown">WCL 无可用交互</span>'}</td>
+      <td class="timecode"${death?.synthetic ? ' title="根据 Boss 战结束时间复原"' : ""}>${death ? `${escapeHtml(death.pullTime)}${death.synthetic ? '<span class="synthetic-death">复原</span>' : ""}` : '<span class="unknown">未记录</span>'}</td>
+      <td class="timecode">${enemy.survival ? escapeHtml(enemy.survival) : '<span class="unknown">—</span>'}</td>
+      <td>${opener?.player ? actorName(opener.player) : '<span class="unknown">WCL 无可用交互</span>'}</td>
       <td>${opener ? openerEvidence(opener) : "—"}</td>
     </tr>`;
   }).join("");
@@ -154,7 +179,7 @@ function renderPull() {
 
 function openerEvidence(opener) {
   const labels = { cast: "首次施法", damage: "首次伤害", enemyTarget: "敌方首次点名" };
-  const spell = opener.abilityId ? ` · ${opener.abilityId}` : "";
+  const spell = opener.abilityName ? ` · ${escapeHtml(opener.abilityName)}` : "";
   return `<span class="event-badge">${labels[opener.evidence] || opener.evidence}${spell}</span>`;
 }
 
@@ -176,12 +201,17 @@ function renderTimeline() {
       || event.scope === "party";
   });
   $("#timeline-body").innerHTML = events.map((event) => {
+    const duration = event.duration ? ` · 持续 ${escapeHtml(event.duration)}` : "";
+    const roundEvidence = event.roundIncomplete
+      ? `${event.roundLabel} · WCL记录 ${event.roundCastCount}/${event.expectedRoundCastCount}`
+      : event.roundLabel;
+    const round = roundEvidence ? ` · ${escapeHtml(roundEvidence)}` : "";
     const evidence = event.synthetic
-      ? '<span class="event-badge synthetic">Buff remove · 1225789</span>'
-      : `<span class="event-badge">${escapeHtml(event.eventType || (event.kind === "enemyBeginCast" ? "begincast" : "cast"))}</span>`;
+      ? `<span class="event-badge synthetic">${escapeHtml(event.syntheticEvidence || "日志事件重建")}${duration}</span>`
+      : `<span class="event-badge">${escapeHtml(event.eventType || (event.kind === "enemyBeginCast" ? "begincast" : "cast"))}${round}</span>`;
     return `<tr class="timeline-row ${event.kind}">
       <td class="timecode">${escapeHtml(clock === "pull" ? event.pullTime : event.dungeonTime)}</td>
-      <td class="source-name">${escapeHtml(event.source?.name || "未知来源")}</td>
+      <td class="source-name">${actorName(event.source)}</td>
       <td><div class="ability"><span class="ability-name">${escapeHtml(event.ability.name)}</span><span class="spell-id">${event.ability.id}</span></div></td>
       <td>${eventTargets(event)}</td>
       <td>${evidence}</td>
@@ -191,9 +221,9 @@ function renderTimeline() {
 
 function eventTargets(event) {
   if (Array.isArray(event.targets) && event.targets.length) {
-    return event.targets.map((target) => escapeHtml(target.name)).join("、");
+    return event.targets.map((target) => actorName(target, "未知目标")).join("、");
   }
-  return event.target ? escapeHtml(event.target.name) : '<span class="unknown">—</span>';
+  return event.target ? actorName(event.target, "未知目标") : '<span class="unknown">—</span>';
 }
 
 $$('[data-clock]').forEach((button) => button.addEventListener("click", () => {

@@ -40,9 +40,10 @@ DUNGEON_CONFIGS = {
         "enemyAbilities": {
             1270356: "奥术碎击", 377344: "啄击", 1276632: "狂怒尖啸",
             1282244: "邪恶撕咬", 1270098: "缚咒武器",
-            396716: "皲皮", 388923: "爆发苏醒", 388544: "裂树击",
+            396716: "皲皮", 388923: "爆发苏醒", 388544: "裂树击", 388623: "分枝",
             376997: "狂野啄击", 377004: "震耳尖啸", 1285508: "炽热之火",
-            387691: "奥术宝珠", 386173: "法力炸弹", 388537: "奥术裂隙",
+            387691: "奥术宝珠", 386173: "法力炸弹", 385958: "奥术驱除", 388537: "奥术裂隙",
+            1276752: "毁灭之风",
             1282251: "星界冲击", 374343: "能量炸弹", 388822: "力量真空",
         },
         "linkedTargetCasts": {
@@ -57,15 +58,46 @@ DUNGEON_CONFIGS = {
         "enemyAbilities": {
             1256561: "碎裂护甲", 1257088: "死疽波动", 1257895: "先祖碾碎",
             1259631: "震荡打击", 1256059: "撕裂角刺", 1256047: "震耳咆哮",
-            1257920: "恐惧打击", 1260648: "弹幕射击", 1266485: "长矛侧攻",
+            1257920: "恐惧打击", 1260648: "弹幕射击", 1266480: "长矛侧攻",
+            1246666: "感染羽翼", 1243900: "恶臭羽毛风暴", 1249478: "腐肉飞扑",
             1266488: "迸裂创伤", 1251813: "萦绕恐惧", 1263735: "死疽融合",
-            1251567: "吸取灵魂", 1252777: "灵魂束缚", 1251023: "碎魂者",
+            1251554: "吸取灵魂", 1251204: "束缚幻影", 1252777: "灵魂束缚",
+            1252676: "粉碎灵魂", 1251023: "碎魂者",
             1251024: "二连击", 1253765: "最后一击", 1253788: "裂魂咆哮",
         },
         "linkedTargetCasts": {
+            1260648: {
+                "displayEventType": "cast", "targetAuraId": 1260643,
+                "toleranceMs": 25, "requireLinkedTarget": True,
+            },
+            1266480: {
+                "displayEventType": "begincast", "targetEventType": "cast",
+                "includeAnchorTarget": True, "requireAnchor": True,
+            },
+            1251204: {"displayEventType": "cast"},
+            1252676: {
+                "displayEventType": "begincast", "targetAuraId": 1252675,
+                "toleranceMs": 3100, "requireLinkedTarget": True,
+            },
+            1251023: {"displayEventType": "cast"},
             # WCL's Soulbind cast already contains its concrete player target.
             1252777: {"displayEventType": "cast"},
         },
+        "syntheticEnemyCasts": [
+            {
+                "trigger": "aura", "triggerAbilityId": 1249478,
+                "eventDataType": "Debuffs", "hostilityType": "Friendlies",
+                "triggerEventType": "applydebuff", "abilityId": 1249478,
+                "name": "腐肉飞扑", "evidence": "腐肉飞扑点名光环",
+            },
+            {
+                "trigger": "aura", "triggerAbilityId": 1251598,
+                "eventDataType": "Buffs", "hostilityType": "Enemies",
+                "triggerEventType": "applybuff", "endEventType": "removebuff",
+                "abilityId": 1263735, "name": "死疽融合",
+                "evidence": "死亡之幕获得→消失",
+            },
+        ],
     },
     "pit_of_saron": {
         "name": "矿坑",
@@ -77,6 +109,7 @@ DUNGEON_CONFIGS = {
             1261847: "寒晶践踏", 1262029: "冰川过载", 1264336: "瘟疫喷射",
             1264287: "凋零猛击", 1264453: "笨重凝视", 1262745: "白霜冲击",
             1262582: "天灾领主的印记", 1263756: "死亡之握", 1263406: "亡者大军",
+            1276648: "骸骨灌注",
         },
         "linkedTargetCasts": {
             1262745: {"displayEventType": "begincast", "targetEventType": "begincast", "targetAuraId": 1262772, "toleranceMs": 25},
@@ -93,9 +126,11 @@ DUNGEON_CONFIGS = {
             1264048: "能量坍缩", 1257509: "核闪引爆", 1247937: "幽影鞭笞",
             1282723: "暮色骇魔", 1264429: "光痕耀斑", 1282665: "虚空鞭笞",
             1249014: "蚀光步伐", 1257595: "神圣诡计", 1269222: "闪烁",
-            1252950: "灼热撕裂", 1253855: "辉熠消散",
+            1253950: "灼热撕裂", 1253855: "辉熠消散",
         },
         "linkedTargetCasts": {
+            1251767: {"displayEventType": "cast"},
+            1264429: {"displayEventType": "cast"},
             1249014: {"displayEventType": "cast", "targetEventType": "cast", "targetAuraId": 1249020, "effectAuraId": 1252875, "toleranceMs": 600},
             1253855: {"displayEventType": "begincast", "targetEventType": "cast", "targetAuraId": 1255503, "toleranceMs": 1100},
         },
@@ -115,8 +150,11 @@ DUNGEON_CONFIGS = {
             1263538: "暗影触须", 1263528: "驱逐", 1263532: "虚空风暴",
             1268733: "精神鞭笞", 1265419: "绝望音符", 1265421: "绝望哀歌",
             1265463: "不谐射线", 1265689: "幽冥和音", 1266003: "永夜交响曲",
+            1263529: "崩塌虚空", 1266001: "反冲",
         },
         "linkedTargetCasts": {
+            245742: {"displayEventType": "cast"},
+            1266001: {"displayEventType": "cast"},
             1263542: {"displayEventType": "begincast", "targetEventType": "cast", "targetAuraId": 1263542, "toleranceMs": 25},
             1265463: {"displayEventType": "begincast", "targetEventType": "begincast", "targetAuraId": 1265426, "effectAuraId": 1265464, "toleranceMs": 25},
         },
@@ -143,20 +181,35 @@ DUNGEON_CONFIGS = {
         "name": "风行",
         "officialNameZh": "风行者之塔",
         "aliases": ["Windrunner Spire"],
+        "bossActorOriginalNames": ["Kalis", "Latch"],
         "enemyAbilities": {
             1216462: "精确切割", 1216825: "毒性喷射", 1216253: "奥术齐射",
             471643: "干扰尖啸", 1216985: "刺穿撕咬", 1217021: "凶猛扑击",
             1270618: "烈焰新星", 466556: "炽焰腾流", 466064: "炽热尖喙",
-            367040: "燃烧烈风", 472888: "碎骨猛砍", 472795: "猛力拖拽",
+            467040: "燃烧烈风", 472888: "碎骨猛砍", 472795: "猛力拖拽",
+            474105: "黑暗诅咒", 472745: "飞溅喷吐",
             1219491: "衰弱尖啸", 472053: "无情跳跃", 467620: "暴怒",
             472043: "集结怒吼", 1270620: "烈焰新星", 1253026: "破胆怒吼",
             1253272: "破胆怒吼", 472662: "暴风斩", 468429: "疾风狙击",
             474528: "飞矢烈风", 1253986: "劲风射击",
         },
         "linkedTargetCasts": {
+            467040: {"displayEventType": "cast"},
+            474528: {
+                "displayEventType": "begincast", "targetAuraId": 1282911,
+                "toleranceMs": 25, "requireLinkedTarget": True,
+            },
             466556: {"displayEventType": "begincast", "targetEventType": "cast", "targetAuraId": 466559, "toleranceMs": 500},
             1253986: {"displayEventType": "cast", "targetEventType": "cast", "targetAuraId": 1253979, "effectAuraId": 1253978, "toleranceMs": 900},
         },
+        "syntheticEnemyCasts": [
+            {
+                "trigger": "hostileCast", "triggerAbilityId": 472795,
+                "triggerEventType": "begincast", "abilityId": 1219491,
+                "name": "衰弱尖啸", "sourceOriginalName": "Kalis",
+                "evidence": "伴随猛力拖拽开始读条",
+            },
+        ],
     },
     "magisters_terrace": {
         "name": "魔导师平台",
@@ -165,10 +218,35 @@ DUNGEON_CONFIGS = {
         "enemyAbilities": {
             145629: "反魔法领域（环境）", 1254338: "燃烧", 1254336: "燃烧",
             1244907: "符文战刃", 473258: "人群驱散", 474496: "震退猛击",
+            1264687: "吞噬打击", 1248138: "虚空炸弹", 1265977: "吞噬暗影",
             1214081: "奥术驱除", 474345: "补给协议", 1225792: "符文印记",
             1225193: "静默浪潮", 1224299: "星界束缚", 1223847: "三重复制",
             1284954: "寰宇刺击", 1280113: "庞大碎片", 1215087: "不稳定的虚空精华",
         },
+        "linkedTargetCasts": {
+            1248138: {"displayEventType": "cast"},
+            1244907: {
+                "displayEventType": "begincast", "targetEventType": "cast",
+                "targetAuraId": 1244907, "toleranceMs": 1200,
+                "requireAnchor": True, "includeAnchorTarget": True,
+            },
+            1225792: {
+                "displayEventType": "begincast", "targetEventType": "cast",
+                "targetAuraId": 1225792, "toleranceMs": 1100,
+                "requireAnchor": True, "includeAnchorTarget": True,
+            },
+        },
+        "bossCastRoundRules": [
+            {
+                "pullOriginalName": "Gemellus",
+                "sourceOriginalName": "Gemellus",
+                "abilityIds": [1284954, 1224299],
+                "windowMs": 250,
+                "replicationAbilityId": 1223847,
+                "initialCopies": 2,
+                "additionalCopies": 2,
+            },
+        ],
     },
 }
 

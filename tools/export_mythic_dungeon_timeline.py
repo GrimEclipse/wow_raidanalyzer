@@ -21,6 +21,9 @@ from analyzer_core.wcl_api import WclClient  # noqa: E402
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
+CN_WCL_BASE_URL = "https://cn.warcraftlogs.com"
+NPC_LOCALIZATION_BATCH_SIZE = 50
+
 
 METADATA_QUERY = """
 query($code: String!, $fightIDs: [Int]) {
@@ -62,6 +65,80 @@ def _player_details(report: dict) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def _cn_client(client: WclClient) -> WclClient:
+    cn_client = WclClient()
+    cn_client.base_url = CN_WCL_BASE_URL
+    cn_client._token = client.token()
+    return cn_client
+
+
+def _cn_localized_actors(cn_client: WclClient, original: list[dict], localized: list[dict]) -> list[dict]:
+    """Resolve NPC names from Warcraft Logs' Simplified Chinese game data."""
+    game_ids = sorted({
+        int(row.get("gameID") or 0)
+        for row in original
+        if row.get("type") == "NPC" and row.get("gameID")
+    })
+    names_by_game_id = {}
+    for offset in range(0, len(game_ids), NPC_LOCALIZATION_BATCH_SIZE):
+        batch = game_ids[offset:offset + NPC_LOCALIZATION_BATCH_SIZE]
+        declarations = ", ".join(f"$npc{index}: Int!" for index in range(len(batch)))
+        selections = " ".join(
+            f"npc{index}: npc(id: $npc{index}) {{ id name }}"
+            for index in range(len(batch))
+        )
+        query = f"query({declarations}) {{ gameData {{ {selections} }} }}"
+        variables = {f"npc{index}": game_id for index, game_id in enumerate(batch)}
+        data = (cn_client.graphql_data(query, variables).get("gameData") or {})
+        for index, game_id in enumerate(batch):
+            node = data.get(f"npc{index}") or {}
+            if node.get("name"):
+                names_by_game_id[game_id] = node["name"]
+
+    localized_by_id = {int(row.get("id") or 0): dict(row) for row in localized}
+    for actor in original:
+        actor_id = int(actor.get("id") or 0)
+        game_id = int(actor.get("gameID") or 0)
+        row = localized_by_id.setdefault(actor_id, {"id": actor_id, "name": actor.get("name")})
+        if actor.get("type") == "NPC" and game_id in names_by_game_id:
+            row["name"] = names_by_game_id[game_id]
+    return list(localized_by_id.values())
+
+
+def _cn_report_translations(
+    cn_client: WclClient,
+    report_code: str,
+    fight_id: int,
+    original_pulls: list[dict],
+) -> tuple[dict[str, str], dict[int, str]]:
+    query = """
+    query($code: String!) {
+      reportData { report(code: $code) {
+        masterData(translate: true) { abilities { gameID name } }
+        fights { id dungeonPulls { id name } }
+      } }
+    }
+    """
+    report = cn_client.graphql(query, {"code": report_code})
+    fight = next((row for row in report.get("fights") or [] if int(row.get("id") or 0) == fight_id), {})
+    localized_by_id = {
+        int(row.get("id") or 0): row.get("name")
+        for row in fight.get("dungeonPulls") or []
+        if row.get("name")
+    }
+    pull_translations = {
+        row["name"]: localized_by_id[int(row.get("id") or 0)]
+        for row in original_pulls
+        if row.get("name") and int(row.get("id") or 0) in localized_by_id
+    }
+    ability_translations = {
+        int(row.get("gameID") or 0): row.get("name")
+        for row in (report.get("masterData") or {}).get("abilities") or []
+        if row.get("gameID") and row.get("name")
+    }
+    return pull_translations, ability_translations
+
+
 def export(report_code: str, fight_id: int, output: Path, dungeon_key: str = "skyreach") -> dict:
     client = WclClient()
     config = dungeon_config(dungeon_key)
@@ -74,10 +151,23 @@ def export(report_code: str, fight_id: int, output: Path, dungeon_key: str = "sk
     aliases = {name.lower() for name in config.get("aliases") or []}
     if aliases and (fight.get("name") or "").lower() not in aliases:
         raise RuntimeError(f"fight {fight_id} is {fight.get('name')}, not {config.get('officialNameZh')}")
+    cn_client = _cn_client(client)
+    pull_translations, ability_translations = _cn_report_translations(
+        cn_client,
+        report_code,
+        fight_id,
+        fight.get("dungeonPulls") or [],
+    )
+    config = {
+        **config,
+        "pullTranslations": pull_translations,
+        "abilityTranslations": ability_translations,
+    }
 
     hostile_casts = client.events(report_code, "Casts", fight, hostility_type="Enemies")
     friendly_casts = client.events(report_code, "Casts", fight, hostility_type="Friendlies")
     friendly_damage = client.events(report_code, "DamageDone", fight, hostility_type="Friendlies")
+    hostile_deaths = client.events(report_code, "Deaths", fight, hostility_type="Enemies")
     void_meta_buffs = client.events(
         report_code,
         "Buffs",
@@ -97,13 +187,31 @@ def export(report_code: str, fight_id: int, output: Path, dungeon_key: str = "sk
             hostility_type="Friendlies",
             ability_id=aura_id,
         )
+    synthetic_events = {}
+    for rule in config.get("syntheticEnemyCasts") or []:
+        if rule.get("trigger") != "aura":
+            continue
+        aura_id = int(rule.get("triggerAbilityId") or 0)
+        if not aura_id or aura_id in synthetic_events:
+            continue
+        synthetic_events[aura_id] = client.events(
+            report_code,
+            rule.get("eventDataType") or "Buffs",
+            fight,
+            hostility_type=rule.get("hostilityType") or "Enemies",
+            ability_id=aura_id,
+        )
 
     document = build_dungeon_document(
         report_code=report_code,
         report=report,
         fight=fight,
         actors_original=(report.get("original") or {}).get("actors") or [],
-        actors_localized=(report.get("localized") or {}).get("actors") or [],
+        actors_localized=_cn_localized_actors(
+            cn_client,
+            (report.get("original") or {}).get("actors") or [],
+            (report.get("localized") or {}).get("actors") or [],
+        ),
         abilities_original=[
             {"id": row.get("gameID"), **row}
             for row in (report.get("original") or {}).get("abilities") or []
@@ -113,7 +221,9 @@ def export(report_code: str, fight_id: int, output: Path, dungeon_key: str = "sk
         friendly_casts=friendly_casts,
         friendly_damage=friendly_damage,
         void_meta_buffs=void_meta_buffs,
+        hostile_deaths=hostile_deaths,
         linked_target_events=linked_target_events,
+        synthetic_events=synthetic_events,
         config=config,
     )
     output.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../../../../../">
+  <title>盘魂者内克扎利 · 开荒断案</title>
+  <link rel="stylesheet" href="frontend/report/plugins/venomous_abyss/nakzali/report.css">
+</head>
+<body>
+<section id="overviewPage" class="overview">
+  <header class="report-head">
+    <div>
+      <div class="eyebrow">12.1 · 烈毒之渊 · 史诗难度</div>
+      <h1>盘魂者内克扎利</h1>
+    </div>
+    <div id="lastPull" class="last-pull">尚未载入分析结果</div>
+    <div class="toolbar">
+      <a class="button" href="/online">在线分析</a>
+      <a class="button" href="/report">选择结果</a>
+      <label class="button">导入 JSON<input id="overviewFile" type="file" accept=".json" hidden></label>
+    </div>
+  </header>
+  <nav id="overviewTabs" class="page-tabs panel">
+    <button data-overview-tab="pulls" class="active">全部战斗</button>
+    <button data-overview-tab="analysis">数据分析</button>
+  </nav>
+  <section id="pullsView" class="panel overview-body">
+    <div class="overview-tools">
+      <div class="toolbar"><button id="wipesFilter" class="filter-link wipes">全部灭团</button><button id="allFilter" class="filter-link all active">全部战斗</button></div>
+      <div class="toolbar"><label class="check"><input id="separatePhases" type="checkbox" checked> 按阶段分组</label><button id="sortButton" class="button">时间正序</button></div>
+    </div>
+    <div id="overviewError" class="error"></div>
+    <div id="pullBoard" class="pull-board"><div class="empty">请运行在线分析，选择已生成结果，或导入分析 JSON。</div></div>
+  </section>
+  <section id="analysisView" class="hidden">
+    <div id="analysisTags" class="analysis-tags panel"></div>
+    <div id="analysisContent" class="analysis-content"></div>
+  </section>
+</section>
+
+<section id="detailPage" class="hidden">
+  <header class="detail-header">
+    <div><h1 id="detailTitle">盘魂者内克扎利单场开庭分析</h1><div id="detailMeta" class="muted">等待选择 Pull</div></div>
+    <div class="toolbar"><button id="backButton" class="button">返回全部战斗</button><a id="wclLink" class="button" target="_blank" rel="noreferrer">WCL 原始记录</a><label class="button">导入 JSON<input id="detailFile" type="file" accept=".json" hidden></label></div>
+  </header>
+  <main class="detail-main">
+    <section id="stats" class="stats panel"></section>
+    <section id="phaseCards" class="phase-cards"></section>
+    <section class="layout">
+      <aside class="panel event-panel">
+        <h2>重要技能逐场推演</h2>
+        <div id="skillFocus" class="skill-focus">
+          <button data-focus="all" class="active">全部</button>
+          <button data-focus="essenceRend">精华撕裂</button>
+          <button data-focus="possessionBarrage">附身弹幕</button>
+          <button data-focus="hungeringPyre">葬火分散</button>
+        </div>
+        <div id="eventList" class="event-list"></div>
+      </aside>
+      <section class="panel stage">
+        <div class="legend"><span class="chip">图标尖角：当前面向</span><span class="chip">金框：当前机制目标</span><span class="chip">虚线淡化：超窗坐标</span><span class="chip">滚轮以鼠标位置缩放</span></div>
+        <div id="mapWrap" class="map-wrap">
+          <div id="mapScene" class="map-scene"></div>
+          <div class="combat-ring" aria-hidden="true"></div>
+          <div class="map-controls"><button data-map="out">−</button><span id="mapZoom" class="map-zoom">118%</span><button data-map="in">+</button><button data-map="reset">重置</button></div>
+          <div id="actorTooltip" class="actor-tooltip" role="tooltip"></div>
+        </div>
+        <div id="selectedDetails" class="selected-details"></div>
+      </section>
+    </section>
+    <nav id="detailTabs" class="page-tabs panel"><button data-tab="summary" class="active">情况分析</button><button data-tab="mechanics">机制明细</button><button data-tab="avoidable">可躲避伤害</button></nav>
+    <section id="tabContent" class="tab-content"></section>
+  </main>
+</section>
+<script src="frontend/report/plugins/venomous_abyss/nakzali/report.js"></script>
+</body>
+</html>

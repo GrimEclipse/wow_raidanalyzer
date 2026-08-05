@@ -263,7 +263,10 @@ class Zone54RaidGuideTests(unittest.TestCase):
             if mechanic["evidenceType"] == "infection-resolution"
         )
         self.assertIn("冥河喷发", infection["wipePoints"][0])
-        self.assertIn("个人减伤", infection["wipePoints"][2])
+        self.assertTrue(any("个人减伤" in row for row in infection["wipePoints"]))
+        self.assertIn("伤害随距离衰减", infection["leaderDetails"][1])
+        self.assertIn("离开人群放置", infection["leaderDetails"][1])
+        self.assertNotIn("全团分散", infection["leaderDetails"][1])
         catalyst = next(
             mechanic for mechanic in vashnik["mechanics"]
             if mechanic["evidenceType"] == "unavoidable-raid-aoe"

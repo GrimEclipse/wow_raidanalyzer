@@ -277,9 +277,103 @@
               "externalKey": "wow.venomabyss,01.nakzali",
               "aliases": ["「缠魂者」尼札利"],
               "plugin": "boss_plugins.venomous_abyss.nakzali",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
-              "configSchema": [],
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "nakzali-pulls" },
+                "avoidable": { "enabled": true, "renderer": "nakzali-avoidable" },
+                "interrupts": { "enabled": false, "renderer": "generic-interrupts" },
+                "dispels": { "enabled": false, "renderer": "generic-dispels" },
+                "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
+                "verdict": { "enabled": false, "renderer": "mistake-verdict" },
+                "replay": { "enabled": true, "renderer": "nakzali-field" }
+              },
+              "configSchema": [
+                {
+                  "key": "amaniLeakReviewEnabled",
+                  "type": "boolean",
+                  "label": "取证阿曼尼漏进灵魂之井",
+                  "description": "对照灵魂点燃的正常仪式灼烧轮次，识别额外灼烧并尝试和小怪实例闭环。",
+                  "default": true
+                },
+                {
+                  "key": "amaniLeakCountEnabled",
+                  "type": "boolean",
+                  "label": "确认漏怪计入错误",
+                  "description": "只有小怪实例与额外仪式灼烧闭环时才计数；疑似事件始终只展示。",
+                  "default": false,
+                  "visibleWhen": { "field": "amaniLeakReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "essenceRendReviewEnabled",
+                  "type": "boolean",
+                  "label": "取证精华撕裂解除位置",
+                  "description": "关闭后不请求精华撕裂 Debuff 与附近坐标事件。",
+                  "default": true
+                },
+                {
+                  "key": "essenceRendPlacementCountEnabled",
+                  "type": "boolean",
+                  "label": "内场解除计入错误",
+                  "description": "当前场地中心仍由样本估算，默认仅取证；完成坐标标定后再开启。",
+                  "default": false,
+                  "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "essenceRendMaxSampleOffsetMs",
+                  "type": "number",
+                  "label": "精华撕裂最大坐标采样偏移",
+                  "description": "解除时间前后超过该区间的坐标不再使用，也不会用死亡位置回填。",
+                  "unit": "毫秒",
+                  "integer": true,
+                  "min": 100,
+                  "max": 3000,
+                  "step": 50,
+                  "default": 1250,
+                  "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "essenceRendEdgeRatio",
+                  "type": "number",
+                  "label": "精华撕裂靠边半径阈值",
+                  "description": "以估算场地半径为 1；落点半径低于该值时标为内场候选。",
+                  "unit": "场地半径",
+                  "min": 0.4,
+                  "max": 1.2,
+                  "step": 0.01,
+                  "default": 0.72,
+                  "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "possessionBarrageReviewEnabled",
+                  "type": "boolean",
+                  "label": "取证附身弹幕异常",
+                  "description": "用击杀场建立飞行延迟和人均伤害基线，区分挡线、团血与狂暴。",
+                  "default": true
+                },
+                {
+                  "key": "possessionBarrageCountEnabled",
+                  "type": "boolean",
+                  "label": "疑似提前挡线计入错误",
+                  "description": "默认只展示；需要同时满足飞行显著提前与人均伤害显著高于击杀基线。",
+                  "default": false,
+                  "visibleWhen": { "field": "possessionBarrageReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "invokeInterruptReviewEnabled",
+                  "type": "boolean",
+                  "label": "统计祈求打断施法",
+                  "description": "通过祈求结算产生的玩家状态记录被打断者。",
+                  "default": true
+                },
+                {
+                  "key": "avoidableDamageReviewEnabled",
+                  "type": "boolean",
+                  "label": "统计可躲避伤害",
+                  "description": "读取移动黑圈、尸体枯萎、盘旋灵魂与不朽盘卷等伤害。",
+                  "default": true
+                }
+              ],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/01-nakzali.png", "width": 1997, "height": 1118 }
               ]
