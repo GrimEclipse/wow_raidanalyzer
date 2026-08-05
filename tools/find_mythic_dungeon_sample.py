@@ -22,16 +22,22 @@ if hasattr(sys.stdout, "reconfigure"):
 
 ZONE_QUERY = """
 query($zoneID: Int!) {
-  worldData { zone(id: $zoneID) { id name encounters { id name } } }
+  worldData { zone(id: $zoneID) {
+    id name frozen
+    brackets { min max bucket type }
+    partitions { id name compactName default }
+    difficulties { id name sizes }
+    encounters { id name }
+  } }
 }
 """
 
 RANKING_QUERY = """
-query($encounterID: Int!, $page: Int, $bracket: Int) {
+query($encounterID: Int!, $page: Int, $bracket: Int, $partition: Int) {
   worldData {
     encounter(id: $encounterID) {
       id name
-      fightRankings(page: $page, bracket: $bracket, leaderboard: LogsOnly)
+      fightRankings(page: $page, bracket: $bracket, partition: $partition, leaderboard: LogsOnly)
     }
   }
 }
@@ -43,6 +49,7 @@ def main() -> None:
     parser.add_argument("--zone", type=int, default=47)
     parser.add_argument("--encounter", type=int)
     parser.add_argument("--bracket", type=int)
+    parser.add_argument("--partition", type=int)
     parser.add_argument("--page", type=int, default=1)
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--full", action="store_true")
@@ -55,6 +62,7 @@ def main() -> None:
     data = client.graphql_data(RANKING_QUERY, {
         "encounterID": args.encounter,
         "bracket": args.bracket,
+        "partition": args.partition,
         "page": args.page,
     })
     encounter = data["worldData"]["encounter"]

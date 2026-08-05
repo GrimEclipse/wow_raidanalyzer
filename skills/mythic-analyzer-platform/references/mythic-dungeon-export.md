@@ -8,6 +8,7 @@
 - 前端：`frontend/tools/mythic-dungeon/`
 - 样板清单：`assets/samples/mythic_dungeon_manifest.json`
 - 样板资源：`assets/samples/mythic_dungeon_<dungeon>_<report>_fight<id>.json`
+- 12.1 技能跟踪表：`mythic-dungeon-12.1-spell-tracker.md`
 
 ## 生成流程
 
