@@ -1,49 +1,2446 @@
 {
-  "schemaVersion": 1,
-  "season": "12.1 PTR",
-  "translationPolicy": "nameZh marked temporary is a working translation, not an official localization",
+  "schemaVersion": 2,
+  "season": "12.1",
+  "source": {
+    "kind": "wow.tools.local-db2",
+    "build": "12.1.0.69189",
+    "locale": "zhCN",
+    "tables": [
+      "JournalInstance",
+      "JournalEncounter",
+      "JournalEncounterItem",
+      "Item",
+      "ItemSparse",
+      "Toy",
+      "HouseDecor"
+    ]
+  },
+  "summary": {
+    "raidCount": 2,
+    "bossCount": 9,
+    "itemCount": 130
+  },
   "raids": [
     {
-      "key": "venomous_abyss",
-      "name": "烈毒之渊",
+      "key": "tidebound_grotto",
+      "id": 1317,
+      "name": "潮缚石窟",
       "bosses": [
-        {"key": "nakzali", "name": "盘魂者内克扎利", "lootStatus": "pending-ptr-source", "items": []},
-        {"key": "sentinels", "name": "陵寝哨兵", "lootStatus": "pending-ptr-source", "items": []},
-        {"key": "vashnik", "name": "万毒邪祟者瓦什尼克", "lootStatus": "pending-ptr-source", "items": []},
-        {"key": "lostexplorers", "name": "迷失的探险者", "lootStatus": "pending-ptr-source", "items": []},
-        {"key": "sszorak", "name": "斯索拉克", "lootStatus": "pending-ptr-source", "items": []},
-        {"key": "twinfangs", "name": "双子毒牙", "lootStatus": "pending-ptr-source", "items": []},
-        {"key": "bargained", "name": "The Coiled Altar（中文名待定）", "lootStatus": "pending-ptr-source", "items": []},
         {
-          "key": "ulatek",
-          "name": "乌拉特克",
-          "lootStatus": "ptr-verified",
-          "sourceUrl": "https://www.wowhead.com/ptr/npc=268956/ulatek",
-          "sourceCheckedAt": "2026-08-10",
+          "key": "nymrissa_wavecaller",
+          "id": 2849,
+          "name": "尼姆瑞莎·唤波者",
+          "order": 1,
+          "lootStatus": "official-zhCN-db2",
           "items": [
-            {"id": 268202, "nameEn": "Jaw of the Shackled Goddess", "nameZh": "枷锁女神之颚", "translationStatus": "temporary", "slot": "单手剑", "armorType": "weapon", "classes": ["death-knight", "paladin", "warrior"], "tags": ["武器", "力量", "单手剑"]},
-            {"id": 268207, "nameEn": "Caustic Repose Greatbow", "nameZh": "腐蚀长眠巨弓", "translationStatus": "temporary", "slot": "弓", "armorType": "weapon", "classes": ["hunter"], "tags": ["武器", "敏捷", "弓"]},
-            {"id": 268215, "nameEn": "Abyssal Broodfiend's Bardiche", "nameZh": "深渊巢魔长柄斧", "translationStatus": "temporary", "slot": "长柄武器", "armorType": "weapon", "classes": ["druid", "hunter", "monk"], "tags": ["武器", "敏捷", "长柄武器"]},
-            {"id": 268265, "nameEn": "Aqirbane Reliquary", "nameZh": "阿其尔克星圣物匣", "translationStatus": "temporary", "slot": "项链", "armorType": "accessory", "classes": [], "tags": ["项链", "通用"]},
-            {"id": 270168, "nameEn": "Font of Venomous Rage", "nameZh": "剧毒狂怒之源", "translationStatus": "temporary", "slot": "饰品", "armorType": "accessory", "classes": [], "tags": ["饰品"]},
-            {"id": 270175, "nameEn": "Voracious Heart of Ula'tek", "nameZh": "乌拉特克的贪噬之心", "translationStatus": "temporary", "slot": "饰品", "armorType": "accessory", "classes": [], "tags": ["饰品"]},
-            {"id": 270909, "nameEn": "Slumbering Coil Curio", "nameZh": "沉眠盘蛇珍玩", "translationStatus": "temporary", "slot": "套装兑换物", "armorType": "token", "classes": [], "tags": ["套装", "兑换物"]},
-            {"id": 271092, "nameEn": "Jan'thrazet, the Soul Fang", "nameZh": "詹萨泽特，灵魂之牙", "translationStatus": "temporary", "slot": "匕首", "armorType": "weapon", "classes": ["druid", "mage", "priest", "shaman", "warlock"], "tags": ["武器", "智力", "匕首"]},
-            {"id": 271093, "nameEn": "Zatha'tek, Breath of Corruption", "nameZh": "扎萨泰克，腐化之息", "translationStatus": "temporary", "slot": "匕首", "armorType": "weapon", "classes": ["demon-hunter", "druid", "hunter", "rogue"], "tags": ["武器", "敏捷", "匕首"]},
-            {"id": 271874, "nameEn": "Venomkeeper's Horrific Cowl", "nameZh": "毒液守护者的骇人兜帽", "translationStatus": "temporary", "slot": "头部", "armorType": "cloth", "classes": ["mage", "priest", "warlock"], "tags": ["布甲", "头部"]},
-            {"id": 271875, "nameEn": "Gaze of the Coiled Watcher", "nameZh": "盘蛇守望者之凝视", "translationStatus": "temporary", "slot": "头部", "armorType": "leather", "classes": ["demon-hunter", "druid", "monk", "rogue"], "tags": ["皮甲", "头部"]},
-            {"id": 271876, "nameEn": "Awoken Dreadfang Cuirass", "nameZh": "苏醒恐牙胸甲", "translationStatus": "temporary", "slot": "胸部", "armorType": "mail", "classes": ["evoker", "hunter", "shaman"], "tags": ["锁甲", "胸部"]},
-            {"id": 271878, "nameEn": "Chausses of Unbound Rancor", "nameZh": "无拘怨恨腿铠", "translationStatus": "temporary", "slot": "腿部", "armorType": "plate", "classes": ["death-knight", "paladin", "warrior"], "tags": ["板甲", "腿部"]}
+            {
+              "id": 270167,
+              "nameZh": "唤波者的海石",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268199,
+              "nameZh": "穿潮者的击泡长杖",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "法杖",
+              "armorType": "weapon",
+              "classes": [
+                "druid",
+                "hunter",
+                "mage",
+                "monk",
+                "priest",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "法杖"
+              ]
+            },
+            {
+              "id": 268221,
+              "nameZh": "潮缚女巫法袍",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "胸部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "胸部"
+              ]
+            },
+            {
+              "id": 268238,
+              "nameZh": "涡流之怒护手",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "手部"
+              ]
+            },
+            {
+              "id": 268226,
+              "nameZh": "涌潮之海护肩",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "肩部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "肩部"
+              ]
+            },
+            {
+              "id": 268263,
+              "nameZh": "霜鳞的秘法蕨叶",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "副手物品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "副手物品"
+              ]
+            },
+            {
+              "id": 268262,
+              "nameZh": "泡鳍挡水盾",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "盾牌",
+              "armorType": "weapon",
+              "classes": [
+                "paladin",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "盾牌"
+              ]
+            },
+            {
+              "id": 268232,
+              "nameZh": "深渊海窟束带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268247,
+              "nameZh": "破浪皮靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268217,
+              "nameZh": "怒潮护腕",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腕部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "腕部"
+              ]
+            },
+            {
+              "id": 268244,
+              "nameZh": "遗忘石窟束带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268266,
+              "nameZh": "诱人水泡指环",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手指",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "手指"
+              ]
+            },
+            {
+              "id": 279112,
+              "nameZh": "成簇的海星",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
           ]
         }
       ]
     },
     {
-      "key": "tidebound_grotto",
-      "name": "潮缚石窟",
+      "key": "venomous_abyss",
+      "id": 1320,
+      "name": "烈毒之渊",
       "bosses": [
-        {"key": "nymrissa_wavecaller", "name": "尼姆瑞莎·唤潮者", "lootStatus": "pending-ptr-source", "items": []}
+        {
+          "key": "nakzali",
+          "id": 2888,
+          "name": "盘魂者内克扎莉",
+          "order": 1,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270162,
+              "nameZh": "盘魂者仪式容器",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268203,
+              "nameZh": "咒魇裂魂匕首",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "匕首",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "hunter",
+                "mage",
+                "priest",
+                "rogue",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "匕首"
+              ]
+            },
+            {
+              "id": 268236,
+              "nameZh": "学徒的献祭紧身裤",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腿部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "腿部"
+              ]
+            },
+            {
+              "id": 268235,
+              "nameZh": "觉醒外衣",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "胸部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "胸部"
+              ]
+            },
+            {
+              "id": 268229,
+              "nameZh": "复生祭品护颅",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "头部"
+              ]
+            },
+            {
+              "id": 268245,
+              "nameZh": "入殓教徒的马靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268208,
+              "nameZh": "强血者的仪式切肉斧",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "单手斧",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "hunter",
+                "monk",
+                "paladin",
+                "rogue",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "单手斧"
+              ]
+            },
+            {
+              "id": 270930,
+              "nameZh": "墓穴行者之爪",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "拳套",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "hunter",
+                "monk",
+                "rogue",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "拳套"
+              ]
+            },
+            {
+              "id": 268248,
+              "nameZh": "阿曼尼召唤披巾",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "背部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "背部"
+              ]
+            },
+            {
+              "id": 268218,
+              "nameZh": "内克扎莉的御魂长靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268240,
+              "nameZh": "无眠精魂镣铐",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腕部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "腕部"
+              ]
+            },
+            {
+              "id": 268216,
+              "nameZh": "受诅藏骨腰带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 279115,
+              "nameZh": "盘魂者的仪式蜡烛",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            },
+            {
+              "id": 281227,
+              "nameZh": "盘魂者的鲁希卡面具",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "cosmetic",
+              "classes": [],
+              "tags": [
+                "装备",
+                "幻化收藏",
+                "头部"
+              ]
+            },
+            {
+              "id": 268230,
+              "nameZh": "永恒毒牙之冠",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "头部"
+              ]
+            },
+            {
+              "id": 280305,
+              "nameZh": "盘魂残骸",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "宠物",
+              "slot": "宠物",
+              "armorType": "pet",
+              "classes": [],
+              "tags": [
+                "宠物"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "sentinels",
+          "id": 2874,
+          "name": "陵寝哨兵",
+          "order": 2,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270913,
+              "nameZh": "毒铸神像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "warrior",
+                "paladin",
+                "death-knight"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270912,
+              "nameZh": "毒锻神像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "hunter",
+                "shaman",
+                "evoker"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270911,
+              "nameZh": "毒咒神像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "rogue",
+                "monk",
+                "druid",
+                "demon-hunter"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270910,
+              "nameZh": "毒织神像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "priest",
+                "mage",
+                "warlock"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 268250,
+              "nameZh": "哨兵的强酸锁链",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "颈部",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "颈部"
+              ]
+            },
+            {
+              "id": 270165,
+              "nameZh": "守护者的躁动核心",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268204,
+              "nameZh": "远古构造体的烈毒短刀",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "匕首",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "hunter",
+                "mage",
+                "priest",
+                "rogue",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "匕首"
+              ]
+            },
+            {
+              "id": 268198,
+              "nameZh": "强酸守护者粉碎锤",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "双手锤",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "druid",
+                "monk",
+                "paladin",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "双手锤"
+              ]
+            },
+            {
+              "id": 268224,
+              "nameZh": "烈毒守卫护腿",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腿部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "腿部"
+              ]
+            },
+            {
+              "id": 268228,
+              "nameZh": "毒灼护腕",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腕部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "腕部"
+              ]
+            },
+            {
+              "id": 268219,
+              "nameZh": "暗影猎手战帽",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "头部"
+              ]
+            },
+            {
+              "id": 268197,
+              "nameZh": "嘶鸣深渊脊骨",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "副手物品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "副手物品"
+              ]
+            },
+            {
+              "id": 264716,
+              "nameZh": "妖术陵墓火盆",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "lost_explorers",
+          "id": 2894,
+          "name": "迷失的探险者",
+          "order": 3,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270925,
+              "nameZh": "毒铸残骸",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "warrior",
+                "paladin",
+                "death-knight"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270924,
+              "nameZh": "毒锻残骸",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "hunter",
+                "shaman",
+                "evoker"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270923,
+              "nameZh": "毒咒残骸",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "rogue",
+                "monk",
+                "druid",
+                "demon-hunter"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270922,
+              "nameZh": "毒织残骸",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "priest",
+                "mage",
+                "warlock"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270164,
+              "nameZh": "盖博的无底袋",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 270160,
+              "nameZh": "大副的甲壳结界",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268210,
+              "nameZh": "恶意精魂短棍",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "单手锤",
+              "armorType": "weapon",
+              "classes": [
+                "druid",
+                "monk",
+                "paladin",
+                "priest",
+                "rogue",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "单手锤"
+              ]
+            },
+            {
+              "id": 268200,
+              "nameZh": "盖博的备用冲击枪",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "枪械",
+              "armorType": "weapon",
+              "classes": [
+                "hunter"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "枪械"
+              ]
+            },
+            {
+              "id": 268227,
+              "nameZh": "失魂颅骨束带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268242,
+              "nameZh": "迷途书卷贤者兜帽",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "头部"
+              ]
+            },
+            {
+              "id": 268258,
+              "nameZh": "鲁莽旅人战靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268239,
+              "nameZh": "缚壳臂甲",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腕部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "腕部"
+              ]
+            },
+            {
+              "id": 268196,
+              "nameZh": "毒痕鳞甲盾",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "盾牌",
+              "armorType": "weapon",
+              "classes": [
+                "paladin",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "盾牌"
+              ]
+            },
+            {
+              "id": 279118,
+              "nameZh": "迷失的探险者邮箱",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "vashnik",
+          "id": 2882,
+          "name": "万毒邪祟者瓦什尼克",
+          "order": 4,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270929,
+              "nameZh": "毒铸圣像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "warrior",
+                "paladin",
+                "death-knight"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270928,
+              "nameZh": "毒锻圣像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "hunter",
+                "shaman",
+                "evoker"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270927,
+              "nameZh": "毒咒圣像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "rogue",
+                "monk",
+                "druid",
+                "demon-hunter"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270926,
+              "nameZh": "毒织圣像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "priest",
+                "mage",
+                "warlock"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 268249,
+              "nameZh": "邪恶炼金师指环",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手指",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "手指"
+              ]
+            },
+            {
+              "id": 268246,
+              "nameZh": "泛沫毒液护肩",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "肩部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "肩部"
+              ]
+            },
+            {
+              "id": 268254,
+              "nameZh": "蛇形调配腰带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268260,
+              "nameZh": "鳞魔战靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268214,
+              "nameZh": "恶毒齿缘巨剑",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "双手剑",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "hunter",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "双手剑"
+              ]
+            },
+            {
+              "id": 270166,
+              "nameZh": "瓦什尼克的血色深仇",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 270161,
+              "nameZh": "幽影恶念之牙",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268205,
+              "nameZh": "毒术师的飞翼导能杖",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "法杖",
+              "armorType": "weapon",
+              "classes": [
+                "druid",
+                "hunter",
+                "mage",
+                "monk",
+                "priest",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "法杖"
+              ]
+            },
+            {
+              "id": 272361,
+              "nameZh": "烈毒火堆",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "sszorak",
+          "id": 2871,
+          "name": "斯索拉克",
+          "order": 5,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270921,
+              "nameZh": "毒铸遗物",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "warrior",
+                "paladin",
+                "death-knight"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270920,
+              "nameZh": "毒锻遗物",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "hunter",
+                "shaman",
+                "evoker"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270919,
+              "nameZh": "毒咒遗物",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "rogue",
+                "monk",
+                "druid",
+                "demon-hunter"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270918,
+              "nameZh": "毒织遗物",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "priest",
+                "mage",
+                "warlock"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270163,
+              "nameZh": "斯索拉克的凶猛",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 270174,
+              "nameZh": "呼啸枢纽神像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268206,
+              "nameZh": "游蛇蛮兵之槌",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "单手锤",
+              "armorType": "weapon",
+              "classes": [
+                "druid",
+                "monk",
+                "paladin",
+                "priest",
+                "rogue",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "单手锤"
+              ]
+            },
+            {
+              "id": 268201,
+              "nameZh": "烈毒骨制战刃",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "战刃",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "战刃"
+              ]
+            },
+            {
+              "id": 268257,
+              "nameZh": "强酸缠链束带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268234,
+              "nameZh": "无情屠戮护手",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "手部"
+              ]
+            },
+            {
+              "id": 268233,
+              "nameZh": "凶暴鳞靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268252,
+              "nameZh": "顶级蛮兵爪戒",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手指",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "手指"
+              ]
+            },
+            {
+              "id": 244343,
+              "nameZh": "哀嚎藏骨瓮",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "twin_fangs",
+          "id": 2887,
+          "name": "双子毒牙",
+          "order": 6,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270917,
+              "nameZh": "毒铸雕像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "warrior",
+                "paladin",
+                "death-knight"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270916,
+              "nameZh": "毒锻雕像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "hunter",
+                "shaman",
+                "evoker"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270915,
+              "nameZh": "毒咒雕像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "rogue",
+                "monk",
+                "druid",
+                "demon-hunter"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270914,
+              "nameZh": "毒织雕像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [
+                "priest",
+                "mage",
+                "warlock"
+              ],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 270171,
+              "nameZh": "超自然抗毒剂",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 270170,
+              "nameZh": "维克斯胡尔的涌流腺体",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268251,
+              "nameZh": "双子毒牙护符",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "颈部",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "颈部"
+              ]
+            },
+            {
+              "id": 268264,
+              "nameZh": "贪婪盛宴之牙",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "匕首",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "hunter",
+                "mage",
+                "priest",
+                "rogue",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "匕首"
+              ]
+            },
+            {
+              "id": 268241,
+              "nameZh": "永恒盘绕饰肩",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "肩部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "肩部"
+              ]
+            },
+            {
+              "id": 268261,
+              "nameZh": "沾涎游蛇便鞋",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268223,
+              "nameZh": "蛇裔毒牙锁甲",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "胸部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "胸部"
+              ]
+            },
+            {
+              "id": 268220,
+              "nameZh": "鳞甲锁喉护手",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "手部"
+              ]
+            },
+            {
+              "id": 279122,
+              "nameZh": "毒牙之泉",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "coiled_altar",
+          "id": 2883,
+          "name": "盘卷祭坛",
+          "order": 7,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 268209,
+              "nameZh": "阿曼穆索，督军的复仇",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "单手斧",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "hunter",
+                "monk",
+                "paladin",
+                "rogue",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "单手斧"
+              ]
+            },
+            {
+              "id": 270173,
+              "nameZh": "祖尔金的处斩技法",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268243,
+              "nameZh": "永恒暗影之握",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "手部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "手部"
+              ]
+            },
+            {
+              "id": 270169,
+              "nameZh": "妖术领主的厄运神像",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268237,
+              "nameZh": "释缚结合腿甲",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腿部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "腿部"
+              ]
+            },
+            {
+              "id": 268222,
+              "nameZh": "狂野精魂胸甲",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "胸部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "胸部"
+              ]
+            },
+            {
+              "id": 268213,
+              "nameZh": "迈兹罗阿，督军的狂怒",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "双手斧",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "hunter",
+                "paladin",
+                "shaman",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "双手斧"
+              ]
+            },
+            {
+              "id": 268253,
+              "nameZh": "丝质巫毒斗篷",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "背部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "背部"
+              ]
+            },
+            {
+              "id": 268255,
+              "nameZh": "狂笑履魂靴",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "脚部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "脚部"
+              ]
+            },
+            {
+              "id": 268256,
+              "nameZh": "孤寂容器束带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268259,
+              "nameZh": "剧毒悔恨束带",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腰部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "腰部"
+              ]
+            },
+            {
+              "id": 268211,
+              "nameZh": "灾厄妖术之刃",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "单手剑",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "demon-hunter",
+                "hunter",
+                "mage",
+                "monk",
+                "paladin",
+                "rogue",
+                "warlock",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "单手剑"
+              ]
+            },
+            {
+              "id": 275937,
+              "nameZh": "妖术领主的面容",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "cosmetic",
+              "classes": [],
+              "tags": [
+                "装备",
+                "幻化收藏",
+                "头部"
+              ]
+            },
+            {
+              "id": 275938,
+              "nameZh": "妖术领主的凝视",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "cosmetic",
+              "classes": [],
+              "tags": [
+                "装备",
+                "幻化收藏",
+                "头部"
+              ]
+            },
+            {
+              "id": 279131,
+              "nameZh": "盘卷蛇岛之柱",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            },
+            {
+              "id": 268225,
+              "nameZh": "盘卷妖术护腿",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腿部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "腿部"
+              ]
+            },
+            {
+              "id": 268231,
+              "nameZh": "游魂护肩",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "肩部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "肩部"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "ulatek",
+          "id": 2895,
+          "name": "乌拉特克",
+          "order": 8,
+          "lootStatus": "official-zhCN-db2",
+          "items": [
+            {
+              "id": 270909,
+              "nameZh": "蛰伏盘蛇珍玩",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "套装兑换物",
+              "slot": "套装兑换物",
+              "armorType": "token",
+              "classes": [],
+              "tags": [
+                "套装兑换物"
+              ]
+            },
+            {
+              "id": 268202,
+              "nameZh": "被缚女神之颚",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "单手剑",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "demon-hunter",
+                "hunter",
+                "mage",
+                "monk",
+                "paladin",
+                "rogue",
+                "warlock",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "单手剑"
+              ]
+            },
+            {
+              "id": 268215,
+              "nameZh": "深渊巢魔的长柄大斧",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "长柄武器",
+              "armorType": "weapon",
+              "classes": [
+                "death-knight",
+                "druid",
+                "hunter",
+                "monk",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "长柄武器"
+              ]
+            },
+            {
+              "id": 270168,
+              "nameZh": "剧毒狂怒之泉",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 270175,
+              "nameZh": "乌拉特克贪婪之心",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "饰品",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "饰品"
+              ]
+            },
+            {
+              "id": 268207,
+              "nameZh": "强酸安息巨弓",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "弓",
+              "armorType": "weapon",
+              "classes": [
+                "hunter"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "弓"
+              ]
+            },
+            {
+              "id": 268265,
+              "nameZh": "亚基克星藏骨匣",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "颈部",
+              "armorType": "accessory",
+              "classes": [],
+              "tags": [
+                "装备",
+                "首饰",
+                "颈部"
+              ]
+            },
+            {
+              "id": 271874,
+              "nameZh": "守毒者的骇人兜帽",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "cloth",
+              "classes": [
+                "mage",
+                "priest",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "布甲",
+                "头部"
+              ]
+            },
+            {
+              "id": 271875,
+              "nameZh": "盘卷守望者的凝视",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "头部",
+              "armorType": "leather",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "monk",
+                "rogue"
+              ],
+              "tags": [
+                "装备",
+                "皮甲",
+                "头部"
+              ]
+            },
+            {
+              "id": 271876,
+              "nameZh": "觉醒恐牙胸甲",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "胸部",
+              "armorType": "mail",
+              "classes": [
+                "evoker",
+                "hunter",
+                "shaman"
+              ],
+              "tags": [
+                "装备",
+                "锁甲",
+                "胸部"
+              ]
+            },
+            {
+              "id": 271878,
+              "nameZh": "无羁深仇腿甲",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "腿部",
+              "armorType": "plate",
+              "classes": [
+                "death-knight",
+                "paladin",
+                "warrior"
+              ],
+              "tags": [
+                "装备",
+                "板甲",
+                "腿部"
+              ]
+            },
+            {
+              "id": 271093,
+              "nameZh": "萨塔特克，腐化之息",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "匕首",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "hunter",
+                "mage",
+                "priest",
+                "rogue",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "匕首"
+              ]
+            },
+            {
+              "id": 271092,
+              "nameZh": "简斯拉泽，灵魂之牙",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "装备",
+              "slot": "匕首",
+              "armorType": "weapon",
+              "classes": [
+                "demon-hunter",
+                "druid",
+                "hunter",
+                "mage",
+                "priest",
+                "rogue",
+                "shaman",
+                "warlock"
+              ],
+              "tags": [
+                "装备",
+                "武器",
+                "匕首"
+              ]
+            },
+            {
+              "id": 275658,
+              "nameZh": "始源天翔飞蛇",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "坐骑",
+              "slot": "坐骑",
+              "armorType": "mount",
+              "classes": [],
+              "tags": [
+                "坐骑"
+              ]
+            },
+            {
+              "id": 279125,
+              "nameZh": "烈毒之渊耀金战利品",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            },
+            {
+              "id": 279127,
+              "nameZh": "烈毒之渊闪银战利品",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            },
+            {
+              "id": 279129,
+              "nameZh": "烈毒之渊闪耀战利品",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            },
+            {
+              "id": 279500,
+              "nameZh": "“受枷者的狂怒”壁画",
+              "nameEn": "",
+              "translationStatus": "official-zhCN-db2",
+              "lootType": "家具",
+              "slot": "家具",
+              "armorType": "furniture",
+              "classes": [],
+              "tags": [
+                "家具"
+              ]
+            }
+          ]
+        }
       ]
     }
-  ]
+  ],
+  "boe": {
+    "key": "boe",
+    "name": "装绑物品",
+    "items": [],
+    "allowFreeText": true
+  }
 }

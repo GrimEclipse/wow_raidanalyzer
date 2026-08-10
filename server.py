@@ -285,7 +285,9 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             selected_date = (query.get("date") or [None])[0]
             difficulty = (query.get("difficulty") or ["heroic"])[0]
             try:
-                return self.send_response_body(*json_bytes(loot_store.load_document(selected_date, difficulty)))
+                document = loot_store.load_document(selected_date, difficulty)
+                document["permissions"] = {"isAdmin": user["isAdmin"], "canModify": user["canModify"]}
+                return self.send_response_body(*json_bytes(document))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         if path in {"/api/notebook", "/api/scoreboard"}:
@@ -578,6 +580,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         try:
             if path == "/api/loot/setup":
                 return self.send_response_body(*json_bytes(loot_store.save_setup(self.read_json_body())))
+            if path == "/api/loot/settings":
+                if not user["isAdmin"]:
+                    return self.json_error("仅管理员可以修改史诗难度刷新设置。", HTTPStatus.FORBIDDEN)
+                return self.send_response_body(*json_bytes(loot_store.save_settings(self.read_json_body())))
             if path == "/api/loot/allocations":
                 return self.send_response_body(*json_bytes(loot_store.add_allocation(self.read_json_body())))
             if path == "/api/verdicts":
@@ -630,6 +636,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "statusUrl": f"/api/jobs/{job.id}/status",
                 "resultUrl": f"/api/jobs/{job.id}/result",
             }, HTTPStatus.ACCEPTED))
+        except loot_store.LootConflictWarning as warning:
+            return self.send_response_body(*json_bytes({
+                "error": "该分配存在需求权提醒，请确认后继续。",
+                "requiresConfirmation": True,
+                "warnings": warning.warnings,
+            }, HTTPStatus.CONFLICT))
         except Exception as exc:
             return self.json_error(str(exc), HTTPStatus.BAD_REQUEST)
 

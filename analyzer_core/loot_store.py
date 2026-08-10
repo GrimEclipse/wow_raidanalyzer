@@ -4,8 +4,8 @@ from __future__ import annotations
 import copy
 import json
 import sqlite3
-import time
 import uuid
+from contextlib import closing
 from datetime import date as date_type, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
@@ -18,12 +18,33 @@ DIFFICULTIES = {"lfr", "normal", "heroic", "mythic"}
 DIFFICULTY_NAMES = {"lfr": "随机团队", "normal": "普通", "heroic": "英雄", "mythic": "史诗"}
 ATTENDANCE_STATUSES = {"present", "late", "leave", "absent"}
 AWARD_TYPES = {"need", "greed", "transmog", "alt"}
-ARMOR_TYPES = {"cloth", "leather", "mail", "plate", "accessory", "weapon", "token", "other"}
+ARMOR_TYPES = {
+    "cloth", "leather", "mail", "plate", "accessory", "weapon", "token",
+    "cosmetic", "mount", "pet", "toy", "furniture", "other",
+}
 SCHEDULED_WEEKDAYS = {3, 4, 5}  # Thursday, Friday, Saturday (Monday=0)
+FIRST_PROGRESSION_DATE = date_type(2026, 8, 24)
+MYTHIC_RESET_ANCHOR = date_type(2026, 9, 3)
+
+
+class LootConflictWarning(ValueError):
+    """A need allocation may be saved only after the caller confirms warnings."""
+
+    def __init__(self, warnings: List[str]):
+        super().__init__("；".join(warnings))
+        self.warnings = warnings
+
+
+def _default_settings() -> Dict[str, Any]:
+    return {
+        "mythicBiweeklyEnabled": False,
+        "mythicBiweeklyAnchor": MYTHIC_RESET_ANCHOR.isoformat(),
+        "firstProgressionDate": FIRST_PROGRESSION_DATE.isoformat(),
+    }
 
 
 def _empty_state() -> Dict[str, Any]:
-    return {"schemaVersion": 1, "roster": [], "days": [], "allocations": []}
+    return {"schemaVersion": 2, "settings": _default_settings(), "roster": [], "days": [], "allocations": []}
 
 
 def _connect() -> sqlite3.Connection:
@@ -43,7 +64,7 @@ def _connect() -> sqlite3.Connection:
 
 
 def _load_state() -> Dict[str, Any]:
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         row = conn.execute("SELECT body FROM loot_state WHERE id = 1").fetchone()
     if not row:
         return _empty_state()
@@ -57,7 +78,7 @@ def _save_state(state: Dict[str, Any]) -> None:
     state = _normalise_state(state)
     body = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
     now = datetime.now().astimezone().isoformat(timespec="seconds")
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         conn.execute(
             "INSERT OR REPLACE INTO loot_state(id, body, updated_at) VALUES (1, ?, ?)",
             (body, now),
@@ -74,6 +95,12 @@ def _parse_date(value: Any) -> date_type:
         return date_type.fromisoformat(_text(value, 10))
     except ValueError as error:
         raise ValueError("日期必须使用 YYYY-MM-DD 格式。") from error
+
+
+def _normalise_settings(raw: Dict[str, Any] | None) -> Dict[str, Any]:
+    settings = _default_settings()
+    settings["mythicBiweeklyEnabled"] = bool((raw or {}).get("mythicBiweeklyEnabled", False))
+    return settings
 
 
 def _normalise_roster(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -185,7 +212,8 @@ def _normalise_state(raw: Dict[str, Any]) -> Dict[str, Any]:
     roster = _normalise_roster((raw or {}).get("roster") or [])
     player_ids = {row["id"] for row in roster}
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
+        "settings": _normalise_settings((raw or {}).get("settings")),
         "roster": roster,
         "days": _normalise_days((raw or {}).get("days") or [], player_ids),
         "allocations": _normalise_allocations((raw or {}).get("allocations") or [], player_ids),
@@ -194,21 +222,26 @@ def _normalise_state(raw: Dict[str, Any]) -> Dict[str, Any]:
 
 def load_catalog() -> Dict[str, Any]:
     if not CATALOG_PATH.is_file():
-        return {"schemaVersion": 1, "raids": []}
+        return {"schemaVersion": 2, "raids": [], "boe": {"items": [], "allowFreeText": True}}
     return json.loads(CATALOG_PATH.read_text(encoding="utf-8-sig"))
 
 
-def _week_start(value: date_type) -> date_type:
-    return value - timedelta(days=value.weekday())
+def _lockout_start(value: date_type) -> date_type:
+    """Return the Thursday at the start of the CN weekly lockout."""
+    return value - timedelta(days=(value.weekday() - 3) % 7)
+
+
+def is_progression_date(value: date_type) -> bool:
+    return value == FIRST_PROGRESSION_DATE or (value > FIRST_PROGRESSION_DATE and value.weekday() in SCHEDULED_WEEKDAYS)
 
 
 def _previous_week_absences(state: Dict[str, Any], player_id: str, selected: date_type) -> int:
-    start = _week_start(selected) - timedelta(days=7)
+    start = _lockout_start(selected) - timedelta(days=7)
     end = start + timedelta(days=6)
     count = 0
     for day in state["days"]:
         current = date_type.fromisoformat(day["date"])
-        if not (start <= current <= end) or current.weekday() not in SCHEDULED_WEEKDAYS:
+        if not (start <= current <= end) or not is_progression_date(current):
             continue
         entry = next((row for row in day["attendance"] if row["playerId"] == player_id), None)
         if entry and entry["status"] in {"leave", "absent"}:
@@ -216,16 +249,16 @@ def _previous_week_absences(state: Dict[str, Any], player_id: str, selected: dat
     return count
 
 
-def _need_uses(state: Dict[str, Any], player_id: str, selected: date_type, difficulty: str) -> int:
-    start = _week_start(selected)
+def _need_allocations(state: Dict[str, Any], player_id: str, selected: date_type, difficulty: str) -> List[Dict[str, Any]]:
+    start = _lockout_start(selected)
     end = start + timedelta(days=6)
-    return sum(
-        1 for row in state["allocations"]
+    return [
+        row for row in state["allocations"]
         if row["recipientId"] == player_id
         and row["awardType"] == "need"
         and row["difficulty"] == difficulty
         and start <= date_type.fromisoformat(row["date"]) <= end
-    )
+    ]
 
 
 def eligibility_for(state: Dict[str, Any], selected_date: str, difficulty: str) -> List[Dict[str, Any]]:
@@ -236,40 +269,66 @@ def eligibility_for(state: Dict[str, Any], selected_date: str, difficulty: str) 
     result = []
     for player in state["roster"]:
         absences = _previous_week_absences(state, player["id"], selected)
-        uses = _need_uses(state, player["id"], selected, difficulty)
-        eligible = player["active"] and absences < 2 and uses < 1
+        prior = _need_allocations(state, player["id"], selected, difficulty)
+        eligible = player["active"] and absences < 2 and not prior
         reason = "可需求"
         if not player["active"]:
             reason = "非活动成员"
         elif absences >= 2:
-            reason = f"上周请假/缺勤 {absences} 次，本周仅可贪婪"
-        elif uses >= 1:
-            reason = f"本周{DIFFICULTY_NAMES[difficulty]}难度已使用需求权"
+            reason = f"上周请假/缺勤 {absences} 次，本周暂无需求权"
+        elif prior:
+            item = prior[0]["itemNameZh"] or prior[0]["itemName"]
+            reason = f"{prior[0]['date']} 已获得「{item}」"
         result.append({
             "playerId": player["id"],
             "needEligible": eligible,
             "reason": reason,
             "previousWeekAbsences": absences,
-            "needUsesThisWeek": uses,
+            "needUsesThisLockout": len(prior),
+            "priorNeedAllocations": copy.deepcopy(prior),
         })
     return result
 
 
+def _calendar_document(state: Dict[str, Any], selected: date_type) -> Dict[str, Any]:
+    range_start = date_type(selected.year - 1, 1, 1)
+    range_end = date_type(selected.year + 2, 1, 1)
+    progression = []
+    current = max(range_start, FIRST_PROGRESSION_DATE)
+    while current < range_end:
+        if is_progression_date(current):
+            progression.append(current.isoformat())
+        current += timedelta(days=1)
+
+    reset_dates = []
+    anchor = MYTHIC_RESET_ANCHOR
+    if state["settings"]["mythicBiweeklyEnabled"]:
+        current = anchor
+        while current < range_start:
+            current += timedelta(days=14)
+        while current < range_end:
+            reset_dates.append(current.isoformat())
+            current += timedelta(days=14)
+    elif range_start <= anchor < range_end:
+        reset_dates.append(anchor.isoformat())
+    return {"progressionDates": progression, "mythicResetDates": reset_dates}
+
+
 def load_document(selected_date: str | None = None, difficulty: str = "heroic") -> Dict[str, Any]:
-    selected_date = selected_date or date_type.today().isoformat()
+    selected = _parse_date(selected_date or date_type.today().isoformat())
     state = _load_state()
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "rules": {
-            "scheduledWeekdays": [4, 5, 6],
+            "needLimitPerDifficultyPerLockout": 1,
             "absenceThreshold": 2,
-            "needLimitPerDifficultyPerWeek": 1,
             "awardTypes": ["need", "greed", "transmog", "alt"],
         },
         "catalog": load_catalog(),
         "state": state,
-        "eligibility": eligibility_for(state, selected_date, difficulty),
-        "selectedDate": selected_date,
+        "calendar": _calendar_document(state, selected),
+        "eligibility": eligibility_for(state, selected.isoformat(), difficulty),
+        "selectedDate": selected.isoformat(),
         "difficulty": difficulty,
     }
 
@@ -277,14 +336,42 @@ def load_document(selected_date: str | None = None, difficulty: str = "heroic") 
 def save_setup(payload: Dict[str, Any]) -> Dict[str, Any]:
     existing = _load_state()
     candidate = {
-        "schemaVersion": 1,
-        "roster": payload.get("roster") or [],
-        "days": payload.get("days") or [],
+        "schemaVersion": 2,
+        "settings": existing["settings"],
+        "roster": payload["roster"] if "roster" in payload else existing["roster"],
+        "days": payload["days"] if "days" in payload else existing["days"],
         "allocations": existing["allocations"],
     }
     state = _normalise_state(candidate)
     _save_state(state)
     return {"ok": True, "rosterCount": len(state["roster"]), "dayCount": len(state["days"])}
+
+
+def save_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
+    state = _load_state()
+    state["settings"] = _normalise_settings({
+        **state["settings"],
+        "mythicBiweeklyEnabled": payload.get("mythicBiweeklyEnabled", state["settings"]["mythicBiweeklyEnabled"]),
+    })
+    _save_state(state)
+    return {"ok": True, "settings": copy.deepcopy(state["settings"])}
+
+
+def _allocation_warnings(state: Dict[str, Any], allocation: Dict[str, Any]) -> List[str]:
+    if allocation["awardType"] != "need":
+        return []
+    player = next(row for row in state["roster"] if row["id"] == allocation["recipientId"])
+    selected = date_type.fromisoformat(allocation["date"])
+    warnings = []
+    if not player["active"]:
+        warnings.append(f"{player['name']}当前不是活动成员")
+    absences = _previous_week_absences(state, player["id"], selected)
+    if absences >= 2:
+        warnings.append(f"{player['name']}因上周请假/缺勤 {absences} 次而暂无需求权")
+    for prior in _need_allocations(state, player["id"], selected, allocation["difficulty"]):
+        item = prior["itemNameZh"] or prior["itemName"]
+        warnings.append(f"{player['name']}于 {prior['date']} 获得了「{item}」（{DIFFICULTY_NAMES[allocation['difficulty']]}难度需求）")
+    return warnings
 
 
 def add_allocation(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -295,19 +382,15 @@ def add_allocation(payload: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("分配记录缺少有效的日期、难度、获奖玩家或分配类型。")
     allocation = normalised[0]
     if not allocation["itemName"] and not allocation["itemNameZh"]:
-        raise ValueError("请选择装备，或填写 BOE 装备名称。")
+        raise ValueError("请选择掉落，或填写 BOE 装备名称。")
     if allocation["sourceType"] == "boss" and not allocation["bossKey"]:
         raise ValueError("Boss 掉落必须选择对应 Boss。")
-    if allocation["awardType"] == "need":
-        eligibility = next(
-            row for row in eligibility_for(state, allocation["date"], allocation["difficulty"])
-            if row["playerId"] == allocation["recipientId"]
-        )
-        if not eligibility["needEligible"]:
-            raise ValueError(eligibility["reason"])
+    warnings = _allocation_warnings(state, allocation)
+    if warnings and not bool(payload.get("confirmOverride")):
+        raise LootConflictWarning(warnings)
     state["allocations"].append(allocation)
     _save_state(state)
-    return {"ok": True, "allocation": copy.deepcopy(allocation)}
+    return {"ok": True, "allocation": copy.deepcopy(allocation), "warnings": warnings, "overridden": bool(warnings)}
 
 
 def delete_allocation(allocation_id: str) -> Dict[str, Any]:
