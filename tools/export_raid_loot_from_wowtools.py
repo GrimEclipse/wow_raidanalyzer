@@ -190,6 +190,7 @@ def build_catalog(base_url: str, build: str, locale: str) -> dict:
                     "id": as_int(item_id),
                     "nameZh": name,
                     "nameEn": "",
+                    "wowheadUrl": f"https://www.wowhead.com/ptr/item={item_id}",
                     "translationStatus": "official-zhCN-db2",
                     "lootType": loot_type,
                     "slot": slot,

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=3">
 </head>
 <body>
+  <canvas id="ambientCanvas" class="ambient-canvas" aria-hidden="true"></canvas>
   <header class="topbar">
     <a class="brand" href="/">MYTHIC ANALYZER</a>
     <nav><a href="/raid-guide">团长手册</a><a href="/mythic-dungeon">大秘境</a><a href="/account">账号</a></nav>
@@ -21,7 +22,9 @@
       </div>
       <div class="page-actions">
         <button id="manageRoster" class="button secondary" hidden>管理团队名单</button>
-        <button id="mythicToggle" class="button reset-button" hidden></button>
+        <button id="mythicToggle" class="cadence-switch" role="switch" aria-label="切换史诗刷新周期" hidden>
+          <span>单周</span><i></i><span>双周</span>
+        </button>
       </div>
     </section>
 
@@ -107,6 +110,6 @@
     </section>
   </div>
 
-  <script src="/frontend/tools/raid-loot/app.js?v=2"></script>
+  <script src="/frontend/tools/raid-loot/app.js?v=3"></script>
 </body>
 </html>

@@ -23,8 +23,9 @@ ARMOR_TYPES = {
     "cosmetic", "mount", "pet", "toy", "furniture", "other",
 }
 SCHEDULED_WEEKDAYS = {3, 4, 5}  # Thursday, Friday, Saturday (Monday=0)
-FIRST_PROGRESSION_DATE = date_type(2026, 8, 24)
-MYTHIC_RESET_ANCHOR = date_type(2026, 9, 3)
+FIRST_PROGRESSION_DATE = date_type(2026, 8, 20)
+DELAYED_PROGRESSION_DATES = {date_type(2026, 8, 24), date_type(2026, 8, 25)}
+MYTHIC_RESET_ANCHOR = date_type(2026, 8, 20)
 
 
 class LootConflictWarning(ValueError):
@@ -37,8 +38,8 @@ class LootConflictWarning(ValueError):
 
 def _default_settings() -> Dict[str, Any]:
     return {
-        "mythicBiweeklyEnabled": False,
-        "mythicBiweeklyAnchor": MYTHIC_RESET_ANCHOR.isoformat(),
+        "mythicCadenceWeeks": 2,
+        "mythicResetAnchor": MYTHIC_RESET_ANCHOR.isoformat(),
         "firstProgressionDate": FIRST_PROGRESSION_DATE.isoformat(),
     }
 
@@ -99,7 +100,14 @@ def _parse_date(value: Any) -> date_type:
 
 def _normalise_settings(raw: Dict[str, Any] | None) -> Dict[str, Any]:
     settings = _default_settings()
-    settings["mythicBiweeklyEnabled"] = bool((raw or {}).get("mythicBiweeklyEnabled", False))
+    cadence = (raw or {}).get("mythicCadenceWeeks")
+    try:
+        cadence = int(cadence)
+    except (TypeError, ValueError):
+        # Schema v1 only had an enable flag and used a different anchor. Migrate
+        # every legacy state to the new, user-confirmed default: two weeks.
+        cadence = 2
+    settings["mythicCadenceWeeks"] = cadence if cadence in {1, 2} else 2
     return settings
 
 
@@ -232,33 +240,47 @@ def _lockout_start(value: date_type) -> date_type:
 
 
 def is_progression_date(value: date_type) -> bool:
-    return value == FIRST_PROGRESSION_DATE or (value > FIRST_PROGRESSION_DATE and value.weekday() in SCHEDULED_WEEKDAYS)
+    return (
+        value in DELAYED_PROGRESSION_DATES
+        or value == FIRST_PROGRESSION_DATE
+        or (value > FIRST_PROGRESSION_DATE and value.weekday() in SCHEDULED_WEEKDAYS)
+    )
 
 
-def _previous_week_absences(state: Dict[str, Any], player_id: str, selected: date_type) -> int:
+def _previous_week_absences(state: Dict[str, Any], player_id: str, selected: date_type) -> List[str]:
     start = _lockout_start(selected) - timedelta(days=7)
     end = start + timedelta(days=6)
-    count = 0
+    dates = []
     for day in state["days"]:
         current = date_type.fromisoformat(day["date"])
-        if not (start <= current <= end) or not is_progression_date(current):
+        if not (start <= current <= end):
             continue
         entry = next((row for row in day["attendance"] if row["playerId"] == player_id), None)
         if entry and entry["status"] in {"leave", "absent"}:
-            count += 1
-    return count
+            dates.append(day["date"])
+    return sorted(dates)
+
+
+def _need_period(state: Dict[str, Any], selected: date_type, difficulty: str) -> tuple[date_type, date_type]:
+    if difficulty != "mythic":
+        start = _lockout_start(selected)
+        return start, start + timedelta(days=6)
+    cadence_days = int(state["settings"]["mythicCadenceWeeks"]) * 7
+    offset = (selected - MYTHIC_RESET_ANCHOR).days
+    start = MYTHIC_RESET_ANCHOR + timedelta(days=(offset // cadence_days) * cadence_days)
+    return start, start + timedelta(days=cadence_days - 1)
 
 
 def _need_allocations(state: Dict[str, Any], player_id: str, selected: date_type, difficulty: str) -> List[Dict[str, Any]]:
-    start = _lockout_start(selected)
-    end = start + timedelta(days=6)
-    return [
+    start, end = _need_period(state, selected, difficulty)
+    rows = [
         row for row in state["allocations"]
         if row["recipientId"] == player_id
         and row["awardType"] == "need"
         and row["difficulty"] == difficulty
         and start <= date_type.fromisoformat(row["date"]) <= end
     ]
+    return sorted(rows, key=lambda row: (row["date"], row["createdAt"]))
 
 
 def eligibility_for(state: Dict[str, Any], selected_date: str, difficulty: str) -> List[Dict[str, Any]]:
@@ -268,14 +290,15 @@ def eligibility_for(state: Dict[str, Any], selected_date: str, difficulty: str) 
         raise ValueError("无效的副本难度。")
     result = []
     for player in state["roster"]:
-        absences = _previous_week_absences(state, player["id"], selected)
+        absence_dates = _previous_week_absences(state, player["id"], selected)
+        absences = len(absence_dates)
         prior = _need_allocations(state, player["id"], selected, difficulty)
         eligible = player["active"] and absences < 2 and not prior
         reason = "可需求"
         if not player["active"]:
             reason = "非活动成员"
         elif absences >= 2:
-            reason = f"上周请假/缺勤 {absences} 次，本周暂无需求权"
+            reason = f"于 {'、'.join(absence_dates)} 请假/缺勤，共 {absences} 次，本CD暂无需求权"
         elif prior:
             item = prior[0]["itemNameZh"] or prior[0]["itemName"]
             reason = f"{prior[0]['date']} 已获得「{item}」"
@@ -284,6 +307,7 @@ def eligibility_for(state: Dict[str, Any], selected_date: str, difficulty: str) 
             "needEligible": eligible,
             "reason": reason,
             "previousWeekAbsences": absences,
+            "previousWeekAbsenceDates": absence_dates,
             "needUsesThisLockout": len(prior),
             "priorNeedAllocations": copy.deepcopy(prior),
         })
@@ -301,16 +325,13 @@ def _calendar_document(state: Dict[str, Any], selected: date_type) -> Dict[str, 
         current += timedelta(days=1)
 
     reset_dates = []
-    anchor = MYTHIC_RESET_ANCHOR
-    if state["settings"]["mythicBiweeklyEnabled"]:
-        current = anchor
-        while current < range_start:
-            current += timedelta(days=14)
-        while current < range_end:
-            reset_dates.append(current.isoformat())
-            current += timedelta(days=14)
-    elif range_start <= anchor < range_end:
-        reset_dates.append(anchor.isoformat())
+    cadence_days = int(state["settings"]["mythicCadenceWeeks"]) * 7
+    current = MYTHIC_RESET_ANCHOR
+    while current < range_start:
+        current += timedelta(days=cadence_days)
+    while current < range_end:
+        reset_dates.append(current.isoformat())
+        current += timedelta(days=cadence_days)
     return {"progressionDates": progression, "mythicResetDates": reset_dates}
 
 
@@ -349,9 +370,10 @@ def save_setup(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def save_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
     state = _load_state()
+    cadence = payload.get("mythicCadenceWeeks", state["settings"]["mythicCadenceWeeks"])
     state["settings"] = _normalise_settings({
         **state["settings"],
-        "mythicBiweeklyEnabled": payload.get("mythicBiweeklyEnabled", state["settings"]["mythicBiweeklyEnabled"]),
+        "mythicCadenceWeeks": cadence,
     })
     _save_state(state)
     return {"ok": True, "settings": copy.deepcopy(state["settings"])}
@@ -365,9 +387,9 @@ def _allocation_warnings(state: Dict[str, Any], allocation: Dict[str, Any]) -> L
     warnings = []
     if not player["active"]:
         warnings.append(f"{player['name']}当前不是活动成员")
-    absences = _previous_week_absences(state, player["id"], selected)
-    if absences >= 2:
-        warnings.append(f"{player['name']}因上周请假/缺勤 {absences} 次而暂无需求权")
+    absence_dates = _previous_week_absences(state, player["id"], selected)
+    if len(absence_dates) >= 2:
+        warnings.append(f"{player['name']}于 {'、'.join(absence_dates)} 请假/缺勤，共 {len(absence_dates)} 次，本CD暂无需求权")
     for prior in _need_allocations(state, player["id"], selected, allocation["difficulty"]):
         item = prior["itemNameZh"] or prior["itemName"]
         warnings.append(f"{player['name']}于 {prior['date']} 获得了「{item}」（{DIFFICULTY_NAMES[allocation['difficulty']]}难度需求）")

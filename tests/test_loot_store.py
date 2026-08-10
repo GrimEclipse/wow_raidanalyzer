@@ -58,19 +58,21 @@ class LootStoreTests(unittest.TestCase):
         loot_store.save_setup({
             "roster": loot_store.load_document("2026-08-13")["state"]["roster"],
             "days": [
-                {"date": "2026-08-27", "raidKey": "venomous_abyss", "attendance": [{"playerId": "tank", "status": "leave"}]},
-                {"date": "2026-08-28", "raidKey": "venomous_abyss", "attendance": [{"playerId": "tank", "status": "absent"}]},
+                {"date": "2026-08-24", "raidKey": "venomous_abyss", "attendance": [{"playerId": "tank", "status": "leave"}]},
+                {"date": "2026-08-25", "raidKey": "venomous_abyss", "attendance": [{"playerId": "tank", "status": "absent"}]},
             ],
         })
-        eligibility = loot_store.load_document("2026-09-03", "heroic")["eligibility"]
+        eligibility = loot_store.load_document("2026-08-27", "heroic")["eligibility"]
         tank = next(row for row in eligibility if row["playerId"] == "tank")
         self.assertFalse(tank["needEligible"])
         self.assertEqual(tank["previousWeekAbsences"], 2)
+        self.assertEqual(tank["previousWeekAbsenceDates"], ["2026-08-24", "2026-08-25"])
         with self.assertRaises(loot_store.LootConflictWarning) as caught:
-            loot_store.add_allocation(self.allocation(date="2026-09-03"))
+            loot_store.add_allocation(self.allocation(date="2026-08-27"))
+        self.assertIn("2026-08-24、2026-08-25", caught.exception.warnings[0])
         self.assertIn("暂无需求权", caught.exception.warnings[0])
-        self.assertTrue(loot_store.add_allocation(self.allocation(date="2026-09-03", confirmOverride=True))["ok"])
-        self.assertTrue(loot_store.add_allocation(self.allocation(date="2026-09-03", awardType="greed"))["ok"])
+        self.assertTrue(loot_store.add_allocation(self.allocation(date="2026-08-27", confirmOverride=True))["ok"])
+        self.assertTrue(loot_store.add_allocation(self.allocation(date="2026-08-27", awardType="greed"))["ok"])
 
     def test_boe_does_not_require_a_boss(self):
         result = loot_store.add_allocation(self.allocation(
@@ -80,16 +82,32 @@ class LootStoreTests(unittest.TestCase):
 
     def test_progression_calendar_and_mythic_resets(self):
         document = loot_store.load_document("2026-09-01")
+        self.assertIn("2026-08-20", document["calendar"]["progressionDates"])
         self.assertIn("2026-08-24", document["calendar"]["progressionDates"])
-        self.assertNotIn("2026-08-25", document["calendar"]["progressionDates"])
+        self.assertIn("2026-08-25", document["calendar"]["progressionDates"])
         self.assertIn("2026-08-27", document["calendar"]["progressionDates"])
-        self.assertEqual(document["calendar"]["mythicResetDates"], ["2026-09-03"])
-
-        loot_store.save_settings({"mythicBiweeklyEnabled": True})
-        resets = loot_store.load_document("2026-09-01")["calendar"]["mythicResetDates"]
+        resets = document["calendar"]["mythicResetDates"]
+        self.assertIn("2026-08-20", resets)
         self.assertIn("2026-09-03", resets)
-        self.assertIn("2026-09-17", resets)
-        self.assertNotIn("2026-09-10", resets)
+        self.assertNotIn("2026-08-27", resets)
+
+        loot_store.save_settings({"mythicCadenceWeeks": 1})
+        resets = loot_store.load_document("2026-09-01")["calendar"]["mythicResetDates"]
+        self.assertIn("2026-08-20", resets)
+        self.assertIn("2026-08-27", resets)
+        self.assertIn("2026-09-03", resets)
+        self.assertIn("2026-09-10", resets)
+
+    def test_mythic_need_uses_two_week_period_by_default(self):
+        loot_store.add_allocation(self.allocation(date="2026-08-24", difficulty="mythic", itemNameZh="毒灼护腕"))
+        with self.assertRaises(loot_store.LootConflictWarning) as caught:
+            loot_store.add_allocation(self.allocation(date="2026-08-27", difficulty="mythic", itemNameZh="咒魇裂魂匕首"))
+        self.assertIn("于 2026-08-24 获得了「毒灼护腕」", caught.exception.warnings[0])
+
+        loot_store.save_settings({"mythicCadenceWeeks": 1})
+        self.assertTrue(loot_store.add_allocation(self.allocation(
+            date="2026-08-27", difficulty="mythic", itemNameZh="咒魇裂魂匕首"
+        ))["ok"])
 
     def test_need_lockout_starts_on_thursday(self):
         loot_store.add_allocation(self.allocation(date="2026-08-27"))

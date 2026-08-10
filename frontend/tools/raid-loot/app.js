@@ -8,6 +8,11 @@ const CLASS_OPTIONS = [
 const DIFFICULTY_NAMES = { lfr: "随机团队", normal: "普通", heroic: "英雄", mythic: "史诗" };
 const MODE_NAMES = { need: "需求", greed: "贪婪", transmog: "幻化收藏", alt: "小号提升" };
 const ARMOR_NAMES = { cloth: "布甲", leather: "皮甲", mail: "锁甲", plate: "板甲", accessory: "首饰", weapon: "武器", token: "套装兑换物", cosmetic: "幻化收藏", mount: "坐骑", pet: "宠物", toy: "玩具", furniture: "家具", other: "其他" };
+const CLASS_COLORS = {
+  "death-knight": "#C41F3B", "demon-hunter": "#A330C9", druid: "#FF7D0A", evoker: "#33937F",
+  hunter: "#ABD473", mage: "#69CCF0", monk: "#00FF96", paladin: "#F58CBA", priest: "#FFFFFF",
+  rogue: "#FFF569", shaman: "#0070DE", warlock: "#9482C9", warrior: "#C79C6E"
+};
 
 const $ = selector => document.querySelector(selector);
 const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
@@ -44,7 +49,10 @@ function roster() { return documentState?.state?.roster || []; }
 function raids() { return documentState?.catalog?.raids || []; }
 function selectedRaid() { return raids().find(row => row.key === $("#dayRaid").value) || raids()[0]; }
 function selectedBoss() { return selectedRaid()?.bosses?.find(row => row.key === $("#bossSelect").value); }
-function playerName(id) { return roster().find(row => row.id === id)?.name || id; }
+function player(id) { return roster().find(row => row.id === id); }
+function playerName(id) { return player(id)?.name || id; }
+function playerColor(id) { return CLASS_COLORS[player(id)?.classKey] || "#edf2f7"; }
+function classStyle(id) { return `--class-color:${playerColor(id)}`; }
 function canModify() { return Boolean(documentState?.permissions?.canModify); }
 
 async function load() {
@@ -70,10 +78,11 @@ function renderActions() {
   manage.hidden = !canModify();
   const toggle = $("#mythicToggle");
   const isAdmin = Boolean(documentState?.permissions?.isAdmin);
-  const enabled = Boolean(documentState?.state?.settings?.mythicBiweeklyEnabled);
+  const cadence = Number(documentState?.state?.settings?.mythicCadenceWeeks || 2);
   toggle.hidden = !isAdmin;
-  toggle.classList.toggle("active", enabled);
-  toggle.textContent = enabled ? "史诗双周刷新已启用" : "启用史诗双周刷新";
+  toggle.classList.toggle("biweekly", cadence === 2);
+  toggle.setAttribute("aria-checked", cadence === 2 ? "true" : "false");
+  toggle.title = cadence === 2 ? "当前史诗难度每两周刷新；点击切换为单周" : "当前史诗难度每周刷新；点击切换为双周";
   $("#saveDay").disabled = !canModify();
   $("#addAllocation").disabled = !canModify();
   const source = documentState?.catalog?.source;
@@ -166,7 +175,7 @@ function renderDay() {
     const status = attendance.get(player.id) || "present";
     const isLeave = ["leave", "absent"].includes(status);
     return `<button class="attendance-card ${isLeave ? "leave" : ""}" data-player="${escapeHtml(player.id)}" data-status="${isLeave ? "leave" : "present"}">
-      <span><strong>${escapeHtml(player.name)}</strong><small>${escapeHtml(player.className || "未设置职业")}</small></span>
+      <span><strong>${escapeHtml(player.name)}</strong><small class="class-colored" style="--class-color:${CLASS_COLORS[player.classKey] || "#8d9cab"}">${escapeHtml(player.className || "未设置职业")}</small></span>
       <span class="attendance-state">${isLeave ? "请假" : "出勤"}</span>
     </button>`;
   }).join("") : `<div class="empty">团队名单为空，请先维护成员。</div>`;
@@ -207,6 +216,11 @@ function renderRecipientOptions() {
     return `<option value="${escapeHtml(player.id)}">${entry && !entry.needEligible ? "⚠ " : ""}${escapeHtml(player.name)} · ${escapeHtml(player.className || "未设置职业")}</option>`;
   }).join("") || `<option value="">请先维护团队成员</option>`;
   if ([...$("#recipientSelect").options].some(option => option.value === current)) $("#recipientSelect").value = current;
+  applyRecipientColor();
+}
+
+function applyRecipientColor() {
+  $("#recipientSelect").style.color = playerColor($("#recipientSelect").value);
 }
 
 function renderClassFilter() {
@@ -245,7 +259,7 @@ function renderItemOptions() {
 }
 
 function renderRequests() {
-  $("#requestRows").innerHTML = roster().filter(row => row.active).map(player => `<div class="request-row" data-player="${escapeHtml(player.id)}"><strong>${escapeHtml(player.name)}</strong><select><option value="">未登记</option>${Object.entries(MODE_NAMES).map(([key, name]) => `<option value="${key}">${name}</option>`).join("")}</select><input placeholder="备注（可选）"></div>`).join("");
+  $("#requestRows").innerHTML = roster().filter(row => row.active).map(player => `<div class="request-row" data-player="${escapeHtml(player.id)}"><strong class="class-colored" style="--class-color:${CLASS_COLORS[player.classKey] || "#edf2f7"}">${escapeHtml(player.name)}</strong><select><option value="">未登记</option>${Object.entries(MODE_NAMES).map(([key, name]) => `<option value="${key}">${name}</option>`).join("")}</select><input placeholder="备注（可选）"></div>`).join("");
 }
 
 function renderAllocations() {
@@ -255,8 +269,12 @@ function renderAllocations() {
   $("#allocationList").classList.toggle("empty", !rows.length);
   $("#allocationList").innerHTML = rows.length ? rows.map(row => {
     const boss = allBosses.find(item => item.key === row.bossKey);
-    const requests = (row.requests || []).map(request => `${playerName(request.playerId)}：${MODE_NAMES[request.mode]}`).join(" · ");
-    return `<article class="allocation-card"><div><h4>${escapeHtml(row.itemNameZh || row.itemName)}</h4><div class="allocation-meta"><span>${row.sourceType === "boe" ? "装绑物品" : escapeHtml(boss?.name || row.bossKey)}</span><span>${DIFFICULTY_NAMES[row.difficulty]}</span><span>${escapeHtml(playerName(row.recipientId))} · ${MODE_NAMES[row.awardType]}</span></div>${requests ? `<div class="allocation-note">需求详情：${escapeHtml(requests)}</div>` : ""}${row.notes ? `<div class="allocation-note">${escapeHtml(row.notes)}</div>` : ""}</div><button class="button danger delete-allocation" data-id="${escapeHtml(row.id)}">删除</button></article>`;
+    const requests = (row.requests || []).map(request => `<span class="class-colored" style="${classStyle(request.playerId)}">${escapeHtml(playerName(request.playerId))}</span>：${MODE_NAMES[request.mode]}`).join(" · ");
+    const itemName = row.itemNameZh || row.itemName;
+    const itemTitle = /^\d+$/.test(String(row.itemId || ""))
+      ? `<a class="item-link" href="https://www.wowhead.com/ptr/item=${encodeURIComponent(row.itemId)}" target="_blank" rel="noreferrer">${escapeHtml(itemName)}</a>`
+      : escapeHtml(itemName);
+    return `<article class="allocation-card"><div><h4>${itemTitle}</h4><div class="allocation-meta"><span>${row.sourceType === "boe" ? "装绑物品" : escapeHtml(boss?.name || row.bossKey)}</span><span>${DIFFICULTY_NAMES[row.difficulty]}</span><span><span class="class-colored" style="${classStyle(row.recipientId)}">${escapeHtml(playerName(row.recipientId))}</span> · ${MODE_NAMES[row.awardType]}</span></div>${requests ? `<div class="allocation-note">需求详情：${requests}</div>` : ""}${row.notes ? `<div class="allocation-note">${escapeHtml(row.notes)}</div>` : ""}</div><button class="button danger delete-allocation" data-id="${escapeHtml(row.id)}">删除</button></article>`;
   }).join("") : "当天还没有分配记录";
   $("#allocationList").querySelectorAll(".delete-allocation").forEach(button => button.addEventListener("click", () => deleteAllocation(button.dataset.id)));
 }
@@ -339,8 +357,10 @@ function renderRoster() {
     const player = roster().find(item => item.id === row.dataset.id);
     row.querySelector(".player-class").value = player.classKey || "";
     row.querySelector(".player-armor").value = player.armorType || "plate";
+    row.querySelector(".player-class").style.color = CLASS_COLORS[player.classKey] || "#edf2f7";
     row.querySelector(".player-class").addEventListener("change", event => {
       const meta = CLASS_OPTIONS.find(item => item[0] === event.target.value);
+      event.target.style.color = CLASS_COLORS[event.target.value] || "#edf2f7";
       if (meta) row.querySelector(".player-armor").value = meta[2];
     });
     row.querySelector(".remove-player").addEventListener("click", () => {
@@ -370,12 +390,70 @@ async function saveRoster() {
 }
 
 async function toggleMythicSchedule() {
-  const enabled = !documentState.state.settings.mythicBiweeklyEnabled;
+  const current = Number(documentState.state.settings.mythicCadenceWeeks || 2);
+  const cadence = current === 2 ? 1 : 2;
   try {
-    await api("/api/loot/settings", { method: "PUT", body: JSON.stringify({ mythicBiweeklyEnabled: enabled }) });
-    notify(enabled ? "已启用史诗双周刷新：从 2026-09-03 起每两周周四显示绿点。" : "已停用史诗双周刷新，仅保留 2026-09-03 的首次刷新提示。");
+    await api("/api/loot/settings", { method: "PUT", body: JSON.stringify({ mythicCadenceWeeks: cadence }) });
+    notify(cadence === 2 ? "史诗难度已切换为双周刷新，锚点为 2026-08-20。" : "史诗难度已切换为单周刷新，每周四显示绿点。");
     await load();
   } catch (error) { notify(error.message, true); }
+}
+
+function initAmbientCanvas() {
+  const canvas = $("#ambientCanvas");
+  const context = canvas?.getContext("2d");
+  if (!context) return;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let width = 0;
+  let height = 0;
+  let particles = [];
+
+  function resize() {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const count = Math.max(18, Math.min(44, Math.round(width / 34)));
+    particles = Array.from({ length: count }, (_, index) => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - .5) * .12,
+      vy: (Math.random() - .5) * .12,
+      radius: 1 + Math.random() * 1.8,
+      color: ["121,174,252", "85,214,155", "231,183,92"][index % 3]
+    }));
+  }
+
+  function draw() {
+    context.clearRect(0, 0, width, height);
+    particles.forEach((point, index) => {
+      if (!reduceMotion) {
+        point.x = (point.x + point.vx + width) % width;
+        point.y = (point.y + point.vy + height) % height;
+      }
+      context.beginPath();
+      context.fillStyle = `rgba(${point.color},.24)`;
+      context.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+      context.fill();
+      for (let next = index + 1; next < particles.length; next += 1) {
+        const other = particles[next];
+        const distance = Math.hypot(point.x - other.x, point.y - other.y);
+        if (distance > 125) continue;
+        context.beginPath();
+        context.strokeStyle = `rgba(121,174,252,${(1 - distance / 125) * .055})`;
+        context.moveTo(point.x, point.y);
+        context.lineTo(other.x, other.y);
+        context.stroke();
+      }
+    });
+    if (!reduceMotion) requestAnimationFrame(draw);
+  }
+
+  resize();
+  draw();
+  window.addEventListener("resize", () => { resize(); if (reduceMotion) draw(); }, { passive: true });
 }
 
 $("#prevMonth").addEventListener("click", () => { displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth() - 1, 1); renderCalendar(); });
@@ -386,6 +464,7 @@ $("#saveDay").addEventListener("click", () => saveDay(false));
 $("#dayRaid").addEventListener("change", () => { currentDayRecord(true).raidKey = $("#dayRaid").value; renderBossOptions(); });
 $("#bossSelect").addEventListener("change", renderItemOptions);
 $("#difficultySelect").addEventListener("change", load);
+$("#recipientSelect").addEventListener("change", applyRecipientColor);
 $("#itemSearch").addEventListener("input", renderItemOptions);
 $("#lootTypeFilter").addEventListener("change", renderItemOptions);
 $("#armorFilter").addEventListener("change", renderItemOptions);
@@ -404,4 +483,5 @@ $("#addPlayer").addEventListener("click", () => {
   $("#rosterRows .roster-row:last-child .player-name")?.focus();
 });
 
+initAmbientCanvas();
 load().catch(error => notify(error.message, true));
