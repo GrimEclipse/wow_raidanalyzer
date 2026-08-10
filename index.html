@@ -32,7 +32,7 @@
             <p class="mt-3 text-sm leading-6 text-gray-400">读取分析 JSON，查看灭团复盘、转阶段与开庭明细。不负责跨日计分留痕。</p>
         </a>
 
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-fuchsia-500 hover:bg-gray-900/80"
+        <a data-admin-only class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-fuchsia-500 hover:bg-gray-900/80"
            href="/scoreboard">
             <div class="text-xs font-semibold uppercase tracking-wide text-fuchsia-300">智商记事本</div>
             <h2 class="mt-2 text-xl font-bold">开荒智商日记</h2>
@@ -53,6 +53,13 @@
             <p class="mt-3 text-sm leading-6 text-gray-400">按副本、Boss、难度和指定治疗构成寻找公开过本记录，提取治疗大技能、团队减伤、位移与增辉团队功能，并导出 MRT/NSRT 时间戳。</p>
         </a>
 
+        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-yellow-500 hover:bg-gray-900/80"
+           href="/loot">
+            <div class="text-xs font-semibold uppercase tracking-wide text-yellow-300">开荒运营</div>
+            <h2 class="mt-2 text-xl font-bold">Loot 与出勤日历</h2>
+            <p class="mt-3 text-sm leading-6 text-gray-400">记录活动出勤、需求资格、玩家需求详情和装备分配；按 Boss、难度、护甲及职业快速筛选 PTR 掉落。</p>
+        </a>
+
         <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-orange-500 hover:bg-gray-900/80"
            href="/mythic-dungeon">
             <div class="text-xs font-semibold uppercase tracking-wide text-orange-300">大秘境抄轴</div>
@@ -61,5 +68,10 @@
         </a>
     </section>
 </main>
+<script>
+fetch('/api/auth/me').then(response => response.ok ? response.json() : null).then(payload => {
+    if (!payload?.user?.isAdmin) document.querySelectorAll('[data-admin-only]').forEach(node => node.remove());
+}).catch(() => document.querySelectorAll('[data-admin-only]').forEach(node => node.remove()));
+</script>
 </body>
 </html>

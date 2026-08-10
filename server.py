@@ -15,13 +15,13 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Dict, List, Optional
-from urllib.parse import unquote, urlencode, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from analyzer_core.auth_store import AuthError, default_auth_store
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
-from analyzer_core import notebook_store
+from analyzer_core import loot_store, notebook_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 
 
@@ -280,7 +280,17 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.handle_job_status(path, user)
         if path.startswith("/api/jobs/") and path.endswith("/result"):
             return self.handle_result(path, user)
+        if path == "/api/loot":
+            query = parse_qs(urlparse(self.path).query)
+            selected_date = (query.get("date") or [None])[0]
+            difficulty = (query.get("difficulty") or ["heroic"])[0]
+            try:
+                return self.send_response_body(*json_bytes(loot_store.load_document(selected_date, difficulty)))
+            except ValueError as error:
+                return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         if path in {"/api/notebook", "/api/scoreboard"}:
+            if not user["isAdmin"]:
+                return self.json_error("仅管理员可以查看智商记事本。", HTTPStatus.FORBIDDEN)
             return self.send_response_body(*json_bytes(notebook_store.load_store()))
         if path in {"/api/data/list", "/api/data-files"}:
             files = notebook_store.list_data_files()
@@ -306,6 +316,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             )
         day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
         if day_match:
+            if not user["isAdmin"]:
+                return self.json_error("仅管理员可以查看智商记事本。", HTTPStatus.FORBIDDEN)
             day = notebook_store.get_day(day_match.group(1))
             if day is None:
                 return self.json_error("day not found", HTTPStatus.NOT_FOUND)
@@ -357,8 +369,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes({"ok": True}))
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
+        allocation_match = re.fullmatch(r"/api/loot/allocations/([A-Za-z0-9_-]+)", path)
+        if allocation_match:
+            try:
+                return self.send_response_body(*json_bytes(loot_store.delete_allocation(allocation_match.group(1))))
+            except ValueError as error:
+                return self.json_error(str(error), HTTPStatus.NOT_FOUND)
         day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
         if day_match:
+            if not user["isAdmin"]:
+                return self.json_error("仅管理员可以修改智商记事本。", HTTPStatus.FORBIDDEN)
             return self.send_response_body(*json_bytes(notebook_store.delete_day(day_match.group(1))))
         return self.json_error("not found", HTTPStatus.NOT_FOUND)
 
@@ -556,6 +576,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         try:
+            if path == "/api/loot/setup":
+                return self.send_response_body(*json_bytes(loot_store.save_setup(self.read_json_body())))
+            if path == "/api/loot/allocations":
+                return self.send_response_body(*json_bytes(loot_store.add_allocation(self.read_json_body())))
             if path == "/api/verdicts":
                 return self.handle_save_verdict()
             if path == "/api/export-verdict-excel":
@@ -570,9 +594,13 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                     result = search_raid_cooldowns(self.read_json_body())
                 return self.send_response_body(*json_bytes(result))
             if path in {"/api/notebook", "/api/scoreboard", "/api/notebook/store", "/api/scoreboard/store"}:
+                if not user["isAdmin"]:
+                    return self.json_error("仅管理员可以修改智商记事本。", HTTPStatus.FORBIDDEN)
                 return self.send_response_body(*json_bytes(notebook_store.save_store(self.read_json_body())))
             day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
             if day_match:
+                if not user["isAdmin"]:
+                    return self.json_error("仅管理员可以修改智商记事本。", HTTPStatus.FORBIDDEN)
                 return self.send_response_body(*json_bytes(notebook_store.put_day(day_match.group(1), self.read_json_body())))
             if path != "/api/analyze":
                 return self.json_error("not found", HTTPStatus.NOT_FOUND)
@@ -758,6 +786,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/report": "/frontend/report/index.html",
             "/scoreboard": "/frontend/tools/iq-notebook/index.html",
             "/verdict": "/frontend/tools/iq-notebook/index.html",
+            "/loot": "/frontend/tools/raid-loot/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",
@@ -765,6 +794,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/LuraJudgement.html": "/frontend/report/index.html",
         }
         path = route_map.get(path, path)
+        if path == "/frontend/tools/iq-notebook/index.html" and not public:
+            user = self.current_user()
+            if not user or not user["isAdmin"]:
+                return self.send_error(HTTPStatus.NOT_FOUND)
         allowed = (
             path in {"/index.html", "/boss_catalog.json"}
             or path.startswith("/assets/")

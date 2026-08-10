@@ -153,6 +153,14 @@ DUNGEON_CONFIGS = {
             1263529: "崩塌虚空", 1266001: "反冲",
         },
         "linkedTargetCasts": {
+            1263440: {
+                "displayEventType": "cast",
+                "targetAuraId": 1263494,
+                "targetDataType": "DamageDone",
+                "targetHostilityType": "Enemies",
+                "targetAuraEventType": "damage",
+                "toleranceMs": 1800,
+            },
             245742: {"displayEventType": "cast"},
             1266001: {"displayEventType": "cast"},
             1263542: {"displayEventType": "begincast", "targetEventType": "cast", "targetAuraId": 1263542, "toleranceMs": 25},

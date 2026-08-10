@@ -133,6 +133,7 @@ namespace WowRaidAnalyzer
                 if (path.Equals("/report", StringComparison.OrdinalIgnoreCase)) path = "/frontend/report/index.html";
                 else if (path.Equals("/scoreboard", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/iq-notebook/index.html";
                 else if (path.Equals("/verdict", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/iq-notebook/index.html";
+                else if (path.Equals("/loot", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-loot/index.html";
                 else if (path.Equals("/audit", StringComparison.OrdinalIgnoreCase)) path = "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html";
                 else if (path.Equals("/cooldowns", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-cooldowns/index.html";
                 else if (path.Equals("/raid-guide", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-guide/index.html";

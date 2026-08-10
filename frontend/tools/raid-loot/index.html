@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>开荒 Loot 与出勤</title>
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">MYTHIC ANALYZER</a>
+    <nav><a href="/raid-guide">团长手册</a><a href="/mythic-dungeon">大秘境</a><a href="/account">账号</a></nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">PROGRESSION OPERATIONS</p>
+        <h1>开荒 Loot 与出勤</h1>
+        <p>按周追踪需求权、活动出勤和每件装备的完整分配过程。</p>
+      </div>
+      <div class="rule-chips">
+        <span>活动日 4 / 5 / 6</span><span>每难度每周 1 次需求</span><span>上周缺勤 ≥ 2 次则本周仅贪婪</span>
+      </div>
+    </section>
+
+    <div id="message" class="message" hidden></div>
+
+    <section class="workspace">
+      <aside class="side-stack">
+        <article class="panel calendar-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">RAID CALENDAR</p><h2 id="monthTitle">活动日历</h2></div>
+            <div class="icon-buttons"><button id="prevMonth" aria-label="上个月">←</button><button id="nextMonth" aria-label="下个月">→</button></div>
+          </div>
+          <div class="weekday-row"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+          <div id="calendar" class="calendar"></div>
+        </article>
+
+        <article class="panel eligibility-panel">
+          <div class="panel-heading"><div><p class="kicker">NEED RIGHTS</p><h2>本周需求权</h2></div><span id="difficultyBadge" class="badge">英雄</span></div>
+          <div id="eligibility" class="eligibility-list empty">请先添加团队成员</div>
+        </article>
+      </aside>
+
+      <section class="main-stack">
+        <article class="panel day-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">SELECTED DAY</p><h2 id="selectedDateTitle">活动详情</h2></div>
+            <button id="saveSetup" class="button secondary">保存出勤与名单</button>
+          </div>
+          <div class="field-grid compact">
+            <label>团队副本<select id="dayRaid"></select></label>
+            <label>活动备注<input id="dayNotes" placeholder="如：开荒、加班、临时调休"></label>
+          </div>
+          <div id="attendance" class="attendance-grid"></div>
+        </article>
+
+        <article class="panel allocation-panel">
+          <div class="panel-heading">
+            <div><p class="kicker">LOOT ENTRY</p><h2>登记装备分配</h2></div>
+            <label class="switch"><input id="isBoe" type="checkbox"><span></span>BOE</label>
+          </div>
+          <div class="field-grid">
+            <label>Boss<select id="bossSelect"></select></label>
+            <label>难度<select id="difficultySelect"><option value="lfr">随机团队</option><option value="normal">普通</option><option value="heroic" selected>英雄</option><option value="mythic">史诗</option></select></label>
+            <label id="itemSelectWrap" class="span-2">装备<select id="itemSelect"></select></label>
+            <label id="boeNameWrap" class="span-2" hidden>BOE 装备名称<input id="boeName" placeholder="输入装备名称或物品 ID"></label>
+          </div>
+
+          <div id="itemFilters" class="filters">
+            <input id="itemSearch" placeholder="搜索名称、部位或标签">
+            <select id="armorFilter"><option value="">全部类型</option><option value="cloth">布甲</option><option value="leather">皮甲</option><option value="mail">锁甲</option><option value="plate">板甲</option><option value="accessory">项链 / 饰品</option><option value="weapon">武器</option><option value="token">套装兑换物</option></select>
+            <select id="classFilter"><option value="">全部职业</option></select>
+          </div>
+          <div id="lootSourceNote" class="source-note"></div>
+
+          <div class="field-grid award-grid">
+            <label>获得玩家<select id="recipientSelect"></select></label>
+            <label>分配方式<select id="awardType"><option value="need">需求</option><option value="greed">贪婪</option><option value="transmog">幻化收藏</option><option value="alt">小号提升</option></select></label>
+            <label class="span-2">分配备注<input id="allocationNotes" placeholder="如：套装二件套、主专精优先"></label>
+          </div>
+
+          <details class="requests">
+            <summary>登记所有玩家的需求详情 <span>可选</span></summary>
+            <div id="requestRows" class="request-rows"></div>
+          </details>
+          <button id="addAllocation" class="button primary">确认分配</button>
+        </article>
+
+        <article class="panel allocations-panel">
+          <div class="panel-heading"><div><p class="kicker">DAY LEDGER</p><h2>当日分配明细</h2></div><span id="allocationCount" class="badge">0 件</span></div>
+          <div id="allocationList" class="allocation-list empty">当天还没有装备分配记录</div>
+        </article>
+
+        <article class="panel roster-panel">
+          <div class="panel-heading"><div><p class="kicker">ROSTER</p><h2>团队成员</h2></div><button id="addPlayer" class="button secondary">添加成员</button></div>
+          <div id="rosterRows" class="roster-rows"></div>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script src="/frontend/tools/raid-loot/app.js"></script>
+</body>
+</html>

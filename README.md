@@ -19,6 +19,7 @@ start_app.bat
 - `/raid-guide`：12.1 团长手册
 - `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
 - `/scoreboard`：智商记事本
+- `/loot`：开荒出勤、需求权与装备分配日历
 - `/audit`：奥蕾莉亚场地明细
 
 命令行仍可用于开发和自动化：

@@ -306,6 +306,49 @@ def test_current_breath_of_eons_id_is_kept_in_boss_timeline():
     assert row["ability"]["name"] == "亘古吐息"
 
 
+def test_consumable_bursts_and_evoker_bloodlust_are_kept():
+    document = build(
+        friendly_casts=[
+            event(7_000, "cast", 1236616, 1),
+            event(7_100, "cast", 1236994, 2),
+            event(7_200, "cast", 390386, 3),
+        ],
+        scorching_ray_debuffs=None,
+    )
+    rows = [
+        row for row in document["pulls"][1]["timeline"]
+        if row["ability"]["id"] in {1236616, 1236994, 390386}
+    ]
+    assert [row["ability"]["name"] for row in rows] == ["圣光潜力", "鲁莽药水", "守护巨龙之怒"]
+    assert rows[-1]["scope"] == "party"
+
+
+def test_successful_enemy_cast_can_link_its_tank_target_from_damage():
+    document = build(
+        config={
+            "key": "seat_of_the_triumvirate",
+            "officialNameZh": "执政团之座",
+            "enemyAbilities": {1263440: "虚空挥砍"},
+            "linkedTargetCasts": {
+                1263440: {
+                    "displayEventType": "cast",
+                    "targetAuraId": 1263494,
+                    "targetAuraEventType": "damage",
+                    "toleranceMs": 1800,
+                },
+            },
+        },
+        hostile_casts=[event(7_000, "cast", 1263440, 11, -1)],
+        linked_target_events={
+            1263494: [event(8_500, "damage", 1263494, 11, 1)],
+        },
+        scorching_ray_debuffs=None,
+    )
+    row = document["pulls"][1]["timeline"][0]
+    assert row["ability"]["name"] == "虚空挥砍"
+    assert [target["name"] for target in row["targets"]] == ["Tank"]
+
+
 def test_completed_boss_pull_restores_missing_death_at_pull_end():
     boss = build()["pulls"][1]
     enemy = next(row for row in boss["enemies"] if row.get("isBoss"))

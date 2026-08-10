@@ -180,11 +180,14 @@ def export(report_code: str, fight_id: int, output: Path, dungeon_key: str = "sk
         aura_id = int(rule.get("targetAuraId") or 0)
         if not aura_id or aura_id in linked_target_events:
             continue
+        data_type = rule.get("targetDataType") or "Debuffs"
         linked_target_events[aura_id] = client.events(
             report_code,
-            "Debuffs",
+            data_type,
             fight,
-            hostility_type="Friendlies",
+            hostility_type=rule.get("targetHostilityType") or (
+                "Enemies" if data_type == "DamageDone" else "Friendlies"
+            ),
             ability_id=aura_id,
         )
     synthetic_events = {}
@@ -232,6 +235,8 @@ def export(report_code: str, fight_id: int, output: Path, dungeon_key: str = "sk
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", default="xpYfcXrBnkP8W1Ka")
     parser.add_argument("--fight", type=int, default=2)

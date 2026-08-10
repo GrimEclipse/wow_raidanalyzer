@@ -21,6 +21,8 @@ SKYREACH_ENEMY_ABILITIES = _SKYREACH_CONFIG["enemyAbilities"]
 SKYREACH_ACTOR_ZH = _SKYREACH_CONFIG["actorTranslations"]
 
 SKYREACH_PLAYER_ABILITIES = {
+    1236616: "圣光潜力",
+    1236994: "鲁莽药水",
     102558: "化身：乌索克的守护者",
     20484: "复生",
     204066: "明月普照",
@@ -41,6 +43,7 @@ SKYREACH_PLAYER_ABILITIES = {
     442204: "亘古吐息",
     409632: "亘古吐息",
     403631: "亘古吐息",
+    390386: "守护巨龙之怒",
     374227: "微风",
     363916: "黑曜鳞片",
     443028: "天神御身",
@@ -78,6 +81,7 @@ PARTY_WIDE_PLAYER_ABILITIES = {
     442204,  # Breath of Eons
     115310,  # Revival
     1258283, # Litany trinket
+    390386,   # Fury of the Aspects
 }
 
 SPEC_INFO = {

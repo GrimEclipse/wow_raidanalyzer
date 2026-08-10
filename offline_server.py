@@ -16,6 +16,7 @@ ROUTES = {
     "/audit": "frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
     "/scoreboard": "frontend/tools/iq-notebook/index.html",
     "/verdict": "frontend/tools/iq-notebook/index.html",
+    "/loot": "frontend/tools/raid-loot/index.html",
     "/cooldowns": "frontend/tools/raid-cooldowns/index.html",
     "/raid-guide": "frontend/tools/raid-guide/index.html",
 }

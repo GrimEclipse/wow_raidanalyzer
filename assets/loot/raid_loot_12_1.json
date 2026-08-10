@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "season": "12.1 PTR",
+  "translationPolicy": "nameZh marked temporary is a working translation, not an official localization",
+  "raids": [
+    {
+      "key": "venomous_abyss",
+      "name": "烈毒之渊",
+      "bosses": [
+        {"key": "nakzali", "name": "盘魂者内克扎利", "lootStatus": "pending-ptr-source", "items": []},
+        {"key": "sentinels", "name": "陵寝哨兵", "lootStatus": "pending-ptr-source", "items": []},
+        {"key": "vashnik", "name": "万毒邪祟者瓦什尼克", "lootStatus": "pending-ptr-source", "items": []},
+        {"key": "lostexplorers", "name": "迷失的探险者", "lootStatus": "pending-ptr-source", "items": []},
+        {"key": "sszorak", "name": "斯索拉克", "lootStatus": "pending-ptr-source", "items": []},
+        {"key": "twinfangs", "name": "双子毒牙", "lootStatus": "pending-ptr-source", "items": []},
+        {"key": "bargained", "name": "The Coiled Altar（中文名待定）", "lootStatus": "pending-ptr-source", "items": []},
+        {
+          "key": "ulatek",
+          "name": "乌拉特克",
+          "lootStatus": "ptr-verified",
+          "sourceUrl": "https://www.wowhead.com/ptr/npc=268956/ulatek",
+          "sourceCheckedAt": "2026-08-10",
+          "items": [
+            {"id": 268202, "nameEn": "Jaw of the Shackled Goddess", "nameZh": "枷锁女神之颚", "translationStatus": "temporary", "slot": "单手剑", "armorType": "weapon", "classes": ["death-knight", "paladin", "warrior"], "tags": ["武器", "力量", "单手剑"]},
+            {"id": 268207, "nameEn": "Caustic Repose Greatbow", "nameZh": "腐蚀长眠巨弓", "translationStatus": "temporary", "slot": "弓", "armorType": "weapon", "classes": ["hunter"], "tags": ["武器", "敏捷", "弓"]},
+            {"id": 268215, "nameEn": "Abyssal Broodfiend's Bardiche", "nameZh": "深渊巢魔长柄斧", "translationStatus": "temporary", "slot": "长柄武器", "armorType": "weapon", "classes": ["druid", "hunter", "monk"], "tags": ["武器", "敏捷", "长柄武器"]},
+            {"id": 268265, "nameEn": "Aqirbane Reliquary", "nameZh": "阿其尔克星圣物匣", "translationStatus": "temporary", "slot": "项链", "armorType": "accessory", "classes": [], "tags": ["项链", "通用"]},
+            {"id": 270168, "nameEn": "Font of Venomous Rage", "nameZh": "剧毒狂怒之源", "translationStatus": "temporary", "slot": "饰品", "armorType": "accessory", "classes": [], "tags": ["饰品"]},
+            {"id": 270175, "nameEn": "Voracious Heart of Ula'tek", "nameZh": "乌拉特克的贪噬之心", "translationStatus": "temporary", "slot": "饰品", "armorType": "accessory", "classes": [], "tags": ["饰品"]},
+            {"id": 270909, "nameEn": "Slumbering Coil Curio", "nameZh": "沉眠盘蛇珍玩", "translationStatus": "temporary", "slot": "套装兑换物", "armorType": "token", "classes": [], "tags": ["套装", "兑换物"]},
+            {"id": 271092, "nameEn": "Jan'thrazet, the Soul Fang", "nameZh": "詹萨泽特，灵魂之牙", "translationStatus": "temporary", "slot": "匕首", "armorType": "weapon", "classes": ["druid", "mage", "priest", "shaman", "warlock"], "tags": ["武器", "智力", "匕首"]},
+            {"id": 271093, "nameEn": "Zatha'tek, Breath of Corruption", "nameZh": "扎萨泰克，腐化之息", "translationStatus": "temporary", "slot": "匕首", "armorType": "weapon", "classes": ["demon-hunter", "druid", "hunter", "rogue"], "tags": ["武器", "敏捷", "匕首"]},
+            {"id": 271874, "nameEn": "Venomkeeper's Horrific Cowl", "nameZh": "毒液守护者的骇人兜帽", "translationStatus": "temporary", "slot": "头部", "armorType": "cloth", "classes": ["mage", "priest", "warlock"], "tags": ["布甲", "头部"]},
+            {"id": 271875, "nameEn": "Gaze of the Coiled Watcher", "nameZh": "盘蛇守望者之凝视", "translationStatus": "temporary", "slot": "头部", "armorType": "leather", "classes": ["demon-hunter", "druid", "monk", "rogue"], "tags": ["皮甲", "头部"]},
+            {"id": 271876, "nameEn": "Awoken Dreadfang Cuirass", "nameZh": "苏醒恐牙胸甲", "translationStatus": "temporary", "slot": "胸部", "armorType": "mail", "classes": ["evoker", "hunter", "shaman"], "tags": ["锁甲", "胸部"]},
+            {"id": 271878, "nameEn": "Chausses of Unbound Rancor", "nameZh": "无拘怨恨腿铠", "translationStatus": "temporary", "slot": "腿部", "armorType": "plate", "classes": ["death-knight", "paladin", "warrior"], "tags": ["板甲", "腿部"]}
+          ]
+        }
+      ]
+    },
+    {
+      "key": "tidebound_grotto",
+      "name": "潮缚石窟",
+      "bosses": [
+        {"key": "nymrissa_wavecaller", "name": "尼姆瑞莎·唤潮者", "lootStatus": "pending-ptr-source", "items": []}
+      ]
+    }
+  ]
+}
