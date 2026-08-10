@@ -21,7 +21,7 @@ from analyzer_core.auth_store import AuthError, default_auth_store
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
-from analyzer_core import loot_store, notebook_store
+from analyzer_core import loot_store, notebook_store, recruitment_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 
 
@@ -290,6 +290,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes(document))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
+        if path == "/api/recruitment":
+            return self.send_response_body(*json_bytes(recruitment_store.load_document(user)))
         if path in {"/api/notebook", "/api/scoreboard"}:
             if not user["isAdmin"]:
                 return self.json_error("仅管理员可以查看智商记事本。", HTTPStatus.FORBIDDEN)
@@ -369,6 +371,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/wcl-credentials":
             AUTH.delete_wcl_credentials(user["id"])
             return self.send_response_body(*json_bytes({"ok": True}))
+        if path == "/api/recruitment":
+            return self.send_response_body(*json_bytes(recruitment_store.delete_choice(user)))
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         allocation_match = re.fullmatch(r"/api/loot/allocations/([A-Za-z0-9_-]+)", path)
@@ -575,6 +579,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
     def handle_write(self, path, user):
+        if path == "/api/recruitment":
+            try:
+                return self.send_response_body(*json_bytes(recruitment_store.save_choice(user, self.read_json_body())))
+            except (ValueError, json.JSONDecodeError) as error:
+                return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         try:
@@ -799,6 +808,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/scoreboard": "/frontend/tools/iq-notebook/index.html",
             "/verdict": "/frontend/tools/iq-notebook/index.html",
             "/loot": "/frontend/tools/raid-loot/index.html",
+            "/recruitment": "/frontend/tools/recruitment/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b10">
+  <title>下版本职业初筛 · Mythic Analyzer</title>
+  <link rel="stylesheet" href="/frontend/tools/recruitment/styles.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">M</span><span>MYTHIC ANALYZER</span></a>
+    <nav aria-label="主导航">
+      <a href="/loot">团队运营</a>
+      <a href="/raid-guide">团长手册</a>
+      <a href="/account">账号</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">NEXT SEASON ROSTER · 40 SPECS READY</p>
+        <h1>下版本职业初筛</h1>
+        <p class="hero-copy">先选定你最想玩的主职，再添加可接受的次选专精。<br>这不是最终定职，但会成为新版本阵容讨论的起点。</p>
+      </div>
+      <button id="openEditor" class="primary-action" type="button"><span>+</span> 填写我的职业意向</button>
+    </section>
+
+    <section class="toolbar" aria-label="筛选列表">
+      <div class="search-wrap">
+        <span aria-hidden="true"></span>
+        <input id="listSearch" type="search" placeholder="搜索玩家、职业、专精或备注" autocomplete="off">
+        <kbd>/</kbd>
+      </div>
+      <div id="roleFilters" class="filter-tabs" role="group" aria-label="按职责筛选"></div>
+      <p id="resultCount" class="result-count"></p>
+    </section>
+
+    <div id="message" class="message" hidden></div>
+
+    <div class="content-grid">
+      <section id="rosterList" class="roster-list" aria-live="polite">
+        <div class="loading-card">
+          <i></i><i></i><i></i>
+          <p>正在整理团队职业意向…</p>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <section class="side-card overview-card">
+          <div class="side-heading"><div><p class="kicker">ROSTER SNAPSHOT</p><h2>阵容快照</h2></div><span id="totalCount" class="total-badge">0 人</span></div>
+          <p class="stat-caption">主职职责</p>
+          <div id="roleStats" class="stat-stack"></div>
+          <div class="divider"></div>
+          <p class="stat-caption">主职站位</p>
+          <div id="compositionStats" class="composition-grid"></div>
+          <p class="composition-note">近战包含近战治疗、不含坦克；远程包含远程治疗。</p>
+        </section>
+
+        <section class="side-card missing-card">
+          <div class="side-heading compact"><div><p class="kicker">CLASS COVERAGE</p><h2>目前缺少职业</h2></div></div>
+          <div id="missingClasses" class="missing-grid"></div>
+          <p id="missingHint" class="side-note"></p>
+        </section>
+
+        <section class="side-card guide-card">
+          <p class="kicker">BEFORE YOU SUBMIT</p>
+          <h2>填写小提示</h2>
+          <ol>
+            <li><span>01</span><p><strong>主职只选一个</strong><small>选真正想投入时间开荒的专精。</small></p></li>
+            <li><span>02</span><p><strong>次选不是强制项</strong><small>最多添加 4 个，只填愿意切换的选项。</small></p></li>
+            <li><span>03</span><p><strong>请在备注里说清边界</strong><small>例如装备基础、不接受的定职或可切换条件。</small></p></li>
+          </ol>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <div id="drawerBackdrop" class="backdrop" hidden></div>
+  <aside id="editorDrawer" class="editor-drawer" aria-hidden="true" aria-labelledby="editorTitle">
+    <form id="choiceForm">
+      <header class="drawer-header">
+        <div><p class="kicker">YOUR PREFERENCE</p><h2 id="editorTitle">填写我的职业意向</h2><p>你只能维护自己的这一条信息。</p></div>
+        <button id="closeEditor" class="icon-button" type="button" aria-label="关闭编辑面板">×</button>
+      </header>
+
+      <div class="drawer-body">
+        <label class="field-label" for="playerName">角色名 <span>必填</span></label>
+        <input id="playerName" class="text-input" maxlength="32" required placeholder="填写游戏内常用角色名">
+
+        <div class="field-heading"><div><label class="field-label">主选专精 <span>必选</span></label><p>会作为列表排序与阵容统计的依据。</p></div></div>
+        <button id="primarySlot" class="spec-slot empty" type="button">
+          <span class="slot-plus">+</span><span><strong>选择主选专精</strong><small>从 40 个专精中选择</small></span><i>→</i>
+        </button>
+
+        <div class="field-heading secondary-heading"><div><label class="field-label">次选专精 <em>可选</em></label><p>按接受程度从左到右添加，最多 4 个。</p></div><span id="secondaryCount">0 / 4</span></div>
+        <div id="secondaryList" class="secondary-list"></div>
+        <button id="addSecondary" class="add-secondary" type="button"><span>+</span> 添加一个次选专精</button>
+
+        <div class="field-heading notes-heading"><div><label class="field-label" for="notes">备注 <em>可选</em></label><p>写下装备、熟练度、切换意愿或其他想让团长知道的信息。</p></div></div>
+        <div class="textarea-wrap"><textarea id="notes" maxlength="300" rows="5" placeholder="例：主玩恢复，守护有现成装备，必要时可以补坦…"></textarea><span id="notesCount">0 / 300</span></div>
+      </div>
+
+      <footer class="drawer-footer">
+        <button id="deleteChoice" class="delete-button" type="button" hidden>删除我的条目</button>
+        <div><button id="cancelEditor" class="secondary-button" type="button">取消</button><button id="saveChoice" class="save-button" type="submit">保存职业意向</button></div>
+      </footer>
+    </form>
+  </aside>
+
+  <div id="pickerBackdrop" class="picker-backdrop" hidden>
+    <section id="specPicker" class="spec-picker" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+      <header class="picker-header">
+        <div><p class="kicker">CHOOSE SPECIALIZATION</p><h2 id="pickerTitle">选择主选专精</h2></div>
+        <button id="closePicker" class="icon-button" type="button" aria-label="关闭专精选择器">×</button>
+      </header>
+      <div class="picker-controls">
+        <div class="search-wrap picker-search"><span></span><input id="specSearch" type="search" placeholder="搜索职业或专精" autocomplete="off"></div>
+        <div id="pickerRoleFilters" class="picker-tabs"></div>
+      </div>
+      <div id="specGrid" class="spec-grid"></div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/frontend/tools/recruitment/app.js?v=1"></script>
+</body>
+</html>

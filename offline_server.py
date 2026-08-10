@@ -17,6 +17,7 @@ ROUTES = {
     "/scoreboard": "frontend/tools/iq-notebook/index.html",
     "/verdict": "frontend/tools/iq-notebook/index.html",
     "/loot": "frontend/tools/raid-loot/index.html",
+    "/recruitment": "frontend/tools/recruitment/index.html",
     "/cooldowns": "frontend/tools/raid-cooldowns/index.html",
     "/raid-guide": "frontend/tools/raid-guide/index.html",
 }
