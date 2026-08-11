@@ -107,6 +107,25 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertEqual(possession["reviewStatus"], "reviewed")
         self.assertIn("playerDebuffs", possession["categories"])
         self.assertIn("enemyCasts", possession["categories"])
+        ignition = next(
+            spell for spell in nakzali["spells"] if spell["spellID"] == 1285681
+        )
+        self.assertEqual(ignition["nameZh"], "盘魂点燃")
+        well = next(
+            mechanic for mechanic in nakzali["mechanics"]
+            if mechanic["title"] == "盘魂之井与能量"
+        )
+        self.assertTrue(well["important"])
+        self.assertIn("治疗预警", well["alerts"])
+        self.assertNotIn("roles", well)
+        self.assertNotIn("tags", well)
+        corpse_blight = next(
+            mechanic for mechanic in nakzali["mechanics"]
+            if mechanic["evidenceType"] == "priority-add"
+        )
+        self.assertIn("全团", corpse_blight["summary"])
+        self.assertTrue(any("30 秒" in row for row in corpse_blight["details"]))
+        self.assertTrue(any("可以叠加" in row for row in corpse_blight["details"]))
 
     def test_auto_tags_are_explicitly_uncertain_for_avoidable_candidates(self):
         tags = infer_tags("Raging Shadow Wave", ["damageAbilities"])
@@ -117,6 +136,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
         page = (ROOT / "frontend" / "tools" / "raid-guide" / "index.html").read_text(encoding="utf-8")
         self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
         self.assertIn("data-wowhead=\"domain=cn&amp;dd=15\"", page)
+        self.assertIn('data-wh-rename-link="true"', page)
         self.assertIn("https://www.wowhead.com/cn/spell=${spellID}", page)
         self.assertTrue(all(
             spell["wowheadUrl"].startswith("https://www.wowhead.com/cn/spell=")
@@ -139,6 +159,11 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn('includes("playerDebuffs")', page)
         self.assertIn("font-variant-numeric: tabular-nums", page)
         self.assertIn("mythic-note", page)
+        self.assertIn("常见减员点", page)
+        self.assertNotIn("常见灭团点", page)
+        self.assertIn("坦克预警", page)
+        self.assertIn("伤害输出预警", page)
+        self.assertIn("控制/打断预警", page)
         self.assertIn("timeline-combo", page)
         self.assertIn("sourceColor", page)
         self.assertNotIn("function evidenceCell", page)
@@ -178,18 +203,18 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertTrue(heroic["kill"])
         self.assertTrue(mythic["kill"])
 
-    def test_confirmed_chinese_names_are_preserved_without_forcing_all_rows(self):
+    def test_confirmed_chinese_names_are_preserved(self):
         nakzali = next(
             boss for boss in self.document["bosses"] if boss["key"] == "nakzali"
         )
         possession = next(
             spell for spell in nakzali["spells"] if spell["spellID"] == 1284103
         )
-        unconfirmed = next(
+        soulcoil_ignition = next(
             spell for spell in nakzali["spells"] if spell["spellID"] == 1285681
         )
         self.assertEqual(possession["nameZh"], "附身弹幕")
-        self.assertIsNone(unconfirmed["nameZh"])
+        self.assertEqual(soulcoil_ignition["nameZh"], "盘魂点燃")
 
     def test_sentinels_keeps_wcl_instance_ids_and_mythic_private_aura(self):
         sentinels = next(
@@ -214,7 +239,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
             spell for spell in sentinels["spells"] if spell["spellID"] == 1296880
         )
         self.assertEqual(override["nameEn"], "Shifting Protovenom")
-        self.assertEqual(override["nameZh"], "变换原毒")
+        self.assertEqual(override["nameZh"], "变幻的原型毒液")
         eruption = next(
             spell for spell in sentinels["spells"] if spell["spellID"] == 1296962
         )
@@ -487,13 +512,24 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertEqual(ravage["nameZh"], "\u52ab\u63a0")
         self.assertEqual(sidewind["nameZh"], "\u72c2\u6012\u4fa7\u98ce")
         self.assertIsNone(gash["nameZh"])
+        mutilate = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "shared-hit-refreshing-dot"
+        )
+        self.assertIn("少于 5 人", mutilate["summary"])
+        self.assertNotIn("PTR", " ".join(mutilate["details"]))
+        self.assertTrue(next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["title"] == "狂怒侧风"
+        )["important"])
 
     def test_twin_fangs_keeps_stack_cycle_and_verified_mythic_interrupts(self):
         boss = next(
             row for row in self.document["bosses"] if row["key"] == "twinfangs"
         )
         self.assertEqual(boss["reviewStatus"], "reviewed")
-        self.assertEqual(boss["energy"]["maximum"], 10)
+        self.assertEqual(boss["energy"]["maximum"], 9)
+        self.assertEqual(boss["energy"]["gaugeLabel"], "9 层死亡")
         self.assertEqual(len(boss["phases"]), 4)
         self.assertEqual(len(boss["mechanics"]), 11)
 
@@ -539,7 +575,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         self.assertEqual(eternal["nameZh"], "永恒毒液")
         self.assertEqual(feast["nameZh"], "贪婪盛宴")
-        self.assertIsNone(emergence["nameZh"])
+        self.assertEqual(emergence["nameZh"], "剧毒涌现")
 
     def test_coiled_altar_keeps_four_stage_flow_and_evidence_boundaries(self):
         boss = next(
@@ -589,6 +625,14 @@ class Zone54RaidGuideTests(unittest.TestCase):
         deathmarch = next(row for row in heroic["events"] if row["spellID"] == 1285643)
         self.assertEqual(sever["sourceName"], "祖尔加")
         self.assertEqual(deathmarch["sourceName"], "妖术领主玛拉卡斯")
+        dreadmarch_mechanic = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "mind-control-shield-rescue"
+        )
+        self.assertEqual(dreadmarch_mechanic["title"], "恐惧行军：打破护盾救人")
+        self.assertTrue(dreadmarch_mechanic["important"])
+        self.assertTrue(any("两只幽灵" in row for row in dreadmarch_mechanic["leaderDetails"]))
+        self.assertTrue(any("滚雪球" in row for row in dreadmarch_mechanic["leaderDetails"]))
         self.assertTrue(any(
             row.get("value") == "仅开场约 14.5 秒"
             for row in heroic["stats"]
@@ -608,12 +652,12 @@ class Zone54RaidGuideTests(unittest.TestCase):
             spell for spell in boss["spells"] if spell["spellID"] == 1286918
         )
         self.assertEqual(guillotine["nameZh"], "处斩")
-        self.assertEqual(dreadmarch["nameZh"], "死亡进军")
+        self.assertEqual(dreadmarch["nameZh"], "恐惧行军")
         self.assertEqual(nightfall["nameZh"], "永恒夜幕")
         spiritcackle = next(
             spell for spell in boss["spells"] if spell["spellID"] == 1286441
         )
-        self.assertEqual(spiritcackle["nameZh"], "精魂狂啸")
+        self.assertEqual(spiritcackle["nameZh"], "精魂狂笑")
 
 
 if __name__ == "__main__":

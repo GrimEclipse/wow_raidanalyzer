@@ -37,6 +37,71 @@ HERO_ASSETS = {
     "nymrissa_wavecaller": "assets/raids/tidebound_grotto/01-nymrissa.jpg",
 }
 
+MECHANIC_ALERT_RULES = (
+    (
+        "坦克预警",
+        ("坦克", "换坦", "对坦", "坦克正面", "头前", "嘲讽", "接圈"),
+    ),
+    (
+        "伤害输出预警",
+        (
+            "DPS", "转火", "优先小怪", "优先大怪", "破盾", "打破护盾",
+            "击杀时限", "双目标", "同步压血", "救人",
+        ),
+    ),
+    (
+        "治疗预警",
+        (
+            "全团 AOE", "全团AOE", "固定团伤", "全团伤害", "团队伤害",
+            "治疗轴", "治疗排轴", "全屏", "不可避免的全团",
+        ),
+    ),
+    (
+        "控制/打断预警",
+        (
+            "控制组", "打断组", "可打断", "减速/控制", "持续打断",
+            "控制小怪", "打断转火",
+        ),
+    ),
+)
+
+TIMELINE_TERM_RENAMES = {
+    "灵魂点燃": "盘魂点燃",
+    "苏醒仪式": "觉醒仪式",
+    "苏醒纽带": "觉醒之缚",
+    "解缚之怒": "溃散之怒",
+    "变换原毒": "变幻的原型毒液",
+    "瘟疫泡沫": "滴毒之牙",
+    "呼啸漩涡": "呼啸旋涡",
+    "毒液激流": "剧毒涌动",
+    "缠绕脓液": "盘卷脓液",
+    "熔炉之牙": "盘卷祭坛之牙",
+    "死亡进军": "恐惧行军",
+    "精魂狂啸": "精魂狂笑",
+    "幽魂炸弹": "幽暗炸弹",
+    "熔炉亵渎": "盘卷祭坛亵渎",
+    "诱惑水泡": "诱人水泡",
+    "Water Flurry": "冰刃乱舞",
+    "Frost Barrage": "冰霜弹幕",
+    "Tidepiercer's Rush": "激荡漩涡",
+    "Pop!": "嘭！",
+}
+
+
+def normalize_timeline_terms(value):
+    if isinstance(value, str):
+        for old_name, official_name in TIMELINE_TERM_RENAMES.items():
+            value = value.replace(old_name, official_name)
+        return value
+    if isinstance(value, list):
+        return [normalize_timeline_terms(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: normalize_timeline_terms(item)
+            for key, item in value.items()
+        }
+    return value
+
 ARENA_ASSETS = {
     "nakzali": "assets/raids/venomous_abyss/01-nakzali.png",
     "sentinels": "assets/raids/venomous_abyss/02-sentinels.png",
@@ -113,9 +178,42 @@ def compact_observation(item):
     }
 
 
-def build_spell_rows(boss, confirmed_spell_names=None, spell_overrides=None):
+def present_mechanics(mechanics):
+    """Keep only actionable warning badges in the shipped guide payload."""
+    result = []
+    for mechanic in mechanics:
+        row = json.loads(json.dumps(mechanic))
+        searchable = " ".join(
+            str(value)
+            for value in (
+                row.get("title") or "",
+                row.get("summary") or "",
+                *(row.get("roles") or []),
+                *(row.get("tags") or []),
+                *(row.get("leaderDetails") or []),
+            )
+        )
+        explicit_alerts = row.get("alerts")
+        row["alerts"] = list(explicit_alerts) if explicit_alerts is not None else [
+            label
+            for label, keywords in MECHANIC_ALERT_RULES
+            if any(keyword in searchable for keyword in keywords)
+        ]
+        row.pop("roles", None)
+        row.pop("tags", None)
+        result.append(row)
+    return result
+
+
+def build_spell_rows(
+    boss,
+    confirmed_spell_names=None,
+    spell_overrides=None,
+    required_spell_ids=None,
+):
     confirmed_spell_names = confirmed_spell_names or {}
     spell_overrides = spell_overrides or {}
+    required_spell_ids = required_spell_ids or set()
     aggregate = {}
     catalog = boss.get("spellCatalog") or {}
     for category in CATEGORY_LABELS:
@@ -162,6 +260,17 @@ def build_spell_rows(boss, confirmed_spell_names=None, spell_overrides=None):
         for difficulty, item in (override.get("observedIn") or {}).items():
             target["observedIn"][difficulty] = compact_observation(item)
         target["authoredTags"] = override.get("tags") or []
+    for raw_spell_id in required_spell_ids:
+        spell_id = int(raw_spell_id)
+        confirmed_name = confirmed_spell_names.get(str(spell_id))
+        aggregate.setdefault(spell_id, {
+            "spellID": spell_id,
+            "nameEn": confirmed_name or str(spell_id),
+            "nameZh": confirmed_name,
+            "categories": ["journalOnly"],
+            "observedIn": {},
+            "journal": {},
+        })
     rows = []
     for spell_id, row in aggregate.items():
         row["categoryLabels"] = [CATEGORY_LABELS[key] for key in row["categories"]]
@@ -196,7 +305,7 @@ def enrich_timelines(timelines, evidence_boss, confirmed_source_names=None):
     if not timelines:
         return {}
     confirmed_source_names = confirmed_source_names or {}
-    result = json.loads(json.dumps(timelines))
+    result = normalize_timeline_terms(json.loads(json.dumps(timelines)))
     source_index = {"heroic": {}, "mythic": {}}
     catalog = evidence_boss.get("spellCatalog") or {}
     for category in CATEGORY_LABELS:
@@ -299,7 +408,7 @@ def build_document(discovery, authored, timelines=None):
             ),
             "energy": source.get("energy"),
             "phases": source.get("phases") or phase_rows(key),
-            "mechanics": source.get("mechanics") or [],
+            "mechanics": present_mechanics(source.get("mechanics") or []),
             "timelines": enrich_timelines(
                 timeline_bosses.get(key) or {},
                 evidence_boss,
@@ -309,6 +418,17 @@ def build_document(discovery, authored, timelines=None):
                 evidence_boss,
                 confirmed_spell_names=confirmed_spell_names,
                 spell_overrides=source.get("spellOverrides") or {},
+                required_spell_ids={
+                    int(spell_id)
+                    for section in (
+                        *(source.get("phases") or []),
+                        *(source.get("mechanics") or []),
+                    )
+                    for spell_id in (
+                        *(section.get("spellIDs") or []),
+                        *(section.get("leaderSpellIDs") or []),
+                    )
+                },
             ),
             "journalSpellCount": len((evidence_boss.get("journal") or {}).get("spells") or []),
             "hasHeroicEvidence": bool(

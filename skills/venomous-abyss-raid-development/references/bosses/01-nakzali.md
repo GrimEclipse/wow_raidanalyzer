@@ -12,6 +12,7 @@ Frontend descriptor: `frontend/report/plugins/venomous_abyss/nakzali/plugin.js`.
 - Phase anchors are `1295124` (Ritual of Awakening) for intermission, `1290003` (Uncoiling) for P2, and `1284034` (Uncoiled Rage) for enrage.
 - Compare progression wipes against the kill Pull. A kill does not suppress observed mechanic issues.
 - Count an Amani leak as confirmed only when an extra `1297624` Ritual Burn pulse closes against an individual add instance after `1287533` Gravebound Advance. Keep unmatched extra pulses as suspected evidence.
+- Corpse Blight is a raid-wide, stacking 30-second damage-over-time effect when a Restless Amani dies. Do not model it as a local 15-yard death explosion; simultaneous add deaths are a raid-healing failure window.
 - `1287434` Essence Rend remove events have timestamps but no coordinates. Use the nearest position-bearing damage/resource event within the configured window; never substitute a death position. The current product labels the result as `贴边` / `未贴边` from the configured distance-to-centre threshold, while window-exceeded samples remain reference-only.
 - Player Resources events directly provide current/max health, absorb, x/y and facing. Keep these values in event snapshots and tooltips; do not derive healing-absorb totals.
 - Retrieve Nek'zali position and facing from `DamageDone` events targeting actor gameID `259927` with target resources included. Never replace missing Boss coordinates with the arena centre.

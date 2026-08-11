@@ -15,7 +15,7 @@ Status: raid-leader flow authored; WCL evidence mapped; analysis plugin remains 
 ### 大副纳玛
 
 - `旋壳`: targets a random melee and throws three shells forward. Plan melee positions so the line does not cross the group.
-- `巨力猛击`: three soak circles. Two players are sufficient per circle, but the 30-second vulnerability prevents the same players from soaking again while marked.
+- `巨力重击`: three soak circles. Two players are sufficient per circle, but the 30-second vulnerability prevents the same players from soaking again while marked.
 
 ### 书卷贤者伊库
 
@@ -27,7 +27,7 @@ Status: raid-leader flow authored; WCL evidence mapped; analysis plugin remains 
 
 - `投掷垃圾`: avoid the impact. The remaining box can be opened by stepping on it, applying a stacking bleed.
 - During the fish window, an extra junk throw produces the fish used to interrupt `强化`.
-- `投掷蘑菇`: places mushrooms under ranged players. Touching one begins its detonation and launches a player; use the launch to pass the expanding `爆炸惊喜` wave. Teleports and Demon Hunter double jump can also cross the wave.
+- `蘑菇投掷`: places mushrooms under ranged players. Touching one begins its detonation and launches a player; use the launch to pass the expanding `爆炸惊喜` wave. Teleports and Demon Hunter double jump can also cross the wave.
 
 ## Evidence boundaries
 

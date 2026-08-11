@@ -12,7 +12,7 @@ Status: raid-leader flow authored; Heroic timeline and Mythic Serpent's Fury evi
 ## Core mechanics
 
 - Apex Predator contains exactly two Ravage, two Mutilate, and one Tempest casts in a random order. Tempest is never first.
-- Mutilate is a shared hit and applies a duration-refreshing DoT. PTR testing indicates Anti-Magic Shell can prevent the DoT application.
+- Mutilate is a shared hit and applies a 22-second duration-refreshing DoT. The release journal adds a hard requirement: if fewer than five players are struck, all struck players are killed. The wound increases damage taken from Mutilate by 500%, so the two Mutilates in one Apex Predator sequence require separate groups of at least five players. Anti-Magic Shell cannot bypass the target-count check and must never be documented as a solo-soak strategy.
 - Tempest waves remain in motion after moving away from the boss; avoid their continuing rotation.
 - Raging Crosswinds marks players with directional knockbacks, then applies Turbulent Gusts. Two affected airborne players can collide to land.
 - Heroic uses two Raging Crosswinds directions. Mythic WCL contains additional direction-instance IDs, but client-facing arrows are still required to map the exact directions.
