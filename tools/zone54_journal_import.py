@@ -38,23 +38,23 @@ REFERENCE_VIDEOS = [
 
 JOURNAL_DIFFICULTY_OVERRIDES = {
     # The original preview-news HTML flattens some difficulty badges. These
-    # overrides come from the current PTR encounter-journal NPC pages.
+    # overrides come from the current Chinese encounter-journal NPC pages.
     "lostexplorers": {
-        "source": "https://www.wowhead.com/ptr/npc=267077/morzahi",
+        "source": "https://www.wowhead.com/cn/npc=267077/morzahi",
         "spellIDs": [],
         "notes": [
             "Relic Rupture: On Mythic difficulty, breaking a crate also inflicts Shadow damage to players within 15 yards."
         ],
     },
     "sszorak": {
-        "source": "https://www.wowhead.com/ptr/npc=257347/sszorak",
+        "source": "https://www.wowhead.com/cn/npc=257347/sszorak",
         "spellIDs": [1296898, 1297367, 1297414, 1297707],
         "notes": [
             "Serpent's Fury: On Mythic difficulty, Sszorak marks a player and gains rage over time. When at least 14 players are within 8 yards of the marked player, Sszorak casts To the Slaughter and consumes his rage. At 100 rage he gains Unbound Ferocity."
         ],
     },
     "twinfangs": {
-        "source": "https://www.wowhead.com/ptr/npc=257361/vexhul",
+        "source": "https://www.wowhead.com/cn/npc=257361/vexhul",
         "spellIDs": [1303230, 1303378, 1308356, 1308385],
         "nonMythicIDs": [1290516],
         "notes": [
@@ -66,7 +66,7 @@ JOURNAL_DIFFICULTY_OVERRIDES = {
     },
     "bargained": {
         "source": (
-            "https://www.wowhead.com/ptr/guide/midnight/raids/"
+            "https://www.wowhead.com/cn/guide/midnight/raids/"
             "venomous-abyss-coiled-altar-boss-strategy-abilities"
         ),
         "spellIDs": [],
@@ -86,7 +86,7 @@ JOURNAL_DIFFICULTY_OVERRIDES = {
 }
 
 SPELL_LINK = re.compile(
-    r'href=\\"(?:https://www\.wowhead\.com)?/ptr/spell=(?P<id>\d+)'
+    r'href=\\"(?:https://www\.wowhead\.com)?/(?:cn|ptr)/spell=(?P<id>\d+)'
     r'(?:/[^\\"]*)?\\">(?P<name>[^<]+)<',
     re.IGNORECASE,
 )

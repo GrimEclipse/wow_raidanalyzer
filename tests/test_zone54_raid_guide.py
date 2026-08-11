@@ -113,10 +113,16 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn("疑似可躲 / 需复核", tags)
         self.assertIn("伤害", tags)
 
-    def test_static_page_uses_ptr_tooltips_and_generated_payload(self):
+    def test_static_page_uses_chinese_tooltips_and_generated_payload(self):
         page = (ROOT / "frontend" / "tools" / "raid-guide" / "index.html").read_text(encoding="utf-8")
         self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
-        self.assertIn("data-wowhead=\"domain=ptr&amp;dd=15\"", page)
+        self.assertIn("data-wowhead=\"domain=cn&amp;dd=15\"", page)
+        self.assertIn("https://www.wowhead.com/cn/spell=${spellID}", page)
+        self.assertTrue(all(
+            spell["wowheadUrl"].startswith("https://www.wowhead.com/cn/spell=")
+            for boss in self.document["bosses"]
+            for spell in boss["spells"]
+        ))
         self.assertIn('class="spell-icon-link"', page)
         self.assertIn('class="spell-copy"', page)
         self.assertNotIn('class="spell-link"', page)

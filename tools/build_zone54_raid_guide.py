@@ -168,7 +168,7 @@ def build_spell_rows(boss, confirmed_spell_names=None, spell_overrides=None):
         row["tags"] = row.pop("authoredTags", None) or infer_tags(
             row["nameEn"], row["categories"],
         )
-        row["wowheadUrl"] = f"https://www.wowhead.com/ptr/spell={spell_id}"
+        row["wowheadUrl"] = f"https://www.wowhead.com/cn/spell={spell_id}"
         row["reviewStatus"] = "auto"
         rows.append(row)
     return sorted(rows, key=lambda row: (

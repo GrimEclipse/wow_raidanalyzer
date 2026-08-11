@@ -46,9 +46,9 @@ class Zone54DiscoveryTests(unittest.TestCase):
     def test_journal_import_accepts_relative_and_absolute_spell_links(self):
         raw = (
             "[tabs name=\\\"Nek'zali the Soulcoiler-2888-details\\\"]\\r\\n"
-            '<a href=\\"/ptr/spell=1284032/soulcoil-well\\">'
+            '<a href=\\"/cn/spell=1284032/soulcoil-well\\">'
             '[Soulcoil Well]</a>\\r\\n'
-            '<a href=\\"https:\\/\\/www.wowhead.com\\/ptr\\/spell=1290003\\">'
+            '<a href=\\"https:\\/\\/www.wowhead.com\\/cn\\/spell=1290003\\">'
             'Uncoiling</a> On Mythic difficulty, the test changes. (Mythic)\\r\\n'
             '[tabs name=\\"Entombed Sentinels-1-details\\"]'
         )
@@ -60,35 +60,35 @@ class Zone54DiscoveryTests(unittest.TestCase):
         )
         self.assertTrue(document["bosses"]["nakzali"]["mythicDifferences"])
 
-    def test_journal_import_restores_current_ptr_mythic_difficulty_badges(self):
+    def test_journal_import_restores_current_mythic_difficulty_badges(self):
         raw = (
             '[tabs name=\\"The Lost Explorers-1-details\\"]\\r\\n'
-            '<a href=\\"/ptr/spell=1291933/throw-junk\\">Throw Junk</a>\\r\\n'
+            '<a href=\\"/cn/spell=1291933/throw-junk\\">Throw Junk</a>\\r\\n'
             '[tabs name=\\"Sszorak-1-details\\"]\\r\\n'
-            '<a href=\\"/ptr/spell=1296898/unbound-ferocity\\">'
+            '<a href=\\"/cn/spell=1296898/unbound-ferocity\\">'
             'Unbound Ferocity</a>\\r\\n'
-            '<a href=\\"/ptr/spell=1297367/serpents-fury\\">'
+            '<a href=\\"/cn/spell=1297367/serpents-fury\\">'
             "Serpent's Fury</a>\\r\\n"
-            '<a href=\\"/ptr/spell=1297414/to-the-slaughter\\">'
+            '<a href=\\"/cn/spell=1297414/to-the-slaughter\\">'
             'To the Slaughter</a>\\r\\n'
-            '<a href=\\"/ptr/spell=1297707/virulence\\">Virulence</a>\\r\\n'
+            '<a href=\\"/cn/spell=1297707/virulence\\">Virulence</a>\\r\\n'
             '[tabs name=\\"The Twin Fangs-1-details\\"]\\r\\n'
-            '<a href=\\"/ptr/spell=1290516/ravenous-feast\\">'
+            '<a href=\\"/cn/spell=1290516/ravenous-feast\\">'
             'Ravenous Feast</a>\\r\\n'
-            '<a href=\\"/ptr/spell=1303230/blood-torrent\\">'
+            '<a href=\\"/cn/spell=1303230/blood-torrent\\">'
             'Blood Torrent</a>\\r\\n'
-            '<a href=\\"/ptr/spell=1303378/protected-gestation\\">'
+            '<a href=\\"/cn/spell=1303378/protected-gestation\\">'
             'Protected Gestation</a>\\r\\n'
-            '<a href=\\"/ptr/spell=1308356/rouse-the-brood\\">'
+            '<a href=\\"/cn/spell=1308356/rouse-the-brood\\">'
             'Rouse the Brood</a>\\r\\n'
-            '<a href=\\"/ptr/spell=1308385/visceral-burst\\">'
+            '<a href=\\"/cn/spell=1308385/visceral-burst\\">'
             'Visceral Burst</a>\\r\\n'
             '[tabs name=\\"The Coiled Altar-1-details\\"]\\r\\n'
-            '<a href=\\"/ptr/spell=1285643/dreadmarch\\">'
+            '<a href=\\"/cn/spell=1285643/dreadmarch\\">'
             'Dreadmarch</a> (Mythic)\\r\\n'
-            '<a href=\\"/ptr/spell=1285911/unnerving-fixation\\">'
+            '<a href=\\"/cn/spell=1285911/unnerving-fixation\\">'
             'Unnerving Fixation</a> (Mythic)\\r\\n'
-            '<a href=\\"/ptr/spell=1304032/soulbinding\\">'
+            '<a href=\\"/cn/spell=1304032/soulbinding\\">'
             'Soulbinding</a> (Mythic)\\r\\n'
             '[tabs name=\\"Ulatek-1-details\\"]'
         )

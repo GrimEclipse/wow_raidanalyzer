@@ -272,7 +272,7 @@ function renderAllocations() {
     const requests = (row.requests || []).map(request => `<span class="class-colored" style="${classStyle(request.playerId)}">${escapeHtml(playerName(request.playerId))}</span>：${MODE_NAMES[request.mode]}`).join(" · ");
     const itemName = row.itemNameZh || row.itemName;
     const itemTitle = /^\d+$/.test(String(row.itemId || ""))
-      ? `<a class="item-link" href="https://www.wowhead.com/ptr/item=${encodeURIComponent(row.itemId)}" target="_blank" rel="noreferrer">${escapeHtml(itemName)}</a>`
+      ? `<a class="item-link" href="https://www.wowhead.com/cn/item=${encodeURIComponent(row.itemId)}" target="_blank" rel="noreferrer">${escapeHtml(itemName)}</a>`
       : escapeHtml(itemName);
     return `<article class="allocation-card"><div><h4>${itemTitle}</h4><div class="allocation-meta"><span>${row.sourceType === "boe" ? "装绑物品" : escapeHtml(boss?.name || row.bossKey)}</span><span>${DIFFICULTY_NAMES[row.difficulty]}</span><span><span class="class-colored" style="${classStyle(row.recipientId)}">${escapeHtml(playerName(row.recipientId))}</span> · ${MODE_NAMES[row.awardType]}</span></div>${requests ? `<div class="allocation-note">需求详情：${requests}</div>` : ""}${row.notes ? `<div class="allocation-note">${escapeHtml(row.notes)}</div>` : ""}</div><button class="button danger delete-allocation" data-id="${escapeHtml(row.id)}">删除</button></article>`;
   }).join("") : "当天还没有分配记录";

@@ -13,7 +13,7 @@
         };
     </script>
     <script src="https://wow.zamimg.com/js/tooltips.js"></script>
-    <script src="assets/vendor/zone54-raid-guide-data.js"></script>
+    <script src="assets/vendor/zone54-raid-guide-data.js?v=2"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -761,12 +761,12 @@
         const spell = spellById(boss, spellID) || {
             spellID,
             nameEn: `Spell ${spellID}`,
-            wowheadUrl: `https://www.wowhead.com/ptr/spell=${spellID}`
+            wowheadUrl: `https://www.wowhead.com/cn/spell=${spellID}`
         };
         const label = spell.nameZh || spell.nameEn || `Spell ${spellID}`;
         return `<div class="spell-ref">
             <a class="spell-icon-link" href="${escapeHtml(spell.wowheadUrl)}"
-                data-wowhead="domain=ptr&amp;dd=15" data-wh-icon-size="small"
+                data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small"
                 target="_blank" rel="noreferrer"
                 aria-label="${escapeHtml(`${label} · ID: ${spellID}`)}"
                 title="${escapeHtml(`${label} · ID: ${spellID}`)}">
@@ -783,12 +783,12 @@
         const spell = spellById(boss, spellID) || {
             spellID,
             nameEn: `Spell ${spellID}`,
-            wowheadUrl: `https://www.wowhead.com/ptr/spell=${spellID}`
+            wowheadUrl: `https://www.wowhead.com/cn/spell=${spellID}`
         };
         const label = labelOverride || spell.nameZh || spell.nameEn || `Spell ${spellID}`;
         return `<div class="spell-ref">
             <a class="spell-icon-link" href="${escapeHtml(spell.wowheadUrl)}"
-                data-wowhead="domain=ptr&amp;dd=15" data-wh-icon-size="small"
+                data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small"
                 target="_blank" rel="noreferrer"
                 aria-label="${escapeHtml(label)}"
                 title="${escapeHtml(label)}">
@@ -849,7 +849,7 @@
             const label = spell.nameZh || spell.nameEn || `Spell ${spell.spellID}`;
             const tooltip = `${label} · ${spellCategoryLabel(spell)} · ID: ${spell.spellID}`;
             return `<a class="spell-icon-link" href="${escapeHtml(spell.wowheadUrl)}"
-                data-wowhead="domain=ptr&amp;dd=15" data-wh-icon-size="small"
+                data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small"
                 target="_blank" rel="noreferrer"
                 aria-label="${escapeHtml(tooltip)}" title="${escapeHtml(tooltip)}">
                 <span class="spell-icon-fallback">?</span>

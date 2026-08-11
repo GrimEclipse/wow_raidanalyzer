@@ -21295,7 +21295,7 @@
         "mythicDifferences": [
           "Relic Rupture: On Mythic difficulty, breaking a crate also inflicts Shadow damage to players within 15 yards."
         ],
-        "difficultySource": "https://www.wowhead.com/ptr/npc=267077/morzahi"
+        "difficultySource": "https://www.wowhead.com/cn/npc=267077/morzahi"
       },
       "spellCatalog": {
         "enemyCasts": [
@@ -28096,7 +28096,7 @@
         "mythicDifferences": [
           "Serpent's Fury: On Mythic difficulty, Sszorak marks a player and gains rage over time. When at least 14 players are within 8 yards of the marked player, Sszorak casts To the Slaughter and consumes his rage. At 100 rage he gains Unbound Ferocity."
         ],
-        "difficultySource": "https://www.wowhead.com/ptr/npc=257347/sszorak"
+        "difficultySource": "https://www.wowhead.com/cn/npc=257347/sszorak"
       },
       "spellCatalog": {
         "enemyCasts": [
@@ -34089,7 +34089,7 @@
           "Rouse the Brood: On Mythic difficulty, Ithraz summons Broodlings that repeatedly cast Visceral Burst. Interrupting the cast forces the Broodling to retreat.",
           "Ravenous Feast: On Mythic difficulty, consumed Eternal Venom creates Tainted Blood founts that must have their healing absorption removed before they expire."
         ],
-        "difficultySource": "https://www.wowhead.com/ptr/npc=257361/vexhul"
+        "difficultySource": "https://www.wowhead.com/cn/npc=257361/vexhul"
       },
       "spellCatalog": {
         "enemyCasts": [
@@ -42444,7 +42444,7 @@
           "Spiritcackle: On Mythic difficulty, the summoned spirit has a 99% damage-reduction Spirit Shield that must be weakened with Gloombomb.",
           "Spirit Erasure: On Mythic difficulty, intercepting a fragment increases Spirit Erasure damage taken by 20% for 5 seconds."
         ],
-        "difficultySource": "https://www.wowhead.com/ptr/guide/midnight/raids/venomous-abyss-coiled-altar-boss-strategy-abilities"
+        "difficultySource": "https://www.wowhead.com/cn/guide/midnight/raids/venomous-abyss-coiled-altar-boss-strategy-abilities"
       },
       "spellCatalog": {
         "enemyCasts": [
