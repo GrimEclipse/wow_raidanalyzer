@@ -66,6 +66,12 @@ MECHANIC_ALERT_RULES = (
 )
 
 TIMELINE_TERM_RENAMES = {
+    "强化升腾": "最终扬升",
+    "Broodling of Ithraz": "伊斯拉兹幼体",
+    "Broodlings": "幼体",
+    "Broodling": "幼体",
+    "污染之血泉眼": "污血",
+    "污染之血": "污血",
     "灵魂点燃": "盘魂点燃",
     "苏醒仪式": "觉醒仪式",
     "苏醒纽带": "觉醒之缚",
@@ -170,16 +176,20 @@ def infer_tags(name, categories):
     return tags or ["待分类"]
 
 
-def compact_observation(item):
+def compact_observation(item, confirmed_source_names=None):
     if not item:
         return None
+    confirmed_source_names = confirmed_source_names or {}
     return {
         "events": int(item.get("eventCount") or 0),
         "targets": int(item.get("uniqueTargetCount") or 0),
         "firstMs": int(item.get("firstMs") or 0),
         "lastMs": int(item.get("lastMs") or 0),
         "eventTypes": item.get("eventTypes") or {},
-        "sources": item.get("sourceNames") or [],
+        "sources": [
+            confirmed_source_names.get(source_name, source_name)
+            for source_name in (item.get("sourceNames") or [])
+        ],
         "provenance": item.get("provenance") or {},
     }
 
@@ -214,10 +224,12 @@ def present_mechanics(mechanics):
 def build_spell_rows(
     boss,
     confirmed_spell_names=None,
+    confirmed_source_names=None,
     spell_overrides=None,
     required_spell_ids=None,
 ):
     confirmed_spell_names = confirmed_spell_names or {}
+    confirmed_source_names = confirmed_source_names or {}
     spell_overrides = spell_overrides or {}
     required_spell_ids = required_spell_ids or set()
     aggregate = {}
@@ -242,7 +254,10 @@ def build_spell_rows(
                 target["journal"].update(journal)
                 target["nameEn"] = journal.get("name") or target["nameEn"]
             for difficulty, item in (row.get("observedIn") or {}).items():
-                target["observedIn"][difficulty] = compact_observation(item)
+                target["observedIn"][difficulty] = compact_observation(
+                    item,
+                    confirmed_source_names=confirmed_source_names,
+                )
             if category == "journalOnly":
                 target["journal"].update({
                     "mythicOnly": bool(row.get("mythicOnly")),
@@ -264,7 +279,10 @@ def build_spell_rows(
             if category in CATEGORY_LABELS and category not in target["categories"]:
                 target["categories"].append(category)
         for difficulty, item in (override.get("observedIn") or {}).items():
-            target["observedIn"][difficulty] = compact_observation(item)
+            target["observedIn"][difficulty] = compact_observation(
+                item,
+                confirmed_source_names=confirmed_source_names,
+            )
         target["authoredTags"] = override.get("tags") or []
     for raw_spell_id in required_spell_ids:
         spell_id = int(raw_spell_id)
@@ -423,6 +441,7 @@ def build_document(discovery, authored, timelines=None):
             "spells": build_spell_rows(
                 evidence_boss,
                 confirmed_spell_names=confirmed_spell_names,
+                confirmed_source_names=confirmed_source_names,
                 spell_overrides=source.get("spellOverrides") or {},
                 required_spell_ids={
                     int(spell_id)

@@ -389,6 +389,22 @@ class Zone54RaidGuideTests(unittest.TestCase):
         }
         self.assertEqual(source_by_spell[1296062], "大副纳玛")
         self.assertEqual(source_by_spell[1306145], "商人盖博")
+        ascension = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1292779
+        )
+        self.assertEqual(ascension["nameZh"], "最终扬升")
+        rendered_content = json.dumps(
+            {
+                "energy": boss["energy"],
+                "phases": boss["phases"],
+                "mechanics": boss["mechanics"],
+                "timelines": boss["timelines"],
+            },
+            ensure_ascii=False,
+        )
+        self.assertIn("最终扬升", rendered_content)
+        self.assertNotIn("强化升腾", rendered_content)
+        self.assertNotIn("Final Ascension", rendered_content)
         self.assertEqual(
             [row["timeMs"] for row in heroic["events"] if row["spellID"] == 1306145],
             [31029, 155808, 280622],
@@ -556,8 +572,8 @@ class Zone54RaidGuideTests(unittest.TestCase):
             row for row in self.document["bosses"] if row["key"] == "twinfangs"
         )
         self.assertEqual(boss["reviewStatus"], "reviewed")
-        self.assertEqual(boss["energy"]["maximum"], 9)
-        self.assertEqual(boss["energy"]["gaugeLabel"], "9 层死亡")
+        self.assertEqual(boss["energy"]["maximum"], 11)
+        self.assertEqual(boss["energy"]["gaugeLabel"], "11 层死亡")
         self.assertEqual(len(boss["phases"]), 4)
         self.assertEqual(len(boss["mechanics"]), 11)
 
@@ -566,7 +582,15 @@ class Zone54RaidGuideTests(unittest.TestCase):
             if mechanic["evidenceType"] == "permanent-stack-death-threshold"
         )
         self.assertIn(1290336, venom["spellIDs"])
-        self.assertTrue(any("9 层" in row for row in venom["details"]))
+        self.assertTrue(any("11 层" in row for row in venom["details"]))
+        venom_content = json.dumps(
+            {"energy": boss["energy"], "mechanic": venom},
+            ensure_ascii=False,
+        )
+        self.assertIn("地板技能", venom_content)
+        self.assertIn("小蛇点名", venom_content)
+        self.assertNotIn("8 层", venom_content)
+        self.assertNotIn("最后的安全层", venom_content)
 
         brood = next(
             mechanic for mechanic in boss["mechanics"]
@@ -576,6 +600,24 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn(1308356, brood["spellIDs"])
         self.assertIn(1308385, brood["spellIDs"])
         self.assertTrue(any("56 次" in row for row in brood["details"]))
+        brood_content = json.dumps(brood, ensure_ascii=False)
+        self.assertIn("幼体", brood_content)
+        self.assertNotIn("Broodling", brood_content)
+        visceral_burst = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1308385
+        )
+        self.assertEqual(
+            visceral_burst["observedIn"]["mythic"]["sources"],
+            ["伊斯拉兹幼体"],
+        )
+
+        tainted_blood = next(
+            mechanic for mechanic in boss["mechanics"]
+            if mechanic["evidenceType"] == "mythic-heal-absorb-expiry"
+        )
+        tainted_content = json.dumps(tainted_blood, ensure_ascii=False)
+        self.assertIn("污血", tainted_content)
+        self.assertNotIn("污染之血", tainted_content)
 
         heroic = boss["timelines"]["heroic"]
         mythic = boss["timelines"]["mythic"]

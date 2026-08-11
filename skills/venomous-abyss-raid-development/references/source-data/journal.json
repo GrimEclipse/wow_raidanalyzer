@@ -1251,7 +1251,7 @@
       "mythicDifferences": [
         "Eternal Venom: On Mythic difficulty, a player who dies while afflicted creates additional Caustic Globules.",
         "Blood Torrent: On Mythic difficulty, each Caustic Globule is protected by a Barbed Bulwark. Interrupting Protected Gestation destroys the bulwark.",
-        "Rouse the Brood: On Mythic difficulty, Ithraz summons Broodlings that repeatedly cast Visceral Burst. Interrupting the cast forces the Broodling to retreat.",
+        "唤醒蛇群：史诗难度下，伊斯拉兹召唤幼体反复施放内脏爆裂。打断施法会迫使幼体退场。",
         "Ravenous Feast: On Mythic difficulty, consumed Eternal Venom creates Tainted Blood founts that must have their healing absorption removed before they expire."
       ],
       "difficultySource": "https://www.wowhead.com/cn/npc=257361/vexhul"

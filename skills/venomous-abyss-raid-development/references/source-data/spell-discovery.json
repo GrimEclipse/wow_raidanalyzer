@@ -21051,7 +21051,7 @@
               1292778,
               1292780
             ],
-            "note": "Final Ascension 叠层与终局伤害"
+            "note": "最终扬升叠层与终局伤害"
           }
         ]
       },
@@ -33858,7 +33858,7 @@
       },
       "modeDraft": {
         "confidence": "high",
-        "summary": "固定时间轴的集中双目标战：维克苏尔负责叠加永久的永恒毒液，伊斯拉兹通过三次贪婪盛宴帮助玩家消层。每个场地位置处理两轮常态循环，随后用涌动射线转移；史诗额外加入液滴护盾、场边蛇群打断和污染之血。",
+        "summary": "固定时间轴的集中双目标战：维克苏尔负责叠加永久的永恒毒液，伊斯拉兹通过三次贪婪盛宴帮助玩家消层。每个场地位置处理两轮常态循环，随后用涌动射线转移；史诗额外加入液滴护盾、场边蛇群打断和污血。",
         "phaseSignals": [
           1289192,
           1291404,
@@ -33891,7 +33891,7 @@
               1308356,
               1308385
             ],
-            "note": "史诗液滴护盾与 Broodling 密集打断组"
+            "note": "史诗液滴护盾与幼体密集打断组"
           }
         ]
       },
@@ -34086,7 +34086,7 @@
         "mythicDifferences": [
           "Eternal Venom: On Mythic difficulty, a player who dies while afflicted creates additional Caustic Globules.",
           "Blood Torrent: On Mythic difficulty, each Caustic Globule is protected by a Barbed Bulwark. Interrupting Protected Gestation destroys the bulwark.",
-          "Rouse the Brood: On Mythic difficulty, Ithraz summons Broodlings that repeatedly cast Visceral Burst. Interrupting the cast forces the Broodling to retreat.",
+          "唤醒蛇群：史诗难度下，伊斯拉兹召唤幼体反复施放内脏爆裂。打断施法会迫使幼体退场。",
           "Ravenous Feast: On Mythic difficulty, consumed Eternal Venom creates Tainted Blood founts that must have their healing absorption removed before they expire."
         ],
         "difficultySource": "https://www.wowhead.com/cn/npc=257361/vexhul"

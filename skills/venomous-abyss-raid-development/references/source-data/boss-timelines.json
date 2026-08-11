@@ -402,7 +402,7 @@
         "events": [],
         "eventSeries": [
           {"spellID": 1292104, "label": "投掷蘑菇", "kind": "cast", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [199627, 231606]},
-          {"spellID": 1292779, "label": "强化升腾", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [186900]},
+          {"spellID": 1292779, "label": "最终扬升", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [186900]},
           {"spellID": 1295891, "label": "霜火连射", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [318317]},
           {"spellID": 1296021, "label": "闪现新星", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [19032, 50037, 143811, 174802, 268611, 299609]},
           {"spellID": 1296062, "label": "旋壳", "kind": "cast", "eventType": "cast", "sourceName": "First Mate Nama", "timesMs": [22025, 38000, 53042, 146792, 162779, 177804, 204624, 222623, 236628, 271620, 287606, 302625, 325243]},
@@ -444,13 +444,13 @@
           {"phase": "cycle-3", "label": "强化 3", "timeMs": 249743, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "special-3", "label": "束缚结果 3：书卷贤者", "timeMs": 314234, "spellID": 1297022, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "cycle-4", "label": "强化 4：无合法重复目标", "timeMs": 374994, "spellID": 1297075, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
-          {"phase": "enrage", "label": "强化升腾结算", "timeMs": 439232, "spellID": 1292779, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
+          {"phase": "enrage", "label": "最终扬升结算", "timeMs": 439232, "spellID": 1292779, "eventType": "cast", "source": "wclEnemyCast", "confidence": "observed"},
           {"phase": "wipe", "label": "灭团", "timeMs": 451182, "source": "fightEnd", "confidence": "observed"}
         ],
         "events": [],
         "eventSeries": [
           {"spellID": 1292104, "label": "投掷蘑菇", "kind": "cast", "eventType": "cast", "sourceName": "Trader Gebbo", "timesMs": [76374, 108374]},
-          {"spellID": 1292779, "label": "强化升腾", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [314051, 439232]},
+          {"spellID": 1292779, "label": "最终扬升", "kind": "cast", "eventType": "cast", "sourceName": "Mor'zahi", "timesMs": [314051, 439232]},
           {"spellID": 1295891, "label": "霜火连射", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [329341, 356348]},
           {"spellID": 1296021, "label": "闪现新星", "kind": "cast", "eventType": "cast", "sourceName": "Scrollsage Iku", "timesMs": [17014, 48030, 143378, 174389, 268077, 299077, 393299, 424339]},
           {"spellID": 1296062, "label": "旋壳", "kind": "cast", "eventType": "cast", "sourceName": "First Mate Nama", "timesMs": [22020, 38067, 53005, 77361, 109385, 148368, 164367, 179380, 273078, 289097, 304090, 337302, 364310, 398320, 414317, 429304]},
@@ -465,11 +465,11 @@
         "codingSignals": [
           {"label": "成功转化", "spellID": 1297024, "eventType": "cast", "timeMs": 64329, "rule": "三种命令/束缚实例只确认成功结果；拾鱼者仍不可见。"},
           {"label": "第四轮开始", "spellID": 1297075, "eventType": "cast", "timeMs": 374994, "rule": "前三种结果均已出现后再次强化，可标记为硬性击杀倒计时。"},
-          {"label": "第四轮失败", "spellID": 1292780, "eventType": "damage", "timeMs": 440258, "rule": "Final Ascension 全团伤害可直接归因为未在第四轮强化前击杀。"}
+          {"label": "第四轮失败", "spellID": 1292780, "eventType": "damage", "timeMs": 440258, "rule": "最终扬升全团伤害可直接归因为未在第四轮强化前击杀。"}
         ],
         "cycleNotes": [
           "史诗样本采用商人 → 大副 → 书卷贤者，进一步证明三个目标的处理顺序并不固定。",
-          "第四轮强化约 06:15 开始，约 07:19 完成强化升腾并开始造成全团伤害。",
+          "第四轮强化约 06:15 开始，约 07:19 完成最终扬升并开始造成全团伤害。",
           "当前样本没有显示额外的史诗专属机制；难度差异暂不强行编写。"
         ]
       }
@@ -791,13 +791,13 @@
         ],
         "codingSignals": [
           {"label": "史诗液滴护盾", "spellID": 1303378, "eventType": "applybuff", "timeMs": 11035, "rule": "每轮鲜血洪流后按 Barbed Bulwark actor 检查受护孵化打断与 Aura 移除。"},
-          {"label": "史诗蛇群开始", "spellID": 1308356, "eventType": "cast", "timeMs": 36015, "rule": "与 1291404 召唤子嗣同秒出现；随后按 Broodling actor 分配 1308385 打断序列。"},
+          {"label": "史诗蛇群开始", "spellID": 1308356, "eventType": "cast", "timeMs": 36015, "rule": "与 1291404 召唤子嗣同秒出现；随后按幼体实体分配 1308385 打断序列。"},
           {"label": "内脏爆裂漏断", "spellID": 1308385, "eventType": "cast", "rule": "begincast 必须在 Interrupts 表出现对应 extraAbilityGameID；成功 cast 是明确漏断结果。"}
         ],
         "cycleNotes": [
           "史诗每轮唤醒蛇群与维克苏尔召唤子嗣同秒完成，证明它是同一常态轮次中的额外目标组，不依赖普通子嗣是否仍存活才随机触发。",
           "代表样本四轮蛇群开始于约 00:36、01:37、03:11、04:12；每轮持续约 14 秒并产生密集的内脏爆裂读条。",
-          "样本中的 56 次内脏爆裂全部只记录 begincast，没有成功 cast；Interrupts 表能逐条匹配，说明正确处理方式是持续打断使 Broodling 退场。"
+          "样本中的 56 次内脏爆裂全部只记录 begincast，没有成功 cast；Interrupts 表能逐条匹配，说明正确处理方式是持续打断使幼体退场。"
         ]
       }
     },
