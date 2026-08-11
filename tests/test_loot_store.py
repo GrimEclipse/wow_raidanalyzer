@@ -98,6 +98,51 @@ class LootStoreTests(unittest.TestCase):
         self.assertIn("2026-09-03", resets)
         self.assertIn("2026-09-10", resets)
 
+    def test_progression_days_can_be_manually_added_or_cancelled_without_changing_resets(self):
+        before = loot_store.load_document("2026-09-01")["calendar"]["mythicResetDates"]
+        loot_store.save_setup({
+            "days": [
+                {
+                    "date": "2026-08-26",
+                    "raidKey": "venomous_abyss",
+                    "progressionOverride": True,
+                    "attendance": [],
+                },
+                {
+                    "date": "2026-08-27",
+                    "raidKey": "venomous_abyss",
+                    "progressionOverride": False,
+                    "attendance": [],
+                },
+            ],
+        })
+        document = loot_store.load_document("2026-09-01")
+        self.assertIn("2026-08-26", document["calendar"]["progressionDates"])
+        self.assertNotIn("2026-08-27", document["calendar"]["progressionDates"])
+        self.assertEqual(document["calendar"]["mythicResetDates"], before)
+
+    def test_cancelled_progression_day_does_not_count_as_an_absence(self):
+        loot_store.save_setup({
+            "days": [
+                {
+                    "date": "2026-08-24",
+                    "raidKey": "venomous_abyss",
+                    "progressionOverride": False,
+                    "attendance": [{"playerId": "tank", "status": "leave"}],
+                },
+                {
+                    "date": "2026-08-25",
+                    "raidKey": "venomous_abyss",
+                    "progressionOverride": True,
+                    "attendance": [{"playerId": "tank", "status": "leave"}],
+                },
+            ],
+        })
+        eligibility = loot_store.load_document("2026-08-27", "heroic")["eligibility"]
+        tank = next(row for row in eligibility if row["playerId"] == "tank")
+        self.assertEqual(tank["previousWeekAbsenceDates"], ["2026-08-25"])
+        self.assertTrue(tank["needEligible"])
+
     def test_mythic_need_uses_two_week_period_by_default(self):
         loot_store.add_allocation(self.allocation(date="2026-08-24", difficulty="mythic", itemNameZh="毒灼护腕"))
         with self.assertRaises(loot_store.LootConflictWarning) as caught:

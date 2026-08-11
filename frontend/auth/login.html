@@ -13,21 +13,21 @@
       radial-gradient(circle at 18% 18%,rgba(56,189,248,.08),transparent 30rem),
       radial-gradient(circle at 82% 16%,rgba(139,92,246,.09),transparent 32rem),
       linear-gradient(145deg,#040711,#090d1d 52%,#050713 100%);font:15px/1.5 "Microsoft YaHei",system-ui,sans-serif;color:var(--ink)}
-    #starfield{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+    #starfield{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;opacity:.9;mix-blend-mode:screen}
     .aurora{position:fixed;width:30rem;height:30rem;border-radius:50%;filter:blur(110px);opacity:.07;pointer-events:none}.aurora.a{left:-16rem;bottom:-18rem;background:#22d3ee}.aurora.b{right:-18rem;top:-18rem;background:#8b5cf6}
     .shell{position:relative;z-index:1;min-height:100vh;width:min(980px,100%);margin:auto;padding:40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(350px,420px);align-items:center;gap:72px;animation:arrive .55s ease-out both;transition:opacity .35s ease,transform .35s ease,filter .35s ease}
     .brand{padding:18px 0}.brand::before{content:"";display:block;width:36px;height:3px;margin-bottom:24px;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--violet))}
     h1{margin:0;font-size:clamp(42px,6vw,68px);line-height:1.08;letter-spacing:-.045em;font-weight:790}
-    .lede{max-width:520px;margin:22px 0 0;color:#a8b0c7;font-size:17px;line-height:1.9}
-    .credit{margin:30px 0 0;color:#69738f;font-size:12px;letter-spacing:.03em}
+    .brand-meta{display:flex;align-items:center;gap:10px;margin-top:26px;color:#69738f;font-size:12px;letter-spacing:.03em}.version{display:inline-flex;align-items:center;min-height:24px;padding:2px 9px;border:1px solid rgba(103,232,249,.2);border-radius:99px;background:rgba(8,47,73,.26);color:#9eeaf7;cursor:pointer;font:inherit;font-weight:750;letter-spacing:.06em}.version:hover{border-color:rgba(103,232,249,.48);background:rgba(8,47,73,.44)}
     .card{position:relative;padding:32px;border:1px solid var(--line);border-radius:22px;background:rgba(10,14,32,.78);box-shadow:0 28px 80px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.04);backdrop-filter:blur(22px)}.card-head{margin-bottom:24px}.card-head strong{display:block;font-size:20px}.card-head span{display:block;margin-top:6px;color:#737d99;font-size:12px}
     .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin-bottom:25px;border:1px solid rgba(148,163,184,.12);border-radius:14px;background:rgba(2,6,23,.55)}button,input{font:inherit}.tabs button{height:40px;border:0;border-radius:10px;background:transparent;color:#747e9e;cursor:pointer;font-weight:700;transition:.2s}.tabs button.active{background:linear-gradient(135deg,rgba(30,41,83,.95),rgba(38,30,78,.95));color:#eef2ff;box-shadow:0 5px 18px rgba(0,0,0,.2)}
     form{display:grid;gap:17px}.field{display:grid;gap:8px}.label-row{display:flex;justify-content:space-between;align-items:center;color:#b8c0da;font-size:12px;font-weight:650}.field-wrap{position:relative}.field input{width:100%;height:49px;padding:0 44px 0 15px;border:1px solid rgba(148,163,184,.18);border-radius:13px;outline:0;background:rgba(2,6,23,.58);color:#f7f8ff;transition:border-color .2s,box-shadow .2s,background .2s}.field input::placeholder{color:#4e5878}.field input:hover{border-color:rgba(165,180,252,.3)}.field input:focus{border-color:rgba(103,232,249,.62);background:rgba(3,7,24,.78);box-shadow:0 0 0 4px rgba(34,211,238,.08),0 0 25px rgba(34,211,238,.05)}.reveal{position:absolute;right:8px;top:7px;width:35px;height:35px;border:0;border-radius:9px;background:transparent;color:#74809f;cursor:pointer}.reveal:hover{background:rgba(148,163,184,.08);color:#dce5ff}
     .hint{margin:-4px 0 0;color:#737d9e;font-size:11px;line-height:1.7}.primary{position:relative;height:50px;margin-top:3px;border:1px solid rgba(165,180,252,.3);border-radius:13px;background:linear-gradient(115deg,#67d6f5,#8b8ff0);color:#071020;cursor:pointer;font-weight:800;box-shadow:0 12px 26px rgba(99,102,241,.18);transition:transform .2s,filter .2s}.primary:hover{filter:brightness(1.07);transform:translateY(-1px)}.primary:disabled{opacity:.62;cursor:wait;transform:none}.message{min-height:22px;margin-top:15px;color:var(--rose);font-size:12px}.message.success{color:var(--success)}.hidden{display:none!important}
     .transition-layer{position:fixed;z-index:10;inset:0;display:grid;place-items:center;background:rgba(4,7,17,.72);backdrop-filter:blur(8px);opacity:0;visibility:hidden;transition:opacity .28s ease,visibility .28s ease}.transition-box{display:grid;justify-items:center;gap:15px;color:#dbe3f7;font-size:13px}.loader{width:34px;height:34px;border:2px solid rgba(148,163,184,.18);border-top-color:var(--cyan);border-right-color:var(--violet);border-radius:50%;animation:spin .85s linear infinite}
     body.is-waiting .transition-layer{opacity:1;visibility:visible}body.is-leaving .shell{opacity:0;transform:scale(.985);filter:blur(7px)}
+    body.notice-open{overflow:hidden}.notice-layer{position:fixed;z-index:30;inset:0;display:grid;place-items:center;padding:24px;background:rgba(2,5,14,.78);backdrop-filter:blur(12px)}.notice-layer[hidden]{display:none}.notice-modal{width:min(780px,100%);max-height:min(82vh,820px);overflow:auto;border:1px solid rgba(165,180,252,.22);border-radius:24px;background:linear-gradient(145deg,rgba(13,18,40,.98),rgba(7,11,27,.98));box-shadow:0 36px 110px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.05)}.notice-head{position:sticky;z-index:2;top:0;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:24px 28px 18px;border-bottom:1px solid rgba(148,163,184,.12);background:rgba(10,14,32,.94);backdrop-filter:blur(18px)}.notice-head small{display:block;margin-bottom:5px;color:var(--cyan);font-size:10px;font-weight:800;letter-spacing:.16em}.notice-head h2{margin:0;font-size:24px}.notice-version{color:#8994b2;font-size:12px}.notice-close{flex:none;width:38px;height:38px;border:1px solid rgba(148,163,184,.18);border-radius:50%;background:rgba(15,23,42,.68);color:#cbd5e1;cursor:pointer;font-size:22px}.notice-content{padding:22px 28px 28px;color:#c4cbe0;font-size:14px;line-height:1.82}.notice-content>ol{display:grid;gap:20px;margin:0;padding-left:22px}.notice-content li::marker{color:var(--cyan);font-weight:800}.notice-content p{margin:0 0 10px}.notice-content p:last-child{margin-bottom:0}.notice-content ul{display:grid;gap:6px;margin:10px 0 0;padding-left:20px}.notice-content a{color:#8fe8f7;text-decoration:none}.notice-content a:hover{text-decoration:underline}.notice-action{width:100%;height:48px;margin-top:24px;border:1px solid rgba(165,180,252,.28);border-radius:13px;background:linear-gradient(115deg,#67d6f5,#8b8ff0);color:#071020;cursor:pointer;font-weight:800}
     @keyframes arrive{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes spin{to{transform:rotate(360deg)}}
-    @media(max-width:800px){.shell{grid-template-columns:1fr;gap:30px;padding:30px 20px}.brand{padding:8px 6px 0}.brand::before{margin-bottom:18px}h1{font-size:clamp(38px,12vw,56px)}.lede{margin-top:15px;font-size:15px}.credit{margin-top:18px}.card{width:min(460px,100%);justify-self:center}}
+    @media(max-width:800px){.shell{grid-template-columns:1fr;gap:30px;padding:30px 20px}.brand{padding:8px 6px 0}.brand::before{margin-bottom:18px}h1{font-size:clamp(38px,12vw,56px)}.brand-meta{margin-top:18px}.card{width:min(460px,100%);justify-self:center}.notice-layer{padding:12px}.notice-head{padding:20px}.notice-content{padding:19px 20px 22px}}
     @media(max-width:500px){.shell{padding:20px 14px}.brand{padding:4px 6px}.card{padding:25px 20px;border-radius:18px}}
     @media(prefers-reduced-motion:reduce){.shell,.loader,.primary,.tabs button,.field input,.transition-layer{animation:none;transition:none}body.is-leaving .shell{filter:none}}
   </style>
@@ -38,8 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <p class="lede">旨在快速帮团长完成团本开荒中问题的定位</p>
-    <p class="credit">edit by 爬爬</p>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.0.0 更新公告">v1.0.0</button></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -66,15 +65,73 @@
   </section>
 </main>
 <div class="transition-layer" aria-hidden="true"><div class="transition-box"><span class="loader"></span><span id="transitionText">正在登录…</span></div></div>
+<div id="releaseNotice" class="notice-layer" hidden>
+  <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
+    <header class="notice-head">
+      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.0.0</span></div>
+      <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
+    </header>
+    <div class="notice-content">
+      <ol>
+        <li>
+          <p>爬爬想把这个系统作为一个能便利于 avalon 工会使用的快捷查询工具，包括 Boss 的技能介绍、开荒日志检查、大米极限层抄轴、团本根据同治疗组来快速产生战术板、单场断案，以及用于课代表记录每次开荒的拾取记录等功能。</p>
+          <p>人总会有失误，把自己曾经犯过的错误留下“案底”实在压力太大，所以我单方面取消掉了智商记录本的功能，同时这个功能也不利于迁移……我只会判断出每天日志中导致灭团的原因是什么，来快速帮助团长等定位这些问题。说白了也只是自己的一己私愿，不过初心绝对只是单纯地为了快速辅助团队通过副本和高难度 Boss，而不是为了“开庭”队友们。当然如果之后智商团能够复用到，我会单独外接一个定制化需求的版本，也算是自己给自己练手。</p>
+        </li>
+        <li>
+          <p>目前系统已经维护的内容基本都可以使用，并且基本都外接了 Wowhead、lorrgs.io 等工具的附件。只要你能访问到这个网站，你基本都可以无痛访问到 Wowhead 上的相关资源。</p>
+          <p>有相关需求的可以直接反馈给我，或者反馈到 <a href="https://github.com/GrimEclipse/wow_raidanalyzer" target="_blank" rel="noreferrer">GrimEclipse/wow_raidanalyzer</a>。我会在能力范围之内快速处理这些需求。</p>
+        </li>
+        <li>
+          <p>计划之内的需求包括：</p>
+          <ul>
+            <li>根据每次开荒的日志，快速查询最近一次开荒；</li>
+            <li>完善每个 Boss 的问题分析逻辑，目前都是通过测试环境创建的内容；</li>
+            <li>更新大秘境极限层抄轴工具的相关逻辑，使其也能满足不同专精的队伍构成。</li>
+          </ul>
+        </li>
+      </ol>
+      <button id="enterSystem" class="notice-action" type="button">我知道了，进入系统</button>
+    </div>
+  </section>
+</div>
 <script>
 (() => {
+  const RELEASE_VERSION = 'v1.0.0';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let stars = [];
+  let comets = [];
+  let nextCometAt = 0;
   let width = 0;
   let height = 0;
   let ratio = 1;
+  const cometPalettes = [
+    [103,232,249],
+    [165,180,252],
+    [196,181,253],
+    [125,211,252]
+  ];
+  const spawnComet = (time, delay = 0) => {
+    const direction = Math.random() < .82 ? 1 : -1;
+    const speed = 2.1 + Math.random() * 2.7;
+    const angle = .16 + Math.random() * .34;
+    const tail = 54 + Math.random() * 92;
+    const color = cometPalettes[Math.floor(Math.random() * cometPalettes.length)];
+    comets.push({
+      x: direction > 0 ? -tail : width + tail,
+      y: height * (.04 + Math.random() * .68),
+      vx: Math.cos(angle) * speed * direction,
+      vy: Math.sin(angle) * speed,
+      tail,
+      size: .8 + Math.random() * 1.7,
+      alpha: .3 + Math.random() * .48,
+      color,
+      bornAt: time + delay,
+      life: 0,
+      maxLife: 230 + Math.random() * 250
+    });
+  };
   const resize = () => {
     ratio = Math.min(devicePixelRatio || 1, 2);
     width = innerWidth;
@@ -85,13 +142,47 @@
     canvas.style.height = `${height}px`;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     const count = Math.max(35, Math.min(90, Math.round(width * height / 18000)));
-    stars = Array.from({length:count}, () => ({x:Math.random()*width,y:Math.random()*height,r:Math.random()*.9+.2,a:Math.random()*.4+.12,s:Math.random()*.004+.001,p:Math.random()*Math.PI*2}));
+    stars = Array.from({length:count}, (_, index) => ({
+      x:Math.random()*width,y:Math.random()*height,r:Math.random()*1.1+.25,
+      a:Math.random()*.42+.12,s:Math.random()*.004+.001,p:Math.random()*Math.PI*2,
+      vx:(Math.random()-.5)*.045,vy:(Math.random()-.5)*.035,link:index%3===0
+    }));
+    comets = [];
+    nextCometAt = performance.now() + 250 + Math.random() * 1100;
   };
   const draw = time => {
     context.clearRect(0,0,width,height);
+    const linked = stars.filter(star => star.link);
+    linked.forEach((star,index) => {
+      for(let next=index+1;next<linked.length;next+=1){
+        const other=linked[next],distance=Math.hypot(star.x-other.x,star.y-other.y);
+        if(distance>145)continue;
+        context.beginPath();context.moveTo(star.x,star.y);context.lineTo(other.x,other.y);
+        context.strokeStyle=`rgba(103,232,249,${(1-distance/145)*.075})`;context.lineWidth=.65;context.stroke();
+      }
+    });
     stars.forEach(star => {
+      if(!reducedMotion){star.x=(star.x+star.vx+width)%width;star.y=(star.y+star.vy+height)%height;}
       const alpha = reducedMotion ? star.a : star.a * (.68 + Math.sin(time*star.s+star.p)*.32);
       context.beginPath(); context.arc(star.x,star.y,star.r,0,Math.PI*2); context.fillStyle=`rgba(210,226,255,${alpha})`; context.fill();
+    });
+    if(!reducedMotion&&time>=nextCometAt){
+      const burst=Math.random()<.28?2+Math.floor(Math.random()*3):1;
+      for(let index=0;index<burst;index+=1)spawnComet(time,index*(90+Math.random()*260));
+      nextCometAt=time+1250+Math.random()*3400;
+    }
+    comets=comets.filter(comet=>comet.life<comet.maxLife&&comet.y<height+180&&comet.x>-comet.tail*2&&comet.x<width+comet.tail*2);
+    comets.forEach(comet=>{
+      if(time<comet.bornAt)return;
+      comet.x+=comet.vx;comet.y+=comet.vy;comet.life+=1;
+      const magnitude=Math.hypot(comet.vx,comet.vy);
+      const tailX=comet.x-comet.vx/magnitude*comet.tail,tailY=comet.y-comet.vy/magnitude*comet.tail;
+      const [red,green,blue]=comet.color;
+      const fade=Math.min(1,comet.life/22,Math.max(0,(comet.maxLife-comet.life)/42));
+      const gradient=context.createLinearGradient(tailX,tailY,comet.x,comet.y);
+      gradient.addColorStop(0,`rgba(${red},${green},${blue},0)`);gradient.addColorStop(1,`rgba(${red},${green},${blue},${comet.alpha*fade})`);
+      context.beginPath();context.moveTo(tailX,tailY);context.lineTo(comet.x,comet.y);context.strokeStyle=gradient;context.lineWidth=.7+comet.size*.55;context.stroke();
+      context.beginPath();context.arc(comet.x,comet.y,comet.size,0,Math.PI*2);context.fillStyle=`rgba(238,242,255,${.55+.4*fade})`;context.fill();
     });
     if (!reducedMotion) requestAnimationFrame(draw);
   };
@@ -104,6 +195,53 @@
   const inviteInput = inviteField.querySelector('input');
   const registerHint = document.querySelector('#registerHint');
   const transitionText = document.querySelector('#transitionText');
+  const releaseNotice = document.querySelector('#releaseNotice');
+  const noticeModal = releaseNotice.querySelector('.notice-modal');
+  const enterSystem = document.querySelector('#enterSystem');
+  const versionButton = document.querySelector('#versionButton');
+  let pendingRedirect = '/online';
+  let pendingNoticeKey = '';
+  let noticeAfterLogin = false;
+  const noticeKey = userId => `mythicAnalyzer.releaseNotice.${RELEASE_VERSION}.${userId || 'anonymous'}`;
+  const noticeSeen = key => { try { return localStorage.getItem(key) === 'seen'; } catch (_) { return false; } };
+  const leaveFor = target => {
+    transitionText.textContent = '正在进入系统…';
+    document.body.classList.add('is-waiting','is-leaving');
+    setTimeout(() => location.replace(target), reducedMotion ? 0 : 380);
+  };
+  const acknowledgeNotice = () => {
+    if (pendingNoticeKey) { try { localStorage.setItem(pendingNoticeKey, 'seen'); } catch (_) {} }
+    releaseNotice.hidden = true;
+    document.body.classList.remove('notice-open');
+    if (noticeAfterLogin) leaveFor(pendingRedirect);
+    else versionButton.focus();
+  };
+  const showNotice = () => {
+    document.body.classList.remove('is-waiting','is-leaving');
+    document.body.classList.add('notice-open');
+    releaseNotice.hidden = false;
+    enterSystem.textContent = noticeAfterLogin ? '我知道了，进入系统' : '关闭公告';
+    noticeModal.scrollTop = 0;
+    requestAnimationFrame(() => {
+      noticeModal.scrollTop = 0;
+      noticeModal.focus({preventScroll:true});
+    });
+  };
+  const continueAfterLogin = (result, target) => {
+    const key = noticeKey(result.user?.id);
+    if (noticeSeen(key)) return leaveFor(target);
+    pendingRedirect = target;
+    pendingNoticeKey = key;
+    noticeAfterLogin = true;
+    showNotice();
+  };
+  versionButton.addEventListener('click', () => {
+    pendingNoticeKey = '';
+    noticeAfterLogin = false;
+    showNotice();
+  });
+  enterSystem.addEventListener('click', acknowledgeNotice);
+  document.querySelector('#closeReleaseNotice').addEventListener('click', acknowledgeNotice);
   const setMode = mode => {
     document.querySelectorAll('[data-mode]').forEach(button => {
       const active = button.dataset.mode === mode;
@@ -145,8 +283,7 @@
       if (!response.ok) throw new Error(result.error || '操作失败，请稍后重试');
       succeeded = true;
       transitionText.textContent = registering ? '账号创建成功，正在进入…' : '登录成功，正在进入…';
-      document.body.classList.add('is-leaving');
-      setTimeout(() => location.replace(safeClientTarget(result.redirectTo || next)), reducedMotion ? 0 : 380);
+      continueAfterLogin(result, safeClientTarget(result.redirectTo || next));
     } catch (error) {
       message.textContent = error.message;
       message.className = 'message';

@@ -22,6 +22,19 @@ class RaidLootFrontendTests(unittest.TestCase):
         self.assertIn("function refreshWowheadTooltips()", app)
         self.assertIn("window.WH.Tooltips.refreshLinks()", app)
 
+    def test_progression_day_can_be_toggled_without_touching_reset_settings(self):
+        page = (LOOT_FRONTEND / "index.html").read_text(encoding="utf-8")
+        app = (LOOT_FRONTEND / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="progressionToggle"', page)
+        self.assertIn("async function toggleProgressionDay()", app)
+        self.assertIn("progressionOverride = !wasProgression", app)
+        self.assertNotIn("mythicCadenceWeeks", app[app.index("async function toggleProgressionDay()"):app.index("function renderRecipientOptions()")])
+
+    def test_roster_class_options_keep_individual_class_colors(self):
+        app = (LOOT_FRONTEND / "app.js").read_text(encoding="utf-8")
+        self.assertIn('style="color:${CLASS_COLORS[key] || "#edf2f7"}"', app)
+        self.assertIn('event.target.style.color = CLASS_COLORS[event.target.value]', app)
+
 
 if __name__ == "__main__":
     unittest.main()

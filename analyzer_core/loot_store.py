@@ -162,6 +162,11 @@ def _normalise_days(rows: Iterable[Dict[str, Any]], player_ids: set[str]) -> Lis
             "raidKey": _text(raw.get("raidKey"), 80) or "venomous_abyss",
             "notes": _text(raw.get("notes"), 1000),
             "attendance": attendance,
+            "progressionOverride": (
+                raw.get("progressionOverride")
+                if isinstance(raw.get("progressionOverride"), bool)
+                else None
+            ),
         })
     return sorted(result, key=lambda row: row["date"])
 
@@ -247,6 +252,13 @@ def is_progression_date(value: date_type) -> bool:
     )
 
 
+def _is_state_progression_date(state: Dict[str, Any], value: date_type) -> bool:
+    day = next((row for row in state["days"] if row["date"] == value.isoformat()), None)
+    if day and isinstance(day.get("progressionOverride"), bool):
+        return day["progressionOverride"]
+    return is_progression_date(value)
+
+
 def _previous_week_absences(state: Dict[str, Any], player_id: str, selected: date_type) -> List[str]:
     start = _lockout_start(selected) - timedelta(days=7)
     end = start + timedelta(days=6)
@@ -254,6 +266,8 @@ def _previous_week_absences(state: Dict[str, Any], player_id: str, selected: dat
     for day in state["days"]:
         current = date_type.fromisoformat(day["date"])
         if not (start <= current <= end):
+            continue
+        if not _is_state_progression_date(state, current):
             continue
         entry = next((row for row in day["attendance"] if row["playerId"] == player_id), None)
         if entry and entry["status"] in {"leave", "absent"}:
@@ -320,7 +334,7 @@ def _calendar_document(state: Dict[str, Any], selected: date_type) -> Dict[str, 
     progression = []
     current = max(range_start, FIRST_PROGRESSION_DATE)
     while current < range_end:
-        if is_progression_date(current):
+        if _is_state_progression_date(state, current):
             progression.append(current.isoformat())
         current += timedelta(days=1)
 

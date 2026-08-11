@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>开荒 Loot 记录</title>
-  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=3">
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=4">
   <script>
     const whTooltips = {
       colorLinks: false,
@@ -62,7 +62,10 @@
     <section class="drawer-section attendance-section">
       <div class="section-heading">
         <div><h3>出勤确认</h3><p>名单默认全部出勤；点击成员即可切换为请假。</p></div>
-        <button id="saveDay" class="button secondary">保存当天</button>
+        <div class="section-actions">
+          <button id="progressionToggle" class="button progression-toggle">设为开荒日</button>
+          <button id="saveDay" class="button secondary">保存当天</button>
+        </div>
       </div>
       <div class="field-grid compact">
         <label>团队副本<select id="dayRaid"></select></label>
@@ -118,6 +121,6 @@
     </section>
   </div>
 
-  <script src="/frontend/tools/raid-loot/app.js?v=6"></script>
+  <script src="/frontend/tools/raid-loot/app.js?v=7"></script>
 </body>
 </html>

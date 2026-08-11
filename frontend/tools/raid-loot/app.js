@@ -92,6 +92,7 @@ function renderActions() {
   toggle.setAttribute("aria-checked", cadence === 2 ? "true" : "false");
   toggle.title = cadence === 2 ? "当前史诗难度每两周刷新；点击切换为单周" : "当前史诗难度每周刷新；点击切换为双周";
   $("#saveDay").disabled = !canModify();
+  $("#progressionToggle").disabled = !canModify();
   $("#addAllocation").disabled = !canModify();
   const source = documentState?.catalog?.source;
   const summary = documentState?.catalog?.summary;
@@ -157,7 +158,7 @@ function currentDayRecord(create = true) {
   let day = documentState.state.days.find(row => row.date === selectedDate);
   if (!day && create) {
     const defaultRaid = raids().find(row => row.key === "venomous_abyss") || raids()[0];
-    day = { date: selectedDate, raidKey: defaultRaid?.key || "venomous_abyss", notes: "", attendance: [] };
+    day = { date: selectedDate, raidKey: defaultRaid?.key || "venomous_abyss", notes: "", attendance: [], progressionOverride: null };
     documentState.state.days.push(day);
   }
   return day;
@@ -175,6 +176,11 @@ function renderDay() {
   const weekday = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][date.getDay()];
   $("#selectedDateTitle").textContent = `${date.getMonth() + 1} 月 ${date.getDate()} 日 · ${weekday}`;
   const day = currentDayRecord(false);
+  const isProgression = new Set(documentState?.calendar?.progressionDates || []).has(selectedDate);
+  const progressionToggle = $("#progressionToggle");
+  progressionToggle.textContent = isProgression ? "取消开荒日" : "设为开荒日";
+  progressionToggle.classList.toggle("active", isProgression);
+  progressionToggle.setAttribute("aria-pressed", isProgression ? "true" : "false");
   $("#dayNotes").value = day?.notes || "";
   if (day?.raidKey) $("#dayRaid").value = day.raidKey;
   const attendance = new Map((day?.attendance || []).map(row => [row.playerId, row.status]));
@@ -212,6 +218,18 @@ async function saveDay(silent = false) {
     captureDay();
     await api("/api/loot/setup", { method: "PUT", body: JSON.stringify({ days: documentState.state.days }) });
     if (!silent) notify("当天出勤与备注已保存。");
+    await load();
+  } catch (error) { notify(error.message, true); }
+}
+
+async function toggleProgressionDay() {
+  if (!canModify()) return;
+  const wasProgression = new Set(documentState?.calendar?.progressionDates || []).has(selectedDate);
+  try {
+    captureDay();
+    currentDayRecord(true).progressionOverride = !wasProgression;
+    await api("/api/loot/setup", { method: "PUT", body: JSON.stringify({ days: documentState.state.days }) });
+    notify(wasProgression ? "已取消该日期的开荒日标记。" : "已将该日期设为开荒日。");
     await load();
   } catch (error) { notify(error.message, true); }
 }
@@ -355,10 +373,10 @@ function openRoster() {
 function closeRoster() { $("#rosterBackdrop").hidden = true; }
 
 function renderRoster() {
-  const classOptions = CLASS_OPTIONS.map(([key, name]) => `<option value="${key}">${name}</option>`).join("");
+  const classOptions = CLASS_OPTIONS.map(([key, name]) => `<option value="${key}" style="color:${CLASS_COLORS[key] || "#edf2f7"}">${name}</option>`).join("");
   $("#rosterRows").innerHTML = roster().length ? roster().map(player => `<div class="roster-row" data-id="${escapeHtml(player.id)}">
     <label>角色名<input class="player-name" value="${escapeHtml(player.name)}"></label>
-    <label>职业<select class="player-class"><option value="">未设置</option>${classOptions}</select></label>
+    <label>职业<select class="player-class"><option value="" style="color:#edf2f7">未设置</option>${classOptions}</select></label>
     <label>护甲<select class="player-armor">${Object.entries(ARMOR_NAMES).filter(([key]) => ["cloth", "leather", "mail", "plate"].includes(key)).map(([key, name]) => `<option value="${key}">${name}</option>`).join("")}</select></label>
     <label class="active"><input type="checkbox" ${player.active ? "checked" : ""}>活动</label>
     <button class="button danger remove-player">移除</button>
@@ -471,6 +489,7 @@ $("#nextMonth").addEventListener("click", () => { displayedMonth = new Date(disp
 $("#closeDay").addEventListener("click", closeDay);
 $("#drawerBackdrop").addEventListener("click", closeDay);
 $("#saveDay").addEventListener("click", () => saveDay(false));
+$("#progressionToggle").addEventListener("click", toggleProgressionDay);
 $("#dayRaid").addEventListener("change", () => { currentDayRecord(true).raidKey = $("#dayRaid").value; renderBossOptions(); });
 $("#bossSelect").addEventListener("change", renderItemOptions);
 $("#difficultySelect").addEventListener("change", load);
