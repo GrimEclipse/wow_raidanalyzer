@@ -145,6 +145,9 @@ class Zone54RaidGuideTests(unittest.TestCase):
         ))
         self.assertIn('class="spell-icon-link"', page)
         self.assertIn('class="spell-copy"', page)
+        self.assertIn("background-image: none !important;", page)
+        self.assertIn("padding-left: 0 !important;", page)
+        self.assertIn(".spell-name-link > ins { display: none !important; }", page)
         self.assertNotIn('class="spell-link"', page)
         self.assertIn(".spell-icon-link .iconsmall > ins", page)
         self.assertIn("background-size: cover !important", page)
@@ -496,7 +499,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         self.assertEqual(mythic_combos[0]["timeMs"], 5038)
 
-    def test_sszorak_confirmed_names_keep_unconfirmed_damage_names_english(self):
+    def test_sszorak_uses_release_chinese_names_in_guide_content(self):
         boss = next(
             row for row in self.document["bosses"] if row["key"] == "sszorak"
         )
@@ -509,9 +512,24 @@ class Zone54RaidGuideTests(unittest.TestCase):
         gash = next(
             spell for spell in boss["spells"] if spell["spellID"] == 1285998
         )
+        gusts = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1285447
+        )
+        slaughter = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1297414
+        )
+        ferocity = next(
+            spell for spell in boss["spells"] if spell["spellID"] == 1296898
+        )
         self.assertEqual(ravage["nameZh"], "\u52ab\u63a0")
         self.assertEqual(sidewind["nameZh"], "\u72c2\u6012\u4fa7\u98ce")
-        self.assertIsNone(gash["nameZh"])
+        self.assertEqual(gash["nameZh"], "残毁创伤")
+        self.assertEqual(gusts["nameZh"], "湍流侧风")
+        self.assertEqual(slaughter["nameZh"], "大开杀戒")
+        self.assertEqual(ferocity["nameZh"], "怒不可遏")
+        self.assertFalse([
+            spell["spellID"] for spell in boss["spells"] if not spell.get("nameZh")
+        ])
         mutilate = next(
             mechanic for mechanic in boss["mechanics"]
             if mechanic["evidenceType"] == "shared-hit-refreshing-dot"
@@ -522,6 +540,16 @@ class Zone54RaidGuideTests(unittest.TestCase):
             mechanic for mechanic in boss["mechanics"]
             if mechanic["title"] == "狂怒侧风"
         )["important"])
+        rendered_content = json.dumps(
+            {
+                "phases": boss["phases"],
+                "mechanics": boss["mechanics"],
+                "timelines": boss["timelines"],
+            },
+            ensure_ascii=False,
+        )
+        for stale_name in ("Turbulent Gusts", "To the Slaughter", "无拘狂暴"):
+            self.assertNotIn(stale_name, rendered_content)
 
     def test_twin_fangs_keeps_stack_cycle_and_verified_mythic_interrupts(self):
         boss = next(

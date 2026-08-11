@@ -611,14 +611,14 @@
         "stats": [
           {"label": "最长观察", "timeMs": 169290},
           {"label": "毒蛇之怒", "value": "3 轮"},
-          {"label": "无拘狂暴", "timeMs": 157996}
+          {"label": "怒不可遏", "timeMs": 157996}
         ],
         "phaseMarkers": [
           {"phase": "fury-1", "label": "毒蛇之怒 1", "timeMs": 11, "spellID": 1305621, "eventType": "applydebuff", "source": "wclPlayerDebuff", "confidence": "observed"},
           {"phase": "fury-2", "label": "毒蛇之怒 2", "timeMs": 40006, "spellID": 1305621, "eventType": "applydebuff", "source": "wclPlayerDebuff", "confidence": "observed"},
           {"phase": "fury-3", "label": "毒蛇之怒 3", "timeMs": 86997, "spellID": 1305621, "eventType": "applydebuff", "source": "wclPlayerDebuff", "confidence": "observed"},
           {"phase": "maelstrom-1", "label": "呼啸漩涡 1", "timeMs": 100016, "spellID": 1286033, "eventType": "applybuff", "source": "wclBossAura", "confidence": "observed"},
-          {"phase": "enrage", "label": "无拘狂暴", "timeMs": 157996, "spellID": 1296898, "eventType": "applybuff", "source": "wclBossAura", "confidence": "observed"},
+          {"phase": "enrage", "label": "怒不可遏", "timeMs": 157996, "spellID": 1296898, "eventType": "applybuff", "source": "wclBossAura", "confidence": "observed"},
           {"phase": "wipe", "label": "灭团", "timeMs": 169290, "source": "fightEnd", "confidence": "observed"}
         ],
         "events": [
@@ -638,7 +638,7 @@
             ]
           },
           {"timeMs": 29009, "spellID": 1305959, "label": "毒液激流 1", "kind": "resource", "phase": "fury-1"},
-          {"timeMs": 33821, "spellID": 1297707, "label": "To the Slaughter 后剧毒链 1", "kind": "mythic", "phase": "fury-1"},
+          {"timeMs": 33821, "spellID": 1297707, "label": "大开杀戒后剧毒链 1", "kind": "mythic", "phase": "fury-1"},
           {"timeMs": 40006, "spellID": 1305621, "label": "毒蛇之怒点名 2", "kind": "mythic", "phase": "fury-2"},
           {
             "timeMs": 52018,
@@ -655,7 +655,7 @@
             ]
           },
           {"timeMs": 76005, "spellID": 1305959, "label": "毒液激流 2", "kind": "resource", "phase": "fury-2"},
-          {"timeMs": 80700, "spellID": 1297707, "label": "To the Slaughter 后剧毒链 2", "kind": "mythic", "phase": "fury-2"},
+          {"timeMs": 80700, "spellID": 1297707, "label": "大开杀戒后剧毒链 2", "kind": "mythic", "phase": "fury-2"},
           {"timeMs": 86997, "spellID": 1305621, "label": "毒蛇之怒点名 3", "kind": "mythic", "phase": "fury-3"},
           {"timeMs": 100016, "spellID": 1286033, "label": "三轮吹风开始", "kind": "transition", "phase": "maelstrom-1"},
           {
@@ -673,19 +673,19 @@
             ]
           },
           {"timeMs": 156037, "spellID": 1305959, "label": "毒液激流 3", "kind": "resource", "phase": "fury-3"},
-          {"timeMs": 157996, "spellID": 1296898, "label": "无拘狂暴", "kind": "enrage", "phase": "enrage"}
+          {"timeMs": 157996, "spellID": 1296898, "label": "怒不可遏", "kind": "enrage", "phase": "enrage"}
         ],
         "eventSeries": [
           {"spellID": 1285419, "label": "狂怒侧风", "kind": "direction", "eventType": "cast", "sourceName": "Environment", "timesMs": [39007, 86010, 166044]}
         ],
         "codingSignals": [
           {"label": "史诗点名", "spellID": 1305621, "eventType": "applydebuff", "timeMs": 11, "rule": "每次 1305621 建立一轮毒蛇之怒；移除后若出现全团 1297707/1299899，可确认本轮进入冲锋/剧毒结算。"},
-          {"label": "成功清怒结果", "spellID": 1297707, "eventType": "applydebuff", "timeMs": 33821, "rule": "前两轮均在毒蛇之怒移除后约 0.6 秒开始剧毒链，作为 To the Slaughter 成功结果锚点。"},
+          {"label": "成功清怒结果", "spellID": 1297707, "eventType": "applydebuff", "timeMs": 33821, "rule": "前两轮均在毒蛇之怒移除后约 0.6 秒开始剧毒链，作为大开杀戒成功结果锚点。"},
           {"label": "怒气失败", "spellID": 1296898, "eventType": "applybuff", "timeMs": 157996, "rule": "1296898 是达到 100 怒的明确失败结果；若 API 无可靠 resource 事件，仍可直接以该 Aura 归因。"}
         ],
         "cycleNotes": [
           "史诗毒蛇之怒约每 40—47 秒出现一次，并与常规毒液激流、狂怒侧风和转阶段交错。",
-          "第三轮点名在 01:27 出现，样本未形成与前两轮相同的及时剧毒结算，01:58 获得无拘狂暴。",
+          "第三轮点名在 01:27 出现，样本未形成与前两轮相同的及时剧毒结算，01:58 获得怒不可遏。",
           "1297096/1297111 仅在史诗样本出现，支持狂怒侧风拥有额外方向实例；方向数量和箭头仍需用客户端画面复核。"
         ]
       }

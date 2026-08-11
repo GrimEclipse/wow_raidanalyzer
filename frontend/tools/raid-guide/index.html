@@ -13,7 +13,7 @@
         };
     </script>
     <script src="https://wow.zamimg.com/js/tooltips.js"></script>
-    <script src="assets/vendor/zone54-raid-guide-data.js?v=6"></script>
+    <script src="assets/vendor/zone54-raid-guide-data.js?v=7"></script>
     <style>
         :root {
             color-scheme: dark;
@@ -326,7 +326,12 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .spell-name-link { text-decoration: none; }
+        .spell-name-link {
+            padding-left: 0 !important;
+            background-image: none !important;
+            text-decoration: none;
+        }
+        .spell-name-link > ins { display: none !important; }
         .spell-name-link:hover { color: #ffe09a; text-decoration: underline; }
         .spell-id { display: block; margin-top: 3px; color: #718098; font: 9px/1 ui-monospace, monospace; }
         .timeline-shell {

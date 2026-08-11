@@ -1,0 +1,27 @@
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LOOT_FRONTEND = ROOT / "frontend" / "tools" / "raid-loot"
+
+
+class RaidLootFrontendTests(unittest.TestCase):
+    def test_recipient_options_keep_each_players_class_color(self):
+        app = (LOOT_FRONTEND / "app.js").read_text(encoding="utf-8")
+        self.assertIn('const color = CLASS_COLORS[player.classKey] || "#edf2f7";', app)
+        self.assertIn('style="color:${color}"', app)
+        self.assertIn('$("#recipientSelect").style.color = playerColor', app)
+
+    def test_allocation_item_links_enable_dynamic_wowhead_tooltips(self):
+        page = (LOOT_FRONTEND / "index.html").read_text(encoding="utf-8")
+        app = (LOOT_FRONTEND / "app.js").read_text(encoding="utf-8")
+        self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
+        self.assertIn("iconizeLinks: false", page)
+        self.assertIn('data-wowhead="domain=cn"', app)
+        self.assertIn("function refreshWowheadTooltips()", app)
+        self.assertIn("window.WH.Tooltips.refreshLinks()", app)
+
+
+if __name__ == "__main__":
+    unittest.main()

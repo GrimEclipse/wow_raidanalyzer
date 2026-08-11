@@ -55,6 +55,14 @@ function playerColor(id) { return CLASS_COLORS[player(id)?.classKey] || "#edf2f7
 function classStyle(id) { return `--class-color:${playerColor(id)}`; }
 function canModify() { return Boolean(documentState?.permissions?.canModify); }
 
+function refreshWowheadTooltips() {
+  if (window.WH?.Tooltips?.refreshLinks) {
+    window.WH.Tooltips.refreshLinks();
+  } else if (window.$WowheadPower?.refreshLinks) {
+    window.$WowheadPower.refreshLinks();
+  }
+}
+
 async function load() {
   documentState = await api(`/api/loot?date=${selectedDate}&difficulty=${$("#difficultySelect").value}`);
   renderAll();
@@ -213,7 +221,8 @@ function renderRecipientOptions() {
   const current = $("#recipientSelect").value;
   $("#recipientSelect").innerHTML = roster().filter(row => row.active).map(player => {
     const entry = eligibility.get(player.id);
-    return `<option value="${escapeHtml(player.id)}">${entry && !entry.needEligible ? "⚠ " : ""}${escapeHtml(player.name)} · ${escapeHtml(player.className || "未设置职业")}</option>`;
+    const color = CLASS_COLORS[player.classKey] || "#edf2f7";
+    return `<option value="${escapeHtml(player.id)}" style="color:${color}">${entry && !entry.needEligible ? "⚠ " : ""}${escapeHtml(player.name)} · ${escapeHtml(player.className || "未设置职业")}</option>`;
   }).join("") || `<option value="">请先维护团队成员</option>`;
   if ([...$("#recipientSelect").options].some(option => option.value === current)) $("#recipientSelect").value = current;
   applyRecipientColor();
@@ -272,11 +281,12 @@ function renderAllocations() {
     const requests = (row.requests || []).map(request => `<span class="class-colored" style="${classStyle(request.playerId)}">${escapeHtml(playerName(request.playerId))}</span>：${MODE_NAMES[request.mode]}`).join(" · ");
     const itemName = row.itemNameZh || row.itemName;
     const itemTitle = /^\d+$/.test(String(row.itemId || ""))
-      ? `<a class="item-link" href="https://www.wowhead.com/cn/item=${encodeURIComponent(row.itemId)}" target="_blank" rel="noreferrer">${escapeHtml(itemName)}</a>`
+      ? `<a class="item-link" href="https://www.wowhead.com/cn/item=${encodeURIComponent(row.itemId)}" data-wowhead="domain=cn" target="_blank" rel="noreferrer">${escapeHtml(itemName)}</a>`
       : escapeHtml(itemName);
     return `<article class="allocation-card"><div><h4>${itemTitle}</h4><div class="allocation-meta"><span>${row.sourceType === "boe" ? "装绑物品" : escapeHtml(boss?.name || row.bossKey)}</span><span>${DIFFICULTY_NAMES[row.difficulty]}</span><span><span class="class-colored" style="${classStyle(row.recipientId)}">${escapeHtml(playerName(row.recipientId))}</span> · ${MODE_NAMES[row.awardType]}</span></div>${requests ? `<div class="allocation-note">需求详情：${requests}</div>` : ""}${row.notes ? `<div class="allocation-note">${escapeHtml(row.notes)}</div>` : ""}</div><button class="button danger delete-allocation" data-id="${escapeHtml(row.id)}">删除</button></article>`;
   }).join("") : "当天还没有分配记录";
   $("#allocationList").querySelectorAll(".delete-allocation").forEach(button => button.addEventListener("click", () => deleteAllocation(button.dataset.id)));
+  refreshWowheadTooltips();
 }
 
 function toggleBoe() {

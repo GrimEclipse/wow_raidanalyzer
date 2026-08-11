@@ -85,6 +85,12 @@ TIMELINE_TERM_RENAMES = {
     "Frost Barrage": "冰霜弹幕",
     "Tidepiercer's Rush": "激荡漩涡",
     "Pop!": "嘭！",
+    "Turbulent Gusts": "湍流侧风",
+    "To the Slaughter": "大开杀戒",
+    "Serpent's Fury": "毒蛇之怒",
+    "Virulence": "剧毒",
+    "Unbound Ferocity": "怒不可遏",
+    "无拘狂暴": "怒不可遏",
 }
 
 
