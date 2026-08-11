@@ -6,12 +6,10 @@ Mythic Analyzer 离线包
 3. 报告入口会根据 raidKey / bossKey 自动加载：
    - 通用逐场分析；
    - 或该 Boss 的专用前端插件。
-4. 智商记事本的数据保存在 scoreboard\。
-5. 关闭宿主窗口即可停止本地服务。
+4. 关闭宿主窗口即可停止本地服务。
 
 常用入口：
 - /report      战斗分析
-- /scoreboard  智商记事本
 - /cooldowns   团队技能时间轴
 - /raid-guide  团长手册
 - /audit       奥蕾莉亚逐场场地分析

@@ -18,7 +18,6 @@ start_app.bat
 - `/online`：通过界面运行 WCL 分析
 - `/raid-guide`：12.1 团长手册
 - `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
-- `/scoreboard`：智商记事本
 - `/loot`：开荒出勤、需求权与装备分配日历
 - `/audit`：奥蕾莉亚场地明细
 
@@ -32,10 +31,10 @@ py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --repo
 
 ## 目录
 
-- `analyzer_core/`：共享契约、调度、数据路径、团队技能和记事本存储
+- `analyzer_core/`：共享契约、调度、数据路径和团队技能
 - `boss_plugins/`：后端 Boss 插件
 - `frontend/report/`：报告入口、通用报告和 Boss 前端插件
-- `frontend/tools/`：团长手册、团队时间轴、在线执行器、智商记事本
+- `frontend/tools/`：团长手册、团队时间轴、在线执行器与团队运营工具
 - `skills/`：项目维护规范与 Boss 研究资料
 - `tools/debug/`：手工调试入口
 - `host/OfflineHost.cs`：无需 Python 的离线宿主

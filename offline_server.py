@@ -14,10 +14,7 @@ ROUTES = {
     "/": "frontend/offline/index.html" if (ROOT / "frontend/offline/index.html").exists() else "index.html",
     "/report": "frontend/report/index.html",
     "/audit": "frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
-    "/scoreboard": "frontend/tools/iq-notebook/index.html",
-    "/verdict": "frontend/tools/iq-notebook/index.html",
     "/loot": "frontend/tools/raid-loot/index.html",
-    "/recruitment": "frontend/tools/recruitment/index.html",
     "/cooldowns": "frontend/tools/raid-cooldowns/index.html",
     "/raid-guide": "frontend/tools/raid-guide/index.html",
 }

@@ -167,7 +167,7 @@ py -3 tools/export_verdict_excel.py
 py -3 tools/reprocess_crown_json.py data/wcl_pZg3NDa6JkY1yqz7_crown_of_the_cosmos_20260715.json
 ```
 
-然后在浏览器打开 `/report?json=data/wcl_....json` 核对开庭板与智商同步。
+然后在浏览器打开 `/report?json=data/wcl_....json` 核对开庭板与终审结果。
 
 ### 深挖单场机制
 

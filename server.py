@@ -21,8 +21,9 @@ from analyzer_core.auth_store import AuthError, default_auth_store
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
-from analyzer_core import loot_store, notebook_store, recruitment_store
+from analyzer_core import loot_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
+from analyzer_core.wcl_paths import iter_wcl_json_files, list_wcl_data_files, write_data_manifest
 
 
 ROOT = Path(__file__).resolve().parent
@@ -48,8 +49,6 @@ JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)
-SCOREBOARD_DIR = ROOT / "scoreboard"
-SCOREBOARD_DIR.mkdir(exist_ok=True)
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 _DESKTOP = Path.home() / "Desktop"
@@ -290,21 +289,18 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes(document))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
-        if path == "/api/recruitment":
-            return self.send_response_body(*json_bytes(recruitment_store.load_document(user)))
-        if path in {"/api/notebook", "/api/scoreboard"}:
-            if not user["isAdmin"]:
-                return self.json_error("仅管理员可以查看智商记事本。", HTTPStatus.FORBIDDEN)
-            return self.send_response_body(*json_bytes(notebook_store.load_store()))
         if path in {"/api/data/list", "/api/data-files"}:
-            files = notebook_store.list_data_files()
+            files = list_wcl_data_files()
+            write_data_manifest()
             if path == "/api/data-files":
                 return self.send_response_body(*json_bytes({"schemaVersion": 1, "files": files}))
             return self.send_response_body(*json_bytes(files))
         if path == "/api/data/latest":
-            data = notebook_store.read_latest_data()
-            if data is None:
+            files = list(iter_wcl_json_files())
+            if not files:
                 return self.json_error("no data json", HTTPStatus.NOT_FOUND)
+            latest = max(files, key=lambda candidate: candidate.stat().st_mtime)
+            data = json.loads(latest.read_text(encoding="utf-8-sig"))
             return self.send_response_body(*json_bytes(data))
         data_file = re.fullmatch(r"/api/data/([^/]+\.json)", path)
         if data_file:
@@ -318,14 +314,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "application/json; charset=utf-8",
                 path_obj.read_bytes(),
             )
-        day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
-        if day_match:
-            if not user["isAdmin"]:
-                return self.json_error("仅管理员可以查看智商记事本。", HTTPStatus.FORBIDDEN)
-            day = notebook_store.get_day(day_match.group(1))
-            if day is None:
-                return self.json_error("day not found", HTTPStatus.NOT_FOUND)
-            return self.send_response_body(*json_bytes(day))
         if path.startswith("/api/"):
             return self.json_error("not found", HTTPStatus.NOT_FOUND)
         return self.handle_static(path)
@@ -371,8 +359,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/wcl-credentials":
             AUTH.delete_wcl_credentials(user["id"])
             return self.send_response_body(*json_bytes({"ok": True}))
-        if path == "/api/recruitment":
-            return self.send_response_body(*json_bytes(recruitment_store.delete_choice(user)))
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         allocation_match = re.fullmatch(r"/api/loot/allocations/([A-Za-z0-9_-]+)", path)
@@ -381,11 +367,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes(loot_store.delete_allocation(allocation_match.group(1))))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.NOT_FOUND)
-        day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
-        if day_match:
-            if not user["isAdmin"]:
-                return self.json_error("仅管理员可以修改智商记事本。", HTTPStatus.FORBIDDEN)
-            return self.send_response_body(*json_bytes(notebook_store.delete_day(day_match.group(1))))
         return self.json_error("not found", HTTPStatus.NOT_FOUND)
 
     def request_path(self):
@@ -579,11 +560,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
     def handle_write(self, path, user):
-        if path == "/api/recruitment":
-            try:
-                return self.send_response_body(*json_bytes(recruitment_store.save_choice(user, self.read_json_body())))
-            except (ValueError, json.JSONDecodeError) as error:
-                return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         try:
@@ -595,8 +571,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes(loot_store.save_settings(self.read_json_body())))
             if path == "/api/loot/allocations":
                 return self.send_response_body(*json_bytes(loot_store.add_allocation(self.read_json_body())))
-            if path == "/api/verdicts":
-                return self.handle_save_verdict()
             if path == "/api/export-verdict-excel":
                 return self.handle_export_verdict_excel()
             if path == "/api/raid-cooldowns/search":
@@ -608,15 +582,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 with use_wcl_credentials(credentials):
                     result = search_raid_cooldowns(self.read_json_body())
                 return self.send_response_body(*json_bytes(result))
-            if path in {"/api/notebook", "/api/scoreboard", "/api/notebook/store", "/api/scoreboard/store"}:
-                if not user["isAdmin"]:
-                    return self.json_error("仅管理员可以修改智商记事本。", HTTPStatus.FORBIDDEN)
-                return self.send_response_body(*json_bytes(notebook_store.save_store(self.read_json_body())))
-            day_match = re.fullmatch(r"/api/(?:notebook|scoreboard)/(\d{4}-\d{2}-\d{2})", path)
-            if day_match:
-                if not user["isAdmin"]:
-                    return self.json_error("仅管理员可以修改智商记事本。", HTTPStatus.FORBIDDEN)
-                return self.send_response_body(*json_bytes(notebook_store.put_day(day_match.group(1), self.read_json_body())))
             if path != "/api/analyze":
                 return self.json_error("not found", HTTPStatus.NOT_FOUND)
 
@@ -686,52 +651,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(
                 *json_bytes({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             )
-
-    def handle_save_verdict(self):
-        try:
-            payload = self.read_json_body()
-            date = str(payload.get("progressDate") or payload.get("date") or "").strip()
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
-                raise ValueError("progressDate 必须是 YYYY-MM-DD")
-            # Prefer notebook DB day upsert when payload looks like scoreboard day
-            if payload.get("players") and any(isinstance(p, dict) and p.get("mechanics") for p in payload.get("players") or []):
-                return self.send_response_body(*json_bytes(notebook_store.put_day(date, payload)))
-            slim = {
-                "schemaVersion": 2,
-                "module": "final_verdict",
-                "progressDate": date,
-                "date": date,
-                "sourceReports": payload.get("sourceReports") or [],
-                "sourceFile": payload.get("sourceFile") or "",
-                "pointsPerCount": payload.get("pointsPerCount") or 10,
-                "updatedAt": payload.get("updatedAt") or time.strftime("%Y-%m-%dT%H:%M:%S"),
-                "players": [
-                    {
-                        "name": row.get("name"),
-                        "recognitionCount": row.get("recognitionCount") or 0,
-                        "recognitionReasons": row.get("recognitionReasons") or "",
-                        "appealAcquittalCount": row.get("appealAcquittalCount") or 0,
-                        "appealAcquittalReasons": row.get("appealAcquittalReasons") or "",
-                        "iqLoss": row.get("iqLoss") or 0,
-                    }
-                    for row in (payload.get("players") or [])
-                    if row.get("name")
-                ],
-            }
-            path = VERDICT_DIR / f"verdict-{date}.json"
-            path.write_text(json.dumps(slim, ensure_ascii=False, indent=2), encoding="utf-8")
-            notebook_store.put_day(date, {
-                "date": date,
-                "sourceReports": slim["sourceReports"],
-                "pointsPerCount": slim["pointsPerCount"],
-                "tankMultiplier": 0.5,
-                "updatedAt": slim["updatedAt"],
-                "players": [],
-                "legacyVerdict": slim["players"],
-            })
-            return self.send_response_body(*json_bytes({"ok": True, "path": str(path.relative_to(ROOT)).replace("\\", "/")}))
-        except Exception as exc:
-            return self.send_response_body(*json_bytes({"error": str(exc)}, HTTPStatus.BAD_REQUEST))
 
     def handle_events(self, path, user):
         job_id = path.split("/")[3]
@@ -805,10 +724,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/account": "/frontend/auth/account.html",
             "/online": "/frontend/tools/analysis-runner/index.html",
             "/report": "/frontend/report/index.html",
-            "/scoreboard": "/frontend/tools/iq-notebook/index.html",
-            "/verdict": "/frontend/tools/iq-notebook/index.html",
             "/loot": "/frontend/tools/raid-loot/index.html",
-            "/recruitment": "/frontend/tools/recruitment/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",
@@ -816,10 +732,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/LuraJudgement.html": "/frontend/report/index.html",
         }
         path = route_map.get(path, path)
-        if path == "/frontend/tools/iq-notebook/index.html" and not public:
-            user = self.current_user()
-            if not user or not user["isAdmin"]:
-                return self.send_error(HTTPStatus.NOT_FOUND)
         allowed = (
             path in {"/index.html", "/boss_catalog.json"}
             or path.startswith("/assets/")

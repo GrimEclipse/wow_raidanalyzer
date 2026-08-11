@@ -20,12 +20,11 @@
 - `frontend/tools/raid-cooldowns/`: raid cooldown timeline search/export.
 - `frontend/tools/analysis-runner/`: UI-driven WCL analysis.
 - `frontend/tools/mythic-dungeon/`: stable Mythic+ route samples and per-Pull timelines.
-- `frontend/tools/iq-notebook/`: cross-day mistake ledger and appeal state.
 - `frontend/offline/`: offline package landing page.
 
 ## Stable public routes
 
-Use `/report`, `/online`, `/scoreboard`, `/verdict`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, and `/audit`. Physical paths may change; update all three hosts and offline packaging together.
+Use `/report`, `/online`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, `/loot`, and `/audit`. Physical paths may change; update all three hosts and offline packaging together.
 
 ## Data
 

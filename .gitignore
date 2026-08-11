@@ -22,6 +22,14 @@ tools/tmp/
 *.rar
 *.exe
 
+# Private backup projects: retained locally, never published.
+/frontend/tools/iq-notebook/
+/analyzer_core/notebook_store.py
+/frontend/tools/recruitment/
+/analyzer_core/recruitment_store.py
+/assets/specs/catalog.json
+/tests/test_recruitment_store.py
+
 # Accidental artifacts from unrelated local tasks.
 /.tools/
 /.video_work/

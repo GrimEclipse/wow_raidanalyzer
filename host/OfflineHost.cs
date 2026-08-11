@@ -4,20 +4,18 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace WowRaidAnalyzer
 {
     /// <summary>
-    /// Zero-dependency Windows host: serves static files and persists scoreboard/data JSON.
+    /// Zero-dependency Windows host: serves static files and analysis data.
     /// End users need no Python — drop analysis JSON into ./data and open the home page.
     /// </summary>
     class Program
     {
         static string Root;
         static string DataDir;
-        static string ScoreboardDir;
         static HttpListener Listener;
         const int DefaultPort = 8765;
 
@@ -25,9 +23,7 @@ namespace WowRaidAnalyzer
         {
             Root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             DataDir = Path.Combine(Root, "data");
-            ScoreboardDir = Path.Combine(Root, "scoreboard");
             Directory.CreateDirectory(DataDir);
-            Directory.CreateDirectory(ScoreboardDir);
 
             int preferredPort = DefaultPort;
             bool portExplicit = false;
@@ -79,7 +75,6 @@ namespace WowRaidAnalyzer
             Console.WriteLine("  WoW 开荒复盘 · 本地宿主");
             Console.WriteLine("  " + prefix);
             Console.WriteLine("  数据目录: " + DataDir);
-            Console.WriteLine("  计分板:   " + ScoreboardDir);
             Console.WriteLine("  关闭本窗口即停止服务");
             Console.WriteLine("========================================");
 
@@ -131,10 +126,7 @@ namespace WowRaidAnalyzer
 
                 // Friendly routes
                 if (path.Equals("/report", StringComparison.OrdinalIgnoreCase)) path = "/frontend/report/index.html";
-                else if (path.Equals("/scoreboard", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/iq-notebook/index.html";
-                else if (path.Equals("/verdict", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/iq-notebook/index.html";
                 else if (path.Equals("/loot", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-loot/index.html";
-                else if (path.Equals("/recruitment", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/recruitment/index.html";
                 else if (path.Equals("/audit", StringComparison.OrdinalIgnoreCase)) path = "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html";
                 else if (path.Equals("/cooldowns", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-cooldowns/index.html";
                 else if (path.Equals("/raid-guide", StringComparison.OrdinalIgnoreCase)) path = "/frontend/tools/raid-guide/index.html";
@@ -225,79 +217,6 @@ namespace WowRaidAnalyzer
                 }
                 if (latest == null) { WriteJson(res, 404, "{\"error\":\"no data json\"}"); return; }
                 WriteBytes(res, 200, "application/json; charset=utf-8", File.ReadAllBytes(latest.FullName));
-                return;
-            }
-
-            // GET /api/notebook|/api/scoreboard  → catalog of days (local diary store)
-            if ((path.Equals("/api/scoreboard", StringComparison.OrdinalIgnoreCase) ||
-                 path.Equals("/api/notebook", StringComparison.OrdinalIgnoreCase)) &&
-                req.HttpMethod == "GET")
-            {
-                var days = new List<string>();
-                foreach (var file in Directory.GetFiles(ScoreboardDir, "day-*.json"))
-                {
-                    string raw = File.ReadAllText(file, Encoding.UTF8);
-                    days.Add(raw);
-                }
-                // Also support store.json multi-day
-                string storePath = Path.Combine(ScoreboardDir, "store.json");
-                if (File.Exists(storePath))
-                {
-                    WriteBytes(res, 200, "application/json; charset=utf-8", File.ReadAllBytes(storePath));
-                    return;
-                }
-                WriteJson(res, 200, "{\"schemaVersion\":2,\"days\":[" + string.Join(",", days.ToArray()) + "]}");
-                return;
-            }
-
-            // GET/PUT/POST/DELETE /api/notebook|scoreboard/{date}
-            var sbMatch = Regex.Match(path, @"^/api/(?:scoreboard|notebook)/(\d{4}-\d{2}-\d{2})$", RegexOptions.IgnoreCase);
-            if (sbMatch.Success)
-            {
-                string date = sbMatch.Groups[1].Value;
-                string dayFile = Path.Combine(ScoreboardDir, "day-" + date + ".json");
-                string storePath = Path.Combine(ScoreboardDir, "store.json");
-
-                if (req.HttpMethod == "GET")
-                {
-                    if (File.Exists(dayFile))
-                    {
-                        WriteBytes(res, 200, "application/json; charset=utf-8", File.ReadAllBytes(dayFile));
-                        return;
-                    }
-                    WriteJson(res, 404, "{\"error\":\"day not found\"}");
-                    return;
-                }
-
-                if (req.HttpMethod == "PUT" || req.HttpMethod == "POST")
-                {
-                    string body = ReadBody(req);
-                    File.WriteAllText(dayFile, body, new UTF8Encoding(false));
-                    UpsertStore(storePath, date, body);
-                    WriteJson(res, 200, "{\"ok\":true,\"path\":" + JsonString("scoreboard/day-" + date + ".json") + "}");
-                    return;
-                }
-
-                if (req.HttpMethod == "DELETE")
-                {
-                    if (File.Exists(dayFile)) File.Delete(dayFile);
-                    RemoveFromStore(storePath, date);
-                    WriteJson(res, 200, "{\"ok\":true}");
-                    return;
-                }
-            }
-
-            // PUT/POST /api/notebook|/api/scoreboard|/api/*/store  full store replace
-            if ((path.Equals("/api/scoreboard", StringComparison.OrdinalIgnoreCase) ||
-                 path.Equals("/api/notebook", StringComparison.OrdinalIgnoreCase) ||
-                 path.Equals("/api/scoreboard/store", StringComparison.OrdinalIgnoreCase) ||
-                 path.Equals("/api/notebook/store", StringComparison.OrdinalIgnoreCase)) &&
-                (req.HttpMethod == "PUT" || req.HttpMethod == "POST"))
-            {
-                string body = ReadBody(req);
-                string storePath = Path.Combine(ScoreboardDir, "store.json");
-                File.WriteAllText(storePath, body, new UTF8Encoding(false));
-                WriteJson(res, 200, "{\"ok\":true,\"path\":\"scoreboard/store.json\"}");
                 return;
             }
 
@@ -412,45 +331,6 @@ namespace WowRaidAnalyzer
             try { File.Delete(tempScript); } catch { }
             if (last != null) throw last;
             return null;
-        }
-
-        static void UpsertStore(string storePath, string date, string dayJson)
-        {
-            string store;
-            if (File.Exists(storePath))
-            {
-                store = File.ReadAllText(storePath, Encoding.UTF8);
-                // naive replace/insert of day object by date field
-                var re = new Regex("\\{[^{}]*\"date\"\\s*:\\s*\"" + Regex.Escape(date) + "\"[\\s\\S]*?\\}(?=,|\\])", RegexOptions.Multiline);
-                if (re.IsMatch(store))
-                    store = re.Replace(store, dayJson, 1);
-                else
-                {
-                    int idx = store.LastIndexOf(']');
-                    if (idx > 0)
-                    {
-                        bool empty = store.Substring(0, idx).TrimEnd().EndsWith("[");
-                        store = store.Substring(0, idx) + (empty ? dayJson : "," + dayJson) + store.Substring(idx);
-                    }
-                    else
-                        store = "{\"schemaVersion\":2,\"days\":[" + dayJson + "]}";
-                }
-            }
-            else
-            {
-                store = "{\"schemaVersion\":2,\"days\":[" + dayJson + "]}";
-            }
-            File.WriteAllText(storePath, store, new UTF8Encoding(false));
-        }
-
-        static void RemoveFromStore(string storePath, string date)
-        {
-            if (!File.Exists(storePath)) return;
-            string store = File.ReadAllText(storePath, Encoding.UTF8);
-            var re = new Regex(",?\\{[^{}]*\"date\"\\s*:\\s*\"" + Regex.Escape(date) + "\"[\\s\\S]*?\\}", RegexOptions.Multiline);
-            store = re.Replace(store, "");
-            store = store.Replace("[,", "[").Replace(",]", "]");
-            File.WriteAllText(storePath, store, new UTF8Encoding(false));
         }
 
         static void ServeFile(HttpListenerResponse res, string urlPath)
