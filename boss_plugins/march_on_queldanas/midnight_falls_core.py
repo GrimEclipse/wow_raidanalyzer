@@ -148,6 +148,7 @@ def graphql(token, query, variables):
 
 
 def fetch_report_fights(token, report_id):
+    from analyzer_core.analysis_scope import filter_fights
     query = """
     query($code: String!) {
       reportData {
@@ -169,7 +170,7 @@ def fetch_report_fights(token, report_id):
         if any(keyword in name for keyword in TARGET_BOSS_KEYWORDS):
             fight["reportStartTime"] = report_start_ms
             valid.append(fight)
-    return valid
+    return filter_fights(report_id, valid)
 
 
 def fetch_master_actor_map(token, report_id):

@@ -10,9 +10,10 @@ Keep the product shell independent from Boss adjudication.
 ## Start here
 
 1. Read `references/platform-map.md`.
-2. For capability or configuration changes, also read `references/analysis-capabilities.md` and `references/configurable-analysis-architecture.md`.
-3. For adding a plugin, read `references/plugin-generation.md`.
-4. Touch only the shared layer required by the request. Put Boss-specific rules in the Boss backend and frontend plugin directories.
+2. For manual guild-report discovery, isolated single-fight analysis, cache behavior, or the shared player ability catalog, read `references/single-fight-analysis.md`.
+3. For capability or configuration changes, also read `references/analysis-capabilities.md` and `references/configurable-analysis-architecture.md`.
+4. For adding a plugin, read `references/plugin-generation.md`.
+5. Touch only the shared layer required by the request. Put Boss-specific rules in the Boss backend and frontend plugin directories.
 
 ## Architecture rules
 
@@ -22,6 +23,9 @@ Keep the product shell independent from Boss adjudication.
 - Put a specialized report under `frontend/report/plugins/<raidKey>/<bossKey>/`.
 - Use `frontend/report/generic.html` only for capability-shaped data shared across Bosses.
 - Keep raid guide, cooldown timeline, analysis runner, and IQ notebook as separate tools under `frontend/tools/`.
+- Keep `/single-fight` isolated from `/online`: the former selects exactly one Fight and may reuse a cache; the latter keeps the original full-report behavior.
+- Treat `config/player_abilities.json` as the runtime source of truth for player burst, defensive, utility, interrupt, and control evidence. Do not copy new spell-ID lists into individual tools.
+- Resolve the roster and spec first, then select catalog entries. Query WCL Casts/Buffs as bulk event streams; never issue one WCL request per configured player spell.
 - Preserve friendly routes in `server.py`, `offline_server.py`, and `host/OfflineHost.cs`.
 - Update `build_offline_package.ps1` whenever a runtime directory moves.
 

@@ -974,6 +974,7 @@ def render_fight(raw, baseline, options):
 
 
 def build_aggregated_json(report_ids, options=None):
+    from analyzer_core.analysis_scope import filter_fights
     options = {**DEFAULT_OPTIONS, **(options or {})}
     report_id_list = [value for value in (item.strip() for item in report_ids.replace(" ", "").split(",")) if value]
     if not report_id_list:
@@ -983,7 +984,10 @@ def build_aggregated_json(report_ids, options=None):
     progress("读取 1 号 Boss Pull 列表", 8)
     for report_id in report_id_list:
         report = client.report_fights(report_id)
-        fights = [row for row in report["fights"] if row.get("encounterID") == ENCOUNTER_ID and row["endTime"] - row["startTime"] >= 20_000]
+        fights = filter_fights(report_id, [
+            row for row in report["fights"]
+            if row.get("encounterID") == ENCOUNTER_ID and row["endTime"] - row["startTime"] >= 20_000
+        ])
         actor_rows = client.actors(report_id)
         actor_map = {row["id"]: row["name"] for row in actor_rows}
         actor_type = {row["id"]: row.get("type") for row in actor_rows}

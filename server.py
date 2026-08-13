@@ -220,6 +220,52 @@ def run_job(job: Job, payload: dict, credentials: WclCredentials):
             JOB_SEMAPHORE.release()
 
 
+def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
+    acquired = False
+    try:
+        from analyzer_core.single_fight import analyze_single_fight
+        from analyzer_core.progress import progress_scope
+
+        set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
+        JOB_SEMAPHORE.acquire()
+        acquired = True
+        set_job_progress(job, status="running", percent=2, message="读取单场战斗", stage="discovery", force=True)
+        output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with use_wcl_credentials(credentials):
+            callback = lambda event: translate_plugin_progress(job, event)
+            with progress_scope(callback):
+                result = analyze_single_fight(
+                    report_code=payload["reportCode"],
+                    fight_id=int(payload["fightID"]),
+                    output_path=output_path,
+                    options=payload.get("options") or {},
+                    force=bool(payload.get("force")),
+                    progress_callback=callback,
+                )
+        job.result_path = Path(result["path"])
+        job.status = "done"
+        job.percent = 100
+        job.stage = "done"
+        job.message = "已从缓存读取" if result.get("cacheHit") else "单场分析完成"
+        publish(job, {
+            "type": "done", "status": "done", "percent": 100,
+            "message": job.message, "stage": "done",
+            "resultUrl": f"/api/jobs/{job.id}/result",
+            "cacheHit": bool(result.get("cacheHit")),
+        })
+    except Exception as exc:
+        job.status = "error"
+        job.error = str(exc)
+        publish(job, {
+            "type": "error", "status": "error", "percent": job.percent,
+            "message": str(exc), "stage": "error",
+        })
+    finally:
+        if acquired:
+            JOB_SEMAPHORE.release()
+
+
 def json_bytes(data, status=HTTPStatus.OK):
     body = json.dumps(data, ensure_ascii=False).encode("utf-8")
     return status, "application/json; charset=utf-8", body
@@ -269,6 +315,39 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes({"users": AUTH.list_users()}))
         if path == "/api/catalog":
             return self.send_response_body(*json_bytes(to_frontend_catalog()))
+        if path == "/api/single-fight/config":
+            from analyzer_core.player_abilities import catalog_summary
+            from analyzer_core.single_fight import load_single_fight_config
+
+            config = load_single_fight_config()
+            return self.send_response_body(*json_bytes({
+                "schemaVersion": config["schemaVersion"],
+                "guild": config["guild"],
+                "raidNight": config["raidNight"],
+                "abilityCatalog": catalog_summary(),
+            }))
+        if path == "/api/single-fight/reports":
+            from analyzer_core.single_fight import recent_guild_reports
+
+            credentials = self.require_wcl_credentials(user)
+            if not credentials:
+                return None
+            query = parse_qs(urlparse(self.path).query)
+            selected_date = str((query.get("date") or [""])[0]).strip()
+            limit = int((query.get("limit") or ["20"])[0])
+            with use_wcl_credentials(credentials):
+                return self.send_response_body(*json_bytes(recent_guild_reports(
+                    selected_date=selected_date, limit=limit,
+                )))
+        single_report = re.fullmatch(r"/api/single-fight/reports/([A-Za-z0-9]+)", path)
+        if single_report:
+            from analyzer_core.single_fight import report_overview
+
+            credentials = self.require_wcl_credentials(user)
+            if not credentials:
+                return None
+            with use_wcl_credentials(credentials):
+                return self.send_response_body(*json_bytes(report_overview(single_report.group(1))))
         if path == "/api/raid-cooldowns/options":
             from analyzer_core.raid_cooldowns import options_document
 
@@ -582,6 +661,32 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 with use_wcl_credentials(credentials):
                     result = search_raid_cooldowns(self.read_json_body())
                 return self.send_response_body(*json_bytes(result))
+            if path == "/api/single-fight/analyze":
+                credentials = self.require_wcl_credentials(user)
+                if not credentials:
+                    return None
+                payload = self.read_json_body()
+                report_code = str(payload.get("reportCode") or "").strip()
+                fight_id = int(payload.get("fightID") or 0)
+                if not re.fullmatch(r"[A-Za-z0-9]+", report_code) or fight_id <= 0:
+                    raise ValueError("请选择有效的 report 与 Fight。")
+                payload["reportCode"] = report_code
+                payload["fightID"] = fight_id
+                job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user["id"])
+                with JOBS_LOCK:
+                    JOBS[job.id] = job
+                thread = threading.Thread(
+                    target=run_single_fight_job,
+                    args=(job, payload, credentials),
+                    daemon=True,
+                )
+                thread.start()
+                return self.send_response_body(*json_bytes({
+                    "jobId": job.id,
+                    "eventsUrl": f"/api/jobs/{job.id}/events",
+                    "statusUrl": f"/api/jobs/{job.id}/status",
+                    "resultUrl": f"/api/jobs/{job.id}/result",
+                }, HTTPStatus.ACCEPTED))
             if path != "/api/analyze":
                 return self.json_error("not found", HTTPStatus.NOT_FOUND)
 
@@ -723,6 +828,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/login": "/frontend/auth/login.html",
             "/account": "/frontend/auth/account.html",
             "/online": "/frontend/tools/analysis-runner/index.html",
+            "/single-fight": "/frontend/tools/single-fight/index.html",
             "/report": "/frontend/report/index.html",
             "/loot": "/frontend/tools/raid-loot/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",

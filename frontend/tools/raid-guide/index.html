@@ -686,10 +686,10 @@
             </header>
 
             <nav class="section-nav" aria-label="页面章节">
-                <a href="#phases">粗略时间轴</a>
-                <a href="#mechanics">技能分析</a>
-                <a href="#timeline">详细时间轴</a>
-                <a href="#evidence">开发 ID 明细</a>
+                <a href="/raid-guide#phases" data-section-target="phases">粗略时间轴</a>
+                <a href="/raid-guide#mechanics" data-section-target="mechanics">技能分析</a>
+                <a href="/raid-guide#timeline" data-section-target="timeline">详细时间轴</a>
+                <a href="/raid-guide#evidence" data-section-target="evidence">开发 ID 明细</a>
             </nav>
 
             <div id="energy"></div>
@@ -1231,6 +1231,14 @@
         state.reviewedOnly = !state.reviewedOnly;
         $("reviewedOnly").classList.toggle("active", state.reviewedOnly);
         renderSpells(byKey[state.bossKey]);
+    });
+    document.querySelectorAll("[data-section-target]").forEach(link => {
+        link.addEventListener("click", event => {
+            const target = $(link.dataset.sectionTarget);
+            if (!target) return;
+            event.preventDefault();
+            target.scrollIntoView({behavior: "smooth", block: "start"});
+        });
     });
     window.addEventListener("hashchange", () => {
         const key = (location.hash.match(/boss=([^&]+)/) || [])[1];

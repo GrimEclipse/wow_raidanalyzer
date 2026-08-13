@@ -352,6 +352,7 @@ def graphql(token, query, variables):
 
 
 def fetch_report_fights(token, report_id):
+    from analyzer_core.analysis_scope import filter_fights
     def query_fights(include_friendly_players=True):
         fields = "id name startTime endTime kill friendlyPlayers" if include_friendly_players else "id name startTime endTime kill"
         query = """
@@ -383,7 +384,7 @@ def fetch_report_fights(token, report_id):
         if any(keyword in name for keyword in PLUGIN_CONFIG["boss"]["keywords"]):
             fight["reportStartTime"] = report["startTime"]
             valid.append(fight)
-    return valid
+    return filter_fights(report_id, valid)
 
 
 def fetch_actor_maps(token, report_id):

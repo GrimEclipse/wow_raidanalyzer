@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>单场日志分析</title>
+  <style>
+    :root{color-scheme:dark;--bg:#060a12;--panel:#101827;--line:#27364a;--ink:#edf3fa;--muted:#91a0b5;--cyan:#22d3ee;--green:#34d399;--amber:#fbbf24;--red:#fb7185}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(900px 520px at 12% -10%,#123255 0,transparent 62%),radial-gradient(700px 500px at 90% 10%,#17255455 0,transparent 65%),var(--bg);color:var(--ink);font:14px/1.55 system-ui,"Microsoft YaHei",sans-serif}
+    a{color:#7dd3fc;text-decoration:none}button,input{font:inherit}.shell{max-width:1260px;margin:auto;padding:30px 22px 60px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:22px;border-bottom:1px solid var(--line)}h1{margin:5px 0 0;font-size:30px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--cyan)}.muted{color:var(--muted)}.nav{display:flex;gap:8px;flex-wrap:wrap}.button,button{border:1px solid #3b4d66;border-radius:9px;padding:9px 13px;background:#0c1422;color:var(--ink);cursor:pointer}.button:hover,button:hover{border-color:#64748b}.primary{border-color:#0891b2;background:#0e7490;font-weight:800}.primary:hover{background:#0891b2}.primary:disabled{cursor:not-allowed;opacity:.45}.danger{border-color:#9f1239}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:14px;background:#0d1522e8;overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h2{margin:0;font-size:16px}.panel-body{padding:16px 18px}.controls{display:grid;grid-template-columns:1fr auto;gap:9px}input{min-width:0;border:1px solid #33445b;border-radius:9px;background:#070d17;color:var(--ink);padding:9px 11px}.stack{display:grid;gap:9px}.report,.fight{width:100%;text-align:left;border-color:#29394f;background:#09111d;padding:12px}.report.active,.fight.active{border-color:#22d3ee;background:#082b36}.report strong,.fight strong{display:block}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--muted)}.tag{padding:2px 6px;border:1px solid #334155;border-radius:999px}.tag.ok{border-color:#047857;color:#6ee7b7}.tag.no{border-color:#713f12;color:#fcd34d}.tag.kill{border-color:#166534;color:#86efac}.empty{padding:22px;border:1px dashed #334155;border-radius:10px;color:var(--muted);text-align:center}.fight-list{display:grid;gap:9px;max-height:520px;overflow:auto}.roster{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.player{padding:3px 7px;border-radius:7px;background:#111827;border:1px solid #334155;font-size:11px}.DeathKnight{color:#c41e3a}.DemonHunter{color:#a330c9}.Druid{color:#ff7c0a}.Evoker{color:#33937f}.Hunter{color:#aad372}.Mage{color:#3fc7eb}.Monk{color:#00ff98}.Paladin{color:#f48cba}.Priest{color:#fff}.Rogue{color:#fff468}.Shaman{color:#0070dd}.Warlock{color:#8788ee}.Warrior{color:#c69b6d}.progress{height:9px;border-radius:999px;overflow:hidden;background:#1e293b}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0891b2,#22d3ee);transition:width .25s}.status{display:flex;justify-content:space-between;gap:12px;margin:10px 0;color:var(--muted)}.result{display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}.result.show{display:block}.result-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stat{padding:10px;border:1px solid #29394f;border-radius:9px;background:#080f1a}.stat span{display:block;color:var(--muted);font-size:10px}.stat strong{font-size:16px}.timeline{display:grid;gap:6px;max-height:360px;overflow:auto;margin-top:12px}.event{display:grid;grid-template-columns:65px 1fr auto;gap:10px;align-items:center;padding:8px 9px;border-left:3px solid #334155;background:#08111d}.event b{font-size:12px}.event small{color:var(--muted)}.note{margin-top:12px;padding:10px 12px;border-left:3px solid #0891b2;background:#08212b;color:#b9e6f2}.error{color:#fda4af}.split{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none!important}
+    @media(max-width:860px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  </style>
+</head>
+<body>
+<main class="shell">
+  <header class="top">
+    <div><div class="eyebrow">MANUAL SINGLE-FIGHT ANALYZER</div><h1>单场日志分析</h1><p class="muted">手动获取工会 report，定位开荒日，再选择当日最后一场 Pull。Boss 结论复用原逐场规则，相同 Fight 优先读取缓存。</p></div>
+    <nav class="nav"><a class="button" href="/">首页</a><a class="button" href="/online">整份 Report</a><a class="button" href="/account">WCL 凭据</a></nav>
+  </header>
+
+  <section class="grid">
+    <aside class="panel">
+      <div class="panel-head"><div class="split"><h2>1 · 获取开荒日</h2><span id="guildLabel" class="muted">工会…</span></div></div>
+      <div class="panel-body stack">
+        <div class="controls"><input id="dateInput" type="date"><button id="loadReports" class="primary">获取数据</button></div>
+        <div class="controls"><input id="reportInput" placeholder="或输入 WCL Report ID"><button id="openReport">读取</button></div>
+        <div id="reportMessage" class="muted">尚未请求 WCL。</div>
+        <div id="reportList" class="stack"></div>
+      </div>
+    </aside>
+
+    <section class="stack">
+      <article class="panel">
+        <div class="panel-head"><div class="split"><h2>2 · 选择本日 Pull</h2><span id="reportTitle" class="muted">未选择 report</span></div></div>
+        <div class="panel-body">
+          <div id="fightEmpty" class="empty">先从左侧选择一份 report。系统只保留时长 ≥ 20 秒且有 Encounter ID 的 Boss 战。</div>
+          <div id="fightList" class="fight-list"></div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head"><div class="split"><h2>3 · 生成当场结论</h2><button id="analyze" class="primary" disabled>分析所选 Fight</button></div></div>
+        <div class="panel-body">
+          <div class="progress"><i id="progressBar"></i></div>
+          <div class="status"><span id="statusText">等待选择</span><span id="percentText">0%</span></div>
+          <div id="analysisNote" class="note">阵容确定后才加载该职业/专精的已验证技能。事件提取使用整场 Casts 与 Buffs 批量流，不按技能逐个请求。</div>
+          <div id="result" class="result">
+            <div id="resultStats" class="result-grid"></div>
+            <div class="split" style="margin-top:12px"><strong>玩家关键技能时间轴</strong><a id="detailLink" class="button" href="#">打开 Boss 专属完整报告</a></div>
+            <div id="timeline" class="timeline"></div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </section>
+</main>
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  const state={reports:[],report:null,fight:null,resultUrl:""};
+  const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const formatDuration=ms=>{const total=Math.max(0,Math.round(Number(ms||0)/1000));return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`};
+  const formatTime=ms=>{const value=Math.max(0,Number(ms||0));return `${String(Math.floor(value/60000)).padStart(2,"0")}:${String(Math.floor(value%60000/1000)).padStart(2,"0")}`};
+  const errorMessage=async response=>{try{return (await response.json()).error||`HTTP ${response.status}`}catch(_){return `HTTP ${response.status}`}};
+
+  function today(){const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`}
+  $("dateInput").value=today();
+
+  async function loadConfig(){
+    const response=await fetch("/api/single-fight/config",{cache:"no-store"});
+    if(!response.ok)throw new Error(await errorMessage(response));
+    const data=await response.json();
+    $("guildLabel").textContent=`${data.guild.name||"工会"} · ${data.guild.id}`;
+    $("analysisNote").textContent=`公共目录 ${data.abilityCatalog.abilityCount} 项 / ${data.abilityCatalog.spellIdCount} 个已验证 ID。阵容确定后才裁剪到当前职业与专精；WCL 使用 Casts/Buffs 批量流，不按技能逐个请求。`;
+  }
+
+  async function loadReports(){
+    $("loadReports").disabled=true;$("reportMessage").textContent="正在读取工会 report…";
+    try{
+      const date=$("dateInput").value;
+      const response=await fetch(`/api/single-fight/reports?date=${encodeURIComponent(date)}&limit=20`,{cache:"no-store"});
+      if(!response.ok)throw new Error(await errorMessage(response));
+      const data=await response.json();state.reports=data.reports||[];
+      const rate=data.rateLimit||{};
+      $("reportMessage").textContent=`找到 ${state.reports.length} 份 report；WCL 本小时 ${rate.pointsSpentThisHour??"?"}/${rate.limitPerHour??"?"} 点。`;
+      renderReports();
+    }catch(error){$("reportMessage").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`}
+    finally{$("loadReports").disabled=false}
+  }
+
+  function renderReports(){
+    $("reportList").innerHTML=state.reports.length?state.reports.map(report=>`<button class="report" data-report="${escapeHtml(report.code)}">
+      <strong>${escapeHtml(report.title)}</strong><div class="meta"><span>${escapeHtml(report.code)}</span><span>${report.fightCount} 场</span><span>${report.supportedFightCount} 场可分析</span>${(report.raidNightDates||[]).map(date=>`<span class="tag">${date}</span>`).join("")}</div>
+      ${report.lastFight?`<div class="meta"><span class="tag ok">当日末场 · ${escapeHtml(report.lastFight.name)} · Fight ${report.lastFight.id}</span></div>`:""}
+    </button>`).join(""):'<div class="empty">所选开荒日没有匹配的 Boss Pull；可换日期或直接输入 report ID。</div>';
+    document.querySelectorAll("[data-report]").forEach(button=>button.addEventListener("click",()=>openReport(button.dataset.report)));
+  }
+
+  async function openReport(code){
+    code=String(code||$("reportInput").value).trim();if(!code)return;
+    $("reportTitle").textContent="正在读取阵容…";
+    try{
+      const response=await fetch(`/api/single-fight/reports/${encodeURIComponent(code)}`,{cache:"no-store"});
+      if(!response.ok)throw new Error(await errorMessage(response));
+      state.report=await response.json();state.fight=null;
+      if(!(state.report.raidNightDates||[]).includes($("dateInput").value) && state.report.raidNightDates?.length){
+        $("dateInput").value=state.report.raidNightDates[state.report.raidNightDates.length-1];
+      }
+      $("reportInput").value=code;$("reportTitle").textContent=state.report.title;
+      document.querySelectorAll("[data-report]").forEach(node=>node.classList.toggle("active",node.dataset.report===code));
+      renderFights();
+      const sameDay=(state.report.fights||[]).filter(row=>row.raidNightDate===$("dateInput").value);
+      const last=[...(sameDay.length?sameDay:state.report.fights||[])].pop();
+      if(last)selectFight(last.id);
+    }catch(error){$("reportTitle").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`}
+  }
+
+  function renderFights(){
+    const rows=(state.report?.fights||[]).filter(row=>!$("dateInput").value||row.raidNightDate===$("dateInput").value);
+    $("fightEmpty").classList.toggle("hidden",Boolean(rows.length));
+    $("fightList").innerHTML=rows.map((fight,index)=>`<button class="fight" data-fight="${fight.id}">
+      <div class="split"><strong>${escapeHtml(fight.analysisIdentity?.bossName||fight.name)} · Fight ${fight.id}</strong><span>${formatDuration(fight.durationMs)}</span></div>
+      <div class="meta"><span>${new Date(fight.absoluteStartTime).toLocaleTimeString("zh-CN",{hour12:false})}</span><span class="tag">${escapeHtml(fight.difficultyName)}</span>${fight.kill?'<span class="tag kill">击杀</span>':''}${fight.supported?'<span class="tag ok">可分析</span>':`<span class="tag no">规则未接入</span>`}${index===rows.length-1?'<span class="tag ok">本日最后一场</span>':''}</div>
+      <div class="roster">${(fight.roster||[]).map(player=>`<span class="player ${escapeHtml(player.class)}">${escapeHtml(player.name)} · ${escapeHtml(player.spec)}</span>`).join("")}</div>
+    </button>`).join("");
+    document.querySelectorAll("[data-fight]").forEach(button=>button.addEventListener("click",()=>selectFight(Number(button.dataset.fight))));
+  }
+
+  function selectFight(id){
+    state.fight=(state.report?.fights||[]).find(row=>row.id===Number(id))||null;
+    document.querySelectorAll("[data-fight]").forEach(node=>node.classList.toggle("active",Number(node.dataset.fight)===Number(id)));
+    $("analyze").disabled=!state.fight?.supported;
+    $("statusText").textContent=state.fight?.supported?`已选择 ${state.fight.analysisIdentity?.bossName||state.fight.name} · Fight ${id}`:(state.fight?.disabledReason||"该 Boss 尚未接入分析规则");
+    $("result").classList.remove("show");
+  }
+
+  function monitor(job){
+    const source=new EventSource(job.eventsUrl);
+    source.onmessage=event=>{
+      const data=JSON.parse(event.data);const percent=Number(data.percent||0);
+      $("progressBar").style.width=`${percent}%`;$("percentText").textContent=`${percent}%`;$("statusText").textContent=data.message||data.status;
+      if(data.type==="done"||data.status==="done"){source.close();loadResult(job.resultUrl)}
+      if(data.type==="error"||data.status==="error"){source.close();$("statusText").innerHTML=`<span class="error">${escapeHtml(data.message)}</span>`;$("analyze").disabled=false}
+    };
+    source.onerror=()=>{if(source.readyState===EventSource.CLOSED)$("analyze").disabled=false};
+  }
+
+  async function analyze(){
+    if(!state.fight||!state.report)return;
+    $("analyze").disabled=true;$("progressBar").style.width="1%";$("statusText").textContent="正在创建单场任务";
+    try{
+      const response=await fetch("/api/single-fight/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reportCode:state.report.code,fightID:state.fight.id})});
+      if(!response.ok)throw new Error(await errorMessage(response));monitor(await response.json());
+    }catch(error){$("statusText").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`;$("analyze").disabled=false}
+  }
+
+  async function loadResult(url){
+    const response=await fetch(url,{cache:"no-store"});if(!response.ok)throw new Error(await errorMessage(response));
+    const result=await response.json();const meta=result.meta?.singleFight||{};const player=result.data?.singleFightPlayerTimeline||{};const performance=result.meta?.performance||{};
+    state.resultUrl=url;$("detailLink").href=`/report?json=${encodeURIComponent(url)}`;
+    $("resultStats").innerHTML=[
+      ["分析耗时",`${meta.elapsedSeconds??performance.elapsedSeconds??"?"} 秒`],
+      ["Boss 规则请求",performance.logicalGraphQLRequests??"未计量"],
+      ["玩家事件请求",player.requestMetrics?.logicalGraphQLRequests??0],
+      ["缓存",meta.cacheHit?"命中":"本次新建"]
+    ].map(([label,value])=>`<div class="stat"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+    const categories={"major-burst":"大爆发","minor-burst":"中爆发","personal-defensive":"个人减伤","party-defensive":"团队减伤","external":"外部技能","utility":"功能","passive-survival":"被动保命","interrupt":"打断","control":"控制","bloodlust":"嗜血","consumable":"爆发药"};
+    $("timeline").innerHTML=(player.events||[]).length?(player.events||[]).map(row=>`<div class="event"><b>${formatTime(row.timeMs)}</b><span class="${escapeHtml(row.class)}"><strong>${escapeHtml(row.playerName)}</strong> · ${escapeHtml(row.abilityName)}<br><small>${escapeHtml(row.spec)} · Spell ${row.abilityId}</small></span><small>${escapeHtml(categories[row.category]||row.category)}</small></div>`).join(""):'<div class="empty">本场没有匹配到公共目录中的关键技能事件。</div>';
+    $("result").classList.add("show");$("analyze").disabled=false;
+  }
+
+  $("loadReports").addEventListener("click",loadReports);$("openReport").addEventListener("click",()=>openReport());$("analyze").addEventListener("click",analyze);
+  loadConfig().catch(error=>$("reportMessage").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`);
+})();
+</script>
+</body>
+</html>

@@ -29,6 +29,7 @@ class BossEntry:
     raid_english_name: str = ""
     raid_external_key: str = ""
     raid_aliases: List[str] = field(default_factory=list)
+    encounter_ids: List[int] = field(default_factory=list)
 
 
 def load_catalog_document(path: Optional[Path] = None) -> dict:
@@ -112,6 +113,7 @@ def build_catalog(document: Optional[dict] = None) -> List[BossEntry]:
                         raid_english_name=str(raid.get("englishName") or ""),
                         raid_external_key=str(raid.get("externalKey") or ""),
                         raid_aliases=list(raid.get("aliases") or []),
+                        encounter_ids=[int(value) for value in boss.get("encounterIds") or []],
                     )
                 )
     return entries
@@ -135,6 +137,11 @@ def find_boss(version: str, raid_key: str, boss_key: str) -> BossEntry:
             return entry
     available = ", ".join(f"{item.version}/{item.raid_key}/{item.boss_key}" for item in CATALOG)
     raise ValueError(f"未找到 boss 插件：{version}/{raid_key}/{boss_key}。可用项：{available}")
+
+
+def find_boss_by_encounter(encounter_id: int) -> Optional[BossEntry]:
+    target = int(encounter_id or 0)
+    return next((entry for entry in CATALOG if target in entry.encounter_ids), None)
 
 
 def to_frontend_catalog() -> dict:
@@ -176,6 +183,8 @@ def to_frontend_catalog() -> dict:
                     boss["arenaAssets"] = entry.arena_assets
                 if entry.capabilities:
                     boss["capabilities"] = entry.capabilities
+                if entry.encounter_ids:
+                    boss["encounterIds"] = entry.encounter_ids
                 raid["bosses"].append(boss)
             raids.append(raid)
         versions.append({"version": version, "raids": raids})

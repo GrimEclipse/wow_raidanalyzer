@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "guild": {
+    "id": 774422,
+    "name": "Avalon"
+  },
+  "raidNight": {
+    "timezone": "Asia/Shanghai",
+    "rolloverHour": 1
+  },
+  "recentReportLimit": 20
+}

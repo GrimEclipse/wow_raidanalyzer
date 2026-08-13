@@ -74,6 +74,7 @@
             {
               "key": "crown_of_the_cosmos",
               "name": "宇宙之冕",
+              "encounterIds": [3181],
               "plugin": "boss_plugins.void_spire.crown_of_the_cosmos",
               "supported": true,
               "disabledReason": "",
@@ -273,6 +274,7 @@
               "key": "nakzali",
               "order": 1,
               "name": "盘魂者内克扎利",
+              "encounterIds": [53470],
               "englishName": "Nek'zali the Soulcoiler",
               "externalKey": "wow.venomabyss,01.nakzali",
               "aliases": ["「缠魂者」尼札利"],

@@ -16,6 +16,7 @@ start_app.bat
 
 - `/report`：按 JSON 中的 Boss 身份选择通用报告或专用报告
 - `/online`：通过界面运行 WCL 分析
+- `/single-fight`：手动读取已配置工会的 report，按开荒日选择单场 Pull 并复用 Boss 逐场规则；相同 Fight 使用缓存
 - `/raid-guide`：12.1 团长手册
 - `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
 - `/loot`：开荒出勤、需求权与装备分配日历
@@ -31,11 +32,12 @@ py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --repo
 
 ## 目录
 
-- `analyzer_core/`：共享契约、调度、数据路径和团队技能
+- `analyzer_core/`：共享契约、调度、数据路径、单场分析和团队技能
 - `boss_plugins/`：后端 Boss 插件
 - `frontend/report/`：报告入口、通用报告和 Boss 前端插件
 - `frontend/tools/`：团长手册、团队时间轴、在线执行器与团队运营工具
 - `skills/`：项目维护规范与 Boss 研究资料
+- `config/player_abilities.json`：按职业/专精维护的 WCL 已验证爆发、减伤、功能、打断与控制技能公共目录
 - `tools/debug/`：手工调试入口
 - `host/OfflineHost.cs`：无需 Python 的离线宿主
 

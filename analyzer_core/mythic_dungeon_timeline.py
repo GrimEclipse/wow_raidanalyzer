@@ -15,6 +15,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 from analyzer_core.mythic_dungeon_configs import dungeon_config as get_dungeon_config
+from analyzer_core.player_abilities import abilities_for_roster
 
 _SKYREACH_CONFIG = get_dungeon_config("skyreach")
 SKYREACH_ENEMY_ABILITIES = _SKYREACH_CONFIG["enemyAbilities"]
@@ -609,6 +610,16 @@ def build_dungeon_document(
     }}
     friendly_ids = {int(actor_id) for actor_id in fight.get("friendlyPlayers") or []}
     players = _flatten_players(player_details, friendly_ids)
+    resolved_player_abilities = abilities_for_roster(players)
+    player_abilities_by_id = {
+        int(spell_id): ability
+        for spell_id, ability in resolved_player_abilities["byEvent"]["cast"].items()
+    }
+    # Existing exported samples used a fixed national-team table.  The shared
+    # resolver supersedes it for known classes/specs while this fallback keeps
+    # legacy/special trinket rows stable until every item is catalogued.
+    for spell_id, name in SKYREACH_PLAYER_ABILITIES.items():
+        player_abilities_by_id.setdefault(int(spell_id), {"nameZh": name})
 
     pulls = []
     source_pulls = sorted(fight.get("dungeonPulls") or [], key=lambda row: row["startTime"])
@@ -763,7 +774,7 @@ def build_dungeon_document(
         for event in friendly_casts:
             ability_id = _event_ability_id(event)
             timestamp = int(event.get("timestamp") or 0)
-            if event.get("type") != "cast" or ability_id not in SKYREACH_PLAYER_ABILITIES or not (start <= timestamp <= end):
+            if event.get("type") != "cast" or ability_id not in player_abilities_by_id or not (start <= timestamp <= end):
                 continue
             timeline.append(_timeline_event(
                 event,
@@ -771,7 +782,7 @@ def build_dungeon_document(
                 dungeon_start=dungeon_start,
                 kind="playerCast",
                 actors=actors,
-                localized_name=SKYREACH_PLAYER_ABILITIES[ability_id],
+                localized_name=player_abilities_by_id[ability_id]["nameZh"],
                 ability_names=ability_names,
             ))
 

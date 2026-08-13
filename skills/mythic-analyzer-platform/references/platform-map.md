@@ -19,12 +19,21 @@
 - `frontend/tools/raid-guide/`: raid leader handbook.
 - `frontend/tools/raid-cooldowns/`: raid cooldown timeline search/export.
 - `frontend/tools/analysis-runner/`: UI-driven WCL analysis.
+- `frontend/tools/single-fight/`: manual guild report/day/Fight selection, single-fight jobs, cache status, and roster-filtered player timeline.
 - `frontend/tools/mythic-dungeon/`: stable Mythic+ route samples and per-Pull timelines.
 - `frontend/offline/`: offline package landing page.
 
 ## Stable public routes
 
-Use `/report`, `/online`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, `/loot`, and `/audit`. Physical paths may change; update all three hosts and offline packaging together.
+Use `/report`, `/online`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, `/loot`, and `/audit` on every host. `/single-fight` is intentionally online-server-only because it requires authenticated WCL credentials and background jobs; do not advertise it in the offline package. Physical paths may change; update the applicable hosts and packaging together.
+
+## Shared player ability evidence
+
+- `config/player_abilities.json`: current WCL-verified spell IDs and categories.
+- `analyzer_core/player_abilities.py`: validates and resolves the catalog from a concrete roster/spec list.
+- `tools/verify_player_abilities.py`: read-only verification against WCL GameData.
+- `analyzer_core/analysis_scope.py`: thread-local one-Fight filter; lets single-fight jobs reuse Boss rules without changing full-report analysis.
+- `analyzer_core/single_fight.py`: guild report discovery, China raid-night grouping, cache, and bulk player Casts/Buffs extraction.
 
 ## Data
 
