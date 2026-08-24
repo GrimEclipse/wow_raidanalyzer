@@ -8,7 +8,6 @@ const CLASS_OPTIONS = [
 const DIFFICULTY_NAMES = { lfr: "随机团队", normal: "普通", heroic: "英雄", mythic: "史诗" };
 const VERDICT_NAMES = { black: "黑", red: "红", neutral: "一般般" };
 const VERDICT_LABELS = { black: "⚫ 黑（掉落拉胯）", red: "🔴 红（掉落爆炸）", neutral: "⚪ 一般般" };
-const VERDICT_ICONS = { black: "⚫", red: "🔴", neutral: "⚪" };
 const MODE_NAMES = { need: "需求", greed: "贪婪", transmog: "幻化收藏", alt: "小号提升" };
 const ARMOR_NAMES = { cloth: "布甲", leather: "皮甲", mail: "锁甲", plate: "板甲", accessory: "首饰", weapon: "武器", token: "套装兑换物", cosmetic: "幻化收藏", mount: "坐骑", pet: "宠物", toy: "玩具", furniture: "家具", other: "其他" };
 const CLASS_COLORS = {
@@ -51,7 +50,9 @@ function notify(message, error = false) {
 function roster() { return documentState?.state?.roster || []; }
 function raids() { return documentState?.catalog?.raids || []; }
 function selectedRaid() { return raids().find(row => row.key === $("#dayRaid").value) || raids()[0]; }
-function selectedBoss() { return selectedRaid()?.bosses?.find(row => row.key === $("#bossSelect").value); }
+// 掉落登记的 Boss 跨团本聚合：所有团本的 Boss 直接进同一个下拉（按团本分组），无需切换
+function allBosses() { return raids().flatMap(raid => (raid.bosses || []).map(boss => ({ ...boss, raidName: raid.name }))); }
+function selectedBoss() { return allBosses().find(row => row.key === $("#bossSelect").value); }
 function player(id) { return roster().find(row => row.id === id); }
 // 昵称是主要辨识：显示为「昵称（角色名）」，没有昵称时退回角色名
 function displayName(p) {
@@ -126,7 +127,6 @@ function renderCalendar() {
   const daysByDate = new Map((documentState?.state?.days || []).map(row => [row.date, row]));
   const allocationsByDate = new Map();
   (documentState?.state?.allocations || []).forEach(row => allocationsByDate.set(row.date, (allocationsByDate.get(row.date) || 0) + 1));
-  const blackByDate = new Map(blackmarks().map(row => [row.date, row]));
 
   $("#calendar").innerHTML = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
@@ -137,11 +137,8 @@ function renderCalendar() {
     const classes = ["calendar-day"];
     if (date.getMonth() !== month) classes.push("other");
     if (progression.has(key)) classes.push("raid");
-    const blackMark = blackByDate.get(key);
-    if (blackMark) { classes.push("black-day"); if (markVerdict(blackMark) === "red") classes.push("red-day"); }
     if (key === selectedDate && $("#dayDrawer").classList.contains("open")) classes.push("selected");
     const lines = [];
-    if (blackMark) lines.push(`<span class="day-black ${markVerdict(blackMark)}">${VERDICT_ICONS[markVerdict(blackMark)]} <strong>${escapeHtml(playerLabel(blackMark.playerId))}</strong>·${DIFFICULTY_NAMES[blackMark.difficulty]}·${VERDICT_NAMES[markVerdict(blackMark)]}</span>`);
     if (leaveCount) lines.push(`<span><strong>${leaveCount}</strong> 人请假</span>`);
     if (allocationCount) lines.push(`<span><strong>${allocationCount}</strong> 件分配</span>`);
     return `<button class="${classes.join(" ")}" data-date="${key}">
@@ -286,8 +283,13 @@ function renderClassFilter() {
 
 function renderBossOptions() {
   const current = $("#bossSelect").value;
-  const bosses = [...(selectedRaid()?.bosses || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
-  $("#bossSelect").innerHTML = bosses.map(boss => `<option value="${escapeHtml(boss.key)}">${boss.order ? `${boss.order}. ` : ""}${escapeHtml(boss.name)}</option>`).join("");
+  const bosses = allBosses();
+  // 用 optgroup 按团本分组，尼姆瑞莎·唤波者等所有 Boss 直接可见可选
+  $("#bossSelect").innerHTML = raids().filter(raid => (raid.bosses || []).length).map(raid => {
+    const group = [...raid.bosses].sort((a, b) => (a.order || 0) - (b.order || 0))
+      .map(boss => `<option value="${escapeHtml(boss.key)}">${escapeHtml(boss.name)}</option>`).join("");
+    return `<optgroup label="${escapeHtml(raid.name)}">${group}</optgroup>`;
+  }).join("");
   if ([...$("#bossSelect").options].some(option => option.value === current)) $("#bossSelect").value = current;
   renderItemOptions();
 }
@@ -496,9 +498,11 @@ function allocationPayload() {
   const isBoe = $("#isBoe").checked;
   const item = isBoe ? null : (selectedBoss()?.items || []).find(row => String(row.id) === $("#itemSelect").value);
   const requests = [...$("#requestRows").querySelectorAll(".request-row")].map(row => ({ playerId: row.dataset.player, mode: row.querySelector("select").value, note: row.querySelector("input").value.trim() })).filter(row => row.mode);
+  const boss = selectedBoss();
+  const bossRaidKey = boss ? raids().find(raid => (raid.bosses || []).some(row => row.key === boss.key))?.key : null;
   return {
     date: selectedDate,
-    raidKey: $("#dayRaid").value,
+    raidKey: bossRaidKey || $("#dayRaid").value,
     bossKey: isBoe ? "boe" : $("#bossSelect").value,
     difficulty: $("#difficultySelect").value,
     sourceType: isBoe ? "boe" : "boss",
@@ -552,14 +556,16 @@ function closeRoster() { $("#rosterBackdrop").hidden = true; }
 
 function renderRoster() {
   const classOptions = CLASS_OPTIONS.map(([key, name]) => `<option value="${key}" style="color:${CLASS_COLORS[key] || "#edf2f7"}">${name}</option>`).join("");
-  $("#rosterRows").innerHTML = roster().length ? `<div class="roster-head"><span>昵称</span><span>角色名</span><span>职业</span><span>活动</span><span></span></div>` : "";
-  $("#rosterRows").insertAdjacentHTML("beforeend", roster().length ? roster().map(player => `<div class="roster-row" data-id="${escapeHtml(player.id)}">
-    <label class="sr-only">昵称<input class="player-nickname" value="${escapeHtml(player.nickname || "")}" placeholder="请输入昵称"></label>
-    <label class="sr-only">角色名<input class="player-name" value="${escapeHtml(player.name)}" placeholder="请输入角色名"></label>
-    <label class="sr-only">职业<select class="player-class"><option value="" style="color:#edf2f7">未设置</option>${classOptions}</select></label>
+  // 紧凑表格式：表头行 + 每人一行；列含义由表头说明，单元格内只放控件
+  $("#rosterRows").innerHTML = roster().length
+    ? `<div class="roster-head"><span>昵称</span><span>角色名</span><span>职业</span><span>活动</span><span></span></div>` + roster().map(player => `<div class="roster-row" data-id="${escapeHtml(player.id)}">
+    <input class="player-nickname" value="${escapeHtml(player.nickname || "")}" placeholder="请输入昵称" aria-label="昵称">
+    <input class="player-name" value="${escapeHtml(player.name)}" placeholder="请输入角色名" aria-label="角色名">
+    <select class="player-class" aria-label="职业"><option value="" style="color:#edf2f7">未设置</option>${classOptions}</select>
     <label class="active"><input type="checkbox" ${player.active ? "checked" : ""}>活动</label>
     <button class="button danger remove-player">删除</button>
-  </div>`).join("") : `<div class="empty">还没有团队成员。</div>`);
+  </div>`).join("")
+    : `<div class="empty">还没有团队成员。</div>`;
   $("#rosterRows").querySelectorAll(".roster-row").forEach(row => {
     const player = roster().find(item => item.id === row.dataset.id);
     row.querySelector(".player-class").value = player.classKey || "";
