@@ -170,6 +170,64 @@ class LootStoreTests(unittest.TestCase):
         self.assertEqual(sum(item["lootType"] == "家具" for item in items), 12)
         self.assertIn("“受枷者的狂怒”壁画", {item["nameZh"] for item in items})
 
+    def test_roster_nickname_is_preserved_and_displayed_first(self):
+        loot_store.save_setup({
+            "roster": [
+                {"id": "papa", "name": "贪睡熊熊", "nickname": "爬爬", "classKey": "druid", "className": "德鲁伊", "armorType": "leather", "active": True},
+            ],
+            "days": [],
+        })
+        player = loot_store.load_document("2026-08-13")["state"]["roster"][0]
+        self.assertEqual(player["nickname"], "爬爬")
+        self.assertEqual(player["name"], "贪睡熊熊")
+        # 职业决定护甲：德鲁伊 = 皮甲
+        self.assertEqual(player["armorType"], "leather")
+
+    def test_blackmark_upsert_per_date_and_difficulty(self):
+        first = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "venomous_abyss", "playerId": "tank", "notes": "板甲护腕全需"})
+        self.assertTrue(first["ok"])
+        self.assertFalse(first["replaced"])
+        # 同日同难度重复登记 = 覆盖更新（换人/改备注）
+        second = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "venomous_abyss", "playerId": "mage", "notes": "改成法师黑"})
+        self.assertTrue(second["replaced"])
+        self.assertEqual(second["mark"]["playerId"], "mage")
+        # 同日不同难度各自独立：普通黑坦克、英雄黑法师
+        normal = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "normal", "raidKey": "venomous_abyss", "playerId": "tank"})
+        self.assertFalse(normal["replaced"])
+        state = loot_store.load_document("2026-08-13")["state"]
+        marks = {(row["date"], row["difficulty"]): row for row in state["blackMarks"]}
+        self.assertEqual(marks[("2026-08-13", "heroic")]["playerId"], "mage")
+        self.assertEqual(marks[("2026-08-13", "normal")]["playerId"], "tank")
+
+    def test_blackmark_requires_valid_player_difficulty_and_deletable(self):
+        with self.assertRaises(ValueError):
+            loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "playerId": "ghost"})
+        with self.assertRaises(ValueError):
+            loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "torghast", "playerId": "tank"})
+        mark = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "mythic", "raidKey": "venomous_abyss", "playerId": "tank", "notes": "史诗黑"})["mark"]
+        result = loot_store.delete_blackmark(mark["id"])
+        self.assertTrue(result["ok"])
+        state = loot_store.load_document("2026-08-13")["state"]
+        self.assertFalse(any(row["playerId"] == "tank" and row["difficulty"] == "mythic" for row in state["blackMarks"]))
+        with self.assertRaises(ValueError):
+            loot_store.delete_blackmark(mark["id"])
+
+    def test_blackmark_history_survives_and_feeds_prompt_text(self):
+        loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "venomous_abyss", "playerId": "tank", "notes": "三次需求全歪"})
+        document = loot_store.load_document("2026-09-03")
+        marks = [row for row in document["state"]["blackMarks"] if row["playerId"] == "tank"]
+        self.assertEqual(len(marks), 1)
+        mark = marks[0]
+        names = {row["id"]: row for row in document["state"]["roster"]}
+        prompt = (
+            f"该玩家于 {mark['date']} 黑本【{loot_store.DIFFICULTY_NAMES[mark['difficulty']]}】"
+            f"【烈毒之渊】，【{mark['notes']}】"
+        )
+        self.assertIn("2026-08-13", prompt)
+        self.assertIn("英雄", prompt)
+        self.assertEqual(names["tank"]["name"], "坦克")
+        self.assertIn("【烈毒之渊】", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

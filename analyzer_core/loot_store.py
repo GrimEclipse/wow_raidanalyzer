@@ -45,7 +45,14 @@ def _default_settings() -> Dict[str, Any]:
 
 
 def _empty_state() -> Dict[str, Any]:
-    return {"schemaVersion": 2, "settings": _default_settings(), "roster": [], "days": [], "allocations": []}
+    return {
+        "schemaVersion": 2,
+        "settings": _default_settings(),
+        "roster": [],
+        "days": [],
+        "allocations": [],
+        "blackMarks": [],
+    }
 
 
 def _connect() -> sqlite3.Connection:
@@ -124,6 +131,7 @@ def _normalise_roster(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
         result.append({
             "id": player_id,
             "name": name,
+            "nickname": _text(raw.get("nickname"), 40),
             "classKey": _text(raw.get("classKey"), 30).lower(),
             "className": _text(raw.get("className"), 40),
             "armorType": armor if armor in ARMOR_TYPES else "other",
@@ -221,6 +229,34 @@ def _normalise_allocations(rows: Iterable[Dict[str, Any]], player_ids: set[str])
     return sorted(result, key=lambda row: (row["date"], row["createdAt"]), reverse=True)
 
 
+def _normalise_blackmarks(rows: Iterable[Dict[str, Any]], player_ids: set[str]) -> List[Dict[str, Any]]:
+    result = []
+    seen = set()
+    for raw in rows or []:
+        try:
+            mark_date = _parse_date(raw.get("date")).isoformat()
+        except ValueError:
+            continue
+        difficulty = _text(raw.get("difficulty"), 20).lower()
+        player_id = _text(raw.get("playerId"), 80)
+        if difficulty not in DIFFICULTIES or player_id not in player_ids:
+            continue
+        key = (mark_date, difficulty)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append({
+            "id": _text(raw.get("id"), 80) or uuid.uuid4().hex[:16],
+            "date": mark_date,
+            "difficulty": difficulty,
+            "raidKey": _text(raw.get("raidKey"), 80) or "venomous_abyss",
+            "playerId": player_id,
+            "notes": _text(raw.get("notes"), 300),
+            "createdAt": _text(raw.get("createdAt"), 40) or datetime.now().astimezone().isoformat(timespec="seconds"),
+        })
+    return sorted(result, key=lambda row: (row["date"], row["createdAt"]))
+
+
 def _normalise_state(raw: Dict[str, Any]) -> Dict[str, Any]:
     roster = _normalise_roster((raw or {}).get("roster") or [])
     player_ids = {row["id"] for row in roster}
@@ -230,6 +266,7 @@ def _normalise_state(raw: Dict[str, Any]) -> Dict[str, Any]:
         "roster": roster,
         "days": _normalise_days((raw or {}).get("days") or [], player_ids),
         "allocations": _normalise_allocations((raw or {}).get("allocations") or [], player_ids),
+        "blackMarks": _normalise_blackmarks((raw or {}).get("blackMarks") or [], player_ids),
     }
 
 
@@ -437,3 +474,41 @@ def delete_allocation(allocation_id: str) -> Dict[str, Any]:
         raise ValueError("分配记录不存在。")
     _save_state(state)
     return {"ok": True, "id": allocation_id}
+
+
+def add_blackmark(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """登记/更新某开荒日某难度的「黑本」玩家。同一日期+难度仅保留一条记录（upsert）。"""
+    state = _load_state()
+    player_ids = {row["id"] for row in state["roster"]}
+    normalised = _normalise_blackmarks([payload], player_ids)
+    if not normalised:
+        raise ValueError("黑本记录缺少有效的日期、难度或玩家。")
+    mark = normalised[0]
+    if not mark["playerId"]:
+        raise ValueError("请选择黑本玩家。")
+    existing = next(
+        (row for row in state["blackMarks"] if row["date"] == mark["date"] and row["difficulty"] == mark["difficulty"]),
+        None,
+    )
+    replaced = existing is not None
+    if existing:
+        existing.update({
+            "playerId": mark["playerId"],
+            "raidKey": mark["raidKey"],
+            "notes": mark["notes"],
+        })
+        mark = existing
+    else:
+        state["blackMarks"].append(mark)
+    _save_state(state)
+    return {"ok": True, "mark": copy.deepcopy(mark), "replaced": replaced}
+
+
+def delete_blackmark(mark_id: str) -> Dict[str, Any]:
+    state = _load_state()
+    before = len(state["blackMarks"])
+    state["blackMarks"] = [row for row in state["blackMarks"] if row["id"] != mark_id]
+    if len(state["blackMarks"]) == before:
+        raise ValueError("黑本记录不存在。")
+    _save_state(state)
+    return {"ok": True, "id": mark_id}

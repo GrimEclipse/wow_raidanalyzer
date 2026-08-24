@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>开荒 Loot 记录</title>
-  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=4">
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=5">
   <script>
     const whTooltips = {
       colorLinks: false,
@@ -29,6 +29,7 @@
         <p>点击日历日期，登记请假与当日装备分配。</p>
       </div>
       <div class="page-actions">
+        <button id="blackHistoryButton" class="button secondary">黑本历史</button>
         <button id="manageRoster" class="button secondary" hidden>管理团队名单</button>
         <button id="mythicToggle" class="cadence-switch" role="switch" aria-label="切换史诗刷新周期" hidden>
           <span>单周</span><i></i><span>双周</span>
@@ -103,6 +104,19 @@
       <button id="addAllocation" class="button primary">确认分配</button>
     </section>
 
+    <section class="drawer-section blackmark-section">
+      <div class="section-heading">
+        <div><h3>黑本登记</h3><p id="blackmarkHint">记录当天出黑掉落的玩家；同一难度仅一条，可修改或删除。</p></div>
+      </div>
+      <div class="field-grid award-grid no-top">
+        <label>难度<select id="blackDifficulty"><option value="lfr">随机团队</option><option value="normal">普通</option><option value="heroic" selected>英雄</option><option value="mythic">史诗</option></select></label>
+        <label>黑本玩家<select id="blackPlayer"><option value="">未标记（当天不黑）</option></select></label>
+        <label class="span-2">备注<input id="blackNotes" placeholder="例如：需求了没人要的板甲护腕 / 三次贪分全歪"></label>
+      </div>
+      <div id="existingBlackmarks" class="existing-blackmarks"></div>
+      <button id="saveBlackmark" class="button primary">保存黑本记录</button>
+    </section>
+
     <section class="drawer-section ledger-section">
       <div class="section-heading"><div><h3>当日分配明细</h3></div><span id="allocationCount" class="badge">0 件</span></div>
       <div id="allocationList" class="allocation-list empty">当天还没有分配记录</div>
@@ -115,12 +129,24 @@
         <div><p class="kicker">ROSTER</p><h2 id="rosterTitle">团队成员</h2></div>
         <button id="closeRoster" class="close-button" aria-label="关闭">×</button>
       </div>
-      <p class="modal-copy">这份名单会自动应用到每一个开荒日。</p>
+      <p class="modal-copy">这份名单会自动应用到每一个开荒日。昵称是主要辨识，显示时优先于角色名。</p>
       <div id="rosterRows" class="roster-rows"></div>
       <div class="modal-actions"><button id="addPlayer" class="button secondary">添加成员</button><button id="saveRoster" class="button primary compact-button">保存名单</button></div>
     </section>
   </div>
 
-  <script src="/frontend/tools/raid-loot/app.js?v=7"></script>
+  <div id="blackHistoryBackdrop" class="modal-backdrop" hidden>
+    <section class="modal black-history-modal" role="dialog" aria-modal="true" aria-labelledby="blackHistoryTitle">
+      <div class="drawer-heading">
+        <div><p class="kicker">BLACK LEDGER</p><h2 id="blackHistoryTitle">黑本历史</h2></div>
+        <button id="closeBlackHistory" class="close-button" aria-label="关闭">×</button>
+      </div>
+      <p class="modal-copy">所有开荒日的黑本记录。选择玩家可只看他/她的历史。</p>
+      <select id="blackHistoryFilter"><option value="">全部玩家</option></select>
+      <div id="blackHistoryList" class="black-history-list"></div>
+    </section>
+  </div>
+
+  <script src="/frontend/tools/raid-loot/app.js?v=8"></script>
 </body>
 </html>
