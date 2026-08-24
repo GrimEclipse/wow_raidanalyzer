@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>开荒 Loot 记录</title>
-  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=7">
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=8">
   <script>
     const whTooltips = {
       colorLinks: false,
@@ -37,8 +37,6 @@
       </div>
     </section>
 
-    <div id="message" class="message" hidden></div>
-
     <section class="calendar-panel">
       <div class="calendar-heading">
         <div class="month-navigation">
@@ -52,6 +50,9 @@
       <div id="calendar" class="calendar"></div>
     </section>
   </main>
+
+  <!-- 提醒条：z-index 高于遮罩(40)/抽屉(50)/弹窗(70)，任何操作后都浮在最上层；放在 .shell 外避免被其 z-index:1 层叠上下文压住 -->
+  <div id="message" class="message" hidden></div>
 
   <div id="drawerBackdrop" class="backdrop" hidden></div>
   <aside id="dayDrawer" class="day-drawer" aria-hidden="true">
