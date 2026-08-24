@@ -446,6 +446,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes(loot_store.delete_allocation(allocation_match.group(1))))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.NOT_FOUND)
+        blackmark_match = re.fullmatch(r"/api/loot/blackmarks/([A-Za-z0-9_-]+)", path)
+        if blackmark_match:
+            try:
+                return self.send_response_body(*json_bytes(loot_store.delete_blackmark(blackmark_match.group(1))))
+            except ValueError as error:
+                return self.json_error(str(error), HTTPStatus.NOT_FOUND)
         return self.json_error("not found", HTTPStatus.NOT_FOUND)
 
     def request_path(self):
@@ -650,6 +656,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes(loot_store.save_settings(self.read_json_body())))
             if path == "/api/loot/allocations":
                 return self.send_response_body(*json_bytes(loot_store.add_allocation(self.read_json_body())))
+            if path == "/api/loot/blackmarks":
+                return self.send_response_body(*json_bytes(loot_store.add_blackmark(self.read_json_body())))
             if path == "/api/export-verdict-excel":
                 return self.handle_export_verdict_excel()
             if path == "/api/raid-cooldowns/search":

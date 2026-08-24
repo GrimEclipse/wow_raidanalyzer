@@ -45,3 +45,6 @@ tools/tmp/
 
 # Local IDE metadata.
 .idea/
+
+# Local runtime venv.
+.venv/

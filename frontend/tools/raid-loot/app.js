@@ -6,6 +6,8 @@ const CLASS_OPTIONS = [
   ["shaman", "萨满祭司", "mail"], ["warlock", "术士", "cloth"], ["warrior", "战士", "plate"]
 ];
 const DIFFICULTY_NAMES = { lfr: "随机团队", normal: "普通", heroic: "英雄", mythic: "史诗" };
+const VERDICT_NAMES = { black: "黑", red: "红" };
+const VERDICT_LABELS = { black: "⚫ 黑（掉落拉胯）", red: "🔴 红（掉落爆炸）" };
 const MODE_NAMES = { need: "需求", greed: "贪婪", transmog: "幻化收藏", alt: "小号提升" };
 const ARMOR_NAMES = { cloth: "布甲", leather: "皮甲", mail: "锁甲", plate: "板甲", accessory: "首饰", weapon: "武器", token: "套装兑换物", cosmetic: "幻化收藏", mount: "坐骑", pet: "宠物", toy: "玩具", furniture: "家具", other: "其他" };
 const CLASS_COLORS = {
@@ -50,9 +52,20 @@ function raids() { return documentState?.catalog?.raids || []; }
 function selectedRaid() { return raids().find(row => row.key === $("#dayRaid").value) || raids()[0]; }
 function selectedBoss() { return selectedRaid()?.bosses?.find(row => row.key === $("#bossSelect").value); }
 function player(id) { return roster().find(row => row.id === id); }
-function playerName(id) { return player(id)?.name || id; }
+// 昵称是主要辨识：显示为「昵称（角色名）」，没有昵称时退回角色名
+function displayName(p) {
+  if (!p) return "";
+  const nickname = String(p.nickname || "").trim();
+  return nickname ? `${nickname}（${p.name || "未命名"}）` : (p.name || "未命名");
+}
+function playerLabel(id) { const p = player(id); return p ? displayName(p) : id; }
+function playerName(id) { return playerLabel(id); }
 function playerColor(id) { return CLASS_COLORS[player(id)?.classKey] || "#edf2f7"; }
 function classStyle(id) { return `--class-color:${playerColor(id)}`; }
+function blackmarks() { return documentState?.state?.blackMarks || []; }
+function markFor(dateValue, difficulty) { return blackmarks().find(row => row.date === dateValue && row.difficulty === difficulty); }
+function markVerdict(row) { return row?.verdict === "red" ? "red" : "black"; }
+function raidName(key) { return raids().find(row => row.key === key)?.name || key; }
 function canModify() { return Boolean(documentState?.permissions?.canModify); }
 
 function refreshWowheadTooltips() {
@@ -78,6 +91,7 @@ function renderAll() {
   renderBossOptions();
   renderRequests();
   renderAllocations();
+  renderBlackmarkSection();
   renderRoster();
 }
 
@@ -111,6 +125,7 @@ function renderCalendar() {
   const daysByDate = new Map((documentState?.state?.days || []).map(row => [row.date, row]));
   const allocationsByDate = new Map();
   (documentState?.state?.allocations || []).forEach(row => allocationsByDate.set(row.date, (allocationsByDate.get(row.date) || 0) + 1));
+  const blackByDate = new Map(blackmarks().map(row => [row.date, row]));
 
   $("#calendar").innerHTML = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
@@ -121,8 +136,11 @@ function renderCalendar() {
     const classes = ["calendar-day"];
     if (date.getMonth() !== month) classes.push("other");
     if (progression.has(key)) classes.push("raid");
+    const blackMark = blackByDate.get(key);
+    if (blackMark) { classes.push("black-day"); if (markVerdict(blackMark) === "red") classes.push("red-day"); }
     if (key === selectedDate && $("#dayDrawer").classList.contains("open")) classes.push("selected");
     const lines = [];
+    if (blackMark) lines.push(`<span class="day-black ${markVerdict(blackMark)}">${markVerdict(blackMark) === "red" ? "🔴" : "⚫"} <strong>${escapeHtml(playerLabel(blackMark.playerId))}</strong>·${DIFFICULTY_NAMES[blackMark.difficulty]}·${VERDICT_NAMES[markVerdict(blackMark)]}</span>`);
     if (leaveCount) lines.push(`<span><strong>${leaveCount}</strong> 人请假</span>`);
     if (allocationCount) lines.push(`<span><strong>${allocationCount}</strong> 件分配</span>`);
     return `<button class="${classes.join(" ")}" data-date="${key}">
@@ -188,8 +206,9 @@ function renderDay() {
   $("#attendance").innerHTML = players.length ? players.map(player => {
     const status = attendance.get(player.id) || "present";
     const isLeave = ["leave", "absent"].includes(status);
+    const hasBlackMark = markFor(selectedDate, $("#blackDifficulty").value)?.playerId === player.id;
     return `<button class="attendance-card ${isLeave ? "leave" : ""}" data-player="${escapeHtml(player.id)}" data-status="${isLeave ? "leave" : "present"}">
-      <span><strong>${escapeHtml(player.name)}</strong><small class="class-colored" style="--class-color:${CLASS_COLORS[player.classKey] || "#8d9cab"}">${escapeHtml(player.className || "未设置职业")}</small></span>
+      <span><strong>${escapeHtml(displayName(player))}${hasBlackMark ? ' <i class="black-dot" title="当天黑本"></i>' : ""}</strong><small class="class-colored" style="--class-color:${CLASS_COLORS[player.classKey] || "#8d9cab"}">${escapeHtml(player.className || "未设置职业")} · ${escapeHtml(ARMOR_NAMES[player.armorType] || "护甲未知")}</small></span>
       <span class="attendance-state">${isLeave ? "请假" : "出勤"}</span>
     </button>`;
   }).join("") : `<div class="empty">团队名单为空，请先维护成员。</div>`;
@@ -237,10 +256,14 @@ async function toggleProgressionDay() {
 function renderRecipientOptions() {
   const eligibility = new Map((documentState?.eligibility || []).map(row => [row.playerId, row]));
   const current = $("#recipientSelect").value;
+  const markedToday = new Set(blackmarks().filter(row => row.date === selectedDate).map(row => row.playerId));
   $("#recipientSelect").innerHTML = roster().filter(row => row.active).map(player => {
     const entry = eligibility.get(player.id);
     const color = CLASS_COLORS[player.classKey] || "#edf2f7";
-    return `<option value="${escapeHtml(player.id)}" style="color:${color}">${entry && !entry.needEligible ? "⚠ " : ""}${escapeHtml(player.name)} · ${escapeHtml(player.className || "未设置职业")}</option>`;
+    const warnParts = [];
+    if (markedToday.has(player.id) && player.id !== current) warnParts.push("⚫已黑");
+    if (entry && !entry.needEligible) warnParts.push("⚠无需求权");
+    return `<option value="${escapeHtml(player.id)}" style="color:${color}">${warnParts.length ? `${warnParts.join("·")} ` : ""}${escapeHtml(displayName(player))} · ${escapeHtml(player.className || "未设置职业")}</option>`;
   }).join("") || `<option value="">请先维护团队成员</option>`;
   if ([...$("#recipientSelect").options].some(option => option.value === current)) $("#recipientSelect").value = current;
   applyRecipientColor();
@@ -281,7 +304,12 @@ function filteredItems() {
 function renderItemOptions() {
   const current = $("#itemSelect").value;
   const items = filteredItems();
-  $("#itemSelect").innerHTML = items.length ? items.map(item => `<option value="${item.id}">${escapeHtml(item.nameZh)} · ${escapeHtml(item.lootType)} / ${escapeHtml(item.slot)}</option>`).join("") : `<option value="">没有符合条件的掉落</option>`;
+  // 装备名带护甲类型，例如「板甲护腕」而不是单纯的「护腕」
+  $("#itemSelect").innerHTML = items.length ? items.map(item => {
+    const armorLabel = ARMOR_NAMES[item.armorType];
+    const armorText = item.lootType === "装备" && armorLabel && !["accessory", "weapon", "other"].includes(item.armorType) ? `${armorLabel}` : "";
+    return `<option value="${item.id}">${escapeHtml(item.nameZh)}${armorText ? ` · ${escapeHtml(armorText)}` : ""} · ${escapeHtml(item.lootType)} / ${escapeHtml(item.slot)}</option>`;
+  }).join("") : `<option value="">没有符合条件的掉落</option>`;
   if (items.some(item => String(item.id) === current)) $("#itemSelect").value = current;
 }
 
@@ -315,6 +343,149 @@ function toggleBoe() {
   $("#bossSelect").disabled = checked;
 }
 
+// ===== 黑本（BLACK LEDGER）=====
+function renderBlackmarkSection() {
+  const select = $("#blackPlayer");
+  const current = select.value;
+  const options = roster().filter(row => row.active).map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))} · ${escapeHtml(row.className || "未设置职业")}</option>`).join("");
+  select.innerHTML = `<option value="">未标记（当天不黑）</option>${options}`;
+  const existing = markFor(selectedDate, $("#blackDifficulty").value);
+  if (existing && [...select.options].some(option => option.value === existing.playerId)) select.value = existing.playerId;
+  else if ([...select.options].some(option => option.value === current)) select.value = current;
+  else select.value = "";
+  applySelectColor(select);
+  if (existing) {
+    $("#blackNotes").value = existing.notes || "";
+    $("#blackVerdict").value = markVerdict(existing);
+  }
+  renderExistingBlackmarks();
+}
+
+function renderExistingBlackmarks() {
+  const rows = blackmarks().filter(row => row.date === selectedDate);
+  const box = $("#existingBlackmarks");
+  box.innerHTML = rows.length ? rows.map(row => {
+    const verdict = markVerdict(row);
+    return `<div class="existing-blackmark ${verdict}">
+      <span class="class-colored" style="${classStyle(row.playerId)}">${escapeHtml(playerLabel(row.playerId))}</span>
+      <span class="bm-diff">${DIFFICULTY_NAMES[row.difficulty]}</span>
+      <span class="bm-verdict ${verdict}">${VERDICT_LABELS[verdict]}</span>
+      ${row.notes ? `<span class="bm-notes">备注：${escapeHtml(row.notes)}</span>` : ""}
+      <button class="button danger bm-edit" data-diff="${row.difficulty}">编辑</button>
+      <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除标记</button>
+    </div>`;
+  }).join("") : "";
+  box.querySelectorAll(".bm-edit").forEach(button => button.addEventListener("click", () => {
+    $("#blackDifficulty").value = button.dataset.diff;
+    renderBlackmarkSection();
+  }));
+  box.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", () => deleteBlackmark(button.dataset.id)));
+}
+
+function applySelectColor(select) {
+  select.style.color = playerColor(select.value);
+}
+
+async function saveBlackmark() {
+  if (!canModify()) return notify("当前账号没有修改权限。", true);
+  const day = currentDayRecord(false);
+  const raidKey = $("#dayRaid").value || day?.raidKey || "venomous_abyss";
+  try {
+    await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
+      date: selectedDate,
+      difficulty: $("#blackDifficulty").value,
+      raidKey,
+      playerId: $("#blackPlayer").value,
+      verdict: markVerdict({ verdict: $("#blackVerdict").value }),
+      notes: $("#blackNotes").value.trim(),
+    }) });
+    notify($("#blackPlayer").value ? `黑本记录已保存（${VERDICT_NAMES[markVerdict({ verdict: $("#blackVerdict").value })]}）。` : "该难度黑本已清空。");
+    await load();
+  } catch (error) { notify(error.message, true); }
+}
+
+async function deleteBlackmark(id) {
+  if (!canModify()) return;
+  if (!confirm("确定删除这条黑本标记吗？")) return;
+  try {
+    await api(`/api/loot/blackmarks/${encodeURIComponent(id)}`, { method: "DELETE" });
+    notify("黑本标记已删除。");
+    await load();
+  } catch (error) { notify(error.message, true); }
+}
+
+function openBlackHistory(playerId = "") {
+  const filter = $("#blackHistoryFilter");
+  const options = roster().map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))}</option>`).join("");
+  filter.innerHTML = `<option value="">全部玩家</option>${options}`;
+  filter.value = playerId || "";
+  renderBlackHistory();
+  $("#blackHistoryBackdrop").hidden = false;
+}
+
+function closeBlackHistory() { $("#blackHistoryBackdrop").hidden = true; }
+
+function filteredBlackmarks() {
+  const playerFilter = $("#blackHistoryFilter").value;
+  const difficultyFilter = $("#blackHistoryDifficulty")?.value || "";
+  const verdictFilter = $("#blackHistoryVerdict")?.value || "";
+  return blackmarks()
+    .filter(row => (!playerFilter || row.playerId === playerFilter)
+      && (!difficultyFilter || row.difficulty === difficultyFilter)
+      && (!verdictFilter || markVerdict(row) === verdictFilter));
+}
+
+function renderBlackHistory() {
+  const rows = filteredBlackmarks();
+  const list = $("#blackHistoryList");
+  list.classList.toggle("empty", !rows.length);
+  // 汇总统计：黑/红次数与最近记录
+  const statsBox = $("#blackHistoryStats");
+  const blackCount = rows.filter(row => markVerdict(row) === "black").length;
+  const redCount = rows.filter(row => markVerdict(row) === "red").length;
+  statsBox.innerHTML = `<span>共 <strong>${rows.length}</strong> 条</span><span class="stat-black">⚫ 黑 <strong>${blackCount}</strong> 次</span><span class="stat-red">🔴 红 <strong>${redCount}</strong> 次</span>`;
+  list.innerHTML = rows.length ? rows.map(row => {
+    const p = player(row.playerId);
+    const verdict = markVerdict(row);
+    return `<article class="history-card ${verdict}">
+      <div class="history-main">
+        <span class="class-colored history-player" style="${classStyle(row.playerId)}">${escapeHtml(playerLabel(row.playerId))}</span>
+        <small>${escapeHtml(p?.className || "")}${p?.armorType ? ` · ${ARMOR_NAMES[p.armorType] || ""}` : ""}</small>
+      </div>
+      <div class="history-meta">
+        <span>${escapeHtml(row.date)}</span>
+        <span>【${DIFFICULTY_NAMES[row.difficulty]}】</span>
+        <span>【${escapeHtml(raidName(row.raidKey))}】</span>
+        <span class="bm-verdict ${verdict}">${VERDICT_LABELS[verdict]}</span>
+        ${row.notes ? `<span class="bm-notes">【${escapeHtml(row.notes)}】</span>` : ""}
+      </div>
+      <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除标记</button>
+    </article>`;
+  }).join("") : "还没有任何黑本记录";
+  list.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", async () => {
+    if (!confirm("确定删除这条黑本标记吗？")) return;
+    try {
+      await api(`/api/loot/blackmarks/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+      notify("黑本标记已删除。");
+      await load();
+      renderBlackHistory();
+      const filter = $("#blackHistoryFilter");
+      [...filter.options].forEach(option => { if (!option.value || player(option.value)) option.hidden = false; });
+    } catch (error) { notify(error.message, true); }
+  }));
+}
+
+function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "") {
+  // 玄学规则：该玩家在相同难度下被判过「黑」，再想黑本时抛出提示
+  const sameDifficultyMarks = blackmarks().filter(row =>
+    row.playerId === playerId && row.date < dateValue
+    && (!difficultyValue || row.difficulty === difficultyValue)
+    && markVerdict(row) === "black");
+  if (!sameDifficultyMarks.length) return true;
+  const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${DIFFICULTY_NAMES[row.difficulty]}】【${raidName(row.raidKey)}】且判定为「黑」${row.notes ? `，备注：${row.notes}` : ""}`);
+  return confirm(`⚠ 该玩家此前在${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同"}难度下黑本时掉落判定为「黑」（掉落拉胯）：\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`);
+}
+
 function allocationPayload() {
   const isBoe = $("#isBoe").checked;
   const item = isBoe ? null : (selectedBoss()?.items || []).find(row => String(row.id) === $("#itemSelect").value);
@@ -339,6 +510,7 @@ function allocationPayload() {
 async function addAllocation() {
   if (!canModify()) return;
   const payload = allocationPayload();
+  if (!confirmContinueIfBlack(payload.recipientId, selectedDate, payload.difficulty)) return;
   try {
     await api("/api/loot/allocations", { method: "POST", body: JSON.stringify(payload) });
   } catch (error) {
@@ -375,9 +547,10 @@ function closeRoster() { $("#rosterBackdrop").hidden = true; }
 function renderRoster() {
   const classOptions = CLASS_OPTIONS.map(([key, name]) => `<option value="${key}" style="color:${CLASS_COLORS[key] || "#edf2f7"}">${name}</option>`).join("");
   $("#rosterRows").innerHTML = roster().length ? roster().map(player => `<div class="roster-row" data-id="${escapeHtml(player.id)}">
+    <label>昵称<input class="player-nickname" value="${escapeHtml(player.nickname || "")}" placeholder="主要辨识，如：爬爬"></label>
     <label>角色名<input class="player-name" value="${escapeHtml(player.name)}"></label>
     <label>职业<select class="player-class"><option value="" style="color:#edf2f7">未设置</option>${classOptions}</select></label>
-    <label>护甲<select class="player-armor">${Object.entries(ARMOR_NAMES).filter(([key]) => ["cloth", "leather", "mail", "plate"].includes(key)).map(([key, name]) => `<option value="${key}">${name}</option>`).join("")}</select></label>
+    <label>护甲类型<select class="player-armor" disabled>${Object.entries(ARMOR_NAMES).filter(([key]) => ["cloth", "leather", "mail", "plate"].includes(key)).map(([key, name]) => `<option value="${key}">${name}</option>`).join("")}</select></label>
     <label class="active"><input type="checkbox" ${player.active ? "checked" : ""}>活动</label>
     <button class="button danger remove-player">移除</button>
   </div>`).join("") : `<div class="empty">还没有团队成员。</div>`;
@@ -386,6 +559,7 @@ function renderRoster() {
     row.querySelector(".player-class").value = player.classKey || "";
     row.querySelector(".player-armor").value = player.armorType || "plate";
     row.querySelector(".player-class").style.color = CLASS_COLORS[player.classKey] || "#edf2f7";
+    // 职业决定护甲类型：选职业后自动带出对应护甲
     row.querySelector(".player-class").addEventListener("change", event => {
       const meta = CLASS_OPTIONS.find(item => item[0] === event.target.value);
       event.target.style.color = CLASS_COLORS[event.target.value] || "#edf2f7";
@@ -403,7 +577,7 @@ function captureRoster() {
   documentState.state.roster = [...$("#rosterRows").querySelectorAll(".roster-row")].map(row => {
     const classKey = row.querySelector(".player-class").value;
     const meta = CLASS_OPTIONS.find(item => item[0] === classKey);
-    return { id: row.dataset.id, name: row.querySelector(".player-name").value.trim(), classKey, className: meta?.[1] || "", armorType: row.querySelector(".player-armor").value, active: row.querySelector(".active input").checked, notes: "" };
+    return { id: row.dataset.id, name: row.querySelector(".player-name").value.trim(), nickname: row.querySelector(".player-nickname").value.trim(), classKey, className: meta?.[1] || "", armorType: row.querySelector(".player-armor").value, active: row.querySelector(".active input").checked, notes: "" };
   }).filter(row => row.name);
 }
 
@@ -505,6 +679,15 @@ $("#closeRoster").addEventListener("click", closeRoster);
 $("#rosterBackdrop").addEventListener("click", event => { if (event.target === $("#rosterBackdrop")) closeRoster(); });
 $("#saveRoster").addEventListener("click", saveRoster);
 $("#mythicToggle").addEventListener("click", toggleMythicSchedule);
+$("#blackHistoryButton").addEventListener("click", () => openBlackHistory());
+$("#closeBlackHistory").addEventListener("click", closeBlackHistory);
+$("#blackHistoryBackdrop").addEventListener("click", event => { if (event.target === $("#blackHistoryBackdrop")) closeBlackHistory(); });
+$("#blackHistoryFilter").addEventListener("change", renderBlackHistory);
+$("#blackHistoryDifficulty")?.addEventListener("change", renderBlackHistory);
+$("#blackHistoryVerdict")?.addEventListener("change", renderBlackHistory);
+$("#blackDifficulty").addEventListener("change", () => { renderBlackmarkSection(); renderDay(); });
+$("#blackPlayer").addEventListener("change", () => applySelectColor($("#blackPlayer")));
+$("#saveBlackmark").addEventListener("click", saveBlackmark);
 $("#addPlayer").addEventListener("click", () => {
   captureRoster();
   documentState.state.roster.push({ id: `p-${Date.now().toString(36)}`, name: "", classKey: "", className: "", armorType: "plate", active: true, notes: "" });
