@@ -6,8 +6,9 @@ const CLASS_OPTIONS = [
   ["shaman", "萨满祭司", "mail"], ["warlock", "术士", "cloth"], ["warrior", "战士", "plate"]
 ];
 const DIFFICULTY_NAMES = { lfr: "随机团队", normal: "普通", heroic: "英雄", mythic: "史诗" };
-const VERDICT_NAMES = { black: "黑", red: "红" };
-const VERDICT_LABELS = { black: "⚫ 黑（掉落拉胯）", red: "🔴 红（掉落爆炸）" };
+const VERDICT_NAMES = { black: "黑", red: "红", neutral: "一般般" };
+const VERDICT_LABELS = { black: "⚫ 黑（掉落拉胯）", red: "🔴 红（掉落爆炸）", neutral: "⚪ 一般般" };
+const VERDICT_ICONS = { black: "⚫", red: "🔴", neutral: "⚪" };
 const MODE_NAMES = { need: "需求", greed: "贪婪", transmog: "幻化收藏", alt: "小号提升" };
 const ARMOR_NAMES = { cloth: "布甲", leather: "皮甲", mail: "锁甲", plate: "板甲", accessory: "首饰", weapon: "武器", token: "套装兑换物", cosmetic: "幻化收藏", mount: "坐骑", pet: "宠物", toy: "玩具", furniture: "家具", other: "其他" };
 const CLASS_COLORS = {
@@ -64,7 +65,7 @@ function playerColor(id) { return CLASS_COLORS[player(id)?.classKey] || "#edf2f7
 function classStyle(id) { return `--class-color:${playerColor(id)}`; }
 function blackmarks() { return documentState?.state?.blackMarks || []; }
 function markFor(dateValue, difficulty) { return blackmarks().find(row => row.date === dateValue && row.difficulty === difficulty); }
-function markVerdict(row) { return row?.verdict === "red" ? "red" : "black"; }
+function markVerdict(row) { return ["red", "neutral"].includes(row?.verdict) ? row.verdict : "black"; }
 function raidName(key) { return raids().find(row => row.key === key)?.name || key; }
 function canModify() { return Boolean(documentState?.permissions?.canModify); }
 
@@ -140,7 +141,7 @@ function renderCalendar() {
     if (blackMark) { classes.push("black-day"); if (markVerdict(blackMark) === "red") classes.push("red-day"); }
     if (key === selectedDate && $("#dayDrawer").classList.contains("open")) classes.push("selected");
     const lines = [];
-    if (blackMark) lines.push(`<span class="day-black ${markVerdict(blackMark)}">${markVerdict(blackMark) === "red" ? "🔴" : "⚫"} <strong>${escapeHtml(playerLabel(blackMark.playerId))}</strong>·${DIFFICULTY_NAMES[blackMark.difficulty]}·${VERDICT_NAMES[markVerdict(blackMark)]}</span>`);
+    if (blackMark) lines.push(`<span class="day-black ${markVerdict(blackMark)}">${VERDICT_ICONS[markVerdict(blackMark)]} <strong>${escapeHtml(playerLabel(blackMark.playerId))}</strong>·${DIFFICULTY_NAMES[blackMark.difficulty]}·${VERDICT_NAMES[markVerdict(blackMark)]}</span>`);
     if (leaveCount) lines.push(`<span><strong>${leaveCount}</strong> 人请假</span>`);
     if (allocationCount) lines.push(`<span><strong>${allocationCount}</strong> 件分配</span>`);
     return `<button class="${classes.join(" ")}" data-date="${key}">
@@ -175,8 +176,9 @@ function closeDay() {
 function currentDayRecord(create = true) {
   let day = documentState.state.days.find(row => row.date === selectedDate);
   if (!day && create) {
-    const defaultRaid = raids().find(row => row.key === "venomous_abyss") || raids()[0];
-    day = { date: selectedDate, raidKey: defaultRaid?.key || "venomous_abyss", notes: "", attendance: [], progressionOverride: null };
+    // 默认团本取掉落目录第一个（当前 CD 的团本），不再写死
+    const defaultRaid = raids()[0];
+    day = { date: selectedDate, raidKey: defaultRaid?.key || "", notes: "", attendance: [], progressionOverride: null };
     documentState.state.days.push(day);
   }
   return day;
@@ -184,7 +186,7 @@ function currentDayRecord(create = true) {
 
 function renderRaidOptions() {
   const currentDay = currentDayRecord(false);
-  const desired = currentDay?.raidKey || $("#dayRaid").value || (raids().find(row => row.key === "venomous_abyss") || raids()[0])?.key || "";
+  const desired = currentDay?.raidKey || $("#dayRaid").value || raids()[0]?.key || "";
   $("#dayRaid").innerHTML = raids().map(raid => `<option value="${escapeHtml(raid.key)}">${escapeHtml(raid.name)}</option>`).join("");
   $("#dayRaid").value = desired;
 }
@@ -207,8 +209,11 @@ function renderDay() {
     const status = attendance.get(player.id) || "present";
     const isLeave = ["leave", "absent"].includes(status);
     const hasBlackMark = markFor(selectedDate, $("#blackDifficulty").value)?.playerId === player.id;
+    // 出勤卡只展示昵称，无昵称退回角色名；名字带职业色
+    const nick = String(player.nickname || "").trim();
+    const cardName = nick || player.name || "未命名";
     return `<button class="attendance-card ${isLeave ? "leave" : ""}" data-player="${escapeHtml(player.id)}" data-status="${isLeave ? "leave" : "present"}">
-      <span><strong>${escapeHtml(displayName(player))}${hasBlackMark ? ' <i class="black-dot" title="当天黑本"></i>' : ""}</strong><small class="class-colored" style="--class-color:${CLASS_COLORS[player.classKey] || "#8d9cab"}">${escapeHtml(player.className || "未设置职业")} · ${escapeHtml(ARMOR_NAMES[player.armorType] || "护甲未知")}</small></span>
+      <span class="attendance-name"><strong class="class-colored" style="--class-color:${CLASS_COLORS[player.classKey] || "#edf2f7"}">${escapeHtml(cardName)}${hasBlackMark ? ' <i class="black-dot" title="当天黑本"></i>' : ""}</strong></span>
       <span class="attendance-state">${isLeave ? "请假" : "出勤"}</span>
     </button>`;
   }).join("") : `<div class="empty">团队名单为空，请先维护成员。</div>`;
@@ -389,7 +394,7 @@ function applySelectColor(select) {
 async function saveBlackmark() {
   if (!canModify()) return notify("当前账号没有修改权限。", true);
   const day = currentDayRecord(false);
-  const raidKey = $("#dayRaid").value || day?.raidKey || "venomous_abyss";
+  const raidKey = $("#dayRaid").value || day?.raidKey || raids()[0]?.key || "";
   try {
     await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
       date: selectedDate,
@@ -439,11 +444,12 @@ function renderBlackHistory() {
   const rows = filteredBlackmarks();
   const list = $("#blackHistoryList");
   list.classList.toggle("empty", !rows.length);
-  // 汇总统计：黑/红次数与最近记录
+  // 汇总统计：各判定次数
   const statsBox = $("#blackHistoryStats");
   const blackCount = rows.filter(row => markVerdict(row) === "black").length;
   const redCount = rows.filter(row => markVerdict(row) === "red").length;
-  statsBox.innerHTML = `<span>共 <strong>${rows.length}</strong> 条</span><span class="stat-black">⚫ 黑 <strong>${blackCount}</strong> 次</span><span class="stat-red">🔴 红 <strong>${redCount}</strong> 次</span>`;
+  const neutralCount = rows.filter(row => markVerdict(row) === "neutral").length;
+  statsBox.innerHTML = `<span>共 <strong>${rows.length}</strong> 条</span><span class="stat-black">⚫ 黑 <strong>${blackCount}</strong> 次</span><span class="stat-red">🔴 红 <strong>${redCount}</strong> 次</span><span class="stat-neutral">⚪ 一般般 <strong>${neutralCount}</strong> 次</span>`;
   list.innerHTML = rows.length ? rows.map(row => {
     const p = player(row.playerId);
     const verdict = markVerdict(row);
@@ -546,24 +552,22 @@ function closeRoster() { $("#rosterBackdrop").hidden = true; }
 
 function renderRoster() {
   const classOptions = CLASS_OPTIONS.map(([key, name]) => `<option value="${key}" style="color:${CLASS_COLORS[key] || "#edf2f7"}">${name}</option>`).join("");
-  $("#rosterRows").innerHTML = roster().length ? roster().map(player => `<div class="roster-row" data-id="${escapeHtml(player.id)}">
-    <label>昵称<input class="player-nickname" value="${escapeHtml(player.nickname || "")}" placeholder="主要辨识，如：爬爬"></label>
-    <label>角色名<input class="player-name" value="${escapeHtml(player.name)}"></label>
-    <label>职业<select class="player-class"><option value="" style="color:#edf2f7">未设置</option>${classOptions}</select></label>
-    <label>护甲类型<select class="player-armor" disabled>${Object.entries(ARMOR_NAMES).filter(([key]) => ["cloth", "leather", "mail", "plate"].includes(key)).map(([key, name]) => `<option value="${key}">${name}</option>`).join("")}</select></label>
+  $("#rosterRows").innerHTML = roster().length ? `<div class="roster-head"><span>昵称</span><span>角色名</span><span>职业</span><span>活动</span><span></span></div>` : "";
+  $("#rosterRows").insertAdjacentHTML("beforeend", roster().length ? roster().map(player => `<div class="roster-row" data-id="${escapeHtml(player.id)}">
+    <label class="sr-only">昵称<input class="player-nickname" value="${escapeHtml(player.nickname || "")}" placeholder="请输入昵称"></label>
+    <label class="sr-only">角色名<input class="player-name" value="${escapeHtml(player.name)}" placeholder="请输入角色名"></label>
+    <label class="sr-only">职业<select class="player-class"><option value="" style="color:#edf2f7">未设置</option>${classOptions}</select></label>
     <label class="active"><input type="checkbox" ${player.active ? "checked" : ""}>活动</label>
-    <button class="button danger remove-player">移除</button>
-  </div>`).join("") : `<div class="empty">还没有团队成员。</div>`;
+    <button class="button danger remove-player">删除</button>
+  </div>`).join("") : `<div class="empty">还没有团队成员。</div>`);
   $("#rosterRows").querySelectorAll(".roster-row").forEach(row => {
     const player = roster().find(item => item.id === row.dataset.id);
     row.querySelector(".player-class").value = player.classKey || "";
-    row.querySelector(".player-armor").value = player.armorType || "plate";
+    // 护甲类型由职业自动推导，不再单独维护
     row.querySelector(".player-class").style.color = CLASS_COLORS[player.classKey] || "#edf2f7";
     // 职业决定护甲类型：选职业后自动带出对应护甲
     row.querySelector(".player-class").addEventListener("change", event => {
-      const meta = CLASS_OPTIONS.find(item => item[0] === event.target.value);
       event.target.style.color = CLASS_COLORS[event.target.value] || "#edf2f7";
-      if (meta) row.querySelector(".player-armor").value = meta[2];
     });
     row.querySelector(".remove-player").addEventListener("click", () => {
       captureRoster();
@@ -577,7 +581,8 @@ function captureRoster() {
   documentState.state.roster = [...$("#rosterRows").querySelectorAll(".roster-row")].map(row => {
     const classKey = row.querySelector(".player-class").value;
     const meta = CLASS_OPTIONS.find(item => item[0] === classKey);
-    return { id: row.dataset.id, name: row.querySelector(".player-name").value.trim(), nickname: row.querySelector(".player-nickname").value.trim(), classKey, className: meta?.[1] || "", armorType: row.querySelector(".player-armor").value, active: row.querySelector(".active input").checked, notes: "" };
+    // 护甲类型始终由职业表推导，保持旧数据字段兼容
+    return { id: row.dataset.id, name: row.querySelector(".player-name").value.trim(), nickname: row.querySelector(".player-nickname").value.trim(), classKey, className: meta?.[1] || "", armorType: meta?.[2] || player(row.dataset.id)?.armorType || "plate", active: row.querySelector(".active input").checked, notes: "" };
   }).filter(row => row.name);
 }
 

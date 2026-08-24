@@ -16,8 +16,8 @@ DB_PATH = ROOT / "scoreboard" / "loot.db"
 CATALOG_PATH = ROOT / "assets" / "loot" / "raid_loot_12_1.json"
 DIFFICULTIES = {"lfr", "normal", "heroic", "mythic"}
 DIFFICULTY_NAMES = {"lfr": "随机团队", "normal": "普通", "heroic": "英雄", "mythic": "史诗"}
-VERDICTS = {"black", "red"}
-VERDICT_NAMES = {"black": "黑", "red": "红"}
+VERDICTS = {"black", "red", "neutral"}
+VERDICT_NAMES = {"black": "黑", "red": "红", "neutral": "一般般"}
 ATTENDANCE_STATUSES = {"present", "late", "leave", "absent"}
 AWARD_TYPES = {"need", "greed", "transmog", "alt"}
 ARMOR_TYPES = {
@@ -247,7 +247,7 @@ def _normalise_blackmarks(rows: Iterable[Dict[str, Any]], player_ids: set[str]) 
         if key in seen:
             continue
         seen.add(key)
-        # 判定：black=因他掉落拉胯 / red=掉落爆炸；旧数据缺判定时默认 black
+        # 判定：black=因他掉落拉胯 / red=掉落爆炸 / neutral=一般般；旧数据缺判定时默认 black
         verdict = _text(raw.get("verdict"), 10).lower() or "black"
         if verdict not in VERDICTS:
             verdict = "black"

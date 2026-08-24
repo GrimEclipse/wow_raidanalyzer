@@ -89,11 +89,10 @@ label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
 input, select { width: 100%; min-height: 40px; border: 1px solid #303b46; border-radius: 8px; background: #080d12; color: var(--text); padding: 8px 10px; outline: none; }
 input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(231,183,92,.09); }
 .attendance-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px; }
-.attendance-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 54px; border: 1px solid #29343e; border-radius: 10px; background: #0b1117; color: var(--text); padding: 9px 11px; text-align: left; }
+.attendance-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; border: 1px solid #29343e; border-radius: 10px; background: #0b1117; color: var(--text); padding: 8px 11px; text-align: left; }
 .attendance-card:hover { border-color: #52606d; }
 .attendance-card.leave { border-color: #69423d; background: #251715; }
-.attendance-card strong { display: block; }
-.attendance-card small { display: block; color: var(--muted); }
+.attendance-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .class-colored { color: var(--class-color, var(--text)); }
 .attendance-state { flex: none; border-radius: 99px; padding: 3px 7px; color: #8ee0b5; background: #112d21; font-size: 11px; }
 .attendance-card.leave .attendance-state { color: #ffaaa4; background: #43211f; }
@@ -126,10 +125,17 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .modal-backdrop { display: grid; place-items: center; z-index: 70; padding: 18px; }
 .modal { width: min(900px, 96vw); max-height: 88vh; overflow: auto; border: 1px solid #35424e; border-radius: 16px; background: #0d1319; box-shadow: 0 28px 80px rgba(0,0,0,.55); padding: 22px; }
 .modal-copy { margin: -6px 0 16px; color: var(--muted); }
-.roster-rows { display: grid; gap: 8px; }
-.roster-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr auto auto; gap: 8px; align-items: end; border-bottom: 1px solid #202933; padding-bottom: 8px; }
-.roster-row .active { display: flex; align-items: center; gap: 5px; height: 40px; }
-.roster-row .active input { width: auto; min-height: auto; }
+.roster-rows { display: grid; gap: 6px; }
+/* 名单管理改为紧凑表格式：表头 + 单行成员，行高大幅压缩 */
+.roster-head, .roster-row { display: grid; grid-template-columns: 1.1fr 1.1fr 0.9fr auto auto; gap: 8px; align-items: center; }
+.roster-head { color: var(--muted); font-size: 11.5px; padding: 0 2px 4px; border-bottom: 1px solid #2a3540; }
+.roster-head :nth-child(4) { text-align: center; }
+.roster-row { padding: 3px 2px; border-bottom: 1px solid #1b242d; }
+.roster-row label.sr-only { display: block; gap: 0; font-size: 0; color: transparent; }
+.roster-row input, .roster-row select { min-height: 34px; padding: 6px 9px; }
+.roster-row .active { display: flex; align-items: center; justify-content: center; gap: 5px; height: auto; font-size: 12px; color: var(--muted); }
+.roster-row .active input { width: auto; min-height: auto; margin: 0; }
+.roster-row .button.danger { min-height: 34px; padding: 5px 10px; }
 .player-class option { background: #080d12; }
 .modal-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; }
 .compact-button { width: auto !important; margin-top: 0 !important; }
@@ -144,6 +150,8 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .bm-verdict { border-radius: 99px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; }
 .bm-verdict.black { background: #241a1f; color: #cbb6bd; box-shadow: inset 0 0 0 1px #4b3038; }
 .bm-verdict.red { background: rgba(255,86,86,.14); color: #ff9d8a; box-shadow: inset 0 0 0 1px rgba(255,120,100,.45); }
+.bm-verdict.neutral { background: #1e242b; color: #b9c2cb; box-shadow: inset 0 0 0 1px #3a4652; }
+.day-black.neutral strong, .day-black.neutral { color: #c3ccd5; }
 .bm-notes { color: #bda6b1; font-size: 12px; flex: 1 1 160px; min-width: 140px; }
 .existing-blackmark .button.danger { margin-left: auto; }
 .black-dot { display: inline-block; width: 9px; height: 9px; margin-left: 6px; border-radius: 50%; vertical-align: 1px; background: radial-gradient(circle at 35% 30%, #4a3f42, #000 70%); box-shadow: 0 0 0 2px rgba(255,118,111,.5); }
@@ -159,6 +167,7 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .black-history-stats strong { color: #edf2f7; }
 .black-history-stats .stat-black strong { color: #cbb6bd; }
 .black-history-stats .stat-red strong { color: #ff9d8a; }
+.black-history-stats .stat-neutral strong { color: #b9c2cb; }
 .black-history-list { display: grid; gap: 9px; max-height: 58vh; overflow-y: auto; }
 .black-history-list.empty { color: var(--muted); text-align: center; padding: 22px 0; }
 .history-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; border: 1px solid #402e36; border-radius: 10px; background: linear-gradient(145deg, #170f14, #110b10); padding: 12px 14px; }
@@ -169,10 +178,6 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .history-meta .bm-notes { flex: 0 1 auto; min-width: 0; }
 .history-card .button.danger { margin-left: auto; }
 .player-armor:disabled { opacity: .8; }
-
-@media (max-width: 900px) {
-  .roster-row { grid-template-columns: 1.2fr 1.2fr 1fr 1fr auto auto; }
-}
 
 @media (max-width: 900px) {
   .calendar-day { min-height: 68px; }
@@ -198,8 +203,7 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
   .day-drawer { width: 100vw; padding: 16px 12px; }
   .field-grid, .filters { grid-template-columns: 1fr; }
   .filters > :first-child, .span-2 { grid-column: span 1; }
-  .roster-row { grid-template-columns: 1fr 1fr; }
-  .roster-row > :first-child { grid-column: span 2; }
+  .roster-row { grid-template-columns: 1fr 1fr auto auto; }
   .request-row { grid-template-columns: 1fr 1fr; }
   .request-row input { grid-column: span 2; }
 }

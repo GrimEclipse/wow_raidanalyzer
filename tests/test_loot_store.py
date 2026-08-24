@@ -223,6 +223,9 @@ class LootStoreTests(unittest.TestCase):
         self.assertEqual(invalid["verdict"], "black")
         red = loot_store.add_blackmark({"date": "2026-08-17", "difficulty": "heroic", "playerId": "tank", "verdict": "RED"})["mark"]
         self.assertEqual(red["verdict"], "red")
+        # 第三种判定：一般般（不掉不炸）
+        neutral = loot_store.add_blackmark({"date": "2026-08-18", "difficulty": "heroic", "playerId": "tank", "verdict": "neutral"})["mark"]
+        self.assertEqual(neutral["verdict"], "neutral")
 
     def test_blackmark_history_survives_and_feeds_prompt_text(self):
         loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "venomous_abyss", "playerId": "tank", "notes": "三次需求全歪"})

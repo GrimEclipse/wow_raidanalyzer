@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>开荒 Loot 记录</title>
-  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=5">
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=6">
   <script>
     const whTooltips = {
       colorLinks: false,
@@ -106,13 +106,13 @@
 
     <section class="drawer-section blackmark-section">
       <div class="section-heading">
-        <div><h3>黑本登记</h3><p id="blackmarkHint">记录当天第一个进本的人（每天必记），并判定当天掉落：黑=因他掉落拉胯，红=掉落爆炸。同一难度仅一条，可修改或删除。</p></div>
+        <div><h3>黑本登记</h3><p id="blackmarkHint">记录当天第一个进本的人（每天必记），并判定当天掉落：黑=因他掉落拉胯，红=掉落爆炸，一般般=不掉不炸。同一难度仅一条，可修改或删除。</p></div>
       </div>
       <div class="field-grid award-grid no-top">
         <label>难度<select id="blackDifficulty"><option value="lfr">随机团队</option><option value="normal">普通</option><option value="heroic" selected>英雄</option><option value="mythic">史诗</option></select></label>
         <label>黑本玩家（首个进本）<select id="blackPlayer"><option value="">未标记（当天不黑）</option></select></label>
-        <label>掉落判定<select id="blackVerdict"><option value="black">⚫ 黑（掉落拉胯）</option><option value="red">🔴 红（掉落爆炸）</option></select></label>
-        <label class="span-2">备注<input id="blackNotes" placeholder="例如：三开盗贼匕首但团里只有他一个盗贼 / 出了双橙"></label>
+        <label>掉落判定<select id="blackVerdict"><option value="black">⚫ 黑（掉落拉胯）</option><option value="red">🔴 红（掉落爆炸）</option><option value="neutral">⚪ 一般般</option></select></label>
+        <label class="span-2">备注<input id="blackNotes" placeholder="例如：三开敏捷匕首，把出坦克饰品"></label>
       </div>
       <div id="existingBlackmarks" class="existing-blackmarks"></div>
       <button id="saveBlackmark" class="button primary">保存黑本记录</button>
@@ -146,13 +146,13 @@
       <div class="history-filters">
         <select id="blackHistoryFilter"><option value="">全部玩家</option></select>
         <select id="blackHistoryDifficulty"><option value="">全部难度</option><option value="lfr">随机团队</option><option value="normal">普通</option><option value="heroic">英雄</option><option value="mythic">史诗</option></select>
-        <select id="blackHistoryVerdict"><option value="">全部判定</option><option value="black">⚫ 黑（掉落拉胯）</option><option value="red">🔴 红（掉落爆炸）</option></select>
+        <select id="blackHistoryVerdict"><option value="">全部判定</option><option value="black">⚫ 黑（掉落拉胯）</option><option value="red">🔴 红（掉落爆炸）</option><option value="neutral">⚪ 一般般</option></select>
       </div>
       <div id="blackHistoryStats" class="black-history-stats"></div>
       <div id="blackHistoryList" class="black-history-list"></div>
     </section>
   </div>
 
-  <script src="/frontend/tools/raid-loot/app.js?v=9"></script>
+  <script src="/frontend/tools/raid-loot/app.js?v=10"></script>
 </body>
 </html>
