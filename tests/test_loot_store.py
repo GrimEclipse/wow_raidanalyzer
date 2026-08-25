@@ -183,24 +183,28 @@ class LootStoreTests(unittest.TestCase):
         # 职业决定护甲：德鲁伊 = 皮甲
         self.assertEqual(player["armorType"], "leather")
 
-    def test_blackmark_upsert_per_date_and_difficulty(self):
+    def test_blackmark_upsert_per_date_raid_and_difficulty(self):
         first = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "venomous_abyss", "playerId": "tank", "verdict": "black", "notes": "板甲护腕全需"})
         self.assertTrue(first["ok"])
         self.assertFalse(first["replaced"])
-        # 同日同难度重复登记 = 覆盖更新（换人/改判定/改备注）
+        # 同日同副本同难度重复登记 = 覆盖更新（换人/改判定/改备注）
         second = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "venomous_abyss", "playerId": "mage", "verdict": "red", "notes": "改成法师黑，且当天掉落爆炸"})
         self.assertTrue(second["replaced"])
         self.assertEqual(second["mark"]["playerId"], "mage")
         self.assertEqual(second["mark"]["verdict"], "red")
-        # 同日不同难度各自独立：普通黑坦克、英雄黑法师
-        normal = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "normal", "raidKey": "venomous_abyss", "playerId": "tank"})
-        self.assertFalse(normal["replaced"])
+        # 同日不同副本同难度 = 两条独立记录（同一天可以黑多个副本）
+        other_raid = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "heroic", "raidKey": "tidebound_grotto", "playerId": "tank", "verdict": "neutral"})
+        self.assertFalse(other_raid["replaced"])
         state = loot_store.load_document("2026-08-13")["state"]
-        marks = {(row["date"], row["difficulty"]): row for row in state["blackMarks"]}
-        self.assertEqual(marks[("2026-08-13", "heroic")]["playerId"], "mage")
-        self.assertEqual(marks[("2026-08-13", "heroic")]["verdict"], "red")
-        self.assertEqual(marks[("2026-08-13", "normal")]["playerId"], "tank")
-        self.assertEqual(marks[("2026-08-13", "normal")]["verdict"], "black")
+        marks = {(row["date"], row["raidKey"], row["difficulty"]): row for row in state["blackMarks"]}
+        self.assertEqual(marks[("2026-08-13", "venomous_abyss", "heroic")]["playerId"], "mage")
+        self.assertEqual(marks[("2026-08-13", "venomous_abyss", "heroic")]["verdict"], "red")
+        self.assertEqual(marks[("2026-08-13", "tidebound_grotto", "heroic")]["playerId"], "tank")
+        self.assertEqual(marks[("2026-08-13", "tidebound_grotto", "heroic")]["verdict"], "neutral")
+        self.assertEqual(len(state["blackMarks"]), 2)
+        # 非法副本 key 回退到目录第一个副本（当前 CD 团本）
+        fallback = loot_store.add_blackmark({"date": "2026-08-13", "difficulty": "normal", "raidKey": "not_a_raid", "playerId": "tank"})["mark"]
+        self.assertEqual(fallback["raidKey"], "tidebound_grotto")
 
     def test_blackmark_requires_valid_player_difficulty_and_deletable(self):
         with self.assertRaises(ValueError):

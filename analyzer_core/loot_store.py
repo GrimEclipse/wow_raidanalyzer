@@ -18,6 +18,27 @@ DIFFICULTIES = {"lfr", "normal", "heroic", "mythic"}
 DIFFICULTY_NAMES = {"lfr": "随机团队", "normal": "普通", "heroic": "英雄", "mythic": "史诗"}
 VERDICTS = {"black", "red", "neutral"}
 VERDICT_NAMES = {"black": "黑", "red": "红", "neutral": "一般般"}
+
+def _catalog_raid_keys() -> set[str]:
+    """当前掉落目录里的副本 key 集合（潮缚石窟/烈毒之渊等）。"""
+    try:
+        return {str(raid.get("key", "")).lower() for raid in load_catalog().get("raids", [])}
+    except Exception:
+        return set()
+
+def _resolve_raid_key(raw_key: str) -> str:
+    """归一化副本 key：目录内有效则用，否则回退目录第一个副本（当前 CD 团本）。"""
+    key = _text(raw_key, 80).lower()
+    keys = _catalog_raid_keys()
+    if key and key in keys:
+        return key
+    try:
+        raids = load_catalog().get("raids", [])
+        if raids:
+            return str(raids[0].get("key", "")).lower()
+    except Exception:
+        pass
+    return key or "venomous_abyss"
 ATTENDANCE_STATUSES = {"present", "late", "leave", "absent"}
 AWARD_TYPES = {"need", "greed", "transmog", "alt"}
 ARMOR_TYPES = {
@@ -240,10 +261,12 @@ def _normalise_blackmarks(rows: Iterable[Dict[str, Any]], player_ids: set[str]) 
         except ValueError:
             continue
         difficulty = _text(raw.get("difficulty"), 20).lower()
+        raid_key = _resolve_raid_key(raw.get("raidKey"))
         player_id = _text(raw.get("playerId"), 80)
         if difficulty not in DIFFICULTIES or player_id not in player_ids:
             continue
-        key = (mark_date, difficulty)
+        # 黑本记录粒度 = 日期 + 副本 + 难度（同一天可黑多个副本，各记一条）
+        key = (mark_date, raid_key, difficulty)
         if key in seen:
             continue
         seen.add(key)
@@ -255,7 +278,7 @@ def _normalise_blackmarks(rows: Iterable[Dict[str, Any]], player_ids: set[str]) 
             "id": _text(raw.get("id"), 80) or uuid.uuid4().hex[:16],
             "date": mark_date,
             "difficulty": difficulty,
-            "raidKey": _text(raw.get("raidKey"), 80) or "venomous_abyss",
+            "raidKey": raid_key,
             "playerId": player_id,
             "verdict": verdict,
             "notes": _text(raw.get("notes"), 300),
@@ -421,6 +444,7 @@ def save_setup(payload: Dict[str, Any]) -> Dict[str, Any]:
         "roster": payload["roster"] if "roster" in payload else existing["roster"],
         "days": payload["days"] if "days" in payload else existing["days"],
         "allocations": existing["allocations"],
+        "blackMarks": existing["blackMarks"],
     }
     state = _normalise_state(candidate)
     _save_state(state)
@@ -485,21 +509,37 @@ def delete_allocation(allocation_id: str) -> Dict[str, Any]:
 
 
 def add_blackmark(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """登记/更新某开荒日某难度的「黑本」玩家（当天玄学上第一个进本的人）。
+    """登记/更新某开荒日某副本某难度的「黑本」玩家（当天玄学上第一个进本的人）。
 
-    同一日期+难度仅保留一条记录（upsert）。verdict 是当天的掉落判定：
-    black=因他导致团队掉落拉胯 / red=掉落爆炸。
+    同一日期+副本+难度仅保留一条记录（upsert），同一天可黑多个副本。
+    verdict 是当天的掉落判定：black=因他导致团队掉落拉胯 / red=掉落爆炸 / neutral=一般般。
     """
     state = _load_state()
     player_ids = {row["id"] for row in state["roster"]}
+    raw_player = _text(payload.get("playerId"), 80)
+    # 玩家选「未标记」= 清空该日期+副本+难度的黑本记录
+    if not raw_player:
+        raw_raid = _resolve_raid_key(payload.get("raidKey"))
+        raw_difficulty = _text(payload.get("difficulty"), 20).lower()
+        raw_date = _parse_date(payload.get("date")).isoformat()
+        before = len(state["blackMarks"])
+        state["blackMarks"] = [
+            row for row in state["blackMarks"]
+            if not (row["date"] == raw_date and row["raidKey"] == raw_raid and row["difficulty"] == raw_difficulty)
+        ]
+        cleared = before - len(state["blackMarks"])
+        if cleared:
+            _save_state(state)
+        return {"ok": True, "mark": None, "replaced": bool(cleared), "cleared": bool(cleared)}
     normalised = _normalise_blackmarks([{**payload, "verdict": payload.get("verdict") or "black"}], player_ids)
     if not normalised:
-        raise ValueError("黑本记录缺少有效的日期、难度或玩家。")
+        raise ValueError("黑本记录缺少有效的日期、副本、难度或玩家。")
     mark = normalised[0]
     if not mark["playerId"]:
         raise ValueError("请选择黑本玩家。")
     existing = next(
-        (row for row in state["blackMarks"] if row["date"] == mark["date"] and row["difficulty"] == mark["difficulty"]),
+        (row for row in state["blackMarks"]
+         if row["date"] == mark["date"] and row["raidKey"] == mark["raidKey"] and row["difficulty"] == mark["difficulty"]),
         None,
     )
     replaced = existing is not None

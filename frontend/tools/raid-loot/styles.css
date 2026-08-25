@@ -146,6 +146,7 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .existing-blackmarks { display: grid; gap: 7px; margin: 12px 0 2px; }
 .existing-blackmark { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; border: 1px dashed #5d3745; border-radius: 9px; background: rgba(43,20,29,.55); padding: 8px 12px; font-size: 13px; }
 .bm-diff { border-radius: 99px; padding: 2px 8px; background: #3c2027; color: #ffaaa4; font-size: 11.5px; }
+.bm-raid { border-radius: 99px; padding: 2px 8px; background: #1f2b20; color: #a9d9b8; font-size: 11.5px; }
 .bm-verdict { border-radius: 99px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; }
 .bm-verdict.black { background: #241a1f; color: #cbb6bd; box-shadow: inset 0 0 0 1px #4b3038; }
 .bm-verdict.red { background: rgba(255,86,86,.14); color: #ff9d8a; box-shadow: inset 0 0 0 1px rgba(255,120,100,.45); }

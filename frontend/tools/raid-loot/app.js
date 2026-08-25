@@ -65,7 +65,8 @@ function playerName(id) { return playerLabel(id); }
 function playerColor(id) { return CLASS_COLORS[player(id)?.classKey] || "#edf2f7"; }
 function classStyle(id) { return `--class-color:${playerColor(id)}`; }
 function blackmarks() { return documentState?.state?.blackMarks || []; }
-function markFor(dateValue, difficulty) { return blackmarks().find(row => row.date === dateValue && row.difficulty === difficulty); }
+// 黑本记录粒度 = 日期 + 副本 + 难度（同一天可黑多个副本）
+function markFor(dateValue, difficulty, raidKey) { return blackmarks().find(row => row.date === dateValue && row.difficulty === difficulty && row.raidKey === raidKey); }
 function markVerdict(row) { return ["red", "neutral"].includes(row?.verdict) ? row.verdict : "black"; }
 function raidName(key) { return raids().find(row => row.key === key)?.name || key; }
 function canModify() { return Boolean(documentState?.permissions?.canModify); }
@@ -205,7 +206,7 @@ function renderDay() {
   $("#attendance").innerHTML = players.length ? players.map(player => {
     const status = attendance.get(player.id) || "present";
     const isLeave = ["leave", "absent"].includes(status);
-    const hasBlackMark = markFor(selectedDate, $("#blackDifficulty").value)?.playerId === player.id;
+    const hasBlackMark = blackmarks().some(row => row.date === selectedDate && row.playerId === player.id);
     // 出勤卡只展示昵称，无昵称退回角色名；名字带职业色
     const nick = String(player.nickname || "").trim();
     const cardName = nick || player.name || "未命名";
@@ -356,7 +357,14 @@ function renderBlackmarkSection() {
   const current = select.value;
   const options = roster().filter(row => row.active).map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))} · ${escapeHtml(row.className || "未设置职业")}</option>`).join("");
   select.innerHTML = `<option value="">未标记（当天不黑）</option>${options}`;
-  const existing = markFor(selectedDate, $("#blackDifficulty").value);
+  // 副本选择：默认跟随当日团队副本；用户手动切过副本时保留手动选择
+  const raidSelect = $("#blackRaid");
+  const dayRaidKey = (currentDayRecord(false) || {}).raidKey || raids()[0]?.key || "";
+  raidSelect.innerHTML = raids().map(raid => `<option value="${escapeHtml(raid.key)}">${escapeHtml(raid.name)}</option>`).join("");
+  raidSelect.value = raids().some(raid => raid.key === raidSelect.value) ? raidSelect.value : dayRaidKey;
+  const raidKey = raidSelect.value;
+  const difficulty = $("#blackDifficulty").value;
+  const existing = markFor(selectedDate, difficulty, raidKey);
   if (existing && [...select.options].some(option => option.value === existing.playerId)) select.value = existing.playerId;
   else if ([...select.options].some(option => option.value === current)) select.value = current;
   else select.value = "";
@@ -376,15 +384,18 @@ function renderExistingBlackmarks() {
     return `<div class="existing-blackmark ${verdict}">
       <span class="class-colored" style="${classStyle(row.playerId)}">${escapeHtml(playerLabel(row.playerId))}</span>
       <span class="bm-diff">${DIFFICULTY_NAMES[row.difficulty]}</span>
+      <span class="bm-raid">${escapeHtml(raidName(row.raidKey))}</span>
       <span class="bm-verdict ${verdict}">${VERDICT_LABELS[verdict]}</span>
       ${row.notes ? `<span class="bm-notes">备注：${escapeHtml(row.notes)}</span>` : ""}
-      <button class="button danger bm-edit" data-diff="${row.difficulty}">编辑</button>
+      <button class="button danger bm-edit" data-raid="${escapeHtml(row.raidKey)}" data-diff="${row.difficulty}">编辑</button>
       <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除标记</button>
     </div>`;
   }).join("") : "";
   box.querySelectorAll(".bm-edit").forEach(button => button.addEventListener("click", () => {
+    $("#blackRaid").value = button.dataset.raid;
     $("#blackDifficulty").value = button.dataset.diff;
     renderBlackmarkSection();
+    renderDay();
   }));
   box.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", () => deleteBlackmark(button.dataset.id)));
 }
@@ -395,18 +406,17 @@ function applySelectColor(select) {
 
 async function saveBlackmark() {
   if (!canModify()) return notify("当前账号没有修改权限。", true);
-  const day = currentDayRecord(false);
-  const raidKey = $("#dayRaid").value || day?.raidKey || raids()[0]?.key || "";
   try {
     await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
       date: selectedDate,
       difficulty: $("#blackDifficulty").value,
-      raidKey,
+      raidKey: $("#blackRaid").value,
       playerId: $("#blackPlayer").value,
       verdict: markVerdict({ verdict: $("#blackVerdict").value }),
       notes: $("#blackNotes").value.trim(),
     }) });
-    notify($("#blackPlayer").value ? `黑本记录已保存（${VERDICT_NAMES[markVerdict({ verdict: $("#blackVerdict").value })]}）。` : "该难度黑本已清空。");
+    const verdictName = VERDICT_NAMES[markVerdict({ verdict: $("#blackVerdict").value })];
+    notify($("#blackPlayer").value ? `黑本记录已保存（${raidName($("#blackRaid").value)}·${verdictName}）。` : "该副本该难度的黑本已清空。");
     await load();
   } catch (error) { notify(error.message, true); }
 }
@@ -426,6 +436,10 @@ function openBlackHistory(playerId = "") {
   const options = roster().map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))}</option>`).join("");
   filter.innerHTML = `<option value="">全部玩家</option>${options}`;
   filter.value = playerId || "";
+  const raidFilter = $("#blackHistoryRaid");
+  const currentRaid = raidFilter.value;
+  raidFilter.innerHTML = `<option value="">全部副本</option>` + raids().map(raid => `<option value="${escapeHtml(raid.key)}">${escapeHtml(raid.name)}</option>`).join("");
+  raidFilter.value = raids().some(raid => raid.key === currentRaid) ? currentRaid : "";
   renderBlackHistory();
   $("#blackHistoryBackdrop").hidden = false;
 }
@@ -434,10 +448,12 @@ function closeBlackHistory() { $("#blackHistoryBackdrop").hidden = true; }
 
 function filteredBlackmarks() {
   const playerFilter = $("#blackHistoryFilter").value;
+  const raidFilter = $("#blackHistoryRaid")?.value || "";
   const difficultyFilter = $("#blackHistoryDifficulty")?.value || "";
   const verdictFilter = $("#blackHistoryVerdict")?.value || "";
   return blackmarks()
     .filter(row => (!playerFilter || row.playerId === playerFilter)
+      && (!raidFilter || row.raidKey === raidFilter)
       && (!difficultyFilter || row.difficulty === difficultyFilter)
       && (!verdictFilter || markVerdict(row) === verdictFilter));
 }
@@ -483,15 +499,16 @@ function renderBlackHistory() {
   }));
 }
 
-function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "") {
-  // 玄学规则：该玩家在相同难度下被判过「黑」，再想黑本时抛出提示
+function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "", raidKey = "") {
+  // 玄学规则：该玩家在相同副本+相同难度下被判过「黑」，再想黑本时抛出提示
   const sameDifficultyMarks = blackmarks().filter(row =>
     row.playerId === playerId && row.date < dateValue
     && (!difficultyValue || row.difficulty === difficultyValue)
+    && (!raidKey || row.raidKey === raidKey)
     && markVerdict(row) === "black");
   if (!sameDifficultyMarks.length) return true;
-  const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${DIFFICULTY_NAMES[row.difficulty]}】【${raidName(row.raidKey)}】且判定为「黑」${row.notes ? `，备注：${row.notes}` : ""}`);
-  return confirm(`⚠ 该玩家此前在${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同"}难度下黑本时掉落判定为「黑」（掉落拉胯）：\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`);
+  const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}】且判定为「黑」${row.notes ? `，备注：${row.notes}` : ""}`);
+  return confirm(`⚠ 该玩家此前在${raidKey ? raidName(raidKey) : "相同副本"}·${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同难度"}下黑本时掉落判定为「黑」（掉落拉胯）：\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`);
 }
 
 function allocationPayload() {
@@ -520,7 +537,7 @@ function allocationPayload() {
 async function addAllocation() {
   if (!canModify()) return;
   const payload = allocationPayload();
-  if (!confirmContinueIfBlack(payload.recipientId, selectedDate, payload.difficulty)) return;
+  if (!confirmContinueIfBlack(payload.recipientId, selectedDate, payload.difficulty, payload.raidKey)) return;
   try {
     await api("/api/loot/allocations", { method: "POST", body: JSON.stringify(payload) });
   } catch (error) {
@@ -694,8 +711,10 @@ $("#blackHistoryButton").addEventListener("click", () => openBlackHistory());
 $("#closeBlackHistory").addEventListener("click", closeBlackHistory);
 $("#blackHistoryBackdrop").addEventListener("click", event => { if (event.target === $("#blackHistoryBackdrop")) closeBlackHistory(); });
 $("#blackHistoryFilter").addEventListener("change", renderBlackHistory);
+$("#blackHistoryRaid")?.addEventListener("change", renderBlackHistory);
 $("#blackHistoryDifficulty")?.addEventListener("change", renderBlackHistory);
 $("#blackHistoryVerdict")?.addEventListener("change", renderBlackHistory);
+$("#blackRaid").addEventListener("change", () => { renderBlackmarkSection(); });
 $("#blackDifficulty").addEventListener("change", () => { renderBlackmarkSection(); renderDay(); });
 $("#blackPlayer").addEventListener("change", () => applySelectColor($("#blackPlayer")));
 $("#saveBlackmark").addEventListener("click", saveBlackmark);
