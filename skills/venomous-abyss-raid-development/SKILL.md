@@ -18,12 +18,13 @@ Read the matching file in `references/bosses/`. Do not load all source dumps unl
 3. Use the project-root `zone54_spell_discovery.md` for the readable spell inventory; inspect the large JSON in `references/source-data/spell-discovery.json` only for exact rows.
 4. Use journal and timeline JSON to corroborate phases, casts, energy transitions, debuffs, damage, summons, and Mythic differences.
 5. In raid-leader copy, explain what the raid does and what wipes the pull. Keep spell-ID/evidence details in the developer section.
-6. Do not invent a Mythic Ula'tek timeline: the final Boss conventionally has no test logs.
-7. Rebuild `assets/vendor/zone54-raid-guide-data.js` with `tools/build_zone54_raid_guide.py` after source changes.
-8. Verify `frontend/tools/raid-guide/index.html` and its icon tooltip behavior.
+6. Use live WCL Zone 53 for formal searches. Keep Zone 54 PTR evidence only as historical comparison, never as a live candidate.
+7. Ula'tek has a live Normal timeline. Do not invent Heroic or Mythic timestamps before matching live logs exist; clearly label journal-derived differences.
+8. Rebuild `assets/vendor/zone54-raid-guide-data.js` with `tools/build_zone54_raid_guide.py` after source changes.
+9. Verify `frontend/tools/raid-guide/index.html` and its icon tooltip behavior.
 
 ## Boss status
 
 - Bosses 1–7 have structured guide material and are candidates for analyzer design.
 - Boss 7 has a complete authored P1/P2/intermission/P3 flow; its current Heroic evidence only covers the opening of P3, and its Mythic evidence ends in early P2.
-- Boss 8 Ula'tek is a journal/manual-design target without test-log expectations.
+- Boss 8 Ula'tek has a live Normal kill timeline and an authored Heroic difference draft. Heroic/Mythic timing remains pending live evidence.

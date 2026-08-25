@@ -1,4 +1,4 @@
-"""Build the stable, static Zone 54 raid-leader guide payload.
+"""Build the stable, static live-raid leader guide payload.
 
 The authored source is the player-facing truth. WCL discovery data is merged as
 an evidence appendix and must never overwrite reviewed mechanic prose.
@@ -77,7 +77,8 @@ TIMELINE_TERM_RENAMES = {
     "苏醒纽带": "觉醒之缚",
     "解缚之怒": "溃散之怒",
     "变换原毒": "变幻的原型毒液",
-    "瘟疫泡沫": "滴毒之牙",
+    "腐毒停滞": "强酸静滞",
+    "团结光环": "联合防御",
     "呼啸漩涡": "呼啸旋涡",
     "毒液激流": "剧毒涌动",
     "缠绕脓液": "盘卷脓液",
@@ -275,6 +276,8 @@ def build_spell_rows(
         })
         if override.get("nameEn"):
             target["nameEn"] = override["nameEn"]
+        if override.get("replaceCategories"):
+            target["categories"] = []
         for category in override.get("categories") or ["journalOnly"]:
             if category in CATEGORY_LABELS and category not in target["categories"]:
                 target["categories"].append(category)
@@ -399,6 +402,12 @@ def build_document(discovery, authored, timelines=None):
     authored_bosses = authored.get("bosses") or {}
     confirmed_spell_names = authored.get("confirmedSpellNames") or {}
     confirmed_source_names = authored.get("confirmedSourceNames") or {}
+    area_damage_ids = authored.get("areaDamageSpellIDs") or {}
+    area_damage_true = {int(spell_id) for spell_id in area_damage_ids.get("true") or []}
+    area_damage_false = {int(spell_id) for spell_id in area_damage_ids.get("false") or []}
+    overlap = area_damage_true & area_damage_false
+    if overlap:
+        raise ValueError(f"areaDamageSpellIDs contains conflicting IDs: {sorted(overlap)}")
     timeline_bosses = (timelines or {}).get("bosses") or {}
     bosses = []
     metadata_rows = [
@@ -456,6 +465,10 @@ def build_document(discovery, authored, timelines=None):
                 },
             ),
             "journalSpellCount": len((evidence_boss.get("journal") or {}).get("spells") or []),
+            "hasNormalEvidence": bool(
+                (evidence_boss.get("evidence") or {}).get("normal")
+                or (timeline_bosses.get(key) or {}).get("normal")
+            ),
             "hasHeroicEvidence": bool(
                 (evidence_boss.get("evidence") or {}).get("heroic")
                 or (timeline_bosses.get(key) or {}).get("heroic")
@@ -472,17 +485,24 @@ def build_document(discovery, authored, timelines=None):
             for spell_id in mechanic.get("spellIDs") or []
         }
         for spell in boss["spells"]:
+            spell_id = int(spell["spellID"])
+            spell["areaDamage"] = (
+                True if spell_id in area_damage_true
+                else False if spell_id in area_damage_false
+                else None
+            )
             if spell["spellID"] in reviewed_ids:
                 spell["reviewStatus"] = "reviewed"
         bosses.append(boss)
 
     return {
         "schemaVersion": 2,
-        "zoneID": int(authored.get("zoneID") or 54),
-        "guideNameZh": authored.get("guideNameZh") or "12.1 团长战斗手册",
+        "zoneID": int(authored.get("zoneID") or 53),
+        "guideNameZh": authored.get("guideNameZh") or "团本手册",
         "raids": authored.get("raids") or [],
         "raidNameZh": authored.get("raidNameZh") or "烈毒之渊",
         "raidNameEn": authored.get("raidNameEn") or "The Venomous Abyss",
+        "areaDamageReference": authored.get("areaDamageReference") or {},
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "sources": discovery.get("sources") or {},
         "bosses": bosses,

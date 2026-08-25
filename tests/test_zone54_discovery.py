@@ -15,7 +15,7 @@ class Zone54DiscoveryTests(unittest.TestCase):
                 "fights": [
                     {
                         "id": 1,
-                        "encounterID": 53470,
+                        "encounterID": 3470,
                         "difficulty": 4,
                         "startTime": 0,
                         "endTime": 600_000,
@@ -23,7 +23,7 @@ class Zone54DiscoveryTests(unittest.TestCase):
                     },
                     {
                         "id": 2,
-                        "encounterID": 53470,
+                        "encounterID": 3470,
                         "difficulty": 4,
                         "startTime": 0,
                         "endTime": 400_000,
@@ -31,7 +31,7 @@ class Zone54DiscoveryTests(unittest.TestCase):
                     },
                     {
                         "id": 3,
-                        "encounterID": 53470,
+                        "encounterID": 3470,
                         "difficulty": 5,
                         "startTime": 0,
                         "endTime": 700_000,
@@ -41,7 +41,7 @@ class Zone54DiscoveryTests(unittest.TestCase):
             },
         }
         selected = choose_representative_fights(documents, 4)
-        self.assertEqual(selected[53470]["id"], 2)
+        self.assertEqual(selected[3470]["id"], 2)
 
     def test_journal_import_accepts_relative_and_absolute_spell_links(self):
         raw = (
@@ -168,7 +168,7 @@ class Zone54DiscoveryTests(unittest.TestCase):
         document = {
             "bosses": {
                 "nakzali": {
-                    "encounterID": 53470,
+                    "encounterID": 3470,
                     "name": "Nek'zali the Soulcoiler",
                     "evidence": evidence,
                     "journal": journal,

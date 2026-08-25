@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "zoneID": 54,
+  "zoneID": 53,
   "source": {
     "url": "https://www.wowhead.com/news/preview-the-patch-12-1-dungeon-journal-raid-lair-and-dungeons-381960",
     "kind": "datamined-dungeon-journal"
@@ -21,17 +21,17 @@
       "subtitleTrackAvailable": false
     },
     {
-      "boss": "vashnik",
-      "bvid": "BV1Z3TC6uE38",
-      "title": "H3-万毒邪祟者瓦什尼克",
-      "url": "https://www.bilibili.com/video/BV1Z3TC6uE38",
+      "boss": "lostexplorers",
+      "bvid": "BV1FuTC6rEcs",
+      "title": "H3-迷失的探险者",
+      "url": "https://www.bilibili.com/video/BV1FuTC6rEcs",
       "subtitleTrackAvailable": false
     },
     {
-      "boss": "lostexplorers",
-      "bvid": "BV1FuTC6rEcs",
-      "title": "H4-迷失的探险者",
-      "url": "https://www.bilibili.com/video/BV1FuTC6rEcs",
+      "boss": "vashnik",
+      "bvid": "BV1Z3TC6uE38",
+      "title": "H4-万毒邪祟者瓦什尼克",
+      "url": "https://www.bilibili.com/video/BV1Z3TC6uE38",
       "subtitleTrackAvailable": false
     },
     {
@@ -58,7 +58,7 @@
   ],
   "bosses": {
     "nakzali": {
-      "encounterID": 53470,
+      "encounterID": 3470,
       "name": "Nek'zali the Soulcoiler",
       "available": true,
       "spells": [
@@ -299,7 +299,7 @@
       ]
     },
     "sentinels": {
-      "encounterID": 53445,
+      "encounterID": 3445,
       "name": "Entombed Sentinels",
       "available": true,
       "spells": [
@@ -447,7 +447,7 @@
       "mythicDifferences": []
     },
     "lostexplorers": {
-      "encounterID": 53497,
+      "encounterID": 3497,
       "name": "The Lost Explorers",
       "available": true,
       "spells": [
@@ -689,7 +689,7 @@
       "difficultySource": "https://www.wowhead.com/cn/npc=267077/morzahi"
     },
     "vashnik": {
-      "encounterID": 53455,
+      "encounterID": 3455,
       "name": "Vashnik the Malignant",
       "available": true,
       "spells": [
@@ -917,7 +917,7 @@
       ]
     },
     "sszorak": {
-      "encounterID": 53420,
+      "encounterID": 3420,
       "name": "Sszorak",
       "available": true,
       "spells": [
@@ -1061,7 +1061,7 @@
       "difficultySource": "https://www.wowhead.com/cn/npc=257347/sszorak"
     },
     "twinfangs": {
-      "encounterID": 53421,
+      "encounterID": 3421,
       "name": "The Twin Fangs",
       "available": true,
       "spells": [
@@ -1257,7 +1257,7 @@
       "difficultySource": "https://www.wowhead.com/cn/npc=257361/vexhul"
     },
     "bargained": {
-      "encounterID": 53429,
+      "encounterID": 3429,
       "name": "The Coiled Altar",
       "available": true,
       "spells": [
@@ -1618,7 +1618,7 @@
       "difficultySource": "https://www.wowhead.com/cn/guide/midnight/raids/venomous-abyss-coiled-altar-boss-strategy-abilities"
     },
     "ulatek": {
-      "encounterID": 53492,
+      "encounterID": 3492,
       "name": "Ula'tek",
       "available": true,
       "spells": [
@@ -1661,7 +1661,7 @@
           "spellID": 1287036,
           "name": "Poisonous Bite",
           "journalOccurrences": 26,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1689,7 +1689,7 @@
           "spellID": 1290779,
           "name": "Malice",
           "journalOccurrences": 3,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1710,7 +1710,7 @@
           "spellID": 1295360,
           "name": "Malignant Shell",
           "journalOccurrences": 5,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1731,7 +1731,7 @@
           "spellID": 1298367,
           "name": "Mother's Wrath",
           "journalOccurrences": 3,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1808,7 +1808,7 @@
           "spellID": 1301117,
           "name": "Grasping Fangs",
           "journalOccurrences": 4,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1822,7 +1822,7 @@
           "spellID": 1301268,
           "name": "Putrid Membrane",
           "journalOccurrences": 7,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1836,7 +1836,7 @@
           "spellID": 1301800,
           "name": "Acidic Burst",
           "journalOccurrences": 22,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1864,7 +1864,7 @@
           "spellID": 1303414,
           "name": "Petrifying Sting",
           "journalOccurrences": 30,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {
@@ -1906,7 +1906,7 @@
           "spellID": 1306086,
           "name": "Volatile Purge",
           "journalOccurrences": 2,
-          "mythicOnly": true,
+          "mythicOnly": false,
           "mythicMentioned": true
         },
         {

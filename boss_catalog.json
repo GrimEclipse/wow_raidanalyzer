@@ -274,7 +274,7 @@
               "key": "nakzali",
               "order": 1,
               "name": "盘魂者内克扎利",
-              "encounterIds": [53470],
+              "encounterIds": [3470, 53470],
               "englishName": "Nek'zali the Soulcoiler",
               "externalKey": "wow.venomabyss,01.nakzali",
               "aliases": ["「缠魂者」尼札利"],
@@ -384,13 +384,96 @@
               "key": "sentinels",
               "order": 2,
               "name": "陵寝哨兵",
+              "encounterIds": [3445, 53445],
               "englishName": "Entombed Sentinels",
               "externalKey": "wow.venomabyss,02.sentinels",
               "aliases": ["埋葬卫哨"],
               "plugin": "boss_plugins.venomous_abyss.sentinels",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
-              "configSchema": [],
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "sentinels-pulls" },
+                "avoidable": { "enabled": true, "renderer": "sentinels-avoidable" },
+                "interrupts": { "enabled": false, "renderer": "generic-interrupts" },
+                "dispels": { "enabled": false, "renderer": "generic-dispels" },
+                "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
+                "verdict": { "enabled": false, "renderer": "mistake-verdict" },
+                "replay": { "enabled": false, "renderer": "sentinels-field" }
+              },
+              "configSchema": [
+                {
+                  "key": "helicalToxinReviewEnabled",
+                  "type": "boolean",
+                  "label": "取证螺旋毒素碰撞链",
+                  "description": "按同毫秒 stack/remove 事件还原每轮碰撞、补救和 28 秒超时。",
+                  "default": true
+                },
+                {
+                  "key": "helicalLargeMovementYards",
+                  "type": "number",
+                  "label": "碰撞前一秒大幅移动阈值",
+                  "description": "错误碰撞前 1 秒移动超过此距离时，在碰撞信息中提示该玩家。",
+                  "unit": "码",
+                  "min": 1,
+                  "max": 30,
+                  "step": 0.5,
+                  "default": 8,
+                  "visibleWhen": { "field": "helicalToxinReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "markReviewEnabled",
+                  "type": "boolean",
+                  "label": "分析酸液 / 鲜血印记",
+                  "description": "逐分场记录 1284500/1284506 的峰值、增层和双侧暴露。",
+                  "default": true
+                },
+                {
+                  "key": "waterPlacementReviewEnabled",
+                  "type": "boolean",
+                  "label": "分析分摊参与与放水离散",
+                  "description": "检查鲜血层数高于酸液的玩家是否参与分摊，并用附着浊物移除位置识别离散玩家。",
+                  "default": true
+                },
+                {
+                  "key": "waterOutlierDistanceYards",
+                  "type": "number",
+                  "label": "放水离散距离",
+                  "description": "附着浊物消失位置距本轮中位中心超过此值时列为过于离散。",
+                  "unit": "码",
+                  "min": 1,
+                  "max": 30,
+                  "step": 0.5,
+                  "default": 8,
+                  "visibleWhen": { "field": "waterPlacementReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "waterMaxSampleOffsetMs",
+                  "type": "number",
+                  "label": "放水最大坐标采样偏移",
+                  "description": "超过此窗口的坐标不参与放水离散判断。",
+                  "unit": "毫秒",
+                  "integer": true,
+                  "min": 100,
+                  "max": 5000,
+                  "step": 50,
+                  "default": 1500,
+                  "visibleWhen": { "field": "waterPlacementReviewEnabled", "equals": true }
+                },
+                {
+                  "key": "livingVenomReviewEnabled",
+                  "type": "boolean",
+                  "label": "统计活体毒液可躲伤害",
+                  "description": "按 1284209 汇总命中、伤害、时间与致死。",
+                  "default": true
+                },
+                {
+                  "key": "toxicDropletReviewEnabled",
+                  "type": "boolean",
+                  "label": "分析剧毒水滴 / 绿球",
+                  "description": "按每轮 1284434 汇总 1284451 踩球，并用 1284452 确认漏球爆炸。",
+                  "default": true
+                }
+              ],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/02-sentinels.png", "width": 1997, "height": 1118 }
               ]

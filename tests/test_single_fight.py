@@ -65,6 +65,7 @@ class SingleFightDiscoveryTests(unittest.TestCase):
 
     def test_encounter_catalog_maps_supported_bosses(self):
         self.assertEqual(find_boss_by_encounter(3181).boss_key, "crown_of_the_cosmos")
+        self.assertEqual(find_boss_by_encounter(3470).boss_key, "nakzali")
         self.assertEqual(find_boss_by_encounter(53470).boss_key, "nakzali")
         self.assertIsNone(find_boss_by_encounter(999999))
 

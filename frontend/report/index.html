@@ -30,22 +30,27 @@
     <input id="file" type="file" accept=".json,application/json">
   </section>
 </main>
-<script src="frontend/core/report-plugin-runtime.js"></script>
+<script src="frontend/core/report-plugin-runtime.js?v=1.1.0-20260825b"></script>
 <script>
   const source = document.getElementById("source");
   const status = document.getElementById("status");
   const route = document.getElementById("route");
 
   async function listSources(){
-    let files=[];
+    const files=[];
+    const appendFiles=rows=>{
+      for(const row of rows||[]){
+        if(row?.path&&!files.some(file=>file.path===row.path)) files.push(row);
+      }
+    };
     try{
       const response=await fetch("/api/data-files",{cache:"no-store"});
-      if(response.ok) files=(await response.json()).files||[];
+      if(response.ok) appendFiles((await response.json()).files);
     }catch(_){}
-    if(!files.length){
+    for(const manifestPath of ["assets/samples/report_manifest.json","data/manifest.json"]){
       try{
-        const response=await fetch("data/manifest.json",{cache:"no-store"});
-        if(response.ok) files=(await response.json()).files||[];
+        const response=await fetch(manifestPath,{cache:"no-store"});
+        if(response.ok) appendFiles((await response.json()).files);
       }catch(_){}
     }
     source.innerHTML='<option value="">选择分析文件</option>'+files.map(file=>`<option value="${escapeHtml(file.path)}">${escapeHtml(file.label||file.name||file.path)}</option>`).join("");
@@ -65,9 +70,10 @@
       status.textContent+=`；暂不支持：${error.message}`;
       return false;
     }
-    const url=window.MythicReportRuntime.reportUrl(descriptor,path);
+    const sourcePath=path||window.MythicReportRuntime.storePayload(payload);
+    const url=window.MythicReportRuntime.reportUrl(descriptor,sourcePath);
     document.getElementById("route-name").textContent=identity.bossName;
-    document.getElementById("route-kind").textContent="Boss 专用分析插件";
+    document.getElementById("route-kind").textContent="公共全场 Pull 概览；点击单场后进入 Boss 专属分析";
     document.getElementById("route-link").href=url;
     route.style.display="block";
     if(autoOpen) location.replace(url);

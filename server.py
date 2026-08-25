@@ -911,15 +911,25 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Mythic Analyzer local web server")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
+    parser = argparse.ArgumentParser(description="Mythic Analyzer web application server")
+    parser.add_argument(
+        "--host",
+        default=environment_setting("APP_HOST", "0.0.0.0"),
+        help="监听地址；默认读取 APP_HOST，并监听所有网络接口",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(environment_setting("APP_PORT", environment_setting("PORT", "8765"))),
+        help="监听端口；默认读取 APP_PORT/PORT，回退到 8765",
+    )
     parser.add_argument("--open", action="store_true", help="启动后自动打开浏览器")
     args = parser.parse_args()
 
     httpd = ThreadingHTTPServer((args.host, args.port), AnalyzerHandler)
-    url = f"http://{args.host}:{args.port}/"
-    print(f"服务已启动：{url}", flush=True)
+    browser_host = "127.0.0.1" if args.host in {"0.0.0.0", "::"} else args.host
+    url = f"http://{browser_host}:{args.port}/"
+    print(f"完整 Web 服务已启动：{url}（监听 {args.host}:{args.port}）", flush=True)
     if args.open:
         webbrowser.open(url)
     httpd.serve_forever()

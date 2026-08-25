@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 import os
 import time
+import warnings
 from pathlib import Path
+from urllib.parse import urlparse
+
+from urllib3.exceptions import InsecureRequestWarning
 
 from analyzer_core.concurrency import MAX_REQUEST_RETRIES, REQUEST_RETRY_BASE_SECONDS, request_post
 from analyzer_core.wcl_context import resolve_wcl_credentials
@@ -28,14 +32,49 @@ def load_project_env() -> None:
 load_project_env()
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    return value not in {"0", "false", "no", "off"}
+
+
+def _is_loopback_proxy(proxy_url: str) -> bool:
+    if not proxy_url:
+        return False
+    return (urlparse(proxy_url).hostname or "").lower() in {"127.0.0.1", "localhost", "::1"}
+
+
 class WclClient:
     def __init__(self) -> None:
         self.base_url = os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com").rstrip("/")
         proxy_url = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
         self.proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+        self.verify_tls = _env_bool("WCL_TLS_VERIFY", default=not _is_loopback_proxy(proxy_url))
+        # The default local proxy commonly terminates TLS with its own certificate.
+        # Silence only that known loopback-proxy warning; remote/direct insecure TLS
+        # remains visible so a real certificate problem is not hidden.
+        self._suppress_local_proxy_tls_warning = not self.verify_tls and _is_loopback_proxy(proxy_url)
+        if self._suppress_local_proxy_tls_warning:
+            # catch_warnings() is not reliable across the parallel Fight worker
+            # threads. This process-wide rule is deliberately restricted to the
+            # exact loopback-host urllib3 message, so remote TLS warnings remain.
+            warnings.filterwarnings(
+                "ignore",
+                message=r"Unverified HTTPS request is being made to host '(?:127\.0\.0\.1|localhost|::1)'.*",
+                category=InsecureRequestWarning,
+            )
         self.client_id = os.getenv("WCL_CLIENT_ID", "")
         self.client_secret = os.getenv("WCL_CLIENT_SECRET", "")
         self._token = None
+
+    def _post(self, *args, **kwargs):
+        kwargs["verify"] = self.verify_tls
+        if not self._suppress_local_proxy_tls_warning:
+            return request_post(*args, **kwargs)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", InsecureRequestWarning)
+            return request_post(*args, **kwargs)
 
     def token(self) -> str:
         if self._token:
@@ -43,12 +82,11 @@ class WclClient:
         credentials = resolve_wcl_credentials(self.client_id, self.client_secret)
         if not credentials.client_id or not credentials.client_secret:
             raise RuntimeError("请先配置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET。")
-        response = request_post(
+        response = self._post(
             f"{self.base_url}/oauth/token",
             data={"grant_type": "client_credentials"},
             auth=(credentials.client_id, credentials.client_secret),
             proxies=self.proxies,
-            verify=False,
             timeout=30,
         )
         if response.status_code == 401:
@@ -58,12 +96,11 @@ class WclClient:
         return self._token
 
     def graphql_data(self, query: str, variables: dict) -> dict:
-        response = request_post(
+        response = self._post(
             f"{self.base_url}/api/v2/client",
             json={"query": query, "variables": variables},
             headers={"Authorization": f"Bearer {self.token()}"},
             proxies=self.proxies,
-            verify=False,
             timeout=90,
         )
         response.raise_for_status()

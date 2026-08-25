@@ -136,7 +136,7 @@
     const reportCodes = el('report-codes');
     const renamePanel = el('rename-panel');
     const renameFields = el('rename-fields');
-    const serviceHelp = '抄轴工具需要 Python 服务访问 WCL。请运行 start_app.bat，然后打开 http://127.0.0.1:8765/cooldowns；如果服务已经开着，请重启一次以加载新接口。';
+    const serviceHelp = '排轴服务暂时不可用，请确认完整 Web 服务已启动，或联系服务器管理员检查 WCL 接口与账号凭据。';
     const classColors = {
         deathknight:'#c41e3a', demonhunter:'#a330c9', druid:'#ff7c0a', evoker:'#33937f',
         hunter:'#aad372', mage:'#3fc7eb', monk:'#00ff98', paladin:'#f48cba', priest:'#ffffff',
@@ -369,7 +369,7 @@
             const selection = payload.selection || {};
             const elapsedSeconds = ((selection.elapsedMs || Date.now() - startedAt) / 1000).toFixed(1);
             const stopped = selection.stoppedEarly ? `找到 ${selection.resultLimit} 份后停止继续翻页` : `已核对 ${selection.compositionCheckedCount || 0} 场治疗构成`;
-            const sources = `速度榜 ${selection.rankingPagesScanned || 0} 页 / ${selection.rankedReportCodeCount || 0} 场，公开报告 ${selection.zoneReportPagesScanned || 0} 页 / ${selection.zoneReportCodeCount || 0} 份，补充日志 ${selection.providedReportCodeCount || 0} 份，PTR 取证 ${selection.discoveryReportCodeCount || 0} 份`;
+            const sources = `速度榜 ${selection.rankingPagesScanned || 0} 页 / ${selection.rankedReportCodeCount || 0} 场，公开报告 ${selection.zoneReportPagesScanned || 0} 页 / ${selection.zoneReportCodeCount || 0} 份，补充日志 ${selection.providedReportCodeCount || 0} 份，历史取证 ${selection.discoveryReportCodeCount || 0} 份`;
             const rangeLabel = `${selection.minDurationSeconds ?? 0}–${selection.maxDurationSeconds ?? '不限'} 秒`;
             const capped = selection.automaticSearchCapped ? ' 已达到本次自动检索上限；可粘贴已知 WCL 日志继续核对。' : '';
             showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。按速度榜优先检索：${sources}；发现 ${selection.encounterDifficultyKillCount || 0} 场指定首领与难度的击杀，其中 ${selection.durationFilteredFightCount || 0} 场符合 ${rangeLabel} 战斗时长，${stopped}。${capped}`, payload.status === 'ok' ? 'ok' : 'info');

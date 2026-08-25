@@ -11,5 +11,5 @@ Mythic Analyzer 离线包
 常用入口：
 - /report      战斗分析
 - /cooldowns   团队技能时间轴
-- /raid-guide  团长手册
+- /raid-guide  团本手册
 - /audit       奥蕾莉亚逐场场地分析

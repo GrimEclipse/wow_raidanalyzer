@@ -16,21 +16,21 @@ SOURCE_URL = (
 )
 
 BOSSES = [
-    ("nakzali", 53470, "Nek'zali the Soulcoiler"),
-    ("sentinels", 53445, "Entombed Sentinels"),
-    ("lostexplorers", 53497, "The Lost Explorers"),
-    ("vashnik", 53455, "Vashnik the Malignant"),
-    ("sszorak", 53420, "Sszorak"),
-    ("twinfangs", 53421, "The Twin Fangs"),
-    ("bargained", 53429, "The Coiled Altar"),
-    ("ulatek", 53492, "Ula'tek"),
+    ("nakzali", 3470, "Nek'zali the Soulcoiler"),
+    ("sentinels", 3445, "Entombed Sentinels"),
+    ("lostexplorers", 3497, "The Lost Explorers"),
+    ("vashnik", 3455, "Vashnik the Malignant"),
+    ("sszorak", 3420, "Sszorak"),
+    ("twinfangs", 3421, "The Twin Fangs"),
+    ("bargained", 3429, "The Coiled Altar"),
+    ("ulatek", 3492, "Ula'tek"),
 ]
 
 REFERENCE_VIDEOS = [
     {"boss": "nakzali", "bvid": "BV1vETC6vEw2", "title": "H1-盘魂者内克扎莉"},
     {"boss": "sentinels", "bvid": "BV1Z3TC6uEdU", "title": "H2-陵寝哨兵"},
-    {"boss": "vashnik", "bvid": "BV1Z3TC6uE38", "title": "H3-万毒邪祟者瓦什尼克"},
-    {"boss": "lostexplorers", "bvid": "BV1FuTC6rEcs", "title": "H4-迷失的探险者"},
+    {"boss": "lostexplorers", "bvid": "BV1FuTC6rEcs", "title": "H3-迷失的探险者"},
+    {"boss": "vashnik", "bvid": "BV1Z3TC6uE38", "title": "H4-万毒邪祟者瓦什尼克"},
     {"boss": "sszorak", "bvid": "BV12rMJ6sEWh", "title": "H5-斯索拉克"},
     {"boss": "twinfangs", "bvid": "BV12rMJ6sEg3", "title": "H6-双子毒牙"},
     {"boss": "bargained", "bvid": "BV11rMJ6sEoc", "title": "H7-盘卷祭坛"},
@@ -81,6 +81,21 @@ JOURNAL_DIFFICULTY_OVERRIDES = {
             "Manifestation of Dread: On Mythic difficulty, each manifestation is visible only to its fixated player and periodically refixates; contact triggers Malevolent Resonance.",
             "Spiritcackle: On Mythic difficulty, the summoned spirit has a 99% damage-reduction Spirit Shield that must be weakened with Gloombomb.",
             "Spirit Erasure: On Mythic difficulty, intercepting a fragment increases Spirit Erasure damage taken by 20% for 5 seconds.",
+        ],
+    },
+    "ulatek": {
+        "source": (
+            "https://www.wowhead.com/guide/midnight/raids/"
+            "venomous-abyss-ulatek-boss-strategy-abilities"
+        ),
+        "spellIDs": [1299650, 1307612, 1307635],
+        "nonMythicIDs": [
+            1287036, 1290779, 1295360, 1298367, 1301117,
+            1301268, 1301800, 1303414, 1306086,
+        ],
+        "notes": [
+            "Hardened, Noxious Shell, and Noxious Splash are Mythic-only parts of the Blightscale Spawn package.",
+            "On Mythic difficulty, Volatile Purge also sends venomous waves across the arena.",
         ],
     },
 }
@@ -216,7 +231,7 @@ def extract_journal(raw, source_url):
         })
     return {
         "schemaVersion": 1,
-        "zoneID": 54,
+        "zoneID": 53,
         "source": {
             "url": source_url,
             "kind": "datamined-dungeon-journal",

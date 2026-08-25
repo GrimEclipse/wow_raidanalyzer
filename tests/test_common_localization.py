@@ -16,6 +16,10 @@ class CommonLocalizationTests(unittest.TestCase):
         self.assertEqual(labels["class"], {})
         self.assertEqual(labels["role"]["zhCN"], "未知")
 
+    def test_devourer_demon_hunter_uses_current_chinese_name(self):
+        labels = spec_localization(1480)
+        self.assertEqual(labels["spec"], {"enUS": "Devourer", "zhCN": "噬灭"})
+
 
 if __name__ == "__main__":
     unittest.main()
