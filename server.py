@@ -410,6 +410,9 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return None
         if path == "/api/auth/logout":
             return self.handle_logout()
+        admin_reset_match = re.fullmatch(r"/api/admin/users/(\d+)/password", path)
+        if admin_reset_match:
+            return self.handle_admin_reset_password(user, int(admin_reset_match.group(1)))
         return self.handle_write(path, user)
 
     def do_PUT(self):
