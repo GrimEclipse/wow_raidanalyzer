@@ -2501,7 +2501,7 @@ ${excelMechanics.map(key => `<td>${numCell(p.breakdown?.[key])}</td>`).join('')}
                     const html = `<html><head><meta charset="utf-8"></head><body><table border="1">
 <tr>${excelHeaders.map(h => `<th>${h}</th>`).join('')}</tr>
 ${rows}
-</table></body></html>`;
+</table><script src="/frontend/core/home-button.js?v=1"></script></body></html>`;
                     this.downloadFile(`智力表_宇宙之冕_${date}.xls`, html, 'application/vnd.ms-excel;charset=utf-8');
                     this.verdictSavedDate = `${date} 已导出（本地兜底 HTML；xlsx 失败：${browserError?.message || browserError} / API：${apiError?.message || apiError}）`;
                 }
@@ -2970,5 +2970,5 @@ ${rows}
     }
 }).mount('#app');
 </script>
-</body>
+<script src="/frontend/core/home-button.js?v=1"></script></body>
 </html>

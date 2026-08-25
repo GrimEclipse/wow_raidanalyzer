@@ -42,4 +42,4 @@
   document.querySelector('#passwordForm').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget;try{await api('/api/auth/password',{method:'PUT',body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();status('密码已更新，其他登录会话已退出')}catch(error){status(error.message,true)}};
   document.querySelector('#logout').onclick=async()=>{await api('/api/auth/logout',{method:'POST',body:'{}'}).catch(()=>{});location.href='/login'};
   load().catch(error=>status(error.message,true));
-</script></body></html>
+</script><script src="/frontend/core/home-button.js?v=1"></script></body></html>
