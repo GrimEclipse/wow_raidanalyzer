@@ -37,15 +37,20 @@
   const route = document.getElementById("route");
 
   async function listSources(){
-    let files=[];
+    const files=[];
+    const appendFiles=rows=>{
+      for(const row of rows||[]){
+        if(row?.path&&!files.some(file=>file.path===row.path)) files.push(row);
+      }
+    };
     try{
       const response=await fetch("/api/data-files",{cache:"no-store"});
-      if(response.ok) files=(await response.json()).files||[];
+      if(response.ok) appendFiles((await response.json()).files);
     }catch(_){}
-    if(!files.length){
+    for(const manifestPath of ["assets/samples/report_manifest.json","data/manifest.json"]){
       try{
-        const response=await fetch("data/manifest.json",{cache:"no-store"});
-        if(response.ok) files=(await response.json()).files||[];
+        const response=await fetch(manifestPath,{cache:"no-store"});
+        if(response.ok) appendFiles((await response.json()).files);
       }catch(_){}
     }
     source.innerHTML='<option value="">选择分析文件</option>'+files.map(file=>`<option value="${escapeHtml(file.path)}">${escapeHtml(file.label||file.name||file.path)}</option>`).join("");
