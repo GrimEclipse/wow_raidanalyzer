@@ -6,8 +6,8 @@ const CLASS_OPTIONS = [
   ["shaman", "萨满祭司", "mail"], ["warlock", "术士", "cloth"], ["warrior", "战士", "plate"]
 ];
 const DIFFICULTY_NAMES = { lfr: "随机团队", normal: "普通", heroic: "英雄", mythic: "史诗" };
-const VERDICT_NAMES = { black: "黑", red: "红", neutral: "一般般" };
-const VERDICT_LABELS = { black: "⚫ 黑（掉落拉胯）", red: "🔴 红（掉落爆炸）", neutral: "⚪ 一般般" };
+const VERDICT_NAMES = { black: "拉了", red: "神了", neutral: "行吧" };
+const VERDICT_LABELS = { black: "⚫ 拉了", red: "🔴 神了", neutral: "⚪ 行吧" };
 const MODE_NAMES = { need: "需求", greed: "贪婪", transmog: "幻化收藏", alt: "小号提升" };
 const ARMOR_NAMES = { cloth: "布甲", leather: "皮甲", mail: "锁甲", plate: "板甲", accessory: "首饰", weapon: "武器", token: "套装兑换物", cosmetic: "幻化收藏", mount: "坐骑", pet: "宠物", toy: "玩具", furniture: "家具", other: "其他" };
 const CLASS_COLORS = {
@@ -61,6 +61,12 @@ function displayName(p) {
   return nickname ? `${nickname}（${p.name || "未命名"}）` : (p.name || "未命名");
 }
 function playerLabel(id) { const p = player(id); return p ? displayName(p) : id; }
+// 只取昵称（无昵称退回角色名）：紧凑展示用
+function playerNick(id) {
+  const p = player(id);
+  if (!p) return id;
+  return String(p.nickname || "").trim() || p.name || id;
+}
 function playerName(id) { return playerLabel(id); }
 function playerColor(id) { return CLASS_COLORS[player(id)?.classKey] || "#edf2f7"; }
 function classStyle(id) { return `--class-color:${playerColor(id)}`; }
@@ -153,7 +159,9 @@ function renderCalendar() {
 }
 
 async function openDay(value) {
+  const dateChanged = value !== selectedDate;
   selectedDate = value;
+  if (dateChanged) resetDrawerForms();
   const parsed = new Date(`${value}T12:00:00`);
   displayedMonth = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
   $("#drawerBackdrop").hidden = false;
@@ -161,6 +169,21 @@ async function openDay(value) {
   $("#dayDrawer").setAttribute("aria-hidden", "false");
   document.body.classList.add("drawer-open");
   try { await load(); } catch (error) { notify(error.message, true); }
+}
+
+// 切换到另一天时，抽屉里的表单恢复初始状态，避免把上一天的输入带到新的一天
+function resetDrawerForms() {
+  $("#blackRaid").value = "";
+  $("#blackDifficulty").value = "heroic";
+  $("#blackVerdict").value = "black";
+  $("#blackPlayer").value = "";
+  $("#blackNotes").value = "";
+  $("#recipientSelect").value = "";
+  $("#itemSearch").value = "";
+  $("#allocationNotes").value = "";
+  $("#boeName").value = "";
+  const boe = $("#isBoe");
+  if (boe.checked) { boe.checked = false; toggleBoe(); }
 }
 
 function closeDay() {
@@ -382,13 +405,11 @@ function renderExistingBlackmarks() {
   box.innerHTML = rows.length ? rows.map(row => {
     const verdict = markVerdict(row);
     return `<div class="existing-blackmark ${verdict}">
-      <span class="class-colored" style="${classStyle(row.playerId)}">${escapeHtml(playerLabel(row.playerId))}</span>
-      <span class="bm-diff">${DIFFICULTY_NAMES[row.difficulty]}</span>
-      <span class="bm-raid">${escapeHtml(raidName(row.raidKey))}</span>
-      <span class="bm-verdict ${verdict}">${VERDICT_LABELS[verdict]}</span>
-      ${row.notes ? `<span class="bm-notes">备注：${escapeHtml(row.notes)}</span>` : ""}
-      <button class="button danger bm-edit" data-raid="${escapeHtml(row.raidKey)}" data-diff="${row.difficulty}">编辑</button>
-      <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除标记</button>
+      <span class="bm-who class-colored" style="${classStyle(row.playerId)}">${escapeHtml(playerNick(row.playerId))}</span>
+      <span class="bm-tag">${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}</span>
+      <span class="bm-verdict ${verdict}">${VERDICT_NAMES[verdict]}</span>
+      ${row.notes ? `<span class="bm-notes" title="${escapeHtml(row.notes)}">${escapeHtml(row.notes)}</span>` : ""}
+      <span class="bm-actions"><button class="button danger bm-edit" data-raid="${escapeHtml(row.raidKey)}" data-diff="${row.difficulty}">编辑</button><button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除</button></span>
     </div>`;
   }).join("") : "";
   box.querySelectorAll(".bm-edit").forEach(button => button.addEventListener("click", () => {
@@ -404,19 +425,36 @@ function applySelectColor(select) {
   select.style.color = playerColor(select.value);
 }
 
+function confirmReBlackmark(playerId, dateValue, raidKey, difficulty) {
+  // 玄学规则：该玩家在这个副本+难度下已有「拉了」的黑本记录，再建黑本时抛出提醒
+  if (!playerId) return true;
+  const prior = blackmarks().filter(row =>
+    row.playerId === playerId && row.date < dateValue
+    && row.raidKey === raidKey && row.difficulty === difficulty
+    && markVerdict(row) === "black");
+  if (!prior.length) return true;
+  const lines = prior.map(row =>
+    `${playerNick(playerId)}于${row.date}让${DIFFICULTY_NAMES[difficulty]}难度的${raidName(raidKey)}掉落拉了库里，备注为${row.notes ? row.notes : "无"}，确定还要让他黑本🐎？`);
+  return confirm(lines.join("\n\n"));
+}
+
 async function saveBlackmark() {
   if (!canModify()) return notify("当前账号没有修改权限。", true);
+  const playerId = $("#blackPlayer").value;
+  const raidKey = $("#blackRaid").value;
+  const difficulty = $("#blackDifficulty").value;
+  if (playerId && !confirmReBlackmark(playerId, selectedDate, raidKey, difficulty)) return;
   try {
     await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
       date: selectedDate,
-      difficulty: $("#blackDifficulty").value,
-      raidKey: $("#blackRaid").value,
-      playerId: $("#blackPlayer").value,
+      difficulty,
+      raidKey,
+      playerId,
       verdict: markVerdict({ verdict: $("#blackVerdict").value }),
       notes: $("#blackNotes").value.trim(),
     }) });
     const verdictName = VERDICT_NAMES[markVerdict({ verdict: $("#blackVerdict").value })];
-    notify($("#blackPlayer").value ? `黑本记录已保存（${raidName($("#blackRaid").value)}·${verdictName}）。` : "该副本该难度的黑本已清空。");
+    notify(playerId ? `黑本记录已保存（${raidName(raidKey)}·${verdictName}）。` : "该副本该难度的黑本已清空。");
     await load();
   } catch (error) { notify(error.message, true); }
 }
@@ -467,23 +505,22 @@ function renderBlackHistory() {
   const blackCount = rows.filter(row => markVerdict(row) === "black").length;
   const redCount = rows.filter(row => markVerdict(row) === "red").length;
   const neutralCount = rows.filter(row => markVerdict(row) === "neutral").length;
-  statsBox.innerHTML = `<span>共 <strong>${rows.length}</strong> 条</span><span class="stat-black">⚫ 黑 <strong>${blackCount}</strong> 次</span><span class="stat-red">🔴 红 <strong>${redCount}</strong> 次</span><span class="stat-neutral">⚪ 一般般 <strong>${neutralCount}</strong> 次</span>`;
+  statsBox.innerHTML = `<span>共 <strong>${rows.length}</strong> 条</span><span class="stat-black">⚫ 拉了 <strong>${blackCount}</strong> 次</span><span class="stat-red">🔴 神了 <strong>${redCount}</strong> 次</span><span class="stat-neutral">⚪ 行吧 <strong>${neutralCount}</strong> 次</span>`;
   list.innerHTML = rows.length ? rows.map(row => {
     const p = player(row.playerId);
     const verdict = markVerdict(row);
     return `<article class="history-card ${verdict}">
       <div class="history-main">
-        <span class="class-colored history-player" style="${classStyle(row.playerId)}">${escapeHtml(playerLabel(row.playerId))}</span>
-        <small>${escapeHtml(p?.className || "")}${p?.armorType ? ` · ${ARMOR_NAMES[p.armorType] || ""}` : ""}</small>
+        <span class="class-colored history-player" style="${classStyle(row.playerId)}">${escapeHtml(playerNick(row.playerId))}</span>
+        <small>${escapeHtml(p?.className || "")}</small>
       </div>
       <div class="history-meta">
         <span>${escapeHtml(row.date)}</span>
-        <span>【${DIFFICULTY_NAMES[row.difficulty]}】</span>
-        <span>【${escapeHtml(raidName(row.raidKey))}】</span>
-        <span class="bm-verdict ${verdict}">${VERDICT_LABELS[verdict]}</span>
-        ${row.notes ? `<span class="bm-notes">【${escapeHtml(row.notes)}】</span>` : ""}
+        <span>${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}</span>
+        <span class="bm-verdict ${verdict}">${VERDICT_NAMES[verdict]}</span>
+        ${row.notes ? `<span class="bm-notes" title="${escapeHtml(row.notes)}">${escapeHtml(row.notes)}</span>` : ""}
       </div>
-      <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除标记</button>
+      <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除</button>
     </article>`;
   }).join("") : "还没有任何黑本记录";
   list.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", async () => {
@@ -507,8 +544,8 @@ function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "", raidK
     && (!raidKey || row.raidKey === raidKey)
     && markVerdict(row) === "black");
   if (!sameDifficultyMarks.length) return true;
-  const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}】且判定为「黑」${row.notes ? `，备注：${row.notes}` : ""}`);
-  return confirm(`⚠ 该玩家此前在${raidKey ? raidName(raidKey) : "相同副本"}·${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同难度"}下黑本时掉落判定为「黑」（掉落拉胯）：\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`);
+  const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}】且判定为「拉了」${row.notes ? `，备注：${row.notes}` : ""}`);
+  return confirm(`⚠ 该玩家此前在${raidKey ? raidName(raidKey) : "相同副本"}·${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同难度"}下黑本时掉落「拉了」：\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`);
 }
 
 function allocationPayload() {

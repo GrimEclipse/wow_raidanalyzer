@@ -17,7 +17,7 @@ CATALOG_PATH = ROOT / "assets" / "loot" / "raid_loot_12_1.json"
 DIFFICULTIES = {"lfr", "normal", "heroic", "mythic"}
 DIFFICULTY_NAMES = {"lfr": "随机团队", "normal": "普通", "heroic": "英雄", "mythic": "史诗"}
 VERDICTS = {"black", "red", "neutral"}
-VERDICT_NAMES = {"black": "黑", "red": "红", "neutral": "一般般"}
+VERDICT_NAMES = {"black": "拉了", "red": "神了", "neutral": "行吧"}
 
 def _catalog_raid_keys() -> set[str]:
     """当前掉落目录里的副本 key 集合（潮缚石窟/烈毒之渊等）。"""
