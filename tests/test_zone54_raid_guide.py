@@ -29,14 +29,23 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         cls.document = build_document(discovery, authored, timelines)
 
-    def test_guide_contains_all_bosses_and_keeps_ulatek_as_expected_untested(self):
+    def test_guide_contains_all_bosses_and_live_ulatek_normal_evidence(self):
         self.assertEqual(len(self.document["bosses"]), 9)
         ulatek = next(
             boss for boss in self.document["bosses"] if boss["key"] == "ulatek"
         )
-        self.assertTrue(ulatek["expectedUntested"])
+        self.assertEqual(self.document["zoneID"], 53)
+        self.assertEqual(ulatek["encounterID"], 3492)
+        self.assertFalse(ulatek["expectedUntested"])
+        self.assertTrue(ulatek["hasNormalEvidence"])
         self.assertFalse(ulatek["hasHeroicEvidence"])
         self.assertFalse(ulatek["hasMythicEvidence"])
+        self.assertIn("normal", ulatek["timelines"])
+        self.assertGreaterEqual(len(ulatek["mechanics"]), 6)
+        self.assertTrue(any(
+            mechanic.get("heroicNotes")
+            for mechanic in ulatek["mechanics"]
+        ))
         nymrissa = next(
             boss for boss in self.document["bosses"]
             if boss["key"] == "nymrissa_wavecaller"
@@ -132,12 +141,41 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertIn("疑似可躲 / 需复核", tags)
         self.assertIn("伤害", tags)
 
+    def test_area_damage_classification_is_static_and_preserved(self):
+        reference = self.document["areaDamageReference"]
+        self.assertIn("docs.google.com/spreadsheets", reference["url"])
+        self.assertIn("docs.qq.com/sheet", reference["translationUrl"])
+
+        nakzali = next(
+            boss for boss in self.document["bosses"] if boss["key"] == "nakzali"
+        )
+        spells = {spell["spellID"]: spell for spell in nakzali["spells"]}
+        self.assertIs(spells[1292034]["areaDamage"], True)
+        self.assertIs(spells[1284109]["areaDamage"], False)
+        self.assertIs(spells[1284110]["areaDamage"], False)
+        self.assertEqual(spells[1284110]["nameZh"], "摄魂打击")
+        self.assertEqual(spells[1284110]["categories"], ["playerDebuffs"])
+        self.assertIsNone(spells[1284103]["areaDamage"])
+        self.assertNotIn("areaDamage", next(
+            mechanic for mechanic in nakzali["mechanics"]
+            if mechanic["title"] == "摄魂打击与附身弹幕"
+        ))
+
+        restless = next(
+            mechanic for mechanic in nakzali["mechanics"]
+            if mechanic["title"] == "无眠的阿曼尼"
+        )
+        self.assertEqual(nakzali["energy"]["displayMode"], "rules")
+        self.assertEqual(restless["leaderSpellIDs"], [1289919])
+        self.assertEqual(restless["displaySpellIDs"], [1289919, 1287533, 1294729])
+
     def test_static_page_uses_chinese_tooltips_and_generated_payload(self):
         page = (ROOT / "frontend" / "tools" / "raid-guide" / "index.html").read_text(encoding="utf-8")
         self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
         self.assertIn("data-wowhead=\"domain=cn&amp;dd=15\"", page)
         self.assertIn('data-wh-rename-link="true"', page)
         self.assertIn("https://www.wowhead.com/cn/spell=${spellID}", page)
+        self.assertIn("英雄难度变化", page)
         self.assertTrue(all(
             spell["wowheadUrl"].startswith("https://www.wowhead.com/cn/spell=")
             for boss in self.document["bosses"]
@@ -173,12 +211,22 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertNotIn("人工明细已复核", page)
         self.assertNotIn("流程与分类待复核", page)
         self.assertNotIn("个流程阶段", page)
-        self.assertIn("未经过测试 · 阶段未知", page)
-        self.assertIn("boss-test-note", page)
+        self.assertNotIn("阶段未知", page)
+        self.assertNotIn("boss-test-note", page)
         self.assertIn("assets/vendor/zone54-raid-guide-data.js", page)
         self.assertIn("Boss 切换", page)
-        self.assertIn("战斗大概时间分析（粗略时间轴）", page)
+        self.assertIn("战斗过程分析", page)
+        self.assertIn("团本手册", page)
         self.assertIn("开发 ID 明细", page)
+        self.assertIn('data-category="areaDamage">范围伤害</button>', page)
+        self.assertIn("function displaySpellTags", page)
+        self.assertIn('label: "单体伤害"', page)
+        self.assertIn('label: "敌方cast"', page)
+        self.assertIn('label: "阶段信号"', page)
+        self.assertIn("return tags.slice(0, 4)", page)
+        self.assertNotIn("...(spell.categoryLabels || [])", page)
+        self.assertNotIn("...(spell.tags || [])", page)
+        self.assertIn("中文 / 英文技能名或法术 ID", page)
         self.assertIn('href="/raid-guide#timeline" data-section-target="timeline"', page)
         self.assertNotIn('href="#timeline"', page)
         self.assertIn('target.scrollIntoView({behavior: "smooth", block: "start"})', page)
@@ -251,6 +299,10 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         self.assertEqual(eruption["nameZh"], "原毒喷发")
         self.assertEqual(sentinels["energy"]["title"], "循环与转阶段")
+        self.assertNotIn("腐毒停滞", json.dumps(sentinels, ensure_ascii=False))
+        split_phase = next(row for row in sentinels["phases"] if row["key"] == "split-cycle")
+        self.assertEqual(split_phase["leaderSpellIDs"], [1290189, 1284494, 1284503])
+        self.assertEqual(mythic["displaySpellIDs"], [1296878])
         self.assertTrue(all(row.get("leaderDetails") for row in sentinels["mechanics"]))
         self.assertTrue(all(row.get("wipePoints") for row in sentinels["mechanics"]))
         stasis = next(
@@ -284,8 +336,9 @@ class Zone54RaidGuideTests(unittest.TestCase):
             boss for boss in self.document["bosses"] if boss["key"] == "vashnik"
         )
         self.assertEqual(vashnik["reviewStatus"], "reviewed")
-        self.assertIn("固定时间轴", vashnik["summary"])
-        self.assertIn("三座能量之泉", vashnik["summary"])
+        self.assertEqual(vashnik["order"], 4)
+        self.assertIn("时间轴基本固定", vashnik["summary"])
+        self.assertIn("三座能量泉水", vashnik["summary"])
         self.assertEqual(vashnik["energy"]["displayMode"], "rules")
         wave = next(
             mechanic for mechanic in vashnik["mechanics"]
@@ -293,7 +346,8 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         self.assertIn(1295798, wave["spellIDs"])
         self.assertIn("Assignment", wave["details"][3])
-        self.assertEqual(wave["leaderSpellIDs"], [1280935])
+        self.assertEqual(wave["leaderSpellIDs"], [1281907])
+        self.assertIn("瘟疫泡沫会点名四名玩家", wave["summary"])
         self.assertGreaterEqual(len(wave["wipePoints"]), 3)
         infection = next(
             mechanic for mechanic in vashnik["mechanics"]
@@ -308,7 +362,18 @@ class Zone54RaidGuideTests(unittest.TestCase):
             mechanic for mechanic in vashnik["mechanics"]
             if mechanic["evidenceType"] == "unavoidable-raid-aoe"
         )
-        self.assertNotIn("wipePoints", catalyst)
+        self.assertIn(1282601, catalyst["spellIDs"])
+        self.assertTrue(any("每个落点" in row for row in catalyst["leaderDetails"]))
+        self.assertTrue(any("空圈" in row for row in catalyst["wipePoints"]))
+        self.assertIn(1314273, infection["spellIDs"])
+        self.assertTrue(any("每 1.5 秒" in row for row in infection["leaderDetails"]))
+        mythic_extra = next(
+            mechanic for mechanic in vashnik["mechanics"]
+            if mechanic["evidenceType"] == "mythic-assigned-target"
+        )
+        self.assertIn(1306746, mythic_extra["spellIDs"])
+        self.assertIn(1309774, mythic_extra["spellIDs"])
+        self.assertTrue(any("首周实战日志" in row for row in mythic_extra["leaderDetails"]))
         heroic = vashnik["timelines"]["heroic"]
         mythic = vashnik["timelines"]["mythic"]
         self.assertTrue(heroic["kill"])
@@ -338,6 +403,10 @@ class Zone54RaidGuideTests(unittest.TestCase):
             if row["key"] == "lostexplorers"
         )
         self.assertEqual(boss["reviewStatus"], "reviewed")
+        self.assertEqual(boss["order"], 3)
+        videos = self.document["sources"]["referenceVideos"]
+        self.assertEqual(videos[2]["title"], "H3-迷失的探险者")
+        self.assertEqual(videos[3]["title"], "H4-万毒邪祟者瓦什尼克")
         self.assertEqual(boss["energy"]["maximum"], 4)
         self.assertEqual(len(boss["phases"]), 3)
         self.assertEqual(len(boss["mechanics"]), 10)
@@ -346,6 +415,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
             mechanic for mechanic in boss["mechanics"]
             if mechanic["evidenceType"] == "result-only-interaction-cycle"
         )
+        self.assertTrue(any("直接宣告 Boss 战失败" in row for row in fish["wipePoints"]))
         self.assertTrue(any("WCL" in row for row in fish["details"]))
         self.assertTrue(any("1296975" in row for row in fish["details"]))
         self.assertIn(1306145, fish["spellIDs"])

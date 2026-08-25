@@ -30,9 +30,9 @@ class RaidCooldownTests(unittest.TestCase):
         self.assertIn("阶段转换", page)
         self.assertIn("（+${clock(row.phaseTimeMs ?? row.timeMs)}）", page)
 
-    def test_options_include_live_12_0_and_ptr_boss_lists(self):
+    def test_options_include_live_12_0_and_12_1_boss_lists(self):
         options = options_document()
-        self.assertEqual([row["key"] for row in options["versions"]], ["12.0", "12.1 PTR"])
+        self.assertEqual([row["key"] for row in options["versions"]], ["12.0", "12.1"])
         raids = {row["key"]: row for row in options["raids"]}
         self.assertEqual(raids["void_spire"]["version"], "12.0")
         self.assertEqual(
@@ -40,11 +40,16 @@ class RaidCooldownTests(unittest.TestCase):
             [3176, 3177, 3179, 3178, 3180, 3181],
         )
         self.assertEqual(len(raids["venomous_abyss"]["bosses"]), 8)
+        self.assertEqual(raids["venomous_abyss"]["zoneID"], 53)
+        self.assertEqual(
+            [row["encounterID"] for row in raids["venomous_abyss"]["bosses"]],
+            [3470, 3445, 3455, 3497, 3420, 3421, 3429, 3492],
+        )
         self.assertEqual(
             raids["tidebound_grotto"]["bosses"][0]["key"],
             "nymrissa_wavecaller",
         )
-        self.assertEqual(raids["tidebound_grotto"]["zoneID"], 57)
+        self.assertEqual(raids["tidebound_grotto"]["zoneID"], 53)
         self.assertEqual(raids["tidebound_grotto"]["bosses"][0]["encounterID"], 3379)
 
     def test_non_healer_specs_use_common_chinese_labels(self):
@@ -72,21 +77,14 @@ class RaidCooldownTests(unittest.TestCase):
         )
         self.assertEqual([row["specLabel"] for row in timeline], ["元素 萨满祭司", "增辉 唤魔师"])
 
-    def test_ptr_discovery_fallback_uses_checked_in_reports(self):
-        self.assertIn("xBt6r2LqHzdfkZN7", _discovery_report_codes("venomous_abyss", 4))
-        self.assertIn("g2Cm9dXRjxAT61Dw", _discovery_report_codes("venomous_abyss", 4))
-        self.assertIn("HPrGLV84XRJjCykN", _discovery_report_codes("venomous_abyss", 5))
+    def test_live_search_does_not_seed_ptr_discovery_reports(self):
+        self.assertEqual(_discovery_report_codes("venomous_abyss", 4), [])
+        self.assertEqual(_discovery_report_codes("venomous_abyss", 5), [])
         self.assertEqual(_discovery_report_codes("void_spire", 5), [])
-        self.assertEqual(
-            _discovery_report_codes("tidebound_grotto", 4, 3379),
-            ["zpRDdcafg7hCrT9Y"],
-        )
-        self.assertEqual(
-            _discovery_report_codes("tidebound_grotto", 5, 3379),
-            ["ZmYa6M2QV4hbLCry"],
-        )
+        self.assertEqual(_discovery_report_codes("tidebound_grotto", 4, 3379), [])
+        self.assertEqual(_discovery_report_codes("tidebound_grotto", 5, 3379), [])
 
-    def test_zone_report_listing_adds_public_ptr_candidates(self):
+    def test_zone_report_listing_adds_public_live_candidates(self):
         raid_cooldowns._CACHE.clear()
         with patch.object(raid_cooldowns, "_client_graphql", return_value={
             "reportData": {"reports": {
@@ -97,7 +95,7 @@ class RaidCooldownTests(unittest.TestCase):
                 "data": [{"code": "PTR-PUBLIC-1"}, {"code": "PTR-PUBLIC-2"}],
             }}
         }):
-            result = raid_cooldowns._zone_report_codes("token", 54)
+            result = raid_cooldowns._zone_report_codes("token", 53)
         self.assertEqual(result["codes"], ["PTR-PUBLIC-1", "PTR-PUBLIC-2"])
         self.assertEqual(result["total"], 27)
 
@@ -264,11 +262,11 @@ class RaidCooldownTests(unittest.TestCase):
         self.assertIn("{spell:98008}", export_mrt(timeline))
         nsrt = export_nsrt(
             timeline,
-            encounter_id=53455,
+            encounter_id=3455,
             difficulty=5,
             encounter_name="Vashnik the Malignant",
         )
-        self.assertIn("EncounterID:53455;Difficulty:Mythic", nsrt)
+        self.assertIn("EncounterID:3455;Difficulty:Mythic", nsrt)
         self.assertIn("time:30;ph:1;tag:奶萨;spellid:98008;", nsrt)
         self.assertIn("00:30\tP1\t00:30\t奶萨\t灵魂链接图腾\t98008", export_timestamp_tsv(timeline))
 

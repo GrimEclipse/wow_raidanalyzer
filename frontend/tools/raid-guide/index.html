@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <base href="../../../">
-    <title>12.1 · 团长战斗手册</title>
+    <title>团本手册</title>
     <script>
         const whTooltips = {
             colorLinks: false,
@@ -137,14 +137,6 @@
         .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #5e6878; }
         .status-dot.reviewed { background: var(--green); box-shadow: 0 0 10px rgba(79, 209, 165, .7); }
         .boss-status { display: flex; align-items: center; gap: 7px; }
-        .boss-test-note {
-            color: #e5b95c;
-            font-size: 9px;
-            font-weight: 800;
-            line-height: 1.25;
-            text-align: right;
-            white-space: nowrap;
-        }
         .sidebar-note { margin: 18px 6px 4px; color: #657286; font-size: 11px; line-height: 1.6; }
         .main { min-width: 0; padding: 24px clamp(18px, 4vw, 60px) 70px; }
         .content { max-width: 1320px; margin: 0 auto; }
@@ -512,6 +504,16 @@
         .chip.damage { border-color: #e65d68; color: #ffabb1; background: rgba(133, 36, 46, .22); }
         .chip.healer { border-color: #48b976; color: #9ce8b7; background: rgba(33, 116, 70, .22); }
         .chip.control { border-color: #a978e3; color: #d8baff; background: rgba(103, 60, 152, .22); }
+        .spell-tags .area-damage {
+            border-color: #4e9f7d;
+            color: #a9efd1;
+            background: rgba(35, 119, 83, .22);
+        }
+        .spell-tags .single-target {
+            border-color: #48566b;
+            color: #9aa8ba;
+            background: rgba(72, 86, 107, .17);
+        }
         .mechanic-details { margin: 13px 0 0; padding-left: 20px; color: #9fabbb; }
         .mechanic-details li { margin: 6px 0; }
         .mechanic-spell-cluster { min-width: min(320px, 44%); }
@@ -625,7 +627,7 @@
         .evidence b { display: block; color: #778499; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
         .evidence span { display: block; margin-top: 2px; color: #c4cedb; font: 10px/1.45 ui-monospace, monospace; }
         .spell-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 9px; }
-        .spell-tags span { color: #8491a3; font-size: 9px; }
+        .spell-tags span { padding: 1px 5px; border: 1px solid transparent; border-radius: 999px; color: #8491a3; font-size: 9px; }
         .spell-tags span::before { content: "#"; color: #4f5c70; }
         .no-results { padding: 32px; color: #738196; text-align: center; border: 1px dashed #2c3546; border-radius: 10px; }
         .footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: #5f6b7d; font-size: 11px; }
@@ -657,7 +659,7 @@
         <div class="brand">
             <div class="brand-mark">12.1</div>
             <div>
-                <h1>12.1 · 团长手册</h1>
+                <h1>团本手册</h1>
                 <p>The Venomous Abyss / Tidebound Grotto</p>
             </div>
         </div>
@@ -668,7 +670,7 @@
         <div class="side-label">Encounter index</div>
         <nav id="bossList" class="boss-list" aria-label="Boss 切换"></nav>
         <p class="sidebar-note">
-            绿色表示已有人工复核的带团明细；乌拉特克未经过测试，阶段未知。
+            绿色表示已有人工复核的带团明细。
             鼠标悬停技能图标可查看完整说明。
         </p>
     </aside>
@@ -686,7 +688,7 @@
             </header>
 
             <nav class="section-nav" aria-label="页面章节">
-                <a href="/raid-guide#phases" data-section-target="phases">粗略时间轴</a>
+                <a href="/raid-guide#phases" data-section-target="phases">战斗过程</a>
                 <a href="/raid-guide#mechanics" data-section-target="mechanics">技能分析</a>
                 <a href="/raid-guide#timeline" data-section-target="timeline">详细时间轴</a>
                 <a href="/raid-guide#evidence" data-section-target="evidence">开发 ID 明细</a>
@@ -697,8 +699,7 @@
             <section id="phases" class="guide-section">
                 <div class="section-heading">
                     <div>
-                        <h3>战斗大概时间分析（粗略时间轴）</h3>
-                        <p>团长讲解顺序、阶段目标与关键转场。</p>
+                        <h3>战斗过程分析</h3>
                     </div>
                 </div>
                 <div id="phaseRail" class="phase-rail"></div>
@@ -733,8 +734,9 @@
                     <span id="spellCount" class="spell-count"></span>
                 </div>
                 <div class="filters">
-                    <input id="spellSearch" class="search" type="search" placeholder="搜索英文技能名或法术 ID">
+                    <input id="spellSearch" class="search" type="search" placeholder="搜索中文 / 英文技能名或法术 ID">
                     <button class="filter-button active" data-category="all">全部</button>
+                    <button class="filter-button" data-category="areaDamage">范围伤害</button>
                     <button class="filter-button" data-category="damageAbilities">伤害</button>
                     <button class="filter-button" data-category="playerDebuffs">Debuff</button>
                     <button class="filter-button" data-category="bossAuras">Aura</button>
@@ -747,7 +749,7 @@
 
             <footer class="footer">
                 英文技能名与法术 ID 是稳定键；中文名称与机制结论属于项目人工维护层。
-                Wowhead tooltip 需要联网，离线时链接和本地 WCL 证据仍可正常查看。
+                Wowhead tooltip 依赖外部网络；外部服务不可用时，系统内的 WCL 证据仍可正常查看。
             </footer>
         </div>
     </main>
@@ -777,6 +779,32 @@
 
     function spellById(boss, spellID) {
         return boss.spells.find(spell => Number(spell.spellID) === Number(spellID));
+    }
+
+    function isMythicOnly(spell) {
+        return Boolean(spell.journal?.mythicOnly)
+            || (spell.tags || []).some(tag => tag === "史诗" || tag === "仅史诗");
+    }
+
+    function isPhaseSignal(boss, spellID) {
+        return Object.values(boss.timelines || {}).some(timeline =>
+            (timeline.phaseMarkers || []).some(marker => Number(marker.spellID) === Number(spellID))
+        );
+    }
+
+    function displaySpellTags(boss, spell) {
+        const tags = [];
+        if (spell.areaDamage === true) tags.push({label: "范围伤害", className: "area-damage"});
+        if (spell.areaDamage === false) tags.push({label: "单体伤害", className: "single-target"});
+
+        const categories = spell.categories || [];
+        if (categories.includes("enemyCasts")) tags.push({label: "敌方cast", className: ""});
+        else if (categories.includes("playerDebuffs")) tags.push({label: "debuff", className: ""});
+        else if (categories.includes("bossAuras")) tags.push({label: "敌方增益", className: ""});
+
+        if (isMythicOnly(spell)) tags.push({label: "史诗", className: ""});
+        if (isPhaseSignal(boss, spell.spellID)) tags.push({label: "阶段信号", className: ""});
+        return tags.slice(0, 4);
     }
 
     function spellLink(boss, spellID) {
@@ -854,7 +882,7 @@
     }
 
     function mechanicSpellCluster(boss, mechanic) {
-        const allIDs = [...new Set((mechanic.spellIDs || []).map(Number).filter(Boolean))];
+        const allIDs = [...new Set((mechanic.displaySpellIDs || mechanic.spellIDs || []).map(Number).filter(Boolean))];
         const spells = allIDs.map(spellID => spellById(boss, spellID)).filter(Boolean);
         if (!spells.length) return "";
         const choosePrimary = candidates => candidates.find(spell => (spell.categories || []).includes("enemyCasts"))
@@ -903,7 +931,6 @@
                     <span class="boss-name"><strong>${escapeHtml(boss.nameZh)}</strong><span>${escapeHtml(boss.nameEn)}</span></span>
                     <span class="boss-status">
                         <span class="status-dot ${boss.reviewStatus === "reviewed" ? "reviewed" : ""}"></span>
-                        ${boss.expectedUntested ? '<span class="boss-test-note">未测试<br>阶段未知</span>' : ""}
                     </span>
                 </button>`).join("")}`;
         }).join("");
@@ -918,9 +945,7 @@
         $("bossName").textContent = boss.nameZh;
         $("bossEnglish").textContent = boss.nameEn;
         $("bossSummary").textContent = boss.summary;
-        $("bossMeta").innerHTML = boss.expectedUntested
-            ? '<span class="pill warn">未经过测试 · 阶段未知</span>'
-            : "";
+        $("bossMeta").innerHTML = "";
     }
 
     function renderEnergy(boss) {
@@ -962,7 +987,7 @@
                 <h4>${escapeHtml(phase.title)}</h4>
                 <div class="phase-trigger">${escapeHtml(phase.trigger)}</div>
                 <p class="phase-goal">${escapeHtml(phase.goal)}</p>
-                <div class="spell-line">${(phase.leaderSpellIDs || phase.spellIDs || []).slice(0, 2).map(id => leaderSpellLink(boss, id)).join("")}</div>
+                <div class="spell-line">${(phase.leaderSpellIDs || phase.spellIDs || []).slice(0, 3).map(id => leaderSpellLink(boss, id)).join("")}</div>
             </article>
         `).join("") || '<div class="draft-empty">尚未形成阶段草案。</div>';
     }
@@ -981,9 +1006,9 @@
     function renderTimeline(boss) {
         const panel = $("timelinePanel");
         const timelines = boss.timelines || {};
-        const available = ["heroic", "mythic"].filter(mode => timelines[mode]);
+        const available = ["normal", "heroic", "mythic"].filter(mode => timelines[mode]);
         if (!available.length) {
-            panel.innerHTML = '<div class="timeline-empty">当前没有经过验证的 H/M 击杀时间轴；不会用未击杀样本强行拼接流程。</div>';
+            panel.innerHTML = '<div class="timeline-empty">当前没有经过验证的正式服击杀时间轴；不会用未击杀样本强行拼接流程。</div>';
             return;
         }
         if (!timelines[state.timelineDifficulty]) {
@@ -1077,7 +1102,9 @@
                     <div class="timeline-tabs">
                         ${available.map(item => {
                             const itemTimeline = boss.timelines[item];
-                            const difficultyLabel = item === "heroic" ? "Heroic" : "Mythic";
+                            const difficultyLabel = item === "normal"
+                                ? "Normal"
+                                : (item === "heroic" ? "Heroic" : "Mythic");
                             return `<button class="timeline-tab ${item === mode ? "active" : ""}"
                                 data-timeline-mode="${item}">${difficultyLabel} ${itemTimeline?.kill ? "击杀" : "最长样本"}</button>`;
                         }).join("")}
@@ -1138,6 +1165,9 @@
                     ${(mechanic.leaderDetails || []).length
                         ? `<ul class="mechanic-details">${mechanic.leaderDetails.map(detail => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>`
                         : ""}
+                    ${(mechanic.heroicNotes || []).length
+                        ? `<div class="mythic-note"><strong>英雄难度变化</strong>${mechanic.heroicNotes.map(note => `<div>${escapeHtml(note)}</div>`).join("")}</div>`
+                        : ""}
                     ${(mechanic.mythicNotes || []).length
                         ? `<div class="mythic-note"><strong>史诗难度变化</strong>${mechanic.mythicNotes.map(note => `<div>${escapeHtml(note)}</div>`).join("")}</div>`
                         : ""}
@@ -1152,7 +1182,8 @@
     function renderSpells(boss) {
         const query = state.query.trim().toLowerCase();
         const rows = boss.spells.filter(spell => {
-            if (state.category !== "all" && !spell.categories.includes(state.category)) return false;
+            if (state.category === "areaDamage" && spell.areaDamage !== true) return false;
+            if (state.category !== "all" && state.category !== "areaDamage" && !spell.categories.includes(state.category)) return false;
             if (state.reviewedOnly && spell.reviewStatus !== "reviewed") return false;
             if (!query) return true;
             return String(spell.spellID).includes(query)
@@ -1169,8 +1200,7 @@
                     </span>
                 </div>
                 <div class="spell-tags">
-                    ${[...(spell.categoryLabels || []), ...(spell.tags || [])].map(tag => `<span>${escapeHtml(tag)}</span>`).join("")}
-                    ${spell.journal.mythicOnly ? "<span>仅史诗</span>" : ""}
+                    ${displaySpellTags(boss, spell).map(tag => `<span class="${escapeHtml(tag.className)}">${escapeHtml(tag.label)}</span>`).join("")}
                 </div>
             </article>
         `).join("") || '<div class="no-results">没有符合当前筛选条件的法术。</div>';
@@ -1195,7 +1225,7 @@
         renderTimeline(boss);
         renderMechanics(boss);
         renderSpells(boss);
-        document.title = `${boss.nameZh} · 12.1团长手册`;
+        document.title = `${boss.nameZh} · 团本手册`;
         refreshWowhead();
     }
 

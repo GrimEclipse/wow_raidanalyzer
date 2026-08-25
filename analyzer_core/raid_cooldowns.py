@@ -77,25 +77,24 @@ RAIDS = {
         ],
     },
     "venomous_abyss": {
-        "version": "12.1 PTR",
-        "zoneID": 54,
+        "version": "12.1",
+        "zoneID": 53,
         "name": "烈毒之渊",
         "bosses": [
-            {"key": "nakzali", "name": "缚魂者内克扎莉", "encounterID": 53470},
-            {"key": "sentinels", "name": "陵寝哨兵", "encounterID": 53445},
-            {"key": "vashnik", "name": "万毒邪祟者瓦什尼克", "encounterID": 53455},
-            {"key": "lostexplorers", "name": "迷失的探险者", "encounterID": 53497},
-            {"key": "sszorak", "name": "斯索拉克", "encounterID": 53420},
-            {"key": "twinfangs", "name": "双子毒牙", "encounterID": 53421},
-            {"key": "bargained", "name": "盘卷祭坛", "encounterID": 53429},
-            {"key": "ulatek", "name": "乌拉特克", "encounterID": 53492},
+            {"key": "nakzali", "name": "缚魂者内克扎莉", "encounterID": 3470},
+            {"key": "sentinels", "name": "陵寝哨兵", "encounterID": 3445},
+            {"key": "vashnik", "name": "万毒邪祟者瓦什尼克", "encounterID": 3455},
+            {"key": "lostexplorers", "name": "迷失的探险者", "encounterID": 3497},
+            {"key": "sszorak", "name": "斯索拉克", "encounterID": 3420},
+            {"key": "twinfangs", "name": "双子毒牙", "encounterID": 3421},
+            {"key": "bargained", "name": "盘卷祭坛", "encounterID": 3429},
+            {"key": "ulatek", "name": "乌拉特克", "encounterID": 3492},
         ],
     },
     "tidebound_grotto": {
-        "version": "12.1 PTR",
-        # PTR rankings are incomplete, so supplied reports remain the preferred
-        # source; Zone 57 is still useful for discovering additional samples.
-        "zoneID": 57,
+        "version": "12.1",
+        # The live WCL zone groups the one-boss lair with the main raid.
+        "zoneID": 53,
         "name": "潮缚石窟",
         "bosses": [
             {"key": "nymrissa_wavecaller", "name": "尼姆瑞莎·唤潮者", "encounterID": 3379},
@@ -359,11 +358,10 @@ def _discovery_report_codes(
 ) -> list[str]:
     key = "mythic" if int(difficulty) == 5 else "heroic"
     codes = []
-    if raid_key == "venomous_abyss":
-        discovery_path = next((path for path in ZONE54_DISCOVERY_PATHS if path.is_file()), None)
-        if discovery_path is not None:
-            data = json.loads(discovery_path.read_text(encoding="utf-8"))
-            codes.extend(str(value) for value in (data.get("reports") or {}).get(key) or [])
+    raid = RAIDS.get(raid_key) or {}
+    # The checked-in discovery catalog intentionally preserves PTR evidence for
+    # comparison. Live raid searches must use rankings and Zone 53 instead of
+    # treating those historical report IDs as formal candidates.
 
     if encounter_id is not None:
         boss_key = next((
@@ -372,7 +370,10 @@ def _discovery_report_codes(
             if int(boss.get("encounterID") or 0) == int(encounter_id)
         ), None)
         reference = _reference_phase_data(boss_key, difficulty) if boss_key else {}
-        if reference.get("reportID"):
+        if (
+            reference.get("reportID")
+            and int(reference.get("zoneID") or 0) == int(raid.get("zoneID") or 0)
+        ):
             codes.append(str(reference["reportID"]))
     return list(dict.fromkeys(codes))
 
@@ -384,12 +385,22 @@ def _reference_timelines() -> dict:
     return json.loads(ZONE54_TIMELINES_PATH.read_text(encoding="utf-8"))
 
 
-def _reference_phase_data(boss_key: str, difficulty: int) -> dict:
+def _reference_phase_data(
+    boss_key: str,
+    difficulty: int,
+    *,
+    raid_key: str | None = None,
+) -> dict:
     difficulty_key = "mythic" if int(difficulty) == 5 else "heroic"
-    return (
+    reference = (
         ((_reference_timelines().get("bosses") or {}).get(boss_key) or {}).get(difficulty_key)
         or {}
     )
+    if raid_key:
+        live_zone_id = int((RAIDS.get(raid_key) or {}).get("zoneID") or 0)
+        if int(reference.get("zoneID") or 0) != live_zone_id:
+            return {}
+    return reference
 
 
 def _report_overview(token: str, report_code: str) -> dict:
@@ -1288,7 +1299,7 @@ def search_raid_cooldowns(payload: dict) -> dict:
             fight_end=candidate["endTime"],
             phase_transitions=candidate.get("phaseTransitions") or [],
             phase_metadata=candidate.get("phaseMetadata") or [],
-            reference=_reference_phase_data(boss_key, difficulty),
+            reference=_reference_phase_data(boss_key, difficulty, raid_key=raid_key),
             report_id=candidate["reportID"],
             fight_id=candidate["fightID"],
         )

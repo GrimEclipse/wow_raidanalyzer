@@ -274,7 +274,7 @@
               "key": "nakzali",
               "order": 1,
               "name": "盘魂者内克扎利",
-              "encounterIds": [53470],
+              "encounterIds": [3470, 53470],
               "englishName": "Nek'zali the Soulcoiler",
               "externalKey": "wow.venomabyss,01.nakzali",
               "aliases": ["「缠魂者」尼札利"],

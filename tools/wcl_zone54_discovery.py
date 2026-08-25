@@ -1,4 +1,4 @@
-"""Collect a difficulty-aware spell/evidence catalog for WCL zone 54.
+"""Collect a difficulty-aware spell/evidence catalog for the live WCL raid zone.
 
 This is a developer discovery tool, not a player-facing analysis entry point.
 It uses Heroic kills/long pulls as the baseline, Mythic pulls as observed
@@ -17,22 +17,17 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-ZONE_ID = 54
-DIFFICULTIES = {4: "heroic", 5: "mythic"}
+ZONE_ID = 53
+DIFFICULTIES = {3: "normal", 4: "heroic", 5: "mythic"}
 ENCOUNTERS = {
-    53470: {"key": "nakzali", "name": "Nek'zali the Soulcoiler"},
-    53445: {"key": "sentinels", "name": "Entombed Sentinels"},
-    53455: {"key": "vashnik", "name": "Vashnik the Malignant"},
-    53497: {"key": "lostexplorers", "name": "The Lost Explorers"},
-    53420: {"key": "sszorak", "name": "Sszorak"},
-    53421: {"key": "twinfangs", "name": "The Twin Fangs"},
-    53429: {"key": "bargained", "name": "The Coiled Altar"},
-    53492: {
-        "key": "ulatek",
-        "name": "Ula'tek",
-        "expectedUntested": True,
-        "note": "团队副本尾王按惯例不开放公开测试，缺少 Mythic 日志属于预期状态。",
-    },
+    3470: {"key": "nakzali", "name": "Nek'zali the Soulcoiler"},
+    3445: {"key": "sentinels", "name": "Entombed Sentinels"},
+    3497: {"key": "lostexplorers", "name": "The Lost Explorers"},
+    3455: {"key": "vashnik", "name": "Vashnik the Malignant"},
+    3420: {"key": "sszorak", "name": "Sszorak"},
+    3421: {"key": "twinfangs", "name": "The Twin Fangs"},
+    3429: {"key": "bargained", "name": "The Coiled Altar"},
+    3492: {"key": "ulatek", "name": "Ula'tek"},
 }
 
 MODE_DRAFTS = {
@@ -198,7 +193,7 @@ SPELL_ZH = {
     1277025: "顶级掠食者",
     1277027: "毁伤",
     1280189: "恶性反应",
-    1280935: "瘟疫泡沫",
+    1280935: "滴毒之牙",
     1281907: "瘟疫泡沫",
     1282116: "适应性毒素",
     1282117: "适应性感染",
@@ -207,6 +202,10 @@ SPELL_ZH = {
     1282419: "不稳定毒液",
     1282487: "熔炉之牙",
     1282525: "恶性催化",
+    1282601: "催化胆汁",
+    1282602: "催化胆汁",
+    1282616: "催化胆汁",
+    1282931: "催化胆汁",
     1282869: "腐蚀毒液",
     1283164: "汲取",
     1283290: "剧毒地面",
@@ -334,7 +333,7 @@ SPELL_ZH = {
     1297367: "毒蛇之怒",
     1297414: "大开杀戒",
     1297624: "仪式灼烧",
-    1297644: "团结光环",
+    1297644: "联合防御",
     1297645: "联合防御",
     1297646: "联合防御",
     1297648: "冰霜地带",
@@ -1054,7 +1053,10 @@ def merge_spell_catalog(evidence, journal):
 
 def migrate_result(result):
     if int(result.get("schemaVersion") or 1) >= 2:
-        result.setdefault("reports", {"heroic": [], "mythic": []})
+        result.setdefault("reports", {"normal": [], "heroic": [], "mythic": []})
+        result["reports"].setdefault("normal", [])
+        result["reports"].setdefault("heroic", [])
+        result["reports"].setdefault("mythic", [])
         return result
     old_reports = result.get("reports") or []
     bosses = {}
@@ -1081,7 +1083,7 @@ def migrate_result(result):
     return {
         "schemaVersion": 2,
         "zoneID": result.get("zoneID") or ZONE_ID,
-        "reports": {"heroic": [], "mythic": old_reports},
+        "reports": {"normal": [], "heroic": [], "mythic": old_reports},
         "bosses": bosses,
         "missingEncounterIDs": {},
         "expectedUntested": result.get("expectedUntested") or [],
@@ -1126,13 +1128,14 @@ def render_markdown(document):
         "",
     ]
     for key, boss in document["bosses"].items():
+        normal = (boss.get("evidence") or {}).get("normal")
         heroic = (boss.get("evidence") or {}).get("heroic")
         mythic = (boss.get("evidence") or {}).get("mythic")
         lines.extend([
             f"## {BOSS_ZH.get(key, boss['name'])} / {boss['name']} (`{key}`)",
             "",
         ])
-        for label, analysis in (("英雄", heroic), ("史诗", mythic)):
+        for label, analysis in (("普通", normal), ("英雄", heroic), ("史诗", mythic)):
             if not analysis:
                 lines.append(f"- {label}代表战斗：无")
                 continue
@@ -1146,8 +1149,8 @@ def render_markdown(document):
             f"- 地下城手册收录 {len(journal.get('spells') or [])} 个法术 ID；"
             f"其中日志尚未观察到 {len((boss.get('spellCatalog') or {}).get('journalOnly') or [])} 个。"
         )
-        if key == "ulatek":
-            lines.append("- 状态：惯例不开放尾王公开测试；以下只有手册证据，不应误标为数据缺失。")
+        if key == "ulatek" and normal:
+            lines.append("- 状态：已接入正式服普通难度击杀；英雄与史诗差异继续以手册标注，等待对应日志复核。")
 
         lines.extend(["", "### 战斗阶段（初稿）", ""])
         lines.append("| 阶段 | 触发/边界 | 核心 spell ID | 大致机制 |")
@@ -1170,8 +1173,8 @@ def render_markdown(document):
             if not rows:
                 lines.append("该类别在当前代表日志中没有可用记录。")
                 continue
-            lines.append("| spell ID | 技能（中文编辑译名 / 英文稳定名） | 英雄证据 | 史诗证据 | 机制/取证用途 |")
-            lines.append("|---:|---|---|---|---|")
+            lines.append("| spell ID | 技能（中文编辑译名 / 英文稳定名） | 普通证据 | 英雄证据 | 史诗证据 | 机制/取证用途 |")
+            lines.append("|---:|---|---|---|---|---|")
             for row in rows:
                 spell_id = int(row["spellID"])
                 name = str(
@@ -1182,7 +1185,8 @@ def render_markdown(document):
                 hint = mechanic_hint(key, category, row).replace("|", "／")
                 lines.append(
                     f"| `{spell_id}` | {spell_label(spell_id, name)} | "
-                    f"{observed_cell(row, 'heroic')} | {observed_cell(row, 'mythic')} | {hint} |"
+                    f"{observed_cell(row, 'normal')} | {observed_cell(row, 'heroic')} | "
+                    f"{observed_cell(row, 'mythic')} | {hint} |"
                 )
 
         journal_only = (boss.get("spellCatalog") or {}).get("journalOnly") or []
@@ -1215,6 +1219,7 @@ def render_markdown(document):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--reports", help="旧参数：逗号分隔的 Mythic WCL report ID")
+    parser.add_argument("--normal-reports", help="逗号分隔的 Normal WCL report ID")
     parser.add_argument("--heroic-reports", help="逗号分隔的 Heroic WCL report ID")
     parser.add_argument("--mythic-reports", help="逗号分隔的 Mythic WCL report ID")
     parser.add_argument(
@@ -1232,6 +1237,10 @@ def main():
     parser.add_argument("--resume", action="store_true", help="保留已有 Boss 结果，只补缺失 encounter")
     args = parser.parse_args()
 
+    normal_report_ids = [
+        value.strip() for value in (args.normal_reports or "").split(",")
+        if value.strip()
+    ]
     heroic_report_ids = [
         value.strip() for value in (args.heroic_reports or "").split(",")
         if value.strip()
@@ -1240,9 +1249,13 @@ def main():
         value.strip() for value in (args.mythic_reports or args.reports or "").split(",")
         if value.strip()
     ]
-    report_ids = list(dict.fromkeys([*heroic_report_ids, *mythic_report_ids]))
+    report_ids = list(dict.fromkeys([
+        *normal_report_ids,
+        *heroic_report_ids,
+        *mythic_report_ids,
+    ]))
     if not report_ids and not (args.resume and Path(args.output).exists()):
-        parser.error("至少提供 --heroic-reports 或 --mythic-reports")
+        parser.error("至少提供 --normal-reports、--heroic-reports 或 --mythic-reports")
     if report_ids:
         # Keep the WCL HTTP client lazy so offline/static rebuilds do not
         # require the optional requests dependency.
@@ -1257,6 +1270,9 @@ def main():
     token = get_token() if report_ids else None
     documents = {report_id: report_index(token, report_id) for report_id in report_ids}
     selected_by_difficulty = {
+        "normal": choose_representative_fights(
+            {key: documents[key] for key in normal_report_ids}, 3,
+        ),
         "heroic": choose_representative_fights(
             {key: documents[key] for key in heroic_report_ids}, 4,
         ),
@@ -1271,11 +1287,14 @@ def main():
         result = {
             "schemaVersion": 2,
             "zoneID": ZONE_ID,
-            "reports": {"heroic": [], "mythic": []},
+            "reports": {"normal": [], "heroic": [], "mythic": []},
             "bosses": {},
             "missingEncounterIDs": {},
         }
+    result["zoneID"] = ZONE_ID
+    result.setdefault("reports", {}).setdefault("normal", [])
     for difficulty_name, ids in (
+        ("normal", normal_report_ids),
         ("heroic", heroic_report_ids),
         ("mythic", mythic_report_ids),
     ):
@@ -1294,6 +1313,8 @@ def main():
                 "name": metadata["name"],
                 "evidence": {},
             })
+            boss["encounterID"] = encounter_id
+            boss["name"] = metadata["name"]
             if difficulty_name in boss.setdefault("evidence", {}):
                 continue
             print(
@@ -1318,11 +1339,13 @@ def main():
     # Keep journal-only encounters (notably the traditionally untested final
     # boss Ula'tek) in the same output shape as encounters with WCL evidence.
     for encounter_id, metadata in ENCOUNTERS.items():
-        result["bosses"].setdefault(metadata["key"], {
+        boss = result["bosses"].setdefault(metadata["key"], {
             "encounterID": encounter_id,
             "name": metadata["name"],
             "evidence": {},
         })
+        boss["encounterID"] = encounter_id
+        boss["name"] = metadata["name"]
     for boss_key, boss in result["bosses"].items():
         boss["modeDraft"] = MODE_DRAFTS.get(boss_key, {
             "confidence": "unknown",

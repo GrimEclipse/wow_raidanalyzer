@@ -20,7 +20,9 @@ from boss_plugins.common import (
 )
 
 
-ENCOUNTER_ID = 53470
+ENCOUNTER_ID = 3470
+LEGACY_ENCOUNTER_IDS = {53470}
+ENCOUNTER_IDS = {ENCOUNTER_ID, *LEGACY_ENCOUNTER_IDS}
 CN_TZ = timezone(timedelta(hours=8))
 
 SPELLS = {
@@ -986,7 +988,8 @@ def build_aggregated_json(report_ids, options=None):
         report = client.report_fights(report_id)
         fights = filter_fights(report_id, [
             row for row in report["fights"]
-            if row.get("encounterID") == ENCOUNTER_ID and row["endTime"] - row["startTime"] >= 20_000
+            if int(row.get("encounterID") or 0) in ENCOUNTER_IDS
+            and row["endTime"] - row["startTime"] >= 20_000
         ])
         actor_rows = client.actors(report_id)
         actor_map = {row["id"]: row["name"] for row in actor_rows}

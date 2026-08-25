@@ -939,6 +939,54 @@
         ]
       }
     },
+    "ulatek": {
+      "normal": {
+        "zoneID": 53,
+        "reportID": "T9G1VpZHkmNgCfxL",
+        "fightID": 41,
+        "kill": true,
+        "durationMs": 302823,
+        "stats": [
+          {"label": "普通击杀", "timeMs": 302823},
+          {"label": "P2 开始", "timeMs": 165127},
+          {"label": "剧毒之心", "value": "2 轮"}
+        ],
+        "phaseMarkers": [
+          {"phase": "p1", "label": "P1 毒蛇之母的怒火", "timeMs": 0, "source": "fightStart", "confidence": "observed"},
+          {"phase": "heart-1", "label": "束缚之怒 / 剧毒之心 1", "timeMs": 130006, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p2", "label": "P2 厄鳞之子", "timeMs": 165127, "spellID": 1306862, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "heart-2", "label": "束缚之怒 / 剧毒之心 2", "timeMs": 279040, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "kill", "label": "击杀（未进入碎场 / P3）", "timeMs": 302823, "source": "fightEnd", "confidence": "observed"}
+        ],
+        "eventSeries": [
+          {"spellID": 1298367, "label": "母神之怒", "kind": "tank", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [10011, 72000]},
+          {"spellID": 1299010, "label": "幽魂盘卷", "kind": "soak", "phase": "p1", "sourceName": "Spectral Coil", "timesMs": [23378, 26610, 107593, 110429]},
+          {"spellID": 1296301, "label": "恶臭横扫", "kind": "raid", "phase": "p1", "sourceName": "Gore Rattle", "timesMs": [35017, 75998]},
+          {"spellID": 1292403, "label": "腐蚀浪潮", "kind": "direction", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [42015, 84031]},
+          {"spellID": 1304012, "label": "毒蛇呼唤", "kind": "adds", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [62002]},
+          {"spellID": 1286860, "label": "束缚之怒", "kind": "raid", "phase": "transition", "sourceName": "Ula'tek", "timesMs": [130006, 279040]},
+          {"spellID": 1299526, "label": "剧毒之心", "kind": "phase", "phase": "transition", "sourceName": "Venomous Heart", "timesMs": [136510, 285540]},
+          {"spellID": 1306862, "label": "厄兆孵化", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Egg", "timesMs": [165127]},
+          {"spellID": 1290779, "label": "恶意", "kind": "interrupt", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [173242, 176096, 202774]},
+          {"spellID": 1301117, "label": "攫取毒牙", "kind": "spread", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [187806, 189421]},
+          {"spellID": 1301213, "label": "暗影蜕皮", "kind": "movement", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [191453, 193068]},
+          {"spellID": 1302950, "label": "扭动孵化", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [196576]},
+          {"spellID": 1303410, "label": "缺陷：虚弱", "kind": "phase", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [220694, 221717]},
+          {"spellID": 1305650, "label": "痛苦尖啸", "kind": "raid", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [228278, 229904, 244074, 245707, 259865]},
+          {"spellID": 1305709, "label": "绝望横扫", "kind": "tank", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [233144, 237186, 251384]}
+        ],
+        "codingSignals": [
+          {"label": "正式服 P2 起点", "spellID": 1306862, "eventType": "begincast", "timeMs": 165127, "rule": "WCL Stage Two transition 与两个 Doomscale Egg 的 Hatching Doom 同时出现。"},
+          {"label": "守卫恶意打断", "spellID": 1290779, "eventType": "begincast", "timeMs": 173242, "rule": "三次仅有 begincast、没有 cast，按可打断全团伤害记录。"},
+          {"label": "提前孵化成功", "spellID": 1303410, "eventType": "cast", "timeMs": 220694, "rule": "Defect: Weakened 标记提前孵化，后续不应出现 Dread Roar 1305775。"}
+        ],
+        "cycleNotes": [
+          "正式服普通击杀样本的 P1 约 02:45；两轮幽魂盘卷分别在约 00:23/00:27 与 01:48/01:50 开始。",
+          "两个厄鳞守卫在约 02:53 首次读恶意，约 03:40 两只虚弱厄鳞出现；样本未观察到恐怖咆哮，说明提前孵化处理成功。",
+          "团队在第二次剧毒之心易伤窗口完成击杀，因此普通日志没有覆盖连续盘卷碎场与最终 P3；这些阶段只按手册建立草案，不伪造时间点。"
+        ]
+      }
+    },
     "nymrissa_wavecaller": {
       "heroic": {
         "reportID": "zpRDdcafg7hCrT9Y",
