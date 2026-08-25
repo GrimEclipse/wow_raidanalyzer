@@ -38,7 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.0.0 更新公告">v1.0.0</button></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.1.0 更新公告">v1.1.0</button></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -68,11 +68,21 @@
 <div id="releaseNotice" class="notice-layer" hidden>
   <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
     <header class="notice-head">
-      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.0.0</span></div>
+      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.1.0</span></div>
       <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
     </header>
     <div class="notice-content">
       <ol>
+        <li>
+          <p><strong>v1.1.0 · 正式服资料与陵寝哨兵分析更新</strong></p>
+          <ul>
+            <li>新增所有 Boss 共用的整场 Pull 概览：按阶段归类灭团、显示进度与时间，并从 Pull 方块进入对应 Boss 的单场分析。</li>
+            <li>新增陵寝哨兵专项复盘：螺旋毒素碰撞链、酸液/鲜血印记、分摊参与、附着幽暗离散、活体毒液与剧毒水滴分析。</li>
+            <li>螺旋毒素支持同帧多条安全移除的两两归组；安全碰撞同样保留时间戳、玩家 ID 与证据来源，只有真正缺失搭档时才使用坐标补配。</li>
+            <li>团本资料切换到正式服 WCL Zone 53 与正式 encounter ID，并更新团本手册、普通难度证据、团队排轴和通天峰分析样例。</li>
+            <li>服务端支持可配置监听地址与端口；本地代理证书提示只在确认是回环代理时收敛，远程 TLS 风险仍保留警告。</li>
+          </ul>
+        </li>
         <li>
           <p>爬爬想把这个系统作为一个能便利于 avalon 工会使用的快捷查询工具，包括 Boss 的技能介绍、开荒日志检查、大米极限层抄轴、团本根据同治疗组来快速产生战术板、单场断案，以及用于课代表记录每次开荒的拾取记录等功能。</p>
           <p>人总会有失误，把自己曾经犯过的错误留下“案底”实在压力太大，所以我单方面取消掉了智商记录本的功能，同时这个功能也不利于迁移……我只会判断出每天日志中导致灭团的原因是什么，来快速帮助团长等定位这些问题。说白了也只是自己的一己私愿，不过初心绝对只是单纯地为了快速辅助团队通过副本和高难度 Boss，而不是为了“开庭”队友们。当然如果之后智商团能够复用到，我会单独外接一个定制化需求的版本，也算是自己给自己练手。</p>
@@ -96,7 +106,7 @@
 </div>
 <script>
 (() => {
-  const RELEASE_VERSION = 'v1.0.0';
+  const RELEASE_VERSION = 'v1.1.0';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

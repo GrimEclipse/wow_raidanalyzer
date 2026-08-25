@@ -1,4 +1,4 @@
-const state = { payload: null, pulls: [], pull: 0, tab: "overview", playerID: null };
+const state = { payload: null, pulls: [], pull: 0, tab: "helical", playerID: null, sourcePath: "" };
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -29,23 +29,6 @@ function simpleTable(headers, rows) {
 }
 
 function renderSummary() {
-  if (state.tab === "overview") {
-    const pulls = state.pulls;
-    const kills = pulls.filter(pull => pull.isKill).length;
-    const totalDurationMs = pulls.reduce((total, pull) => total + Number(pull.durationMs || 0), 0);
-    const totalRounds = pulls.reduce((total, pull) => total + Number(pull.sentinels?.helicalToxins?.roundCount || 0), 0);
-    const totalWrong = pulls.reduce((total, pull) => total + Number(pull.sentinels?.helicalToxins?.wrongCollisionCount || 0), 0);
-    const bestWipe = Math.min(...pulls.filter(pull => !pull.isKill).map(pull => Number(pull.bossPercentage || 100)), 100);
-    const stats = [
-      ["Pull 总数", pulls.length], ["击杀", kills],
-      ["累计战斗", formatDuration(totalDurationMs)], ["最好进度", kills ? "KILL" : `${bestWipe.toFixed(2)}%`],
-      ["静滞总轮数", totalRounds], ["错误碰撞", totalWrong]
-    ];
-    $("summary").innerHTML = stats.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join("");
-    const reportID = pulls[0]?.reportID;
-    $("wclLink").href = reportID ? `https://www.warcraftlogs.com/reports/${encodeURIComponent(reportID)}` : "#";
-    return;
-  }
   const pull = current(), sentinels = pull?.sentinels || {};
   const helical = sentinels.helicalToxins || {}, water = sentinels.clingingMurk || {};
   const living = sentinels.livingVenom || {}, droplets = sentinels.toxicDroplets || {};
@@ -59,28 +42,6 @@ function renderSummary() {
   $("wclLink").href = pull?.wclDeepLink || "#";
 }
 
-function formatDuration(milliseconds) {
-  const seconds = Math.max(0, Math.round(Number(milliseconds || 0) / 1000));
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const rest = seconds % 60;
-  return hours ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}` : `${minutes}:${String(rest).padStart(2, "0")}`;
-}
-
-function phaseTimeline(pull) {
-  const duration = Math.max(1, Number(pull.durationMs || 1));
-  const rows = pull.phaseTimeline || [];
-  return `<div class="phase-track" aria-label="Fight ${pull.fightID} 阶段时间线">${rows.map((phase, index) => {
-    const left = Math.max(0, Math.min(100, Number(phase.timeMs || 0) / duration * 100));
-    return `<span class="phase-marker ${index === rows.length - 1 ? (pull.isKill ? "kill" : "wipe") : ""}" style="left:${left}%" title="${esc(phase.label)} · ${esc(formatDuration(phase.timeMs))}"></span>`;
-  }).join("")}</div><div class="phase-legend">${rows.map(phase => `<span class="phase-chip"><b>${esc(formatDuration(phase.timeMs))}</b> ${esc(phase.label)}</span>`).join("")}</div>`;
-}
-
-function renderOverview() {
-  $("content").innerHTML = `<section class="overview-head panel"><div><h2>整场 Pull 与阶段概览</h2><p class="muted">选择任意 Pull 进入技能分析；进入后仍可使用页头下拉框切换战斗。</p></div></section><div class="overview-list">${state.pulls.map((pull, index) => `<article class="overview-pull ${pull.isKill ? "kill" : "wipe"}"><div class="overview-pull-head"><div><span class="pull-number">Fight ${pull.fightID}</span><h3>${esc(pull.date || "")} ${esc(pull.startClock || "")}</h3></div><span class="badge ${pull.isKill ? "good" : "bad"}">${pull.isKill ? "击杀" : `${Number(pull.bossPercentage || 0).toFixed(2)}%`} · ${esc(pull.duration)}</span></div><div class="overview-reason"><b>${esc(pull.wipePhase || "阶段待定")}</b><span>${esc(pull.wipeReason || pull.summary || "暂无结论")}</span></div>${phaseTimeline(pull)}<div class="overview-actions"><button class="button primary" data-enter-pull="${index}">进入技能分析</button><a class="button" href="${esc(pull.wclDeepLink || "#")}" target="_blank" rel="noreferrer">打开本场 WCL</a></div></article>`).join("") || '<div class="empty">当前 JSON 没有 Pull。</div>'}</div>`;
-  document.querySelectorAll("[data-enter-pull]").forEach(button => button.onclick = () => enterPull(Number(button.dataset.enterPull)));
-}
-
 function enterPull(index) {
   state.pull = Math.max(0, Math.min(index, state.pulls.length - 1));
   state.playerID = null;
@@ -91,13 +52,17 @@ function enterPull(index) {
 }
 
 function collisionDetail(collision) {
+  const evidence = collision.pairingEvidence === "coordinates"
+    ? `<span class="collision-evidence ${collision.positionConfidence === "reference" ? "reference" : ""}">${collision.positionConfidence === "reference" ? "坐标参考配对" : "坐标配对"}${collision.distanceYards == null ? "" : ` · ${collision.distanceYards}码`}</span>`
+    : "";
+  const header = `<div class="collision-main"><time>${esc(collision.time || "—")}</time><div class="collision-players">${coloredPlayers(collision.players, collision.playerIDs)}</div>`;
   if (collision.kind === "wrong-collision") {
     const movers = (collision.largeMovers || []).map(row => `<div class="movement-warning">${esc(row.player)}在最后一秒进行了大范围的移动（${row.movementYards}码）</div>`).join("");
-    return `<div class="mechanic-cell ${collision.firstWrongCollision ? "first-wrong" : ""}"><b>${esc(collision.time)} · ${coloredPlayers(collision.players, collision.playerIDs)}</b><div><span class="badge bad">错误相撞</span> ${esc(collision.collisionCombination || "组合待定")} → 两人均变为 ${collision.resultStack} 层</div>${collision.firstWrongCollision ? '<div class="first-wrong-label">本轮第一个错误碰撞</div>' : ""}${movers}</div>`;
+    return `<div class="mechanic-cell wrong-cell ${collision.firstWrongCollision ? "first-wrong" : ""}">${header}<span class="badge bad">错误相撞</span></div><div class="collision-note">${esc(collision.collisionCombination || "组合待定")} → 两人均变为 ${collision.resultStack} 层</div>${collision.firstWrongCollision ? '<div class="first-wrong-label">本轮第一个错误碰撞</div>' : ""}${movers}</div>`;
   }
-  if (collision.kind === "recovery-clear") return `<div class="mechanic-cell"><b>${esc(collision.time)} · ${coloredPlayers(collision.players, collision.playerIDs)}</b><div><span class="badge good">补救后安全消除</span> ${esc(collision.collisionCombination || "")}</div></div>`;
-  if (collision.kind === "timeout-remove") return `<div class="mechanic-cell compact"><b>${esc(collision.time)} · ${coloredPlayers(collision.players, collision.playerIDs)}</b><div><span class="badge bad">超时移除</span></div></div>`;
-  if (collision.kind === "unpaired-remove") return `<div class="mechanic-cell compact"><b>${esc(collision.time)} · ${coloredPlayers(collision.players, collision.playerIDs)}</b><div><span class="badge warn">单条移除</span></div></div>`;
+  if (collision.kind === "recovery-clear") return `<div class="mechanic-cell recovery-cell">${header}<span class="badge good">补救消除</span></div><div class="collision-note">${esc(collision.collisionCombination || "安全组合")} ${evidence}</div></div>`;
+  if (collision.kind === "timeout-remove") return `<div class="mechanic-cell timeout-cell">${header}<span class="badge bad">超时移除</span></div></div>`;
+  if (collision.kind === "unpaired-remove") return `<div class="mechanic-cell unresolved-cell">${header}<span class="badge warn">无法严谨配对</span></div></div>`;
   return "";
 }
 
@@ -105,7 +70,10 @@ function roundMechanicCells(round) {
   const failures = round.failures || [], matchedFailures = new Set(), cells = [];
   for (const collision of round.collisions || []) {
     if (collision.kind === "safe-clear") {
-      cells.push(`<div class="mechanic-cell safe-cell">${coloredPlayers(collision.players, collision.playerIDs)}</div>`);
+      const evidence = collision.pairingEvidence === "coordinates"
+        ? `<span class="collision-evidence ${collision.positionConfidence === "reference" ? "reference" : ""}">${collision.positionConfidence === "reference" ? "坐标参考配对" : "坐标配对"}${collision.distanceYards == null ? "" : ` · ${collision.distanceYards}码`}</span>`
+        : "";
+      cells.push(`<div class="mechanic-cell safe-cell"><div class="collision-main"><time>${esc(collision.time || "—")}</time><div class="collision-players">${coloredPlayers(collision.players, collision.playerIDs)}</div><span class="badge good">安全消除</span></div>${evidence}</div>`);
       continue;
     }
     if (collision.kind === "timeout-remove") {
@@ -116,7 +84,7 @@ function roundMechanicCells(round) {
       if (failureIndex >= 0) {
         const failure = failures[failureIndex];
         matchedFailures.add(failureIndex);
-        cells.push(`<div class="mechanic-cell compact timeout-burst"><b>${esc(failure.time)} · ${coloredPlayer(failure.player, failure.playerID)}</b><div class="effect-line"><span class="badge bad">超时移除</span><span class="badge bad result-badge">培养爆发 ${num(failure.amount)}</span></div></div>`);
+        cells.push(`<div class="mechanic-cell timeout-cell timeout-burst"><div class="collision-main"><time>${esc(failure.time)}</time><div class="collision-players">${coloredPlayer(failure.player, failure.playerID)}</div><div class="effect-line"><span class="badge bad">超时移除</span><span class="badge bad result-badge">培养爆发 ${num(failure.amount)}</span></div></div></div>`);
         continue;
       }
     }
@@ -124,14 +92,14 @@ function roundMechanicCells(round) {
   }
   failures.forEach((failure, index) => {
     if (matchedFailures.has(index)) return;
-    cells.push(`<div class="mechanic-cell compact"><b>${esc(failure.time)} · ${coloredPlayer(failure.player, failure.playerID)}</b><div><span class="badge bad result-badge">培养爆发 ${num(failure.amount)}</span></div></div>`);
+    cells.push(`<div class="mechanic-cell timeout-cell"><div class="collision-main"><time>${esc(failure.time)}</time><div class="collision-players">${coloredPlayer(failure.player, failure.playerID)}</div><span class="badge bad result-badge">培养爆发 ${num(failure.amount)}</span></div></div>`);
   });
   return cells.join("");
 }
 
 function renderHelical() {
   const helical = current()?.sentinels?.helicalToxins || {};
-  $("content").innerHTML = `<section class="panel notice"><p>${esc(helical.explanation || "")}</p></section><div class="round-list">${(helical.rounds || []).map(round => `<details class="round panel ${round.success ? "safe" : "fail"}" ${round.success ? "" : "open"}><summary><span>第 ${round.index} 轮 · ${esc(round.startTime)}</span><span class="badge ${round.success ? "good" : "bad"}">${round.success ? "安全" : `错误 ${round.wrongCollisionCount}`}</span></summary><div class="round-meta">${round.initialPlayerCount} 人 · 截止 ${esc(round.deadlineTime)}</div><div class="round-content-grid">${roundMechanicCells(round)}</div></details>`).join("") || '<div class="empty">没有螺旋毒素轮次。</div>'}</div>`;
+  $("content").innerHTML = `<section class="panel notice"><p>${esc(helical.explanation || "")}</p></section><div class="round-list">${(helical.rounds || []).map(round => `<details class="round panel ${round.success ? "safe" : "fail"}" ${round.success ? "" : "open"}><summary><span class="round-title">第 ${round.index} 轮 <small>${esc(round.startTime)}–${esc(round.deadlineTime)} · ${round.initialPlayerCount} 人</small></span><span class="badge ${round.success ? "good" : "bad"}">${round.success ? "安全处理" : `错误 ${round.wrongCollisionCount}`}</span></summary><div class="round-content-grid">${roundMechanicCells(round)}</div></details>`).join("") || '<div class="empty">没有螺旋毒素轮次。</div>'}</div>`;
 }
 
 function specLabel(player) {
@@ -170,28 +138,31 @@ function renderAvoidable() {
 
 function render() {
   renderSummary();
-  $("pageTitle").textContent = state.tab === "overview" ? "陵寝哨兵 · 全场概览" : `陵寝哨兵 · Fight ${current()?.fightID || "-"} 技能分析`;
+  $("pageTitle").textContent = `陵寝哨兵 · Fight ${current()?.fightID || "-"} 技能分析`;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === state.tab));
-  ({ overview: renderOverview, helical: renderHelical, marks: renderMarks, field: renderField, avoidable: renderAvoidable }[state.tab] || renderOverview)();
+  ({ helical: renderHelical, marks: renderMarks, field: renderField, avoidable: renderAvoidable }[state.tab] || renderHelical)();
 }
 
 function load(payload) {
   state.payload = payload; state.pulls = payload.data?.page1_wipeAnalysis || []; state.pull = 0; state.playerID = null;
-  state.tab = state.pulls.length > 1 ? "overview" : "helical";
+  const selectedFight = Number(new URLSearchParams(location.search).get("fight"));
+  const selectedIndex = selectedFight ? state.pulls.findIndex(pull => Number(pull.fightID) === selectedFight) : -1;
+  state.pull = selectedIndex >= 0 ? selectedIndex : 0;
+  state.tab = "helical";
   $("pullSelect").innerHTML = state.pulls.map((pull, index) => `<option value="${index}">Fight ${pull.fightID} · ${pull.isKill ? "KILL" : `${Number(pull.bossPercentage).toFixed(2)}%`} · ${esc(pull.duration)}</option>`).join("");
+  $("pullSelect").value = String(state.pull);
   $("error").textContent = state.pulls.length ? "" : "分析结果中没有陵寝哨兵战斗。";
   render();
 }
 
 async function loadPath(path) {
-  const response = await fetch(path, { cache: "no-store" });
-  if (!response.ok) throw new Error(`读取失败：HTTP ${response.status}`);
-  load(await response.json());
+  load(await window.MythicReportRuntime.loadPayload(path));
 }
 
 $("pullSelect").onchange = event => enterPull(Number(event.target.value));
-$("overviewLink").onclick = () => { state.tab = "overview"; render(); window.scrollTo({ top: 0, behavior: "smooth" }); };
 $("fileInput").onchange = async event => { try { load(JSON.parse(await event.target.files[0].text())); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
 document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => { state.tab = button.dataset.tab; render(); });
 const path = new URLSearchParams(location.search).get("json");
+state.sourcePath = path || "";
+if (path) $("overviewLink").href = `/frontend/report/overview.html?json=${encodeURIComponent(path)}`;
 if (path) loadPath(path).catch(error => $("error").textContent = error.message); else render();

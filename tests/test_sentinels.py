@@ -43,6 +43,88 @@ def test_helical_toxins_reconstructs_one_plus_one_then_two_plus_two_recovery():
     assert collisions[0]["resultStack"] == 2
     assert collisions[1]["kind"] == "recovery-clear"
     assert collisions[1]["knownInput"] == [2, 2]
+    assert collisions[1]["time"] == "00:15.6"
+    assert collisions[1]["playerIDs"] == [1, 2]
+
+
+def test_helical_safe_clear_always_keeps_timestamp_and_player_ids():
+    fight = {"startTime": 0, "endTime": 60_000}
+    stasis = [event(10_000, next(iter(STASIS_IDS)), "cast")]
+    auras = [
+        event(10_010, HELICAL_ID, "applydebuff", 1),
+        event(10_011, HELICAL_ID, "applydebuff", 2),
+        event(12_000, HELICAL_ID, "removedebuff", 1),
+        event(12_001, HELICAL_ID, "removedebuff", 2),
+    ]
+
+    result = analyze_helical_toxins(fight, {1: "甲", 2: "乙"}, stasis, auras, [])
+
+    collision = result["rounds"][0]["collisions"][0]
+    assert collision["kind"] == "safe-clear"
+    assert collision["timeMs"] == 12_000
+    assert collision["time"] == "00:12.0"
+    assert collision["playerIDs"] == [1, 2]
+    assert collision["pairingEvidence"] == "same-frame-removal"
+
+
+def test_helical_arbitrarily_pairs_four_safe_removals_in_same_frame():
+    fight = {"startTime": 0, "endTime": 60_000}
+    stasis = [event(10_000, next(iter(STASIS_IDS)), "cast")]
+    auras = [event(10_010 + player_id, HELICAL_ID, "applydebuff", player_id) for player_id in range(1, 5)]
+    auras += [event(12_000, HELICAL_ID, "removedebuff", player_id) for player_id in range(1, 5)]
+    result = analyze_helical_toxins(
+        fight, {1: "甲", 2: "乙", 3: "丙", 4: "丁"}, stasis, auras, [],
+    )
+
+    collisions = result["rounds"][0]["collisions"]
+    assert [row["playerIDs"] for row in collisions] == [[1, 2], [3, 4]]
+    assert all(row["kind"] == "safe-clear" for row in collisions)
+    assert all(row["pairingEvidence"] == "same-frame-removal" for row in collisions)
+    assert [row["distanceYards"] for row in collisions] == [None, None]
+
+
+def test_helical_consumes_initial_stack_if_wcl_ever_supplies_it():
+    fight = {"startTime": 0, "endTime": 60_000}
+    stasis = [event(10_000, next(iter(STASIS_IDS)), "cast")]
+    auras = [
+        event(10_010, HELICAL_ID, "applydebuff", 1, stack=1),
+        event(10_011, HELICAL_ID, "applydebuff", 2, stack=3),
+        event(12_000, HELICAL_ID, "removedebuff", 1),
+        event(12_001, HELICAL_ID, "removedebuff", 2),
+    ]
+
+    result = analyze_helical_toxins(fight, {1: "甲", 2: "乙"}, stasis, auras, [])
+
+    round_row = result["rounds"][0]
+    assert round_row["initialStackCount"] == 2
+    assert round_row["collisions"][0]["kind"] == "safe-clear"
+
+
+def test_helical_single_remove_uses_nearest_active_coordinate_partner():
+    fight = {"startTime": 0, "endTime": 60_000}
+    stasis = [event(10_000, next(iter(STASIS_IDS)), "cast")]
+    auras = [
+        event(10_010, HELICAL_ID, "applydebuff", 1),
+        event(10_011, HELICAL_ID, "applydebuff", 2),
+        event(10_012, HELICAL_ID, "applydebuff", 3),
+        event(12_000, HELICAL_ID, "removedebuff", 1),
+    ]
+    positions = build_position_index([
+        {"timestamp": 12_000, "sourceID": 1, "x": 0, "y": 0},
+        {"timestamp": 12_000, "sourceID": 2, "x": 180, "y": 0},
+        {"timestamp": 12_000, "sourceID": 3, "x": 1600, "y": 0},
+    ])
+
+    result = analyze_helical_toxins(
+        fight, {1: "甲", 2: "乙", 3: "丙"}, stasis, auras, [],
+        position_index=positions,
+    )
+
+    collision = result["rounds"][0]["collisions"][0]
+    assert collision["kind"] == "safe-clear"
+    assert collision["playerIDs"] == [1, 2]
+    assert collision["pairingEvidence"] == "coordinates"
+    assert collision["distanceYards"] == 1.8
 
 
 def test_phase_timeline_deduplicates_cast_and_buff_rows_for_one_stasis():

@@ -10,10 +10,10 @@
 </head>
 <body>
   <header class="head">
-    <div><span>12.1 · 烈毒之渊</span><h1 id="pageTitle">陵寝哨兵 · 全场概览</h1></div>
+    <div><span>12.1 · 烈毒之渊</span><h1 id="pageTitle">陵寝哨兵 · 技能分析</h1></div>
     <div class="tools">
       <a class="button" href="/">首页</a>
-      <button id="overviewLink" class="button" type="button">全场概览</button>
+      <a id="overviewLink" class="button" href="/report">全场概览</a>
       <select id="pullSelect" aria-label="选择战斗"></select>
       <a id="wclLink" class="button" target="_blank" rel="noreferrer">WCL 原始记录</a>
       <a class="button" href="/online">在线分析</a>
@@ -24,14 +24,14 @@
     <div id="error" class="error"></div>
     <section id="summary" class="stats"></section>
     <nav class="tabs">
-      <button data-tab="overview" class="active">全场概览</button>
-      <button data-tab="helical">转阶段 / 螺旋毒素</button>
+      <button data-tab="helical" class="active">转阶段 / 螺旋毒素</button>
       <button data-tab="marks">酸液 / 鲜血印记</button>
       <button data-tab="field">分摊与放水</button>
       <button data-tab="avoidable">活体毒液 / 绿球</button>
     </nav>
     <section id="content"></section>
   </main>
+  <script src="frontend/core/report-plugin-runtime.js?v=1.1.0-20260825b"></script>
   <script src="frontend/report/plugins/venomous_abyss/sentinels/report.js"></script>
 </body>
 </html>

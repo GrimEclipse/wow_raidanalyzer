@@ -49,6 +49,7 @@ CLINGING_MURK_ID = 1288297
 DEFAULT_OPTIONS = {
     "helicalToxinReviewEnabled": True,
     "helicalLargeMovementYards": 8.0,
+    "helicalPairingMaxDistanceYards": 8.0,
     "markReviewEnabled": True,
     "waterPlacementReviewEnabled": True,
     "waterOutlierDistanceYards": 8.0,
@@ -129,6 +130,46 @@ def _unique_input_pair(result_stack):
     return None
 
 
+def _coordinate_distance(position_index, left_id, right_id, timestamp):
+    left = position_at(position_index, left_id, timestamp)
+    right = position_at(position_index, right_id, timestamp)
+    if not left or not right:
+        return None
+    return math.dist((left["x"], left["y"]), (right["x"], right["y"])) / 100
+
+
+def same_frame_removal_pairs(player_ids):
+    """Arbitrarily pair safe removals emitted in one WCL frame."""
+    remaining = list(dict.fromkeys(player_id for player_id in player_ids if player_id is not None))
+    pairs = []
+    for offset in range(0, len(remaining) - 1, 2):
+        pairs.append({
+            "playerIDs": remaining[offset:offset + 2],
+            "distanceYards": None,
+            "pairingEvidence": "same-frame-removal",
+        })
+    return pairs
+
+
+def nearest_active_partner(target_id, active_ids, timestamp, position_index, max_distance_yards):
+    candidates = []
+    for candidate_id in active_ids:
+        if candidate_id == target_id:
+            continue
+        distance = _coordinate_distance(position_index, target_id, candidate_id, timestamp)
+        if distance is not None and distance <= max_distance_yards:
+            candidates.append((distance, candidate_id))
+    if not candidates:
+        return None
+    distance, partner_id = min(candidates)
+    return {
+        "playerIDs": [target_id, partner_id],
+        "distanceYards": round(distance, 1),
+        "pairingEvidence": "coordinates",
+        "positionConfidence": "high",
+    }
+
+
 def analyze_helical_toxins(
     fight,
     actor_map,
@@ -166,13 +207,24 @@ def analyze_helical_toxins(
             if start <= int(event.get("timestamp") or 0) < next_start
         ]
         collision_rows = []
-        known_values = {}
+        known_values = {
+            event.get("targetID"): int(event.get("stack"))
+            for event in initial
+            if event.get("targetID") is not None and event.get("stack") is not None
+        }
         last_stack_collision = {}
+        active_players = {
+            event.get("targetID") for event in initial
+            if event.get("targetID") is not None
+        }
         non_initial = [event for event in round_events if event_type(event) != "applydebuff"]
         for group in cluster_events(non_initial):
             timestamp = min(int(event.get("timestamp") or 0) for event in group)
             kinds = {event_type(event) for event in group}
-            targets = [event.get("targetID") for event in group if event.get("targetID") is not None]
+            targets = list(dict.fromkeys(
+                event.get("targetID") for event in group
+                if event.get("targetID") is not None
+            ))
             if not targets:
                 continue
             close_burst = any(abs(int(event.get("timestamp") or 0) - timestamp) <= 100 for event in round_bursts)
@@ -210,44 +262,74 @@ def analyze_helical_toxins(
                 }
                 collision_rows.append(row)
                 for target_id in targets:
+                    active_players.add(target_id)
                     known_values[target_id] = result_stack
                     last_stack_collision[target_id] = row
                 continue
-            if kinds <= {"removedebuff", "removedebuffstack"} and len(targets) == 2 and not close_burst and not close_death:
-                prior = [known_values.get(target_id) for target_id in targets]
-                known_input = None
-                if all(value is not None for value in prior) and sum(prior) == 4:
-                    known_input = prior
-                elif sum(value is not None for value in prior) == 1:
-                    known_index = 0 if prior[0] is not None else 1
-                    known_value = prior[known_index]
-                    inferred_partner = 4 - known_value
-                    if 1 <= inferred_partner <= 3:
-                        known_input = list(prior)
-                        known_input[1 - known_index] = inferred_partner
-                recovery = known_input is not None and any(
-                    last_stack_collision.get(target_id) is not None for target_id in targets
-                )
-                if recovery:
+            if kinds <= {"removedebuff", "removedebuffstack"} and not close_burst and not close_death:
+                targets = [target_id for target_id in targets if target_id in active_players]
+                if not targets:
+                    continue
+                max_pair_distance = float(options["helicalPairingMaxDistanceYards"])
+                pair_rows = same_frame_removal_pairs(targets)
+                paired_targets = {player_id for pair in pair_rows for player_id in pair["playerIDs"]}
+                for target_id in targets:
+                    if target_id in paired_targets or target_id not in active_players:
+                        continue
+                    inferred_pair = nearest_active_partner(
+                        target_id,
+                        active_players - paired_targets,
+                        timestamp,
+                        position_index,
+                        max_pair_distance,
+                    )
+                    if inferred_pair:
+                        pair_rows.append(inferred_pair)
+                        paired_targets.update(inferred_pair["playerIDs"])
+                for pair in pair_rows:
+                    pair_targets = pair["playerIDs"]
+                    prior = [known_values.get(target_id) for target_id in pair_targets]
+                    known_input = None
+                    if all(value is not None for value in prior) and sum(prior) == 4:
+                        known_input = prior
+                    elif sum(value is not None for value in prior) == 1:
+                        known_index = 0 if prior[0] is not None else 1
+                        known_value = prior[known_index]
+                        inferred_partner = 4 - known_value
+                        if 1 <= inferred_partner <= 3:
+                            known_input = list(prior)
+                            known_input[1 - known_index] = inferred_partner
+                    recovery = known_input is not None and any(
+                        last_stack_collision.get(target_id) is not None
+                        for target_id in pair_targets
+                    )
                     row = {
                         "timeMs": timestamp - int(fight["startTime"]),
                         "time": fmt_ms(timestamp - int(fight["startTime"])),
-                        "kind": "recovery-clear",
-                        "players": [actor_name(actor_map, target_id) for target_id in targets],
-                        "playerIDs": targets,
-                        "knownInput": known_input,
-                        "collisionCombination": "+".join(str(value) for value in known_input),
+                        "kind": "recovery-clear" if recovery else "safe-clear",
+                        "players": [actor_name(actor_map, target_id) for target_id in pair_targets],
+                        "playerIDs": pair_targets,
                         "resultStack": 0,
+                        "pairingEvidence": pair["pairingEvidence"],
+                        "distanceYards": pair["distanceYards"],
+                        "positionConfidence": pair.get("positionConfidence"),
                     }
-                else:
-                    row = {
-                        "kind": "safe-clear",
-                        "players": [actor_name(actor_map, target_id) for target_id in targets],
-                    }
-                collision_rows.append(row)
-                for target_id in targets:
-                    known_values.pop(target_id, None)
-                continue
+                    if recovery:
+                        row.update({
+                            "knownInput": known_input,
+                            "collisionCombination": "+".join(str(value) for value in known_input),
+                        })
+                    collision_rows.append(row)
+                    for target_id in pair_targets:
+                        active_players.discard(target_id)
+                        known_values.pop(target_id, None)
+                unresolved_targets = [
+                    target_id for target_id in targets
+                    if target_id not in paired_targets and target_id in active_players
+                ]
+                if not unresolved_targets:
+                    continue
+                targets = unresolved_targets
             # A single removal at the 28s endpoint is cleanup/timeout evidence,
             # not a fabricated partner attribution.
             for target_id in targets:
@@ -259,6 +341,8 @@ def analyze_helical_toxins(
                     "playerIDs": [target_id],
                     "resultStack": 0,
                 })
+                if close_burst or abs(timestamp - deadline) <= 250:
+                    active_players.discard(target_id)
 
         failures = []
         for event in round_bursts:
@@ -284,6 +368,7 @@ def analyze_helical_toxins(
             "deadlineTimeMs": deadline - int(fight["startTime"]),
             "deadlineTime": fmt_ms(deadline - int(fight["startTime"])),
             "initialPlayerCount": len({event.get("targetID") for event in initial}),
+            "initialStackCount": sum(event.get("stack") is not None for event in initial),
             "collisions": collision_rows,
             "wrongCollisionCount": len(wrong_collisions),
             "recoveryCount": sum(row["kind"] == "recovery-clear" for row in collision_rows),
@@ -295,7 +380,7 @@ def analyze_helical_toxins(
         "roundCount": len(rounds),
         "failedRoundCount": sum(not row["success"] for row in rounds),
         "wrongCollisionCount": sum(row["wrongCollisionCount"] for row in rounds),
-        "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。",
+        "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。",
     }
 
 
@@ -1027,7 +1112,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "sentinels",
             "bossName": "陵寝哨兵",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "sentinels-helical-summary-v2-2026-08-25",
+            "mechanicVersion": "sentinels-helical-coordinate-pairing-v3-2026-08-25",
             "features": {"interrupts": False, "dispels": False, "fieldReplay": False, "mistakes": False},
             "capabilities": {
                 "wipe": {"enabled": True, "renderer": "sentinels-pulls"},

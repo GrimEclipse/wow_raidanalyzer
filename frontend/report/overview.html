@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../../">
+  <title>全场战斗概览</title>
+  <link rel="stylesheet" href="frontend/report/overview.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="report-head">
+      <div>
+        <div id="raidName" class="eyebrow">战斗分析</div>
+        <h1 id="bossName">全场战斗概览</h1>
+      </div>
+      <div id="lastPull" class="last-pull">正在载入分析结果…</div>
+      <div class="toolbar">
+        <a class="button" href="/">首页</a>
+        <a class="button" href="/report">选择结果</a>
+        <a class="button" href="/online">在线分析</a>
+      </div>
+    </header>
+
+    <section class="panel overview-body">
+      <div class="overview-tools">
+        <div class="toolbar">
+          <button id="wipesFilter" class="filter-link wipes" type="button">全部灭团</button>
+          <button id="allFilter" class="filter-link all active" type="button">全部战斗</button>
+        </div>
+        <div class="toolbar">
+          <label class="check"><input id="separatePhases" type="checkbox" checked> 按阶段分组</label>
+          <button id="sortButton" class="button" type="button">时间正序</button>
+        </div>
+      </div>
+      <div id="error" class="error"></div>
+      <div id="pullBoard" class="pull-board"><div class="empty">正在读取整场 Pull…</div></div>
+    </section>
+  </main>
+  <script src="frontend/core/report-plugin-runtime.js?v=1.1.0-20260825b"></script>
+  <script src="frontend/report/overview.js?v=1.1.0-20260825b"></script>
+</body>
+</html>

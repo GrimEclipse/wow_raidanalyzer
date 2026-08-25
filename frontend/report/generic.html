@@ -17,11 +17,12 @@
 </head>
 <body>
 <main>
-  <header><div><div class="muted">GENERIC REPORT RENDERER</div><h1 id="title">通用战斗报告</h1><div id="subtitle" class="muted">等待载入数据</div></div><div class="toolbar"><a class="button" href="frontend/report/index.html">切换分析</a><label class="button">导入 JSON<input id="file" type="file" accept=".json,application/json" hidden></label></div></header>
+  <header><div><div class="muted">GENERIC REPORT RENDERER</div><h1 id="title">通用战斗报告</h1><div id="subtitle" class="muted">等待载入数据</div></div><div class="toolbar"><a class="button" href="/">首页</a><a id="overviewLink" class="button" href="frontend/report/index.html">返回全场概览</a><a class="button" href="frontend/report/index.html">切换分析</a><label class="button">导入 JSON<input id="file" type="file" accept=".json,application/json" hidden></label></div></header>
   <div id="error" class="muted" style="margin-top:14px"></div>
   <section><h2>逐场灭团分析</h2><div id="pulls" class="grid" style="margin-top:12px"></div></section>
   <section><h2>可躲避伤害</h2><div id="boards" class="grid" style="margin-top:12px"></div></section>
 </main>
+<script src="frontend/core/report-plugin-runtime.js?v=1.1.0-20260825b"></script>
 <script>
   const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
   const num=value=>Number(value||0).toLocaleString("zh-CN");
@@ -33,11 +34,15 @@
     return [];
   }
 
+  const params=new URLSearchParams(location.search);
+  const selectedFight=Number(params.get("fight"));
+
   function render(payload){
     const meta=payload.meta||{},data=payload.data||{};
     document.getElementById("title").textContent=meta.bossName||meta.bossKey||"通用战斗报告";
     document.getElementById("subtitle").textContent=`${meta.version||""} · ${meta.raidName||meta.raidKey||""} · ${meta.analyzedReports?.join(", ")||""}`;
-    const pulls=pullsOf(data);
+    const allPulls=pullsOf(data);
+    const pulls=selectedFight?allPulls.filter(fight=>Number(fight.fightID??fight.id)===selectedFight):allPulls;
     document.getElementById("pulls").innerHTML=pulls.length?pulls.map(fight=>`
       <article class="card">
         <div class="pull-head"><h3>Fight ${esc(fight.fightID??fight.id??"-")}</h3><span class="badge ${fight.isKill||fight.kill?"kill":"wipe"}">${fight.isKill||fight.kill?"击杀":"灭团"} · ${esc(fight.duration||"")}</span></div>
@@ -55,15 +60,14 @@
   }
 
   async function loadPath(path){
-    const response=await fetch(path,{cache:"no-store"});
-    if(!response.ok)throw new Error(`读取失败：HTTP ${response.status}`);
-    render(await response.json());
+    render(await window.MythicReportRuntime.loadPayload(path));
   }
   document.getElementById("file").addEventListener("change",async event=>{
     try{render(JSON.parse(await event.target.files[0].text()));document.getElementById("error").textContent=""}
     catch(error){document.getElementById("error").textContent=`无法载入文件：${error.message}`}
   });
-  const path=new URLSearchParams(location.search).get("json");
+  const path=params.get("json");
+  if(path)document.getElementById("overviewLink").href=`/frontend/report/overview.html?json=${encodeURIComponent(path)}`;
   if(path)loadPath(path).catch(error=>document.getElementById("error").textContent=error.message);
   else document.getElementById("error").textContent="请从报告入口选择分析文件，或导入本地 JSON。";
 </script>

@@ -25,8 +25,14 @@ class BossCatalogTests(unittest.TestCase):
         route_page = (root / "frontend" / "report" / "index.html").read_text(
             encoding="utf-8"
         )
-        self.assertIn('descriptor.renderer === "generic"', runtime)
-        self.assertIn('/generic.html', runtime)
+        overview = (root / "frontend" / "report" / "overview.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("overviewUrl", runtime)
+        self.assertIn("detailUrl", runtime)
+        self.assertNotIn('descriptor.renderer === "generic"', runtime)
+        self.assertIn("公共全场 Pull 概览", route_page)
+        self.assertIn('id="pullBoard"', overview)
         self.assertIn("暂不支持", route_page)
         self.assertNotIn("使用通用报告页", route_page)
 
