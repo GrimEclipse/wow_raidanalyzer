@@ -9,7 +9,7 @@
     "analyzedReports": [
       "GJx48AgjRMt3KrpZ"
     ],
-    "mechanicVersion": "sentinels-helical-coordinate-pairing-v3-2026-08-25",
+    "mechanicVersion": "sentinels-helical-collision-movement-v4-2026-08-25",
     "features": {
       "interrupts": false,
       "dispels": false,
@@ -48,7 +48,7 @@
     },
     "analysisConfig": {
       "helicalToxinReviewEnabled": true,
-      "helicalLargeMovementYards": 8.0,
+      "helicalLargeMovementYards": 5.0,
       "helicalPairingMaxDistanceYards": 8.0,
       "markReviewEnabled": true,
       "waterPlacementReviewEnabled": true,
@@ -870,11 +870,35 @@
                     "collisionCombination": "1+1",
                     "recoverable": true,
                     "overflow": false,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 26,
+                          "player": "残夜将歇",
+                          "movementYards": 13.9
+                        },
+                        {
+                          "playerID": 8,
+                          "player": "黑心貓",
+                          "movementYards": 12.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 3.8,
+                      "pairDistanceAtCollisionYards": 3.2,
+                      "closingDistanceYards": 0.6
+                    },
                     "largeMovers": [
+                      {
+                        "playerID": 26,
+                        "player": "残夜将歇",
+                        "movementYards": 13.9,
+                        "windowMs": 1000
+                      },
                       {
                         "playerID": 8,
                         "player": "黑心貓",
-                        "movementYards": 12.6,
+                        "movementYards": 12.2,
                         "windowMs": 1000
                       }
                     ],
@@ -914,6 +938,24 @@
                     "collisionCombination": "合计 5 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 22,
+                          "player": "茶喵不吃糖",
+                          "movementYards": 1.8
+                        },
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 2.5
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 6.2,
+                      "pairDistanceAtCollisionYards": 9.1,
+                      "closingDistanceYards": -2.9
+                    },
                     "largeMovers": []
                   },
                   {
@@ -989,6 +1031,24 @@
                     "collisionCombination": "合计 7 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 26,
+                          "player": "残夜将歇",
+                          "movementYards": 5.0
+                        },
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 2.9
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 9.8,
+                      "pairDistanceAtCollisionYards": 2.9,
+                      "closingDistanceYards": 6.9
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1045,6 +1105,24 @@
                     "collisionCombination": "3+3",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 3,
+                          "player": "Leviac",
+                          "movementYards": 1.6
+                        },
+                        {
+                          "playerID": 17,
+                          "player": "飞天小喷菇",
+                          "movementYards": 3.3
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 10.9,
+                      "pairDistanceAtCollisionYards": 10.2,
+                      "closingDistanceYards": 0.7
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1064,7 +1142,32 @@
                     "collisionCombination": "合计 7 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 17,
+                          "player": "飞天小喷菇",
+                          "movementYards": 5.2
+                        },
+                        {
+                          "playerID": 4,
+                          "player": "雷横",
+                          "movementYards": 3.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 9.3,
+                      "pairDistanceAtCollisionYards": 1.7,
+                      "closingDistanceYards": 7.6
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 17,
+                        "player": "飞天小喷菇",
+                        "movementYards": 5.2,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 161073,
@@ -1083,7 +1186,32 @@
                     "collisionCombination": "合计 7 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 6.8
+                        },
+                        {
+                          "playerID": 3,
+                          "player": "Leviac",
+                          "movementYards": 4.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 8.4,
+                      "pairDistanceAtCollisionYards": 4.1,
+                      "closingDistanceYards": 4.3
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 6.8,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 161975,
@@ -1102,7 +1230,32 @@
                     "collisionCombination": "合计 14 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 5.4
+                        },
+                        {
+                          "playerID": 17,
+                          "player": "飞天小喷菇",
+                          "movementYards": 3.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 4.1,
+                      "pairDistanceAtCollisionYards": 4.0,
+                      "closingDistanceYards": 0.0
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 5.4,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 163971,
@@ -1121,7 +1274,32 @@
                     "collisionCombination": "合计 10 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 6,
+                          "player": "贪睡熊熊",
+                          "movementYards": 5.8
+                        },
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 1.3
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 13.8,
+                      "pairDistanceAtCollisionYards": 7.0,
+                      "closingDistanceYards": 6.8
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 6,
+                        "player": "贪睡熊熊",
+                        "movementYards": 5.8,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 164512,
@@ -1140,6 +1318,16 @@
                     "collisionCombination": "合计 8 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 1.1
+                        }
+                      ]
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1207,6 +1395,24 @@
                     "collisionCombination": "合计 9 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 0.8
+                        },
+                        {
+                          "playerID": 19,
+                          "player": "Loveating",
+                          "movementYards": 1.0
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.0,
+                      "pairDistanceAtCollisionYards": 7.2,
+                      "closingDistanceYards": -0.3
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1226,6 +1432,24 @@
                     "collisionCombination": "合计 28 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 4,
+                          "player": "雷横",
+                          "movementYards": 0.9
+                        },
+                        {
+                          "playerID": 17,
+                          "player": "飞天小喷菇",
+                          "movementYards": 4.6
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.1,
+                      "pairDistanceAtCollisionYards": 7.9,
+                      "closingDistanceYards": -0.9
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1245,6 +1469,24 @@
                     "collisionCombination": "合计 42 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 4,
+                          "player": "雷横",
+                          "movementYards": 1.4
+                        },
+                        {
+                          "playerID": 3,
+                          "player": "Leviac",
+                          "movementYards": 1.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 5.9,
+                      "pairDistanceAtCollisionYards": 6.5,
+                      "closingDistanceYards": -0.6
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1264,7 +1506,32 @@
                     "collisionCombination": "合计 19 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 2.4
+                        },
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 6.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 9.9,
+                      "pairDistanceAtCollisionYards": 1.8,
+                      "closingDistanceYards": 8.1
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 5,
+                        "player": "狐不理",
+                        "movementYards": 6.1,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 173602,
@@ -1283,7 +1550,32 @@
                     "collisionCombination": "合计 32 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 1.2
+                        },
+                        {
+                          "playerID": 22,
+                          "player": "茶喵不吃糖",
+                          "movementYards": 5.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 4.3,
+                      "pairDistanceAtCollisionYards": 2.7,
+                      "closingDistanceYards": 1.6
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 22,
+                        "player": "茶喵不吃糖",
+                        "movementYards": 5.1,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 173698,
@@ -1302,6 +1594,24 @@
                     "collisionCombination": "合计 43 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 4.1
+                        },
+                        {
+                          "playerID": 6,
+                          "player": "贪睡熊熊",
+                          "movementYards": 0.5
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.3,
+                      "pairDistanceAtCollisionYards": 3.0,
+                      "closingDistanceYards": 4.3
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1321,6 +1631,24 @@
                     "collisionCombination": "合计 51 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 22,
+                          "player": "茶喵不吃糖",
+                          "movementYards": 4.7
+                        },
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 2.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 6.1,
+                      "pairDistanceAtCollisionYards": 2.3,
+                      "closingDistanceYards": 3.8
+                    },
                     "largeMovers": []
                   },
                   {
@@ -1340,11 +1668,29 @@
                     "collisionCombination": "合计 70 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 17,
+                          "player": "飞天小喷菇",
+                          "movementYards": 10.5
+                        },
+                        {
+                          "playerID": 4,
+                          "player": "雷横",
+                          "movementYards": 1.0
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 13.8,
+                      "pairDistanceAtCollisionYards": 3.0,
+                      "closingDistanceYards": 10.8
+                    },
                     "largeMovers": [
                       {
                         "playerID": 17,
                         "player": "飞天小喷菇",
-                        "movementYards": 8.5,
+                        "movementYards": 10.5,
                         "windowMs": 1000
                       }
                     ]
@@ -1571,7 +1917,7 @@
             "roundCount": 2,
             "failedRoundCount": 1,
             "wrongCollisionCount": 17,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -3582,87 +3928,95 @@
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "time": "00:32.5",
-                    "distanceFromGroupYards": 13.5,
-                    "sampleOffsetMs": 98
+                    "distanceFromGroupYards": 14.9,
+                    "sampleOffsetMs": 14
+                  },
+                  {
+                    "playerID": 12,
+                    "player": "Toccata",
+                    "time": "00:32.5",
+                    "distanceFromGroupYards": 8.9,
+                    "sampleOffsetMs": 14
+                  },
+                  {
+                    "playerID": 15,
+                    "player": "Breezeluck",
+                    "time": "00:32.5",
+                    "distanceFromGroupYards": 8.9,
+                    "sampleOffsetMs": 0
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "time": "00:32.5",
-                    "distanceFromGroupYards": 10.8,
-                    "sampleOffsetMs": -307
-                  },
-                  {
-                    "playerID": 17,
-                    "player": "飞天小喷菇",
-                    "time": "00:32.5",
-                    "distanceFromGroupYards": 9.3,
-                    "sampleOffsetMs": -27
+                    "distanceFromGroupYards": 8.7,
+                    "sampleOffsetMs": 14
                   }
                 ],
-                "reliableRemovalPositionCount": 6,
+                "reliableRemovalPositionCount": 7,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32490,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 98,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 13.5
+                    "distanceFromGroupYards": 14.9
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 32490,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 29,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.9
+                    "distanceFromGroupYards": 4.2
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 32490,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 1546,
-                    "positionReliable": false
+                    "sampleOffsetMs": 14,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 7.2
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 32490,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -76,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.5
+                    "distanceFromGroupYards": 8.9
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32504,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -245,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.8
+                    "distanceFromGroupYards": 8.9
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 32490,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -307,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 10.8
+                    "distanceFromGroupYards": 8.7
                   },
                   {
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "timeMs": 32490,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -27,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 9.3
+                    "distanceFromGroupYards": 6.5
                   }
                 ]
               },
@@ -3695,34 +4049,41 @@
                     "playerID": 8,
                     "player": "黑心貓",
                     "time": "01:32.0",
-                    "distanceFromGroupYards": 11.5,
-                    "sampleOffsetMs": 204
+                    "distanceFromGroupYards": 11.3,
+                    "sampleOffsetMs": 29
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "time": "01:32.0",
-                    "distanceFromGroupYards": 21.1,
+                    "distanceFromGroupYards": 21.5,
                     "sampleOffsetMs": -52
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "time": "01:32.1",
-                    "distanceFromGroupYards": 11.3,
-                    "sampleOffsetMs": -911
+                    "distanceFromGroupYards": 8.5,
+                    "sampleOffsetMs": 1
+                  },
+                  {
+                    "playerID": 43,
+                    "player": "劉浩然",
+                    "time": "01:32.0",
+                    "distanceFromGroupYards": 10.1,
+                    "sampleOffsetMs": 29
                   }
                 ],
-                "reliableRemovalPositionCount": 7,
+                "reliableRemovalPositionCount": 8,
                 "placements": [
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 92033,
                     "time": "01:32.0",
-                    "sampleOffsetMs": 204,
+                    "sampleOffsetMs": 29,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 11.5
+                    "distanceFromGroupYards": 11.3
                   },
                   {
                     "playerID": 9,
@@ -3731,34 +4092,34 @@
                     "time": "01:32.0",
                     "sampleOffsetMs": -52,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 21.1
+                    "distanceFromGroupYards": 21.5
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 92033,
                     "time": "01:32.0",
-                    "sampleOffsetMs": 59,
+                    "sampleOffsetMs": 29,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.4
+                    "distanceFromGroupYards": 5.6
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 92033,
                     "time": "01:32.0",
-                    "sampleOffsetMs": 392,
+                    "sampleOffsetMs": 29,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.4
+                    "distanceFromGroupYards": 2.9
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 92061,
                     "time": "01:32.1",
-                    "sampleOffsetMs": -911,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 11.3
+                    "distanceFromGroupYards": 8.5
                   },
                   {
                     "playerID": 24,
@@ -3767,24 +4128,25 @@
                     "time": "01:32.0",
                     "sampleOffsetMs": 30,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.8
+                    "distanceFromGroupYards": 4.2
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 92033,
                     "time": "01:32.0",
-                    "sampleOffsetMs": -49,
+                    "sampleOffsetMs": 29,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.7
+                    "distanceFromGroupYards": 2.4
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 92033,
                     "time": "01:32.0",
-                    "sampleOffsetMs": -2019,
-                    "positionReliable": false
+                    "sampleOffsetMs": 29,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 10.1
                   }
                 ]
               },
@@ -3818,34 +4180,43 @@
                     "bloodStack": 21
                   }
                 ],
-                "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 6,
+                "dispersedPlayers": [
+                  {
+                    "playerID": 8,
+                    "player": "黑心貓",
+                    "time": "02:13.3",
+                    "distanceFromGroupYards": 13.6,
+                    "sampleOffsetMs": 1
+                  }
+                ],
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 133299,
                     "time": "02:13.3",
-                    "sampleOffsetMs": -911,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.8
+                    "distanceFromGroupYards": 3.8
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 133299,
                     "time": "02:13.3",
-                    "sampleOffsetMs": -2072,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 13.6
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 133300,
                     "time": "02:13.3",
-                    "sampleOffsetMs": -846,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.2
+                    "distanceFromGroupYards": 4.1
                   },
                   {
                     "playerID": 11,
@@ -3854,33 +4225,34 @@
                     "time": "02:13.3",
                     "sampleOffsetMs": -185,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.1
+                    "distanceFromGroupYards": 4.4
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 133299,
                     "time": "02:13.3",
-                    "sampleOffsetMs": 262,
+                    "sampleOffsetMs": 223,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.8
+                    "distanceFromGroupYards": 1.2
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 133299,
                     "time": "02:13.3",
-                    "sampleOffsetMs": 1785,
-                    "positionReliable": false
+                    "sampleOffsetMs": 223,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 1.8
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 133299,
                     "time": "02:13.3",
-                    "sampleOffsetMs": -911,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.5
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 26,
@@ -3889,15 +4261,16 @@
                     "time": "02:13.3",
                     "sampleOffsetMs": -16,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.9
+                    "distanceFromGroupYards": 0.1
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 133299,
                     "time": "02:13.3",
-                    "sampleOffsetMs": 1506,
-                    "positionReliable": false
+                    "sampleOffsetMs": 2,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.9
                   }
                 ]
               }
@@ -5423,6 +5796,24 @@
                     "collisionCombination": "1+2",
                     "recoverable": true,
                     "overflow": false,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 4,
+                          "player": "雷横",
+                          "movementYards": 4.0
+                        },
+                        {
+                          "playerID": 15,
+                          "player": "Breezeluck",
+                          "movementYards": 1.7
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 1.1,
+                      "pairDistanceAtCollisionYards": 4.9,
+                      "closingDistanceYards": -3.8
+                    },
                     "largeMovers": [],
                     "firstWrongCollision": true
                   },
@@ -5601,7 +5992,32 @@
                     "collisionCombination": "合计 5 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 11,
+                          "player": "三坑不二",
+                          "movementYards": 2.9
+                        },
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 5.4
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 10.3,
+                      "pairDistanceAtCollisionYards": 6.3,
+                      "closingDistanceYards": 4.0
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 5.4,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 70742,
@@ -5620,11 +6036,29 @@
                     "collisionCombination": "合计 8 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 26.8
+                        },
+                        {
+                          "playerID": 15,
+                          "player": "Breezeluck",
+                          "movementYards": 2.7
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 29.7,
+                      "pairDistanceAtCollisionYards": 5.4,
+                      "closingDistanceYards": 24.3
+                    },
                     "largeMovers": [
                       {
-                        "playerID": 15,
-                        "player": "Breezeluck",
-                        "movementYards": 8.3,
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 26.8,
                         "windowMs": 1000
                       }
                     ]
@@ -5646,7 +6080,32 @@
                     "collisionCombination": "合计 11 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 10.7
+                        },
+                        {
+                          "playerID": 17,
+                          "player": "飞天小喷菇",
+                          "movementYards": 0.7
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 9.9,
+                      "pairDistanceAtCollisionYards": 18.4,
+                      "closingDistanceYards": -8.5
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 10.7,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 74251,
@@ -5759,7 +6218,7 @@
             "roundCount": 1,
             "failedRoundCount": 1,
             "wrongCollisionCount": 4,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -7339,28 +7798,29 @@
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "time": "00:32.7",
-                    "distanceFromGroupYards": 10.5,
+                    "distanceFromGroupYards": 11.7,
                     "sampleOffsetMs": 0
                   }
                 ],
-                "reliableRemovalPositionCount": 5,
+                "reliableRemovalPositionCount": 6,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32654,
                     "time": "00:32.7",
-                    "sampleOffsetMs": 306,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.4
+                    "distanceFromGroupYards": 1.2
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 32654,
                     "time": "00:32.7",
-                    "sampleOffsetMs": 2238,
-                    "positionReliable": false
+                    "sampleOffsetMs": 0,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 4.8
                   },
                   {
                     "playerID": 14,
@@ -7369,25 +7829,25 @@
                     "time": "00:32.7",
                     "sampleOffsetMs": 192,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 7.1
+                    "distanceFromGroupYards": 7.6
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32654,
                     "time": "00:32.7",
-                    "sampleOffsetMs": 719,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.4
+                    "distanceFromGroupYards": 1.2
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 32654,
                     "time": "00:32.7",
-                    "sampleOffsetMs": -20,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 2.0
                   },
                   {
                     "playerID": 17,
@@ -7396,7 +7856,7 @@
                     "time": "00:32.7",
                     "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 10.5
+                    "distanceFromGroupYards": 11.7
                   }
                 ]
               },
@@ -7477,53 +7937,54 @@
                     "playerID": 13,
                     "player": "染小战",
                     "time": "01:28.1",
-                    "distanceFromGroupYards": 27.4,
-                    "sampleOffsetMs": 1234
+                    "distanceFromGroupYards": 23.2,
+                    "sampleOffsetMs": 28
                   }
                 ],
-                "reliableRemovalPositionCount": 3,
+                "reliableRemovalPositionCount": 6,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 88087,
                     "time": "01:28.1",
-                    "sampleOffsetMs": -466,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.9
+                    "distanceFromGroupYards": 2.4
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 88087,
                     "time": "01:28.1",
-                    "sampleOffsetMs": 1785,
-                    "positionReliable": false
+                    "sampleOffsetMs": 15,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 4.4
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 88073,
                     "time": "01:28.1",
-                    "sampleOffsetMs": -452,
+                    "sampleOffsetMs": 29,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.1
+                    "distanceFromGroupYards": 4.3
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 88074,
                     "time": "01:28.1",
-                    "sampleOffsetMs": 1234,
+                    "sampleOffsetMs": 28,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 27.4
+                    "distanceFromGroupYards": 23.2
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 88087,
                     "time": "01:28.1",
-                    "sampleOffsetMs": -6670,
+                    "sampleOffsetMs": -5998,
                     "positionReliable": false
                   },
                   {
@@ -7531,16 +7992,18 @@
                     "player": "残夜将歇",
                     "timeMs": 88087,
                     "time": "01:28.1",
-                    "sampleOffsetMs": -3399,
-                    "positionReliable": false
+                    "sampleOffsetMs": 15,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.2
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 88074,
                     "time": "01:28.1",
-                    "sampleOffsetMs": 2149,
-                    "positionReliable": false
+                    "sampleOffsetMs": 692,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.8
                   }
                 ]
               }
@@ -8711,6 +9174,24 @@
                     "collisionCombination": "合计 9 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 43,
+                          "player": "劉浩然",
+                          "movementYards": 1.1
+                        },
+                        {
+                          "playerID": 3,
+                          "player": "Leviac",
+                          "movementYards": 3.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.1,
+                      "pairDistanceAtCollisionYards": 5.2,
+                      "closingDistanceYards": 1.9
+                    },
                     "largeMovers": [],
                     "firstWrongCollision": true
                   },
@@ -8748,31 +9229,49 @@
                     "collisionCombination": "合计 16 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 43,
+                          "player": "劉浩然",
+                          "movementYards": 4.8
+                        },
+                        {
+                          "playerID": 26,
+                          "player": "残夜将歇",
+                          "movementYards": 8.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 5.1,
+                      "pairDistanceAtCollisionYards": 2.0,
+                      "closingDistanceYards": 3.2
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 26,
+                        "player": "残夜将歇",
+                        "movementYards": 8.2,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 51562,
                     "time": "00:51.6",
-                    "kind": "unpaired-remove",
+                    "kind": "safe-clear",
                     "players": [
-                      "Toccata"
-                    ],
-                    "playerIDs": [
-                      12
-                    ],
-                    "resultStack": 0
-                  },
-                  {
-                    "timeMs": 51573,
-                    "time": "00:51.6",
-                    "kind": "unpaired-remove",
-                    "players": [
+                      "Toccata",
                       "Breezeluck"
                     ],
                     "playerIDs": [
+                      12,
                       15
                     ],
-                    "resultStack": 0
+                    "resultStack": 0,
+                    "pairingEvidence": "coordinates",
+                    "distanceYards": 4.8,
+                    "positionConfidence": "high"
                   },
                   {
                     "timeMs": 51818,
@@ -8842,6 +9341,24 @@
                     "collisionCombination": "合计 19 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 8,
+                          "player": "黑心貓",
+                          "movementYards": 3.8
+                        },
+                        {
+                          "playerID": 43,
+                          "player": "劉浩然",
+                          "movementYards": 0.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 6.4,
+                      "pairDistanceAtCollisionYards": 2.9,
+                      "closingDistanceYards": 3.5
+                    },
                     "largeMovers": []
                   },
                   {
@@ -8861,6 +9378,24 @@
                     "collisionCombination": "合计 24 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 43,
+                          "player": "劉浩然",
+                          "movementYards": 3.0
+                        },
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 0.5
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 4.9,
+                      "pairDistanceAtCollisionYards": 2.5,
+                      "closingDistanceYards": 2.4
+                    },
                     "largeMovers": []
                   },
                   {
@@ -8880,6 +9415,24 @@
                     "collisionCombination": "合计 43 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 8,
+                          "player": "黑心貓",
+                          "movementYards": 3.2
+                        },
+                        {
+                          "playerID": 43,
+                          "player": "劉浩然",
+                          "movementYards": 4.5
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 5.2,
+                      "pairDistanceAtCollisionYards": 6.2,
+                      "closingDistanceYards": -1.0
+                    },
                     "largeMovers": []
                   },
                   {
@@ -8899,7 +9452,32 @@
                     "collisionCombination": "合计 67 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 6.5
+                        },
+                        {
+                          "playerID": 8,
+                          "player": "黑心貓",
+                          "movementYards": 2.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.0,
+                      "pairDistanceAtCollisionYards": 3.8,
+                      "closingDistanceYards": 3.2
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 13,
+                        "player": "染小战",
+                        "movementYards": 6.5,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 74183,
@@ -9007,7 +9585,7 @@
             "roundCount": 1,
             "failedRoundCount": 1,
             "wrongCollisionCount": 6,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -10602,7 +11180,7 @@
                     "player": "花落冬陽丶",
                     "timeMs": 32202,
                     "time": "00:32.2",
-                    "sampleOffsetMs": 401,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
                     "distanceFromGroupYards": 0.0
                   },
@@ -10611,7 +11189,7 @@
                     "player": "小楚唯",
                     "timeMs": 32202,
                     "time": "00:32.2",
-                    "sampleOffsetMs": -6416,
+                    "sampleOffsetMs": -5980,
                     "positionReliable": false
                   },
                   {
@@ -10619,7 +11197,7 @@
                     "player": "飞天小喷菇",
                     "timeMs": 32202,
                     "time": "00:32.2",
-                    "sampleOffsetMs": -5980,
+                    "sampleOffsetMs": -5979,
                     "positionReliable": false
                   },
                   {
@@ -10627,7 +11205,7 @@
                     "player": "Loveating",
                     "timeMs": 32202,
                     "time": "00:32.2",
-                    "sampleOffsetMs": -6075,
+                    "sampleOffsetMs": -5979,
                     "positionReliable": false
                   }
                 ]
@@ -12270,7 +12848,7 @@
             "roundCount": 3,
             "failedRoundCount": 1,
             "wrongCollisionCount": 0,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -14707,14 +15285,14 @@
                     "player": "狐不理",
                     "time": "00:32.4",
                     "distanceFromGroupYards": 10.5,
-                    "sampleOffsetMs": -211
+                    "sampleOffsetMs": 1
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "time": "00:32.4",
                     "distanceFromGroupYards": 10.8,
-                    "sampleOffsetMs": 350
+                    "sampleOffsetMs": 1
                   },
                   {
                     "playerID": 17,
@@ -14724,23 +15302,23 @@
                     "sampleOffsetMs": 0
                   }
                 ],
-                "reliableRemovalPositionCount": 7,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 120,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.6
+                    "distanceFromGroupYards": 1.4
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -211,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
                     "distanceFromGroupYards": 10.5
                   },
@@ -14749,24 +15327,25 @@
                     "player": "小树暖暖",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -3132,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.2
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -628,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.9
+                    "distanceFromGroupYards": 3.8
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 350,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
                     "distanceFromGroupYards": 10.8
                   },
@@ -14775,24 +15354,25 @@
                     "player": "丶若叶睦",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 4112,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.5
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 489,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.9
+                    "distanceFromGroupYards": 3.0
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 32382,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 121,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
                     "distanceFromGroupYards": 4.2
                   },
@@ -14849,25 +15429,34 @@
                     "bloodStack": 11
                   }
                 ],
-                "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 7,
+                "dispersedPlayers": [
+                  {
+                    "playerID": 18,
+                    "player": "Superhunter",
+                    "time": "01:34.4",
+                    "distanceFromGroupYards": 8.6,
+                    "sampleOffsetMs": -977
+                  }
+                ],
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 94356,
                     "time": "01:34.4",
-                    "sampleOffsetMs": 2904,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 1.7
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 94357,
                     "time": "01:34.4",
-                    "sampleOffsetMs": -91,
+                    "sampleOffsetMs": 18,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 11,
@@ -14876,31 +15465,32 @@
                     "time": "01:34.4",
                     "sampleOffsetMs": 247,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.1
+                    "distanceFromGroupYards": 1.8
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 94356,
                     "time": "01:34.4",
-                    "sampleOffsetMs": 880,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.2
+                    "distanceFromGroupYards": 0.3
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 94356,
                     "time": "01:34.4",
-                    "sampleOffsetMs": 2904,
-                    "positionReliable": false
+                    "sampleOffsetMs": -977,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 8.6
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 94374,
                     "time": "01:34.4",
-                    "sampleOffsetMs": -238,
+                    "sampleOffsetMs": -17,
                     "positionReliable": true,
                     "distanceFromGroupYards": 7.7
                   },
@@ -14911,25 +15501,25 @@
                     "time": "01:34.4",
                     "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.7
+                    "distanceFromGroupYards": 3.5
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 94356,
                     "time": "01:34.4",
-                    "sampleOffsetMs": 50,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.3
+                    "distanceFromGroupYards": 1.6
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 94356,
                     "time": "01:34.4",
-                    "sampleOffsetMs": 437,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.3
+                    "distanceFromGroupYards": 0.8
                   }
                 ]
               },
@@ -14971,36 +15561,36 @@
                     "player": "Leviac",
                     "timeMs": 135646,
                     "time": "02:15.6",
-                    "sampleOffsetMs": 638,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.1
+                    "distanceFromGroupYards": 6.0
                   },
                   {
                     "playerID": 6,
                     "player": "贪睡熊熊",
                     "timeMs": 135646,
                     "time": "02:15.6",
-                    "sampleOffsetMs": 638,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 2.0
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 135646,
                     "time": "02:15.6",
-                    "sampleOffsetMs": -776,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 3.1
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 135647,
                     "time": "02:15.6",
-                    "sampleOffsetMs": -472,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.9
+                    "distanceFromGroupYards": 0.7
                   },
                   {
                     "playerID": 11,
@@ -15009,34 +15599,34 @@
                     "time": "02:15.6",
                     "sampleOffsetMs": 637,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.4
+                    "distanceFromGroupYards": 5.3
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 135647,
                     "time": "02:15.6",
-                    "sampleOffsetMs": 1275,
+                    "sampleOffsetMs": 35,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.0
+                    "distanceFromGroupYards": 2.5
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 135646,
                     "time": "02:15.6",
-                    "sampleOffsetMs": -246,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.3
+                    "distanceFromGroupYards": 1.4
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 135647,
                     "time": "02:15.6",
-                    "sampleOffsetMs": -120,
+                    "sampleOffsetMs": 36,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.0
+                    "distanceFromGroupYards": 0.2
                   },
                   {
                     "playerID": 43,
@@ -15091,32 +15681,24 @@
                     "bloodStack": 21
                   }
                 ],
-                "dispersedPlayers": [
-                  {
-                    "playerID": 12,
-                    "player": "Toccata",
-                    "time": "03:18.8",
-                    "distanceFromGroupYards": 8.3,
-                    "sampleOffsetMs": -788
-                  }
-                ],
-                "reliableRemovalPositionCount": 6,
+                "dispersedPlayers": [],
+                "reliableRemovalPositionCount": 7,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": 282,
+                    "sampleOffsetMs": 17,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.4
+                    "distanceFromGroupYards": 6.0
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": -12247,
+                    "sampleOffsetMs": -5272,
                     "positionReliable": false
                   },
                   {
@@ -15124,53 +15706,54 @@
                     "player": "狐不理",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": -76,
+                    "sampleOffsetMs": 17,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.5
+                    "distanceFromGroupYards": 5.1
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": -668,
+                    "sampleOffsetMs": 17,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.0
+                    "distanceFromGroupYards": 1.5
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": -788,
+                    "sampleOffsetMs": 555,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.3
+                    "distanceFromGroupYards": 7.9
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": 4212,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 1.4
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": -48,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.3
+                    "distanceFromGroupYards": 0.8
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 198777,
                     "time": "03:18.8",
-                    "sampleOffsetMs": 643,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.6
+                    "distanceFromGroupYards": 0.0
                   }
                 ]
               },
@@ -15185,50 +15768,59 @@
                 "carrierCount": 8,
                 "bloodSideCandidateCount": 8,
                 "missingBloodSidePlayers": [],
-                "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 6,
+                "dispersedPlayers": [
+                  {
+                    "playerID": 10,
+                    "player": "那个猎刃",
+                    "time": "04:00.1",
+                    "distanceFromGroupYards": 8.4,
+                    "sampleOffsetMs": 11
+                  }
+                ],
+                "reliableRemovalPositionCount": 7,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 240076,
                     "time": "04:00.1",
-                    "sampleOffsetMs": 71,
+                    "sampleOffsetMs": -12,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 240053,
                     "time": "04:00.1",
-                    "sampleOffsetMs": 1535,
-                    "positionReliable": false
+                    "sampleOffsetMs": 11,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.0
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 240053,
                     "time": "04:00.1",
-                    "sampleOffsetMs": 24,
+                    "sampleOffsetMs": 11,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 7.9
+                    "distanceFromGroupYards": 8.4
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 240053,
                     "time": "04:00.1",
-                    "sampleOffsetMs": -485,
+                    "sampleOffsetMs": 11,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.9
+                    "distanceFromGroupYards": 6.5
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 240064,
                     "time": "04:00.1",
-                    "sampleOffsetMs": -7074,
+                    "sampleOffsetMs": -4726,
                     "positionReliable": false
                   },
                   {
@@ -15236,27 +15828,27 @@
                     "player": "Breezeluck",
                     "timeMs": 240063,
                     "time": "04:00.1",
-                    "sampleOffsetMs": 525,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.0
+                    "distanceFromGroupYards": 2.4
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 240053,
                     "time": "04:00.1",
-                    "sampleOffsetMs": 404,
+                    "sampleOffsetMs": 11,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.0
+                    "distanceFromGroupYards": 0.4
                   },
                   {
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "timeMs": 240064,
                     "time": "04:00.1",
-                    "sampleOffsetMs": -77,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.4
+                    "distanceFromGroupYards": 4.9
                   }
                 ]
               },
@@ -15286,7 +15878,7 @@
                     "player": "贪睡熊熊",
                     "timeMs": 300731,
                     "time": "05:00.7",
-                    "sampleOffsetMs": 91,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
                     "distanceFromGroupYards": 1.1
                   },
@@ -15295,25 +15887,25 @@
                     "player": "黑心貓",
                     "timeMs": 300731,
                     "time": "05:00.7",
-                    "sampleOffsetMs": -1201,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.0
+                    "distanceFromGroupYards": 3.9
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 300732,
                     "time": "05:00.7",
-                    "sampleOffsetMs": 630,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.3
+                    "distanceFromGroupYards": 2.4
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 300732,
                     "time": "05:00.7",
-                    "sampleOffsetMs": 482,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
                     "distanceFromGroupYards": 1.5
                   },
@@ -15322,18 +15914,18 @@
                     "player": "阿塔尼斯",
                     "timeMs": 300731,
                     "time": "05:00.7",
-                    "sampleOffsetMs": -778,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 2.2
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 300731,
                     "time": "05:00.7",
-                    "sampleOffsetMs": -297,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.7
+                    "distanceFromGroupYards": 6.6
                   }
                 ]
               }
@@ -17050,7 +17642,32 @@
                     "collisionCombination": "1+2",
                     "recoverable": true,
                     "overflow": false,
-                    "largeMovers": [],
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 6.2
+                        },
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 3.0
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 8.2,
+                      "pairDistanceAtCollisionYards": 4.8,
+                      "closingDistanceYards": 3.4
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 13,
+                        "player": "染小战",
+                        "movementYards": 6.2,
+                        "windowMs": 1000
+                      }
+                    ],
                     "firstWrongCollision": true
                   },
                   {
@@ -17141,6 +17758,24 @@
                     "collisionCombination": "3+3",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 8,
+                          "player": "黑心貓",
+                          "movementYards": 4.5
+                        },
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 0.5
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.3,
+                      "pairDistanceAtCollisionYards": 2.4,
+                      "closingDistanceYards": 5.0
+                    },
                     "largeMovers": []
                   },
                   {
@@ -17216,6 +17851,24 @@
                     "collisionCombination": "合计 9 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 3.9
+                        },
+                        {
+                          "playerID": 10,
+                          "player": "那个猎刃",
+                          "movementYards": 0.0
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.3,
+                      "pairDistanceAtCollisionYards": 3.4,
+                      "closingDistanceYards": 3.9
+                    },
                     "largeMovers": []
                   },
                   {
@@ -17235,7 +17888,32 @@
                     "collisionCombination": "合计 11 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 6.2
+                        },
+                        {
+                          "playerID": 11,
+                          "player": "三坑不二",
+                          "movementYards": 0.6
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 10.0,
+                      "pairDistanceAtCollisionYards": 4.6,
+                      "closingDistanceYards": 5.4
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 13,
+                        "player": "染小战",
+                        "movementYards": 6.2,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 71624,
@@ -17254,6 +17932,24 @@
                     "collisionCombination": "合计 20 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 13,
+                          "player": "染小战",
+                          "movementYards": 0.8
+                        },
+                        {
+                          "playerID": 10,
+                          "player": "那个猎刃",
+                          "movementYards": 4.6
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 8.6,
+                      "pairDistanceAtCollisionYards": 4.6,
+                      "closingDistanceYards": 4.0
+                    },
                     "largeMovers": []
                   },
                   {
@@ -17273,7 +17969,32 @@
                     "collisionCombination": "合计 31 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 10,
+                          "player": "那个猎刃",
+                          "movementYards": 5.6
+                        },
+                        {
+                          "playerID": 11,
+                          "player": "三坑不二",
+                          "movementYards": 3.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.9,
+                      "pairDistanceAtCollisionYards": 4.6,
+                      "closingDistanceYards": 3.2
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 10,
+                        "player": "那个猎刃",
+                        "movementYards": 5.6,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 74205,
@@ -17386,7 +18107,7 @@
             "roundCount": 1,
             "failedRoundCount": 1,
             "wrongCollisionCount": 6,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -18950,25 +19671,25 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 6,
+                "reliableRemovalPositionCount": 7,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32140,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -105,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.2
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 7,
                     "player": "小树暖暖",
                     "timeMs": 32124,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 723,
+                    "sampleOffsetMs": 16,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.6
+                    "distanceFromGroupYards": 2.7
                   },
                   {
                     "playerID": 10,
@@ -18977,42 +19698,43 @@
                     "time": "00:32.1",
                     "sampleOffsetMs": 538,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.8
+                    "distanceFromGroupYards": 2.3
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 32140,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -451,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.3
+                    "distanceFromGroupYards": 4.6
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 32124,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -5713,
-                    "positionReliable": false
+                    "sampleOffsetMs": 16,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 4.2
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32140,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 651,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.8
+                    "distanceFromGroupYards": 1.0
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 32124,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 178,
+                    "sampleOffsetMs": 16,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.7
+                    "distanceFromGroupYards": 0.4
                   }
                 ]
               }
@@ -20166,6 +20888,24 @@
                     "collisionCombination": "3+3",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 1.2
+                        },
+                        {
+                          "playerID": 14,
+                          "player": "丶若叶睦",
+                          "movementYards": 1.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 6.4,
+                      "pairDistanceAtCollisionYards": 6.4,
+                      "closingDistanceYards": 0.0
+                    },
                     "largeMovers": [],
                     "firstWrongCollision": true
                   },
@@ -20254,6 +20994,24 @@
                     "collisionCombination": "合计 7 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 15,
+                          "player": "Breezeluck",
+                          "movementYards": 3.2
+                        },
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 2.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.3,
+                      "pairDistanceAtCollisionYards": 7.0,
+                      "closingDistanceYards": 0.4
+                    },
                     "largeMovers": []
                   },
                   {
@@ -20290,6 +21048,24 @@
                     "collisionCombination": "合计 13 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 1.2
+                        },
+                        {
+                          "playerID": 14,
+                          "player": "丶若叶睦",
+                          "movementYards": 1.3
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 5.0,
+                      "pairDistanceAtCollisionYards": 5.4,
+                      "closingDistanceYards": -0.4
+                    },
                     "largeMovers": []
                   },
                   {
@@ -20309,6 +21085,24 @@
                     "collisionCombination": "合计 26 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 14,
+                          "player": "丶若叶睦",
+                          "movementYards": 1.0
+                        },
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 3.2
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 5.9,
+                      "pairDistanceAtCollisionYards": 3.2,
+                      "closingDistanceYards": 2.7
+                    },
                     "largeMovers": []
                   },
                   {
@@ -20328,7 +21122,32 @@
                     "collisionCombination": "合计 33 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 4.1
+                        },
+                        {
+                          "playerID": 15,
+                          "player": "Breezeluck",
+                          "movementYards": 5.9
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 16.2,
+                      "pairDistanceAtCollisionYards": 12.1,
+                      "closingDistanceYards": 4.1
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 15,
+                        "player": "Breezeluck",
+                        "movementYards": 5.9,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 165442,
@@ -20364,7 +21183,32 @@
                     "collisionCombination": "合计 66 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 15,
+                          "player": "Breezeluck",
+                          "movementYards": 2.9
+                        },
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 6.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 10.9,
+                      "pairDistanceAtCollisionYards": 11.2,
+                      "closingDistanceYards": -0.3
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 7,
+                        "player": "小树暖暖",
+                        "movementYards": 6.1,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 179103,
@@ -20428,7 +21272,7 @@
             "roundCount": 2,
             "failedRoundCount": 1,
             "wrongCollisionCount": 6,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -22423,87 +23267,88 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 8,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 75,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.9
+                    "distanceFromGroupYards": 3.2
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -58,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.9
+                    "distanceFromGroupYards": 0.7
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -1189,
+                    "sampleOffsetMs": 1095,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.4
+                    "distanceFromGroupYards": 2.4
                   },
                   {
                     "playerID": 7,
                     "player": "小树暖暖",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 1095,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 7.6
+                    "distanceFromGroupYards": 5.5
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 145,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.8
+                    "distanceFromGroupYards": 1.7
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -3489,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 1.9
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 487,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.4
+                    "distanceFromGroupYards": 0.0
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": -18,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.7
+                    "distanceFromGroupYards": 0.6
                   },
                   {
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "timeMs": 32121,
                     "time": "00:32.1",
-                    "sampleOffsetMs": 21,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.8
+                    "distanceFromGroupYards": 2.9
                   }
                 ]
               },
@@ -22538,85 +23383,88 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 6,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": 663,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.9
+                    "distanceFromGroupYards": 0.8
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 91747,
                     "time": "01:31.7",
-                    "sampleOffsetMs": 59,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": 379,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.1
+                    "distanceFromGroupYards": 6.7
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": -2875,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 0.0
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": -2548,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 1.7
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": -67,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.5
+                    "distanceFromGroupYards": 2.9
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": -821,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.0
+                    "distanceFromGroupYards": 0.7
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": 993,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.3
+                    "distanceFromGroupYards": 2.7
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 91746,
                     "time": "01:31.7",
-                    "sampleOffsetMs": 3159,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.3
                   }
                 ]
               },
@@ -22651,85 +23499,88 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 6,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": -3147,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.9
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": -325,
+                    "sampleOffsetMs": 54,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.0
+                    "distanceFromGroupYards": 0.8
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": 212,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.7
+                    "distanceFromGroupYards": 4.5
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": 1624,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.0
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": -1154,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.5
+                    "distanceFromGroupYards": 4.4
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": 445,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.9
+                    "distanceFromGroupYards": 1.1
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": -19,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.5
+                    "distanceFromGroupYards": 2.7
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": -454,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.6
+                    "distanceFromGroupYards": 2.8
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 133061,
                     "time": "02:13.1",
-                    "sampleOffsetMs": -2925,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.7
                   }
                 ]
               }
@@ -24000,7 +24851,32 @@
                     "collisionCombination": "合计 5 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": [],
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 8.8
+                        },
+                        {
+                          "playerID": 14,
+                          "player": "丶若叶睦",
+                          "movementYards": 2.7
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 34.9,
+                      "pairDistanceAtCollisionYards": 24.3,
+                      "closingDistanceYards": 10.6
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 8.8,
+                        "windowMs": 1000
+                      }
+                    ],
                     "firstWrongCollision": true
                   },
                   {
@@ -24040,7 +24916,32 @@
                     "collisionCombination": "3+3",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 24,
+                          "player": "大堂经理丶",
+                          "movementYards": 15.2
+                        },
+                        {
+                          "playerID": 7,
+                          "player": "小树暖暖",
+                          "movementYards": 1.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 9.3,
+                      "pairDistanceAtCollisionYards": 6.7,
+                      "closingDistanceYards": 2.6
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 24,
+                        "player": "大堂经理丶",
+                        "movementYards": 15.2,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 71793,
@@ -24059,7 +24960,24 @@
                     "collisionCombination": "合计 8 层",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 8.4
+                        }
+                      ]
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 5,
+                        "player": "狐不理",
+                        "movementYards": 8.4,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 73491,
@@ -24078,6 +24996,16 @@
                     "collisionCombination": "合计 16 层",
                     "recoverable": false,
                     "overflow": true,
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 2.3
+                        }
+                      ]
+                    },
                     "largeMovers": []
                   },
                   {
@@ -24191,7 +25119,7 @@
             "roundCount": 1,
             "failedRoundCount": 1,
             "wrongCollisionCount": 4,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -25749,86 +26677,88 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 7,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32514,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -381,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.6
+                    "distanceFromGroupYards": 3.7
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 32514,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 1619,
-                    "positionReliable": false
+                    "sampleOffsetMs": 0,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 3.5
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 32514,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -1263,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.1
+                    "distanceFromGroupYards": 4.8
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 32513,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -29,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.4
+                    "distanceFromGroupYards": 0.2
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 32514,
                     "time": "00:32.5",
-                    "sampleOffsetMs": -183,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.8
+                    "distanceFromGroupYards": 1.7
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 32514,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 6686,
-                    "positionReliable": false
+                    "sampleOffsetMs": 0,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 0.7
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32514,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 33,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.6
+                    "distanceFromGroupYards": 0.5
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 32513,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 287,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.2
+                    "distanceFromGroupYards": 0.3
                   },
                   {
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "timeMs": 32513,
                     "time": "00:32.5",
-                    "sampleOffsetMs": 2,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.7
+                    "distanceFromGroupYards": 3.8
                   }
                 ]
               },
@@ -25892,15 +26822,30 @@
                     "bloodStack": 12
                   }
                 ],
-                "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 0,
+                "dispersedPlayers": [
+                  {
+                    "playerID": 23,
+                    "player": "阿塔尼斯",
+                    "time": "01:27.2",
+                    "distanceFromGroupYards": 19.0,
+                    "sampleOffsetMs": 0
+                  },
+                  {
+                    "playerID": 43,
+                    "player": "劉浩然",
+                    "time": "01:27.2",
+                    "distanceFromGroupYards": 19.0,
+                    "sampleOffsetMs": 1
+                  }
+                ],
+                "reliableRemovalPositionCount": 2,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 87187,
                     "time": "01:27.2",
-                    "sampleOffsetMs": -17208,
+                    "sampleOffsetMs": -2318,
                     "positionReliable": false
                   },
                   {
@@ -25908,7 +26853,7 @@
                     "player": "三坑不二",
                     "timeMs": 87187,
                     "time": "01:27.2",
-                    "sampleOffsetMs": -4416,
+                    "sampleOffsetMs": -1995,
                     "positionReliable": false
                   },
                   {
@@ -25916,7 +26861,7 @@
                     "player": "染小战",
                     "timeMs": 87186,
                     "time": "01:27.2",
-                    "sampleOffsetMs": -2977,
+                    "sampleOffsetMs": -1995,
                     "positionReliable": false
                   },
                   {
@@ -25924,15 +26869,16 @@
                     "player": "阿塔尼斯",
                     "timeMs": 87187,
                     "time": "01:27.2",
-                    "sampleOffsetMs": -1945,
-                    "positionReliable": false
+                    "sampleOffsetMs": 0,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 19.0
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 87186,
                     "time": "01:27.2",
-                    "sampleOffsetMs": -5104,
+                    "sampleOffsetMs": -4682,
                     "positionReliable": false
                   },
                   {
@@ -25940,8 +26886,9 @@
                     "player": "劉浩然",
                     "timeMs": 87186,
                     "time": "01:27.2",
-                    "sampleOffsetMs": -9093,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 19.0
                   }
                 ]
               }
@@ -27463,7 +28410,32 @@
                     "collisionCombination": "1+1",
                     "recoverable": true,
                     "overflow": false,
-                    "largeMovers": [],
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 43,
+                          "player": "劉浩然",
+                          "movementYards": 6.0
+                        },
+                        {
+                          "playerID": 23,
+                          "player": "阿塔尼斯",
+                          "movementYards": 1.1
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 10.4,
+                      "pairDistanceAtCollisionYards": 3.7,
+                      "closingDistanceYards": 6.7
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 43,
+                        "player": "劉浩然",
+                        "movementYards": 6.0,
+                        "windowMs": 1000
+                      }
+                    ],
                     "firstWrongCollision": true
                   },
                   {
@@ -27542,7 +28514,38 @@
                     "collisionCombination": "3+3",
                     "recoverable": false,
                     "overflow": true,
-                    "largeMovers": []
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 22,
+                          "player": "茶喵不吃糖",
+                          "movementYards": 9.2
+                        },
+                        {
+                          "playerID": 1,
+                          "player": "花落冬陽丶",
+                          "movementYards": 6.9
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 17.6,
+                      "pairDistanceAtCollisionYards": 2.5,
+                      "closingDistanceYards": 15.0
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 22,
+                        "player": "茶喵不吃糖",
+                        "movementYards": 9.2,
+                        "windowMs": 1000
+                      },
+                      {
+                        "playerID": 1,
+                        "player": "花落冬陽丶",
+                        "movementYards": 6.9,
+                        "windowMs": 1000
+                      }
+                    ]
                   },
                   {
                     "timeMs": 276409,
@@ -27765,7 +28768,32 @@
                     "collisionCombination": "1+2",
                     "recoverable": true,
                     "overflow": false,
-                    "largeMovers": [],
+                    "movementEvidence": {
+                      "windowMs": 1000,
+                      "players": [
+                        {
+                          "playerID": 14,
+                          "player": "丶若叶睦",
+                          "movementYards": 0.6
+                        },
+                        {
+                          "playerID": 5,
+                          "player": "狐不理",
+                          "movementYards": 6.7
+                        }
+                      ],
+                      "pairDistanceBeforeYards": 7.3,
+                      "pairDistanceAtCollisionYards": 5.8,
+                      "closingDistanceYards": 1.5
+                    },
+                    "largeMovers": [
+                      {
+                        "playerID": 5,
+                        "player": "狐不理",
+                        "movementYards": 6.7,
+                        "windowMs": 1000
+                      }
+                    ],
                     "firstWrongCollision": true
                   },
                   {
@@ -27890,7 +28918,7 @@
             "roundCount": 5,
             "failedRoundCount": 2,
             "wrongCollisionCount": 3,
-            "explanation": "从wcl获取的初始数据不包含玩家的层数信息。只有当玩家相碰撞的时候根据玩家之后获得的层数来判断这两个玩家的类型是什么。但可以判断出这两名玩家相撞时是什么组合。在每一个轮次中第一个产生错误的玩家会用不同色块提醒，具体是谁乱动导致的出错需要进一步确认。"
+            "explanation": "当前 WCL 的初次 applydebuff 事件不包含玩家层数；游戏内插件能显示的私有光环数字没有进入本场 combat log payload。正常同帧移除只记录安全相撞的两名玩家，撞错后的 applydebuffstack 才能用结果层数反推组合。每轮第一个错误碰撞会用不同色块提醒，具体是谁乱动仍需进一步确认。"
           },
           "marks": {
             "players": [
@@ -31190,34 +32218,34 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 8,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -535,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.9
+                    "distanceFromGroupYards": 3.6
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 1059,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.3
+                    "distanceFromGroupYards": 1.8
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -193,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.9
+                    "distanceFromGroupYards": 3.8
                   },
                   {
                     "playerID": 7,
@@ -31226,40 +32254,41 @@
                     "time": "00:32.4",
                     "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.5
+                    "distanceFromGroupYards": 5.9
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 114,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.8
+                    "distanceFromGroupYards": 1.1
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -35,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.3
+                    "distanceFromGroupYards": 1.5
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": 5583,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.0
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 32371,
                     "time": "00:32.4",
-                    "sampleOffsetMs": -363,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
                     "distanceFromGroupYards": 1.9
                   },
@@ -31270,7 +32299,7 @@
                     "time": "00:32.4",
                     "sampleOffsetMs": 457,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.4
+                    "distanceFromGroupYards": 2.0
                   }
                 ]
               },
@@ -31359,22 +32388,23 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 8,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 89506,
                     "time": "01:29.5",
-                    "sampleOffsetMs": -2763,
-                    "positionReliable": false
+                    "sampleOffsetMs": 3,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 0.0
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": -572,
+                    "sampleOffsetMs": 28,
                     "positionReliable": true,
                     "distanceFromGroupYards": 1.3
                   },
@@ -31383,52 +32413,52 @@
                     "player": "Kaminadeko",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": 111,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.9
+                    "distanceFromGroupYards": 3.1
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": -32,
+                    "sampleOffsetMs": 28,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.1
+                    "distanceFromGroupYards": 2.9
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": -436,
+                    "sampleOffsetMs": 28,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.1
+                    "distanceFromGroupYards": 0.7
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": -1242,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.0
+                    "distanceFromGroupYards": 3.8
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": 79,
+                    "sampleOffsetMs": 28,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.4
+                    "distanceFromGroupYards": 1.3
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "timeMs": 89507,
                     "time": "01:29.5",
-                    "sampleOffsetMs": -17,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
                     "distanceFromGroupYards": 1.6
                   },
@@ -31437,9 +32467,9 @@
                     "player": "残夜将歇",
                     "timeMs": 89506,
                     "time": "01:29.5",
-                    "sampleOffsetMs": 130,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.0
+                    "distanceFromGroupYards": 3.8
                   }
                 ]
               },
@@ -31478,53 +32508,54 @@
                     "playerID": 8,
                     "player": "黑心貓",
                     "time": "02:10.8",
-                    "distanceFromGroupYards": 8.9,
-                    "sampleOffsetMs": -995
+                    "distanceFromGroupYards": 8.5,
+                    "sampleOffsetMs": 14
                   }
                 ],
-                "reliableRemovalPositionCount": 7,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": -545,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.5
+                    "distanceFromGroupYards": 3.1
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": -995,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.9
+                    "distanceFromGroupYards": 8.5
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": 421,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.8
+                    "distanceFromGroupYards": 4.5
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": 3107,
-                    "positionReliable": false
+                    "sampleOffsetMs": 14,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 5.0
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": 458,
+                    "sampleOffsetMs": -369,
                     "positionReliable": true,
                     "distanceFromGroupYards": 5.2
                   },
@@ -31533,35 +32564,36 @@
                     "player": "阿塔尼斯",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": 421,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.4
+                    "distanceFromGroupYards": 4.3
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": 216,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.0
+                    "distanceFromGroupYards": 4.5
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": -222,
+                    "sampleOffsetMs": 14,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.6
+                    "distanceFromGroupYards": 4.5
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 130784,
                     "time": "02:10.8",
-                    "sampleOffsetMs": 1799,
-                    "positionReliable": false
+                    "sampleOffsetMs": 14,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 3.8
                   }
                 ]
               },
@@ -31620,33 +32652,34 @@
                   }
                 ],
                 "dispersedPlayers": [],
-                "reliableRemovalPositionCount": 8,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 189059,
                     "time": "03:09.1",
-                    "sampleOffsetMs": 25,
+                    "sampleOffsetMs": -23,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.0
+                    "distanceFromGroupYards": 4.9
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 189035,
                     "time": "03:09.0",
-                    "sampleOffsetMs": -2975,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 189035,
                     "time": "03:09.0",
-                    "sampleOffsetMs": 26,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.7
+                    "distanceFromGroupYards": 5.5
                   },
                   {
                     "playerID": 7,
@@ -31655,16 +32688,16 @@
                     "time": "03:09.0",
                     "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.2
+                    "distanceFromGroupYards": 1.4
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 189035,
                     "time": "03:09.0",
-                    "sampleOffsetMs": -774,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.2
+                    "distanceFromGroupYards": 0.1
                   },
                   {
                     "playerID": 12,
@@ -31680,27 +32713,27 @@
                     "player": "丶若叶睦",
                     "timeMs": 189035,
                     "time": "03:09.0",
-                    "sampleOffsetMs": -1080,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.9
+                    "distanceFromGroupYards": 1.6
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 189035,
                     "time": "03:09.0",
-                    "sampleOffsetMs": -263,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.1
+                    "distanceFromGroupYards": 1.3
                   },
                   {
                     "playerID": 16,
                     "player": "小楚唯",
                     "timeMs": 189036,
                     "time": "03:09.0",
-                    "sampleOffsetMs": 513,
+                    "sampleOffsetMs": 24,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.5
+                    "distanceFromGroupYards": 2.7
                   }
                 ]
               },
@@ -31784,36 +32817,51 @@
                 ],
                 "dispersedPlayers": [
                   {
+                    "playerID": 3,
+                    "player": "Leviac",
+                    "time": "03:50.3",
+                    "distanceFromGroupYards": 12.3,
+                    "sampleOffsetMs": 17
+                  },
+                  {
+                    "playerID": 8,
+                    "player": "黑心貓",
+                    "time": "03:50.3",
+                    "distanceFromGroupYards": 8.9,
+                    "sampleOffsetMs": 0
+                  },
+                  {
                     "playerID": 11,
                     "player": "三坑不二",
                     "time": "03:50.3",
-                    "distanceFromGroupYards": 10.5,
-                    "sampleOffsetMs": -373
+                    "distanceFromGroupYards": 10.3,
+                    "sampleOffsetMs": 2
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "time": "03:50.3",
-                    "distanceFromGroupYards": 12.0,
+                    "distanceFromGroupYards": 10.9,
                     "sampleOffsetMs": 0
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "time": "03:50.3",
-                    "distanceFromGroupYards": 13.8,
-                    "sampleOffsetMs": -168
+                    "distanceFromGroupYards": 14.2,
+                    "sampleOffsetMs": 17
                   }
                 ],
-                "reliableRemovalPositionCount": 6,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": 5662,
-                    "positionReliable": false
+                    "sampleOffsetMs": 17,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 12.3
                   },
                   {
                     "playerID": 8,
@@ -31822,42 +32870,43 @@
                     "time": "03:50.3",
                     "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.0
+                    "distanceFromGroupYards": 8.9
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": -373,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 10.5
+                    "distanceFromGroupYards": 10.3
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": 506,
+                    "sampleOffsetMs": 17,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.5
+                    "distanceFromGroupYards": 5.0
                   },
                   {
                     "playerID": 18,
                     "player": "Superhunter",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": -1543,
-                    "positionReliable": false
+                    "sampleOffsetMs": 17,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 2.8
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": 553,
+                    "sampleOffsetMs": 17,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.6
+                    "distanceFromGroupYards": 7.9
                   },
                   {
                     "playerID": 24,
@@ -31866,24 +32915,25 @@
                     "time": "03:50.3",
                     "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 12.0
+                    "distanceFromGroupYards": 10.9
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": -168,
+                    "sampleOffsetMs": 17,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 13.8
+                    "distanceFromGroupYards": 14.2
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 230321,
                     "time": "03:50.3",
-                    "sampleOffsetMs": -2989,
-                    "positionReliable": false
+                    "sampleOffsetMs": 2,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.1
                   }
                 ]
               },
@@ -31922,111 +32972,113 @@
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "time": "04:51.1",
-                    "distanceFromGroupYards": 8.8,
-                    "sampleOffsetMs": 402
+                    "distanceFromGroupYards": 8.5,
+                    "sampleOffsetMs": 1
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "time": "04:51.1",
-                    "distanceFromGroupYards": 10.1,
-                    "sampleOffsetMs": -591
+                    "distanceFromGroupYards": 9.4,
+                    "sampleOffsetMs": 1
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "time": "04:51.1",
-                    "distanceFromGroupYards": 9.5,
-                    "sampleOffsetMs": -30
+                    "distanceFromGroupYards": 9.7,
+                    "sampleOffsetMs": 1
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "time": "04:51.1",
-                    "distanceFromGroupYards": 8.4,
-                    "sampleOffsetMs": -563
+                    "distanceFromGroupYards": 9.7,
+                    "sampleOffsetMs": 1
                   }
                 ],
-                "reliableRemovalPositionCount": 7,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -6384,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 6.7
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -1800,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 0.6
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": 402,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.8
+                    "distanceFromGroupYards": 8.5
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -591,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 10.1
+                    "distanceFromGroupYards": 9.4
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": 922,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.1
+                    "distanceFromGroupYards": 2.3
                   },
                   {
                     "playerID": 23,
                     "player": "阿塔尼斯",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -760,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.2
+                    "distanceFromGroupYards": 2.3
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -30,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 9.5
+                    "distanceFromGroupYards": 9.7
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 291119,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -561,
+                    "sampleOffsetMs": 2,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.0
+                    "distanceFromGroupYards": 6.1
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 291120,
                     "time": "04:51.1",
-                    "sampleOffsetMs": -563,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.4
+                    "distanceFromGroupYards": 9.7
                   }
                 ]
               },
@@ -32050,83 +33102,98 @@
                 ],
                 "dispersedPlayers": [
                   {
+                    "playerID": 8,
+                    "player": "黑心貓",
+                    "time": "05:32.4",
+                    "distanceFromGroupYards": 9.7,
+                    "sampleOffsetMs": 22
+                  },
+                  {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "time": "05:32.4",
-                    "distanceFromGroupYards": 8.5,
-                    "sampleOffsetMs": 692
+                    "distanceFromGroupYards": 8.4,
+                    "sampleOffsetMs": 22
+                  },
+                  {
+                    "playerID": 24,
+                    "player": "大堂经理丶",
+                    "time": "05:32.4",
+                    "distanceFromGroupYards": 8.7,
+                    "sampleOffsetMs": 0
                   }
                 ],
-                "reliableRemovalPositionCount": 6,
+                "reliableRemovalPositionCount": 7,
                 "placements": [
                   {
                     "playerID": 3,
                     "player": "Leviac",
                     "timeMs": 332406,
                     "time": "05:32.4",
-                    "sampleOffsetMs": -2682,
-                    "positionReliable": false
+                    "sampleOffsetMs": 22,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 0.8
                   },
                   {
                     "playerID": 8,
                     "player": "黑心貓",
                     "timeMs": 332406,
                     "time": "05:32.4",
-                    "sampleOffsetMs": 365,
+                    "sampleOffsetMs": 22,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 7.7
+                    "distanceFromGroupYards": 9.7
                   },
                   {
                     "playerID": 9,
                     "player": "Kaminadeko",
                     "timeMs": 332406,
                     "time": "05:32.4",
-                    "sampleOffsetMs": 692,
+                    "sampleOffsetMs": 22,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.5
+                    "distanceFromGroupYards": 8.4
                   },
                   {
                     "playerID": 11,
                     "player": "三坑不二",
                     "timeMs": 332428,
                     "time": "05:32.4",
-                    "sampleOffsetMs": -79,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.4
+                    "distanceFromGroupYards": 3.0
                   },
                   {
                     "playerID": 13,
                     "player": "染小战",
                     "timeMs": 332407,
                     "time": "05:32.4",
-                    "sampleOffsetMs": 220,
+                    "sampleOffsetMs": 21,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.5
+                    "distanceFromGroupYards": 6.6
                   },
                   {
                     "playerID": 24,
                     "player": "大堂经理丶",
                     "timeMs": 332428,
                     "time": "05:32.4",
-                    "sampleOffsetMs": 199,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 6.9
+                    "distanceFromGroupYards": 8.7
                   },
                   {
                     "playerID": 26,
                     "player": "残夜将歇",
                     "timeMs": 332406,
                     "time": "05:32.4",
-                    "sampleOffsetMs": -359,
+                    "sampleOffsetMs": 21,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.1
+                    "distanceFromGroupYards": 3.4
                   },
                   {
                     "playerID": 43,
                     "player": "劉浩然",
                     "timeMs": 332428,
                     "time": "05:32.4",
-                    "sampleOffsetMs": -13659,
+                    "sampleOffsetMs": -5986,
                     "positionReliable": false
                   }
                 ]
@@ -32166,8 +33233,8 @@
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "time": "06:29.5",
-                    "distanceFromGroupYards": 8.7,
-                    "sampleOffsetMs": -147
+                    "distanceFromGroupYards": 9.0,
+                    "sampleOffsetMs": 1
                   },
                   {
                     "playerID": 7,
@@ -32180,37 +33247,38 @@
                     "playerID": 10,
                     "player": "那个猎刃",
                     "time": "06:29.5",
-                    "distanceFromGroupYards": 18.7,
-                    "sampleOffsetMs": -36
+                    "distanceFromGroupYards": 19.1,
+                    "sampleOffsetMs": 0
                   }
                 ],
-                "reliableRemovalPositionCount": 7,
+                "reliableRemovalPositionCount": 9,
                 "placements": [
                   {
                     "playerID": 1,
                     "player": "花落冬陽丶",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": -147,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.7
+                    "distanceFromGroupYards": 9.0
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": -686,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 4.2
+                    "distanceFromGroupYards": 4.0
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": -1699,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 4.1
                   },
                   {
                     "playerID": 7,
@@ -32226,44 +33294,45 @@
                     "player": "那个猎刃",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": -36,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 18.7
+                    "distanceFromGroupYards": 19.1
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": 304,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.6
+                    "distanceFromGroupYards": 3.3
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": -2087,
-                    "positionReliable": false
+                    "sampleOffsetMs": 1,
+                    "positionReliable": true,
+                    "distanceFromGroupYards": 5.3
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": 990,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 0.3
+                    "distanceFromGroupYards": 2.9
                   },
                   {
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "timeMs": 389536,
                     "time": "06:29.5",
-                    "sampleOffsetMs": 17,
+                    "sampleOffsetMs": 0,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.0
+                    "distanceFromGroupYards": 0.8
                   }
                 ]
               },
@@ -32280,25 +33349,18 @@
                 "missingBloodSidePlayers": [],
                 "dispersedPlayers": [
                   {
-                    "playerID": 1,
-                    "player": "花落冬陽丶",
-                    "time": "07:10.9",
-                    "distanceFromGroupYards": 9.0,
-                    "sampleOffsetMs": 378
-                  },
-                  {
                     "playerID": 7,
                     "player": "小树暖暖",
                     "time": "07:10.9",
-                    "distanceFromGroupYards": 12.4,
-                    "sampleOffsetMs": -1388
+                    "distanceFromGroupYards": 17.2,
+                    "sampleOffsetMs": 1
                   },
                   {
-                    "playerID": 15,
-                    "player": "Breezeluck",
+                    "playerID": 14,
+                    "player": "丶若叶睦",
                     "time": "07:10.9",
-                    "distanceFromGroupYards": 8.4,
-                    "sampleOffsetMs": -448
+                    "distanceFromGroupYards": 10.6,
+                    "sampleOffsetMs": 1
                   }
                 ],
                 "reliableRemovalPositionCount": 9,
@@ -32308,81 +33370,81 @@
                     "player": "花落冬陽丶",
                     "timeMs": 430853,
                     "time": "07:10.9",
-                    "sampleOffsetMs": 378,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 9.0
+                    "distanceFromGroupYards": 6.9
                   },
                   {
                     "playerID": 4,
                     "player": "雷横",
                     "timeMs": 430852,
                     "time": "07:10.9",
-                    "sampleOffsetMs": -665,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.6
+                    "distanceFromGroupYards": 0.5
                   },
                   {
                     "playerID": 5,
                     "player": "狐不理",
                     "timeMs": 430853,
                     "time": "07:10.9",
-                    "sampleOffsetMs": -1388,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 7.0
+                    "distanceFromGroupYards": 6.7
                   },
                   {
                     "playerID": 7,
                     "player": "小树暖暖",
                     "timeMs": 430853,
                     "time": "07:10.9",
-                    "sampleOffsetMs": -1388,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 12.4
+                    "distanceFromGroupYards": 17.2
                   },
                   {
                     "playerID": 10,
                     "player": "那个猎刃",
                     "timeMs": 430853,
                     "time": "07:10.9",
-                    "sampleOffsetMs": -623,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 2.9
+                    "distanceFromGroupYards": 0.5
                   },
                   {
                     "playerID": 12,
                     "player": "Toccata",
                     "timeMs": 430852,
                     "time": "07:10.9",
-                    "sampleOffsetMs": 34,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 5.4
+                    "distanceFromGroupYards": 7.1
                   },
                   {
                     "playerID": 14,
                     "player": "丶若叶睦",
                     "timeMs": 430852,
                     "time": "07:10.9",
-                    "sampleOffsetMs": -1387,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 3.5
+                    "distanceFromGroupYards": 10.6
                   },
                   {
                     "playerID": 15,
                     "player": "Breezeluck",
                     "timeMs": 430853,
                     "time": "07:10.9",
-                    "sampleOffsetMs": -448,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 8.4
+                    "distanceFromGroupYards": 5.4
                   },
                   {
                     "playerID": 17,
                     "player": "飞天小喷菇",
                     "timeMs": 430853,
                     "time": "07:10.9",
-                    "sampleOffsetMs": 18,
+                    "sampleOffsetMs": 1,
                     "positionReliable": true,
-                    "distanceFromGroupYards": 1.1
+                    "distanceFromGroupYards": 3.3
                   }
                 ]
               }

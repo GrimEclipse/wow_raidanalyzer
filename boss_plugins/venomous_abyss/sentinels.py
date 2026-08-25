@@ -48,7 +48,7 @@ CLINGING_MURK_ID = 1288297
 
 DEFAULT_OPTIONS = {
     "helicalToxinReviewEnabled": True,
-    "helicalLargeMovementYards": 8.0,
+    "helicalLargeMovementYards": 5.0,
     "helicalPairingMaxDistanceYards": 8.0,
     "markReviewEnabled": True,
     "waterPlacementReviewEnabled": True,
@@ -236,6 +236,12 @@ def analyze_helical_toxins(
             if kinds == {"applydebuffstack"} and len(targets) == 2:
                 result_stack = int(group[0].get("stack") or 0)
                 inferred = _unique_input_pair(result_stack)
+                movement_evidence = collision_movement_evidence(
+                    actor_map,
+                    targets,
+                    timestamp,
+                    position_index,
+                )
                 row = {
                     "timeMs": timestamp - int(fight["startTime"]),
                     "time": fmt_ms(timestamp - int(fight["startTime"])),
@@ -252,6 +258,7 @@ def analyze_helical_toxins(
                     ),
                     "recoverable": result_stack < 4,
                     "overflow": result_stack > 4,
+                    "movementEvidence": movement_evidence,
                     "largeMovers": movement_before_collision(
                         actor_map,
                         targets,
@@ -588,9 +595,22 @@ def position_at(index, actor_id, timestamp, max_gap_ms=1500):
 
 
 def movement_before_collision(actor_map, player_ids, timestamp, position_index, threshold_yards):
-    rows = []
+    evidence = collision_movement_evidence(actor_map, player_ids, timestamp, position_index)
+    if not evidence:
+        return []
+    return [
+        {**row, "windowMs": evidence["windowMs"]}
+        for row in evidence["players"]
+        if row["movementYards"] > threshold_yards
+    ]
+
+
+def collision_movement_evidence(actor_map, player_ids, timestamp, position_index, window_ms=1000):
+    """Return both players' movement and their closing distance before a wrong collision."""
+    positions = {}
+    players = []
     for player_id in player_ids:
-        before = position_at(position_index, player_id, timestamp - 1000)
+        before = position_at(position_index, player_id, timestamp - window_ms)
         at_collision = position_at(position_index, player_id, timestamp)
         if not before or not at_collision:
             continue
@@ -598,14 +618,31 @@ def movement_before_collision(actor_map, player_ids, timestamp, position_index, 
             (before["x"], before["y"]),
             (at_collision["x"], at_collision["y"]),
         ) / 100
-        if distance > threshold_yards:
-            rows.append({
-                "playerID": player_id,
-                "player": actor_name(actor_map, player_id),
-                "movementYards": round(distance, 1),
-                "windowMs": 1000,
-            })
-    return rows
+        positions[player_id] = (before, at_collision)
+        players.append({
+            "playerID": player_id,
+            "player": actor_name(actor_map, player_id),
+            "movementYards": round(distance, 1),
+        })
+    if not players:
+        return None
+    result = {"windowMs": window_ms, "players": players}
+    if len(player_ids) == 2 and all(player_id in positions for player_id in player_ids):
+        left_id, right_id = player_ids
+        before_distance = math.dist(
+            (positions[left_id][0]["x"], positions[left_id][0]["y"]),
+            (positions[right_id][0]["x"], positions[right_id][0]["y"]),
+        ) / 100
+        collision_distance = math.dist(
+            (positions[left_id][1]["x"], positions[left_id][1]["y"]),
+            (positions[right_id][1]["x"], positions[right_id][1]["y"]),
+        ) / 100
+        result.update({
+            "pairDistanceBeforeYards": round(before_distance, 1),
+            "pairDistanceAtCollisionYards": round(collision_distance, 1),
+            "closingDistanceYards": round(before_distance - collision_distance, 1),
+        })
+    return result
 
 
 def arena_estimate(position_index):
@@ -963,7 +1000,10 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
     helical_events = [event for event in payload["debuffs"] if ability_id(event) == HELICAL_ID]
     burst_damage = [event for event in payload["damage"] if ability_id(event) == CULTIVATED_BURST_DAMAGE_ID]
     mark_events = [event for event in payload["debuffs"] if ability_id(event) in {ACID_MARK_ID, BLOOD_MARK_ID}]
-    position_index = build_position_index(payload["resources"])
+    # DamageTaken resource snapshots are substantially denser than the Resources
+    # table for some players. Combining both avoids silently losing the final
+    # approach immediately before a collision.
+    position_index = build_position_index(payload["resources"] + payload["damage"])
     helical = analyze_helical_toxins(
         fight,
         actor_map,
@@ -1112,7 +1152,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "sentinels",
             "bossName": "陵寝哨兵",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "sentinels-helical-coordinate-pairing-v3-2026-08-25",
+            "mechanicVersion": "sentinels-helical-collision-movement-v4-2026-08-25",
             "features": {"interrupts": False, "dispels": False, "fieldReplay": False, "mistakes": False},
             "capabilities": {
                 "wipe": {"enabled": True, "renderer": "sentinels-pulls"},

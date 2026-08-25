@@ -162,7 +162,7 @@ def test_helical_toxins_links_three_plus_three_overflow_to_burst():
     assert round_row["success"] is False
 
 
-def test_helical_wrong_collision_reports_last_second_movement_over_eight_yards():
+def test_helical_wrong_collision_reports_last_second_movement_over_five_yards():
     fight = {"startTime": 0, "endTime": 60_000}
     stasis = [event(10_000, next(iter(STASIS_IDS)), "cast")]
     auras = [
@@ -173,7 +173,7 @@ def test_helical_wrong_collision_reports_last_second_movement_over_eight_yards()
     ]
     positions = build_position_index([
         {"timestamp": 11_000, "sourceID": 1, "x": 0, "y": 0},
-        {"timestamp": 12_000, "sourceID": 1, "x": 1000, "y": 0},
+        {"timestamp": 12_000, "sourceID": 1, "x": 600, "y": 0},
         {"timestamp": 11_000, "sourceID": 2, "x": 0, "y": 0},
         {"timestamp": 12_000, "sourceID": 2, "x": 200, "y": 0},
     ])
@@ -182,8 +182,18 @@ def test_helical_wrong_collision_reports_last_second_movement_over_eight_yards()
     )
     collision = result["rounds"][0]["collisions"][0]
     assert collision["largeMovers"] == [
-        {"playerID": 1, "player": "甲", "movementYards": 10.0, "windowMs": 1000}
+        {"playerID": 1, "player": "甲", "movementYards": 6.0, "windowMs": 1000}
     ]
+    assert collision["movementEvidence"] == {
+        "windowMs": 1000,
+        "players": [
+            {"playerID": 1, "player": "甲", "movementYards": 6.0},
+            {"playerID": 2, "player": "乙", "movementYards": 2.0},
+        ],
+        "pairDistanceBeforeYards": 0.0,
+        "pairDistanceAtCollisionYards": 4.0,
+        "closingDistanceYards": -4.0,
+    }
 
 
 def test_helical_stack_three_can_recover_with_two_separate_one_players():

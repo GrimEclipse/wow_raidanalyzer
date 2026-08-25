@@ -58,7 +58,13 @@ function collisionDetail(collision) {
   const header = `<div class="collision-main"><time>${esc(collision.time || "—")}</time><div class="collision-players">${coloredPlayers(collision.players, collision.playerIDs)}</div>`;
   if (collision.kind === "wrong-collision") {
     const movers = (collision.largeMovers || []).map(row => `<div class="movement-warning">${esc(row.player)}在最后一秒进行了大范围的移动（${row.movementYards}码）</div>`).join("");
-    return `<div class="mechanic-cell wrong-cell ${collision.firstWrongCollision ? "first-wrong" : ""}">${header}<span class="badge bad">错误相撞</span></div><div class="collision-note">${esc(collision.collisionCombination || "组合待定")} → 两人均变为 ${collision.resultStack} 层</div>${collision.firstWrongCollision ? '<div class="first-wrong-label">本轮第一个错误碰撞</div>' : ""}${movers}</div>`;
+    const movement = collision.movementEvidence;
+    const movementPlayers = (movement?.players || []).map(row => `${coloredPlayer(row.player, row.playerID)} ${row.movementYards}码`).join(" · ");
+    const pairDistance = movement?.pairDistanceBeforeYards == null || movement?.pairDistanceAtCollisionYards == null
+      ? ""
+      : `；两人间距 ${movement.pairDistanceBeforeYards}→${movement.pairDistanceAtCollisionYards}码`;
+    const movementLine = movementPlayers ? `<div class="collision-movement">碰撞前 ${Number(movement.windowMs || 1000) / 1000} 秒位移：${movementPlayers}${pairDistance}</div>` : "";
+    return `<div class="mechanic-cell wrong-cell ${collision.firstWrongCollision ? "first-wrong" : ""}">${header}<span class="badge bad">错误相撞</span></div><div class="collision-note">${esc(collision.collisionCombination || "组合待定")} → 两人均变为 ${collision.resultStack} 层</div>${movementLine}${collision.firstWrongCollision ? '<div class="first-wrong-label">本轮第一个错误碰撞</div>' : ""}${movers}</div>`;
   }
   if (collision.kind === "recovery-clear") return `<div class="mechanic-cell recovery-cell">${header}<span class="badge good">补救消除</span></div><div class="collision-note">${esc(collision.collisionCombination || "安全组合")} ${evidence}</div></div>`;
   if (collision.kind === "timeout-remove") return `<div class="mechanic-cell timeout-cell">${header}<span class="badge bad">超时移除</span></div></div>`;

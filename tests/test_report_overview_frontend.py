@@ -46,6 +46,8 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('collision.time || "—"', self.sentinels_js)
         self.assertIn('坐标参考配对', self.sentinels_js)
         self.assertIn('安全消除', self.sentinels_js)
+        self.assertIn('碰撞前 ${Number(movement.windowMs || 1000) / 1000} 秒位移', self.sentinels_js)
+        self.assertIn('两人间距 ${movement.pairDistanceBeforeYards}→${movement.pairDistanceAtCollisionYards}码', self.sentinels_js)
 
     def test_collision_cards_wrap_as_cards_not_player_names(self):
         self.assertIn("minmax(390px,1fr)", self.sentinels_css)
