@@ -195,7 +195,7 @@ SPEC_NAMES = {
     1467: {"enUS": "Devastation", "zhCN": "湮灭"},
     1468: {"enUS": "Preservation", "zhCN": "恩护"},
     1473: {"enUS": "Augmentation", "zhCN": "增辉"},
-    1480: {"enUS": "Devourer", "zhCN": "吞噬"},
+    1480: {"enUS": "Devourer", "zhCN": "噬灭"},
 }
 
 CLASS_COLORS = {
