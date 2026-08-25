@@ -144,14 +144,21 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="WoW Raid Analyzer offline viewer")
+    parser = argparse.ArgumentParser(description="WoW Raid Analyzer archive-package preview host")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-open", action="store_true")
+    parser.add_argument(
+        "--package-preview",
+        action="store_true",
+        help="显式预览历史归档包；正式系统请使用 server.py",
+    )
     args = parser.parse_args()
+    if not args.package_preview:
+        parser.error("offline_server.py 仅用于归档包预览；请运行 server.py 启动完整系统")
     os.chdir(ROOT)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), OfflineHandler)
     url = f"http://127.0.0.1:{args.port}/"
-    print(f"Offline server at {url}")
+    print(f"Archive package preview at {url}")
     print(f"终审 Excel 导出目录: {DEFAULT_EXPORT_EXCEL_DIR}")
     if not args.no_open:
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()

@@ -10,14 +10,16 @@
 start_app.bat
 ```
 
-或执行 `python server.py --open`，访问 `http://127.0.0.1:8765/`。
+或执行 `python server.py --open`，访问 `http://127.0.0.1:8765/`。服务默认监听
+`0.0.0.0:8765`，服务器部署可通过 `APP_HOST`、`APP_PORT`（或平台提供的
+`PORT`）覆盖监听地址与端口。
 
 稳定入口：
 
 - `/report`：按 JSON 中的 Boss 身份选择通用报告或专用报告
 - `/online`：通过界面运行 WCL 分析
 - `/single-fight`：手动读取已配置工会的 report，按开荒日选择单场 Pull 并复用 Boss 逐场规则；相同 Fight 使用缓存
-- `/raid-guide`：12.1 团长手册
+- `/raid-guide`：团本手册
 - `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
 - `/loot`：开荒出勤、需求权与装备分配日历
 - `/audit`：奥蕾莉亚场地明细
@@ -35,7 +37,7 @@ py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --repo
 - `analyzer_core/`：共享契约、调度、数据路径、单场分析和团队技能
 - `boss_plugins/`：后端 Boss 插件
 - `frontend/report/`：报告入口、通用报告和 Boss 前端插件
-- `frontend/tools/`：团长手册、团队时间轴、在线执行器与团队运营工具
+- `frontend/tools/`：团本手册、团队时间轴、在线执行器与团队运营工具
 - `skills/`：项目维护规范与 Boss 研究资料
 - `config/player_abilities.json`：按职业/专精维护的 WCL 已验证爆发、减伤、功能、打断与控制技能公共目录
 - `tools/debug/`：手工调试入口
@@ -44,7 +46,10 @@ py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --repo
 新增 Boss 时注册后端插件，并创建
 `frontend/report/plugins/<raidKey>/<bossKey>/plugin.js`。只有通用报告无法表达时，才增加该 Boss 的专用 `report.html`。
 
-## 离线包
+## 归档打包
+
+离线宿主不属于产品运行入口，仅用于生成和复核历史归档包。日常使用、正式部署
+和所有 WCL 查询功能统一由 `server.py` 提供。
 
 ```powershell
 .\build_offline_package.bat
