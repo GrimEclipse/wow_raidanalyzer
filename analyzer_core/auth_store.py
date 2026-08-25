@@ -373,6 +373,24 @@ class AuthStore:
                 connection.execute("DELETE FROM sessions WHERE user_id = ?", (int(user_id),))
             connection.commit()
 
+    def delete_user(self, user_id: int, *, actor_user_id: Optional[int] = None):
+        user_id = int(user_id)
+        if actor_user_id is not None and int(actor_user_id) == user_id:
+            raise AuthError("不能删除自己的账号。")
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, username, is_admin FROM users WHERE id = ?",
+                (user_id,),
+            ).fetchone()
+            if not row:
+                raise AuthError("账号不存在。")
+            if row["is_admin"] and self.admin_count() <= 1:
+                raise AuthError("不能删除最后一个管理员。")
+            connection.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM wcl_credentials WHERE user_id = ?", (user_id,))
+            connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            connection.commit()
+
     def set_role(self, user_id: int, role: str, *, actor_user_id: Optional[int] = None):
         role = str(role or "").strip().lower()
         if role not in ROLES:

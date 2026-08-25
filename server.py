@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
-from analyzer_core.auth_store import AuthError, default_auth_store
+from analyzer_core.auth_store import AuthError, default_auth_store, validate_password
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
@@ -426,6 +426,9 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         admin_match = re.fullmatch(r"/api/admin/users/(\d+)", path)
         if admin_match:
             return self.handle_admin_update(user, int(admin_match.group(1)))
+        admin_reset_match = re.fullmatch(r"/api/admin/users/(\d+)/password", path)
+        if admin_reset_match:
+            return self.handle_admin_reset_password(user, int(admin_reset_match.group(1)))
         return self.handle_write(path, user)
 
     def do_DELETE(self):
@@ -438,6 +441,9 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/wcl-credentials":
             AUTH.delete_wcl_credentials(user["id"])
             return self.send_response_body(*json_bytes({"ok": True}))
+        admin_delete_match = re.fullmatch(r"/api/admin/users/(\d+)", path)
+        if admin_delete_match:
+            return self.handle_admin_delete(user, int(admin_delete_match.group(1)))
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         allocation_match = re.fullmatch(r"/api/loot/allocations/([A-Za-z0-9_-]+)", path)
@@ -641,6 +647,35 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             AUTH.set_role(target_user_id, role, actor_user_id=actor["id"])
             AUTH.set_disabled(target_user_id, disabled)
             return self.send_response_body(*json_bytes({"ok": True, "user": AUTH.get_user(target_user_id)}))
+        except (AuthError, ValueError, json.JSONDecodeError) as error:
+            return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
+
+    def handle_admin_delete(self, actor, target_user_id):
+        if not actor["isAdmin"]:
+            return self.json_error("仅管理员可以管理账号。", HTTPStatus.FORBIDDEN)
+        try:
+            AUTH.delete_user(target_user_id, actor_user_id=actor["id"])
+            return self.send_response_body(*json_bytes({"ok": True}))
+        except AuthError as error:
+            status = HTTPStatus.NOT_FOUND if "不存在" in str(error) else HTTPStatus.BAD_REQUEST
+            return self.json_error(str(error), status)
+
+    def handle_admin_reset_password(self, actor, target_user_id):
+        if not actor["isAdmin"]:
+            return self.json_error("仅管理员可以管理账号。", HTTPStatus.FORBIDDEN)
+        try:
+            payload = self.read_json_body()
+            new_password = str(payload.get("newPassword") or "")
+            encoded = validate_password(new_password)
+            target = AUTH.get_user(target_user_id)
+            if not target:
+                return self.json_error("账号不存在。", HTTPStatus.NOT_FOUND)
+            must_change = bool(payload.get("mustChangePassword", target["id"] != actor["id"]))
+            AUTH.reset_password(target_user_id, encoded, must_change_password=must_change)
+            summary = AUTH.get_user(target_user_id)
+            return self.send_response_body(
+                *json_bytes({"ok": True, "user": summary, "temporaryPassword": new_password if must_change else None})
+            )
         except (AuthError, ValueError, json.JSONDecodeError) as error:
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
