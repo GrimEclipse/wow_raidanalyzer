@@ -32,6 +32,9 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('sessionStorage.setItem', self.runtime)
         self.assertIn('id="pullBoard"', self.overview)
         self.assertIn('按阶段分组', self.overview)
+        self.assertIn('id="difficultyFilter"', self.overview)
+        self.assertIn('difficultyName(pull)', self.overview_js)
+        self.assertIn('全部难度（分组展示）', self.overview_js)
         self.assertIn('MythicReportRuntime.detailUrl', self.overview_js)
         self.assertNotRegex(self.overview_js, r"\breturn\d")
 

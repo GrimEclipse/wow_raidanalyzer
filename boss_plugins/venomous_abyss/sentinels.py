@@ -26,6 +26,7 @@ from boss_plugins.common import (
     spec_localization,
     write_json_result,
 )
+from boss_plugins.venomous_abyss.shared import build_survival_timeline, difficulty_fields
 
 
 ENCOUNTER_ID = 3445
@@ -1061,6 +1062,11 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         wipe_reason = f"剧毒水滴漏踩 {droplets['missedRoundCount']} 轮"
     else:
         wipe_reason = "击杀复盘" if fight.get("kill") else "死亡链待复核"
+    survival = build_survival_timeline(
+        fight, actor_map, player_catalog, player_deaths, payload.get("friendlyCasts") or [],
+        {LIVING_VENOM_ID: "活体毒液", TOXIC_DROPLETS_HIT_ID: "剧毒水滴", NOXIOUS_BLAST_ID: "有害爆炸",
+         CULTIVATED_BURST_DAMAGE_ID: "培养爆发"},
+    )
     return {
         "reportID": report_id,
         "fightID": fight["id"],
@@ -1080,6 +1086,9 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         "phaseTimeline": phase_timeline(fight, stasis_events),
         "wclDeepLink": f"https://www.warcraftlogs.com/reports/{report_id}#fight={fight['id']}&type=summary",
         "players": list(player_catalog.values()),
+        "survival": survival,
+        "deathTimeline": survival["timeline"],
+        **difficulty_fields(fight),
         "sentinels": {
             "helicalToxins": helical,
             "marks": marks,

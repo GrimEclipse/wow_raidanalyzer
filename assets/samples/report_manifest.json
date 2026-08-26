@@ -2,9 +2,34 @@
   "schemaVersion": 1,
   "files": [
     {
-      "path": "assets/samples/wcl_GJx48AgjRMt3KrpZ_sentinels_all.json",
-      "name": "wcl_GJx48AgjRMt3KrpZ_sentinels_all.json",
-      "label": "陵寝哨兵 · GJx48AgjRMt3KrpZ · 整场过本日志"
+      "path": "assets/samples/wcl_HchJ8Ktmz7DTYrG2_nakzali_all.json",
+      "name": "wcl_HchJ8Ktmz7DTYrG2_nakzali_all.json",
+      "label": "1 号盘魂者内克扎利 · HchJ8Ktmz7DTYrG2 · 普通+英雄"
+    },
+    {
+      "path": "assets/samples/wcl_HchJ8Ktmz7DTYrG2_sentinels_all.json",
+      "name": "wcl_HchJ8Ktmz7DTYrG2_sentinels_all.json",
+      "label": "2 号陵寝哨兵 · HchJ8Ktmz7DTYrG2 · 普通+英雄"
+    },
+    {
+      "path": "assets/samples/wcl_ZTcf3gMPmnBFVtvx_lostexplorers_all.json",
+      "name": "wcl_ZTcf3gMPmnBFVtvx_lostexplorers_all.json",
+      "label": "3 号迷失的探险者 · ZTcf3gMPmnBFVtvx · 英雄"
+    },
+    {
+      "path": "assets/samples/wcl_ZTcf3gMPmnBFVtvx_vashnik_all.json",
+      "name": "wcl_ZTcf3gMPmnBFVtvx_vashnik_all.json",
+      "label": "4 号万毒邪祟者瓦什尼克 · ZTcf3gMPmnBFVtvx · 英雄"
+    },
+    {
+      "path": "assets/samples/wcl_ZTcf3gMPmnBFVtvx_sszorak_all.json",
+      "name": "wcl_ZTcf3gMPmnBFVtvx_sszorak_all.json",
+      "label": "5 号斯索拉克 · ZTcf3gMPmnBFVtvx · 英雄（含场地回放）"
+    },
+    {
+      "path": "assets/samples/wcl_ZTcf3gMPmnBFVtvx_twinfangs_all.json",
+      "name": "wcl_ZTcf3gMPmnBFVtvx_twinfangs_all.json",
+      "label": "6 号双子毒牙 · ZTcf3gMPmnBFVtvx · 英雄"
     }
   ]
 }

@@ -17,6 +17,7 @@ ROUTES = {
     "/loot": "frontend/tools/raid-loot/index.html",
     "/cooldowns": "frontend/tools/raid-cooldowns/index.html",
     "/raid-guide": "frontend/tools/raid-guide/index.html",
+    "/spec-compare": "frontend/tools/spec-comparison/index.html",
 }
 VERDICT_DIR = ROOT / "verdicts"
 VERDICT_DIR.mkdir(exist_ok=True)

@@ -38,7 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.1.0 更新公告">v1.1.0</button></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.2.0 更新公告">v1.2.0</button></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -68,11 +68,19 @@
 <div id="releaseNotice" class="notice-layer" hidden>
   <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
     <header class="notice-head">
-      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.1.0</span></div>
+      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.2.0</span></div>
       <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
     </header>
     <div class="notice-content">
       <ol>
+        <li>
+          <p><strong>v1.2.0 · 烈毒之渊 1–6 号开荒分析</strong></p>
+          <ul>
+            <li>1–6 号统一增加死亡原因、致死技能与战复时间线；整场概览按普通、英雄和史诗难度分组。</li>
+            <li>补齐 1 号换嘲 / 转场，3 号霜火处理，4 号感染接圈，5 号剑技、囊肿、侧风和第一版场地回放，6 号永恒毒液与腐蚀液滴分析。</li>
+            <li>2 号活体毒液与剧毒水滴增加 Wowhead 中文图标和 Tooltip，并刷新所有随版本过本样本。</li>
+          </ul>
+        </li>
         <li>
           <p><strong>v1.1.0 · 正式服资料与陵寝哨兵分析更新</strong></p>
           <ul>
@@ -106,7 +114,7 @@
 </div>
 <script>
 (() => {
-  const RELEASE_VERSION = 'v1.1.0';
+  const RELEASE_VERSION = 'v1.2.0';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

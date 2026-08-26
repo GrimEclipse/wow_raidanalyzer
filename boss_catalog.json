@@ -480,14 +480,20 @@
             },
             {
               "key": "vashnik",
-              "order": 3,
+              "order": 4,
               "name": "万毒邪祟者瓦什尼克",
+              "encounterIds": [3455],
               "englishName": "Vashnik the Malignant",
               "externalKey": "wow.venomabyss,03.vashnik",
               "aliases": ["「恶性之毒」伐许尼克"],
               "plugin": "boss_plugins.venomous_abyss.vashnik",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "venomous-progression" },
+                "avoidable": { "enabled": true, "renderer": "venomous-progression" },
+                "replay": { "enabled": false, "renderer": "venomous-progression" }
+              },
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/03-vashnik.png", "width": 1997, "height": 1118 }
@@ -495,14 +501,20 @@
             },
             {
               "key": "lostexplorers",
-              "order": 4,
+              "order": 3,
               "name": "迷失的探险者",
+              "encounterIds": [3497],
               "englishName": "The Lost Explorers",
               "externalKey": "wow.venomabyss,04.lostexplorers",
               "aliases": ["迷路的探险者"],
               "plugin": "boss_plugins.venomous_abyss.lostexplorers",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "venomous-progression" },
+                "avoidable": { "enabled": true, "renderer": "venomous-progression" },
+                "replay": { "enabled": false, "renderer": "venomous-progression" }
+              },
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/04-lostexplorers.jpg", "width": 1997, "height": 1118 }
@@ -512,12 +524,18 @@
               "key": "sszorak",
               "order": 5,
               "name": "斯索拉克",
+              "encounterIds": [3420],
               "englishName": "Sszorak",
               "externalKey": "wow.venomabyss,05.sszorak",
               "aliases": ["司佐拉"],
               "plugin": "boss_plugins.venomous_abyss.sszorak",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "venomous-progression" },
+                "avoidable": { "enabled": true, "renderer": "venomous-progression" },
+                "replay": { "enabled": true, "renderer": "venomous-progression" }
+              },
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/05-sszorak.jpg", "width": 1997, "height": 1118 }
@@ -527,12 +545,18 @@
               "key": "twinfangs",
               "order": 6,
               "name": "双子毒牙",
+              "encounterIds": [3421],
               "englishName": "The Twin Fangs",
               "externalKey": "wow.venomabyss,06.twinfangs",
               "aliases": ["双生毒牙"],
               "plugin": "boss_plugins.venomous_abyss.twinfangs",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "venomous-progression" },
+                "avoidable": { "enabled": true, "renderer": "venomous-progression" },
+                "replay": { "enabled": false, "renderer": "venomous-progression" }
+              },
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/06-twinfangs.jpg", "width": 1997, "height": 1118 }

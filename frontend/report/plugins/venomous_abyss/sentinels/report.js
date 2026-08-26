@@ -42,6 +42,19 @@ function renderSummary() {
   $("wclLink").href = pull?.wclDeepLink || "#";
 }
 
+function renderSurvival() {
+  const survival = current()?.survival || {};
+  $("content").innerHTML = `<section class="panel"><h2>死亡 / 战复时间线</h2><p class="muted">阵亡 ${survival.deathCount || 0} 次 · 战复 ${survival.combatResCount || 0} 次 · 战斗结束存活 ${survival.survivorCount || 0}/${survival.rosterCount || 0}</p>${simpleTable(["时间", "类型", "玩家", "原因 / 技能"], (survival.timeline || []).map(event => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', coloredPlayer(event.player, event.playerID), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${esc(event.ability)}` : esc(event.ability)]))}</section>`;
+}
+
+function spellHeading(spellID, label) {
+  return `<span class="spell-heading"><a class="spell-icon-link" href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small" target="_blank" rel="noreferrer"><span class="spell-icon-fallback">${spellID}</span></a><a href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;dd=15" target="_blank" rel="noreferrer">${esc(label)}</a></span>`;
+}
+
+function refreshWowhead() {
+  if (window.WH?.Tooltips?.refreshLinks) window.WH.Tooltips.refreshLinks();
+}
+
 function enterPull(index) {
   state.pull = Math.max(0, Math.min(index, state.pulls.length - 1));
   state.playerID = null;
@@ -139,14 +152,15 @@ function noHitText(players) {
 
 function renderAvoidable() {
   const sentinels = current()?.sentinels || {}, living = sentinels.livingVenom || {}, droplets = sentinels.toxicDroplets || {};
-  $("content").innerHTML = `<section class="panel"><h2>活体毒液（1284209）· 可躲避伤害</h2>${simpleTable(["玩家", "命中", "总伤害", "最大单次", "致死", "时间"], (living.players || []).map(player => [coloredPlayer(player.player, player.playerID), player.hitCount, num(player.totalDamage), num(player.maxHit), player.deathCount, esc((player.events || []).map(event => event.time).join("、"))]))}</section><section class="panel"><h2>剧毒水滴 / 绿球</h2>${simpleTable(["轮次", "施法时间", "踩球命中", "不同踩球者", "重复踩球", "本轮未受踩球伤害", "漏球爆炸"], (droplets.rounds || []).map(round => [`#${round.index}`, esc(round.castTime), round.soakHitCount, round.uniqueSoakerCount, playerList(round.repeatSoakers || [], row => `${coloredPlayer(row.player, row.playerID)}×${row.count}`), noHitText(round.noHitPlayers || []), round.missed ? `<span class="badge bad result-badge">${round.blastVictimCount} 人受伤</span>` : '<span class="badge good result-badge">未见爆炸</span>']))}</section>`;
+  $("content").innerHTML = `<section class="panel"><h2>${spellHeading(1284209, "活体毒液 · 可躲避伤害")}</h2>${simpleTable(["玩家", "命中", "总伤害", "最大单次", "致死", "时间"], (living.players || []).map(player => [coloredPlayer(player.player, player.playerID), player.hitCount, num(player.totalDamage), num(player.maxHit), player.deathCount, esc((player.events || []).map(event => event.time).join("、"))]))}</section><section class="panel"><h2>${spellHeading(1284434, "剧毒水滴 / 绿球")}</h2>${simpleTable(["轮次", "施法时间", "踩球命中", "不同踩球者", "重复踩球", "本轮未受踩球伤害", "漏球爆炸"], (droplets.rounds || []).map(round => [`#${round.index}`, esc(round.castTime), round.soakHitCount, round.uniqueSoakerCount, playerList(round.repeatSoakers || [], row => `${coloredPlayer(row.player, row.playerID)}×${row.count}`), noHitText(round.noHitPlayers || []), round.missed ? `<span class="badge bad result-badge">${round.blastVictimCount} 人受伤</span>` : '<span class="badge good result-badge">未见爆炸</span>']))}</section>`;
+  refreshWowhead();
 }
 
 function render() {
   renderSummary();
   $("pageTitle").textContent = `陵寝哨兵${current()?.difficultyName ? `（${current().difficultyName}）` : ""} · Fight ${current()?.fightID || "-"} 技能分析`;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === state.tab));
-  ({ helical: renderHelical, marks: renderMarks, field: renderField, avoidable: renderAvoidable }[state.tab] || renderHelical)();
+  ({ survival: renderSurvival, helical: renderHelical, marks: renderMarks, field: renderField, avoidable: renderAvoidable }[state.tab] || renderHelical)();
 }
 
 function load(payload) {

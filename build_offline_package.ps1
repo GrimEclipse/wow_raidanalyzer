@@ -36,6 +36,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $target "scoreboard") | Out
 $files = @(
     "index.html",
     "boss_catalog.json",
+    "spec_catalog.json",
     "README_OFFLINE.txt"
 )
 foreach ($file in $files) {

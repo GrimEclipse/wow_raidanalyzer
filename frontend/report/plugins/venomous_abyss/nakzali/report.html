@@ -11,7 +11,7 @@
 <section id="overviewPage" class="overview">
   <header class="report-head">
     <div>
-      <div class="eyebrow">12.1 · 烈毒之渊 · 史诗难度</div>
+      <div class="eyebrow">12.1 · 烈毒之渊 · 难度按 Pull 标记</div>
       <h1>盘魂者内克扎利</h1>
     </div>
     <div id="lastPull" class="last-pull">尚未载入分析结果</div>
@@ -46,34 +46,13 @@
   </header>
   <main class="detail-main">
     <section id="stats" class="stats panel"></section>
-    <section id="phaseCards" class="phase-cards"></section>
-    <section class="layout">
-      <aside class="panel event-panel">
-        <h2>重要技能逐场推演</h2>
-        <div id="skillFocus" class="skill-focus">
-          <button data-focus="all" class="active">全部</button>
-          <button data-focus="essenceRend">精华撕裂</button>
-          <button data-focus="possessionBarrage">附身弹幕</button>
-          <button data-focus="hungeringPyre">葬火分散</button>
-        </div>
-        <div id="eventList" class="event-list"></div>
-      </aside>
-      <section class="panel stage">
-        <div class="legend"><span class="chip">图标尖角：当前面向</span><span class="chip">金框：当前机制目标</span><span class="chip">虚线淡化：超窗坐标</span><span class="chip">滚轮以鼠标位置缩放</span></div>
-        <div id="mapWrap" class="map-wrap">
-          <div id="mapScene" class="map-scene"></div>
-          <div class="combat-ring" aria-hidden="true"></div>
-          <div class="map-controls"><button data-map="out">−</button><span id="mapZoom" class="map-zoom">118%</span><button data-map="in">+</button><button data-map="reset">重置</button></div>
-          <div id="actorTooltip" class="actor-tooltip" role="tooltip"></div>
-        </div>
-        <div id="selectedDetails" class="selected-details"></div>
-      </section>
-    </section>
-    <nav id="detailTabs" class="page-tabs panel"><button data-tab="summary" class="active">情况分析</button><button data-tab="mechanics">机制明细</button><button data-tab="avoidable">可躲避伤害</button></nav>
+    <nav id="detailTabs" class="page-tabs panel"><button data-tab="survival" class="active">全场存活情况</button><button data-tab="essence">精华撕裂放置</button><button data-tab="flames">噬灭 / 蛇形烈焰</button><button data-tab="avoidable">可规避机制</button><button data-tab="tank">坦克换嘲 / 附身弹幕</button></nav>
     <section id="tabContent" class="tab-content"></section>
   </main>
 </section>
-<script src="frontend/core/report-plugin-runtime.js?v=1.1.0-20260825b"></script>
-<script src="frontend/report/plugins/venomous_abyss/nakzali/report.js"></script>
-<script src="/frontend/core/home-button.js?v=1"></script></body>
+<script src="frontend/core/report-plugin-runtime.js?v=1.2.0-20260826"></script>
+<script src="https://wow.zamimg.com/js/tooltips.js"></script>
+<script src="frontend/report/plugins/venomous_abyss/nakzali/report.js?v=1.2.0-20260826"></script>
+<script src="/frontend/core/home-button.js?v=1"></script>
+</body>
 </html>

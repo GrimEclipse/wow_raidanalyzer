@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "kind": "specialization-analysis-catalog",
+  "defaultAnalyzer": "spec_plugins.stub:analyze_comparison",
+  "specializations": [
+    {
+      "class": "Paladin",
+      "spec": "Holy",
+      "key": "paladin-holy",
+      "status": "implemented",
+      "plugin": "spec_plugins.paladin.holy:analyze_comparison",
+      "evidence": ["Casts", "Buffs", "Resources", "CombatantInfo"],
+      "sections": ["buffCoverage", "resourceLedger", "burstWindows", "castSequences"]
+    }
+  ]
+}

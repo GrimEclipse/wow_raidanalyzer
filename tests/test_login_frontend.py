@@ -12,7 +12,7 @@ class LoginFrontendTests(unittest.TestCase):
         cls.page = LOGIN_PAGE.read_text(encoding="utf-8")
 
     def test_login_page_shows_version_and_removes_old_slogan(self):
-        self.assertIn("v1.1.0", self.page)
+        self.assertIn("v1.2.0", self.page)
         self.assertIn('id="versionButton"', self.page)
         self.assertNotIn("旨在快速帮团长完成团本开荒中问题的定位", self.page)
 

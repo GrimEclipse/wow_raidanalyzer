@@ -875,6 +875,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/account": "/frontend/auth/account.html",
             "/online": "/frontend/tools/analysis-runner/index.html",
             "/single-fight": "/frontend/tools/single-fight/index.html",
+            "/spec-compare": "/frontend/tools/spec-comparison/index.html",
             "/report": "/frontend/report/index.html",
             "/loot": "/frontend/tools/raid-loot/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
@@ -885,7 +886,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         }
         path = route_map.get(path, path)
         allowed = (
-            path in {"/index.html", "/boss_catalog.json"}
+            path in {"/index.html", "/boss_catalog.json", "/spec_catalog.json"}
             or path.startswith("/assets/")
             or path.startswith("/frontend/")
             or path.startswith("/data/")

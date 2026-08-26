@@ -1,6 +1,6 @@
 window.MythicReportPlugin = {
   id: "venomous_abyss/vashnik",
-  renderer: "generic",
-  reportPage: "frontend/report/generic.html",
-  sections: ["wipe", "avoidable"]
+  renderer: "venomous-progression",
+  reportPage: "frontend/report/plugins/venomous_abyss/progression/report.html",
+  sections: ["survival", "avoidable", "infection"]
 };

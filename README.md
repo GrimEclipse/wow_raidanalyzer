@@ -19,6 +19,7 @@ start_app.bat
 - `/report`：按 JSON 中的 Boss 身份选择通用报告或专用报告
 - `/online`：通过界面运行 WCL 分析
 - `/single-fight`：手动读取已配置工会的 report，按开荒日选择单场 Pull 并复用 Boss 逐场规则；相同 Fight 使用缓存
+- `/spec-compare`：单场单专精与 WCL 对标日志的 Buff、资源溢出、爆发窗口和施法序列报告；支持下载独立 HTML 留档
 - `/raid-guide`：团本手册
 - `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
 - `/loot`：开荒出勤、需求权与装备分配日历

@@ -18,6 +18,15 @@ from boss_plugins.common import (
     spec_localization,
     write_json_result,
 )
+from boss_plugins.venomous_abyss.shared import (
+    HOLLOWING_STACK_IDS,
+    TAUNT_SPELLS,
+    build_survival_timeline,
+    difficulty_fields,
+    load_confirmed_spell_names,
+    player_ref,
+    spell_name,
+)
 
 
 ENCOUNTER_ID = 3470
@@ -25,7 +34,8 @@ LEGACY_ENCOUNTER_IDS = {53470}
 ENCOUNTER_IDS = {ENCOUNTER_ID, *LEGACY_ENCOUNTER_IDS}
 CN_TZ = timezone(timedelta(hours=8))
 
-SPELLS = {
+SPELLS = load_confirmed_spell_names()
+SPELLS.update({
     1284034: "解缚之怒",
     1284103: "附身弹幕",
     1292034: "附身弹幕",
@@ -34,15 +44,14 @@ SPELLS = {
     1287426: "精华撕裂",
     1287434: "精华撕裂",
     1287533: "墓缚推进",
-    1288554: "潜伏教徒",
     1289683: "苏醒仪式",
     1290003: "解缚",
     1289855: "葬火",
-    1292034: "附身弹幕",
     1292248: "灵魂转移",
     1293214: "攫取深渊",
     1294729: "尸体枯萎",
     1294933: "追踪火焰",
+    1295085: "灵魂转移",
     1295124: "苏醒仪式",
     1297624: "仪式灼烧",
     1299673: "祈求",
@@ -51,14 +60,15 @@ SPELLS = {
     1306666: "葬火点名",
     1307939: "尸体枯萎",
     1308227: "不朽盘卷",
-}
+})
 
 PHASE_CASTS = {1293664, 1295124, 1292248, 1289855, 1299673, 1284034}
 MECHANIC_CASTS = PHASE_CASTS | {1284103, 1287533, 1297624}
 AVOIDABLE_DAMAGE = {
-    1288554: "移动黑圈",
-    1300239: "盘旋灵魂",
-    1308227: "不朽盘卷",
+    1288554: spell_name(1288554),
+    1295085: spell_name(1295085),
+    1300239: spell_name(1300239),
+    1308227: spell_name(1308227),
 }
 POSITION_DAMAGE_IDS = set(AVOIDABLE_DAMAGE) | {1287434, 1292034, 1293214}
 
@@ -348,6 +358,8 @@ def fetch_payload(client, report_id, fight, options, boss_id=None):
         debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1299722))
     if options["hungeringPyreReviewEnabled"]:
         debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1306666))
+        debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1294933))
+    debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1284109))
     damage = []
     wanted_damage = set()
     if options["essenceRendReviewEnabled"]:
@@ -356,6 +368,8 @@ def fetch_payload(client, report_id, fight, options, boss_id=None):
         wanted_damage.add(1292034)
     if options["hungeringPyreReviewEnabled"]:
         wanted_damage.add(1289855)
+        wanted_damage.add(1294933)
+    wanted_damage.update({1284109, 1295085})
     if options["avoidableDamageReviewEnabled"]:
         wanted_damage.update(AVOIDABLE_DAMAGE)
         wanted_damage.add(1293214)
@@ -383,6 +397,7 @@ def fetch_payload(client, report_id, fight, options, boss_id=None):
         "damage": damage,
         "positionEvents": position_events,
         "bossPositionEvents": boss_position_events,
+        "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies"),
     }
 
 
@@ -446,7 +461,7 @@ def nearest_position(target_id, timestamp, damage, max_offset_ms):
     }
 
 
-def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options):
+def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options, players=None):
     if not options["essenceRendReviewEnabled"]:
         return {"enabled": False, "placements": []}
     placements = []
@@ -468,8 +483,10 @@ def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options):
         timestamp = int(event.get("timestamp") or 0)
         position = nearest_position(target_id, timestamp, damage, int(options["essenceRendMaxSampleOffsetMs"]))
         row = {
-            "targetID": target_id,
-            "player": actor_name(actor_map, target_id).split("-", 1)[0],
+            **(player_ref(players or {}, actor_map, target_id) if players else {
+                "targetID": target_id,
+                "player": actor_name(actor_map, target_id).split("-", 1)[0],
+            }),
             "timeMs": timestamp - fight["startTime"],
             "time": fmt_ms(timestamp - fight["startTime"]),
             "applyTimeMs": int(apply_event["timestamp"] - fight["startTime"]) if apply_event else None,
@@ -505,7 +522,7 @@ def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options):
     }
 
 
-def analyze_hungering_pyre(fight, actor_map, debuffs, damage, options):
+def analyze_hungering_pyre(fight, actor_map, debuffs, damage, options, casts=None):
     if not options["hungeringPyreReviewEnabled"]:
         return {"enabled": False, "rounds": []}
     active = {}
@@ -541,6 +558,20 @@ def analyze_hungering_pyre(fight, actor_map, debuffs, damage, options):
             "soakRadiusYards": float(options["hungeringPyreSoakRadiusYards"]),
             "evidenceTime": "1306666 removedebuff",
         })
+    if not rounds:
+        completed = [event for event in (casts or []) if ability_id(event) == 1289855 and event_type(event) == "cast"]
+        for event in sorted(completed, key=lambda row: int(row.get("timestamp") or 0)):
+            timestamp = int(event.get("timestamp") or 0)
+            damage_targets = sorted({row.get("targetID") for row in damage if ability_id(row) == 1289855
+                                     and row.get("targetID") is not None and -300 <= int(row.get("timestamp") or 0) - timestamp <= 1500})
+            target_id = event.get("targetID")
+            rounds.append({
+                "index": len(rounds) + 1, "spellID": 1289855, "debuffID": None,
+                "targetID": target_id, "target": actor_name(actor_map, target_id).split("-", 1)[0],
+                "applyTimeMs": None, "applyTime": None, "timeMs": timestamp - fight["startTime"],
+                "time": fmt_ms(timestamp - fight["startTime"]), "damageTargetIDs": damage_targets,
+                "soakRadiusYards": float(options["hungeringPyreSoakRadiusYards"]), "evidenceTime": "1289855 cast completion",
+            })
     return {
         "enabled": True,
         "spellID": 1289855,
@@ -690,8 +721,113 @@ def analyze_invoke(fight, actor_map, debuffs, markers):
             "playerID": event.get("targetID"),
             "player": actor_name(actor_map, event.get("targetID")).split("-", 1)[0],
             "spellID": 1299722,
+            "interruptedAbilityID": event.get("extraAbilityGameID"),
+            "interruptedAbility": SPELLS.get(event.get("extraAbilityGameID"), str(event.get("extraAbilityGameID"))) if event.get("extraAbilityGameID") else "未记录施法技能",
         })
     return rows
+
+
+def analyze_transition_assignments(fight, actor_map, player_catalog, pyre_rounds, debuffs, damage):
+    slithering = [event for event in debuffs if ability_id(event) == 1294933 and is_apply(event)]
+    for row in pyre_rounds:
+        if row.get("targetID") not in player_catalog:
+            row["targetID"] = None
+            row["target"] = "当前坦克（WCL 未返回主目标）"
+        timestamp = int(fight["startTime"] + row["timeMs"])
+        snake_events = [event for event in slithering if -1500 <= int(event.get("timestamp") or 0) - timestamp <= 3500]
+        snake_ids = sorted({event.get("targetID") for event in snake_events if event.get("targetID") is not None})
+        row["soakPlayerRefs"] = [player_ref(player_catalog, actor_map, player_id) for player_id in row.get("damageTargetIDs", []) if player_id in player_catalog]
+        row["soakPlayersByDamage"] = [ref["player"] for ref in row["soakPlayerRefs"]]
+        row["slitheringFlameRefs"] = [player_ref(player_catalog, actor_map, player_id) for player_id in snake_ids if player_id in player_catalog]
+        row["slitheringFlamePlayers"] = [ref["player"] for ref in row["slitheringFlameRefs"]]
+        row["nonSoakers"] = row["slitheringFlamePlayers"]
+        row["rule"] = "噬灭烈焰伤害目标为分摊者；同轮获得蛇形烈焰的玩家为未分摊组。"
+    return pyre_rounds
+
+
+def analyze_tank_swap(fight, actor_map, players, debuffs, friendly_casts, barrage, survival):
+    tank_ids = {player_id for player_id, player in players.items() if player.get("role") == "tank"}
+    stack_rows = []
+    stacks_by_player = defaultdict(list)
+    for event in debuffs:
+        spell_id = int(ability_id(event) or 0)
+        if spell_id not in HOLLOWING_STACK_IDS or event.get("targetID") not in tank_ids:
+            continue
+        timestamp = int(event.get("timestamp") or 0)
+        kind = event_type(event)
+        if kind in {"applydebuff", "applydebuffstack", "refreshdebuff", "refreshdebuffstack"}:
+            stack = int(event.get("stack") or 1)
+        elif kind in {"removedebuff", "removedebuffstack"}:
+            stack = int(event.get("stack") or 0)
+        else:
+            continue
+        row = {
+            **player_ref(players, actor_map, event.get("targetID")),
+            "timeMs": timestamp - fight["startTime"],
+            "time": fmt_ms(timestamp - fight["startTime"]),
+            "eventType": kind,
+            "stack": stack,
+            "absoluteTime": timestamp,
+            "spellID": spell_id,
+        }
+        stack_rows.append(row)
+        stacks_by_player[event.get("targetID")].append(row)
+
+    def stack_before(player_id, timestamp):
+        prior = [row for row in stacks_by_player.get(player_id, []) if row["absoluteTime"] <= timestamp]
+        return prior[-1]["stack"] if prior else None
+
+    taunts = []
+    for event in friendly_casts:
+        spell_id = int(ability_id(event) or 0)
+        if spell_id not in TAUNT_SPELLS or event.get("sourceID") not in tank_ids or event_type(event) != "cast":
+            continue
+        timestamp = int(event.get("timestamp") or 0)
+        target_id = event.get("targetID")
+        taunts.append({
+            **player_ref(players, actor_map, event.get("sourceID")),
+            "timeMs": timestamp - fight["startTime"],
+            "time": fmt_ms(timestamp - fight["startTime"]),
+            "spellID": spell_id,
+            "spell": TAUNT_SPELLS[spell_id],
+            "targetID": target_id,
+            "target": actor_name(actor_map, target_id).split("-", 1)[0] if target_id else "—",
+        })
+    tank_deaths = []
+    for row in survival.get("timeline", []):
+        if row.get("kind") != "death" or row.get("playerID") not in tank_ids:
+            continue
+        tank_deaths.append({
+            **row,
+            "ability": row.get("ability") or spell_name(row.get("abilityID"), SPELLS),
+            "deathCause": row.get("deathCause") or ("fall" if not row.get("abilityID") else "ability"),
+        })
+    barrage_stacks = []
+    for barrage_row in barrage:
+        timestamp = int(fight["startTime"] + barrage_row["timeMs"])
+        stacks = []
+        for player_id in tank_ids:
+            stack_value = stack_before(player_id, timestamp)
+            stacks.append({
+                **player_ref(players, actor_map, player_id),
+                "stack": stack_value if stack_value is not None else "—",
+            })
+        barrage_stacks.append({
+            "index": barrage_row["index"], "time": barrage_row["time"], "timeMs": barrage_row["timeMs"],
+            "targetID": barrage_row.get("targetID"), "target": barrage_row.get("target"), "tanks": stacks,
+        })
+    return {
+        "tanks": [players[player_id] for player_id in tank_ids],
+        "hollowingStacks": stack_rows,
+        "peakStacks": [{
+            **player_ref(players, actor_map, player_id),
+            "peakStack": max((row["stack"] for row in stack_rows if row["playerID"] == player_id), default=0),
+        } for player_id in tank_ids],
+        "barrageStacks": barrage_stacks,
+        "taunts": sorted(taunts, key=lambda row: row["timeMs"]),
+        "barrageTargets": [{"index": row["index"], "time": row["time"], "targetID": row.get("targetID"), "target": row.get("target")} for row in barrage],
+        "tankDeaths": tank_deaths,
+    }
 
 
 def build_field_replay_events(fight, markers, player_catalog, boss_ids, actor_map, position_index, deaths, placements, barrage_rounds, pyre_rounds, arena):
@@ -770,7 +906,8 @@ def build_field_replay_events(fight, markers, player_catalog, boss_ids, actor_ma
     return sorted(rows, key=lambda row: (row["timeMs"], row["eventType"], row["index"]))
 
 
-def analyze_avoidable(fight, actor_map, actor_type, damage, deaths):
+def analyze_avoidable(fight, actor_map, actor_type, damage, deaths, players=None):
+    players = players or {}
     death_keys = {(event.get("targetID"), event.get("killingAbilityGameID") or ability_id(event)) for event in deaths}
     board = defaultdict(lambda: defaultdict(lambda: {"hitCount": 0, "totalDamage": 0, "deathCount": 0, "events": []}))
     for event in damage:
@@ -789,9 +926,10 @@ def analyze_avoidable(fight, actor_map, actor_type, damage, deaths):
     for spell_id, targets in board.items():
         output[str(spell_id)] = []
         for target_id, row in targets.items():
+            ref = player_ref(players, actor_map, target_id)
             row.update({
-                "name": actor_name(actor_map, target_id).split("-", 1)[0],
-                "playerID": target_id,
+                **ref,
+                "name": ref["player"],
                 "spellID": spell_id,
                 "spellName": AVOIDABLE_DAMAGE[spell_id],
                 "deathCount": int((target_id, spell_id) in death_keys),
@@ -885,22 +1023,11 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
         payload["damage"] + position_events,
         arena,
         options,
+        player_catalog,
     )
     barrage = analyze_barrage(fight, actor_map, payload["casts"], payload["damage"], payload["deaths"])
-    hungering_pyre = analyze_hungering_pyre(fight, actor_map, payload["debuffs"], payload["damage"], options)
-    field_events = build_field_replay_events(
-        fight,
-        markers,
-        player_catalog,
-        boss_ids,
-        actor_map,
-        position_index,
-        payload["deaths"],
-        essence_rend["placements"],
-        barrage,
-        hungering_pyre["rounds"],
-        arena,
-    )
+    hungering_pyre = analyze_hungering_pyre(fight, actor_map, payload["debuffs"], payload["damage"], options, payload["casts"])
+    analyze_transition_assignments(fight, actor_map, player_catalog, hungering_pyre["rounds"], payload["debuffs"], payload["damage"])
     raw = {
         "reportID": report_id,
         "reportStart": report_start,
@@ -913,8 +1040,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
         "barrage": barrage,
         "hungeringPyre": hungering_pyre,
         "invoke": analyze_invoke(fight, actor_map, payload["debuffs"], markers),
-        "avoidable": analyze_avoidable(fight, actor_map, actor_type, payload["damage"], payload["deaths"]),
-        "fieldEvents": field_events,
+        "avoidable": analyze_avoidable(fight, actor_map, actor_type, payload["damage"], payload["deaths"], player_catalog),
     }
     return raw
 
@@ -934,6 +1060,27 @@ def render_fight(raw, baseline, options):
         f"确认/疑似漏怪 {raw['leaks']['confirmedCount']}/{raw['leaks']['suspectedCount']} 次。"
         f"初判：{classification['label']}。"
     )
+    survival = build_survival_timeline(
+        fight,
+        {player_id: player["name"] for player_id, player in raw["players"].items()},
+        raw["players"],
+        raw["payload"]["deaths"],
+        raw["payload"].get("friendlyCasts") or [],
+        SPELLS,
+    )
+    tank_swap = analyze_tank_swap(
+        fight,
+        {player_id: player["name"] for player_id, player in raw["players"].items()},
+        raw["players"],
+        raw["payload"]["debuffs"],
+        raw["payload"].get("friendlyCasts") or [],
+        raw["barrage"],
+        survival,
+    )
+    interrupted_counts = defaultdict(int)
+    for event in raw["invoke"]:
+        interrupted_counts[event.get("interruptedAbility") or "未记录施法技能"] += 1
+    most_interrupted = max(interrupted_counts, key=interrupted_counts.get) if interrupted_counts else None
     return {
         "reportID": raw["reportID"],
         "fightID": fight["id"],
@@ -954,22 +1101,19 @@ def render_fight(raw, baseline, options):
         "phaseTimeline": raw["markers"],
         "wclDeepLink": f"https://www.warcraftlogs.com/reports/{raw['reportID']}#fight={fight['id']}&type=summary",
         "players": list(raw["players"].values()),
+        "survival": survival,
+        "deathTimeline": survival["timeline"],
+        **difficulty_fields(fight),
         "nakzali": {
             "amaniLeaks": raw["leaks"],
             "essenceRend": raw["essenceRend"],
             "possessionBarrage": {"baseline": baseline, "rounds": raw["barrage"]},
             "hungeringPyre": raw["hungeringPyre"],
-            "invokeInterrupts": {"count": len(raw["invoke"]), "events": raw["invoke"]},
+            "invokeInterrupts": {"count": len(raw["invoke"]), "events": raw["invoke"],
+                                 "mostInterruptedAbility": most_interrupted,
+                                 "abilityCounts": [{"ability": name, "count": count} for name, count in sorted(interrupted_counts.items(), key=lambda item: item[1], reverse=True)]},
+            "tankSwap": tank_swap,
             "avoidableBoard": raw["avoidable"],
-            "fieldReplay": {
-                "arenaImage": "assets/raids/venomous_abyss/01-nakzali.png",
-                "placements": raw["essenceRend"]["placements"],
-                "movingBlackCircleRemovals": raw["essenceRend"]["placements"],
-                "events": raw["fieldEvents"],
-                "blackCircleTracking": "remove-player-position-only",
-                "trackingMode": "essence-rend-remove-nearby-player-position",
-                "limitation": "1287434 的移除事件没有坐标；使用移除时间附近的玩家坐标。1288554 由 Boss 作为伤害来源，没有可追踪的黑圈 actor 坐标。",
-            },
         },
         "avoidableSummary": raw["avoidable"],
     }
@@ -1027,7 +1171,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossName": "盘魂者内克扎利",
             "analyzedReports": report_id_list,
             "mechanicVersion": "nakzali-initial-court-2026-08-03",
-            "features": {"interrupts": False, "dispels": False, "fieldReplay": True, "mistakes": False},
+            "features": {"interrupts": False, "dispels": False, "fieldReplay": False, "mistakes": False},
             "capabilities": {
                 "wipe": {"enabled": True, "renderer": "nakzali-pulls"},
                 "avoidable": {"enabled": True, "renderer": "nakzali-avoidable"},
