@@ -161,7 +161,10 @@ function renderCalendar() {
 async function openDay(value) {
   const dateChanged = value !== selectedDate;
   selectedDate = value;
-  if (dateChanged) resetDrawerForms();
+  if (dateChanged) {
+    resetDrawerForms();
+    document.dispatchEvent(new CustomEvent("day:selected", { detail: { date: value } }));
+  }
   const parsed = new Date(`${value}T12:00:00`);
   displayedMonth = new Date(parsed.getFullYear(), parsed.getMonth(), 1);
   $("#drawerBackdrop").hidden = false;
@@ -384,7 +387,13 @@ function renderBlackmarkSection() {
   const raidSelect = $("#blackRaid");
   const dayRaidKey = (currentDayRecord(false) || {}).raidKey || raids()[0]?.key || "";
   raidSelect.innerHTML = raids().map(raid => `<option value="${escapeHtml(raid.key)}">${escapeHtml(raid.name)}</option>`).join("");
-  raidSelect.value = raids().some(raid => raid.key === raidSelect.value) ? raidSelect.value : dayRaidKey;
+  if (raidSelect.dataset.userPicked === "1") {
+    // 用户手动切换过：重建 options 后恢复用户选择，不被默认值覆盖
+    if ([...raidSelect.options].some(option => option.value === raidSelect.dataset.picked)) raidSelect.value = raidSelect.dataset.picked;
+    else { delete raidSelect.dataset.userPicked; delete raidSelect.dataset.picked; }
+  } else {
+    raidSelect.value = dayRaidKey;
+  }
   const raidKey = raidSelect.value;
   const difficulty = $("#blackDifficulty").value;
   const existing = markFor(selectedDate, difficulty, raidKey);
@@ -751,7 +760,18 @@ $("#blackHistoryFilter").addEventListener("change", renderBlackHistory);
 $("#blackHistoryRaid")?.addEventListener("change", renderBlackHistory);
 $("#blackHistoryDifficulty")?.addEventListener("change", renderBlackHistory);
 $("#blackHistoryVerdict")?.addEventListener("change", renderBlackHistory);
-$("#blackRaid").addEventListener("change", () => { renderBlackmarkSection(); });
+$("#blackRaid").addEventListener("change", () => {
+  const raidSelect = $("#blackRaid");
+  raidSelect.dataset.userPicked = "1";
+  raidSelect.dataset.picked = raidSelect.value;
+  renderBlackmarkSection();
+});
+// 切日重置手动副本选择，恢复「跟随当日团队副本」的默认行为
+document.addEventListener("day:selected", () => {
+  const raidSelect = $("#blackRaid");
+  delete raidSelect.dataset.userPicked;
+  delete raidSelect.dataset.picked;
+});
 $("#blackDifficulty").addEventListener("change", () => { renderBlackmarkSection(); renderDay(); });
 $("#blackPlayer").addEventListener("change", () => applySelectColor($("#blackPlayer")));
 $("#saveBlackmark").addEventListener("click", saveBlackmark);

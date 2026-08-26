@@ -144,7 +144,7 @@ function renderAvoidable() {
 
 function render() {
   renderSummary();
-  $("pageTitle").textContent = `陵寝哨兵 · Fight ${current()?.fightID || "-"} 技能分析`;
+  $("pageTitle").textContent = `陵寝哨兵${current()?.difficultyName ? `（${current().difficultyName}）` : ""} · Fight ${current()?.fightID || "-"} 技能分析`;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === state.tab));
   ({ helical: renderHelical, marks: renderMarks, field: renderField, avoidable: renderAvoidable }[state.tab] || renderHelical)();
 }
@@ -155,7 +155,7 @@ function load(payload) {
   const selectedIndex = selectedFight ? state.pulls.findIndex(pull => Number(pull.fightID) === selectedFight) : -1;
   state.pull = selectedIndex >= 0 ? selectedIndex : 0;
   state.tab = "helical";
-  $("pullSelect").innerHTML = state.pulls.map((pull, index) => `<option value="${index}">Fight ${pull.fightID} · ${pull.isKill ? "KILL" : `${Number(pull.bossPercentage).toFixed(2)}%`} · ${esc(pull.duration)}</option>`).join("");
+  $("pullSelect").innerHTML = state.pulls.map((pull, index) => `<option value="${index}">Fight ${pull.fightID} · ${esc(pull.difficultyName || "未知难度")} · ${pull.isKill ? "KILL" : `${Number(pull.bossPercentage).toFixed(2)}%`} · ${esc(pull.duration)}</option>`).join("");
   $("pullSelect").value = String(state.pull);
   $("error").textContent = state.pulls.length ? "" : "分析结果中没有陵寝哨兵战斗。";
   render();

@@ -1051,6 +1051,9 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
     }
     duration_ms = int(fight["endTime"] - fight["startTime"])
     started_at = datetime.fromtimestamp((report_start + fight["startTime"]) / 1000, tz=CN_TZ)
+    difficulty = int(fight.get("difficulty") or 0)
+    difficulty_names = {1: "LFR", 2: "普通", 3: "普通", 4: "英雄", 5: "史诗"}
+    difficulty_name = difficulty_names.get(difficulty, f"难度{difficulty}" if difficulty else "未知")
     failure_names = [failure["player"] for row in helical["rounds"] for failure in row["failures"]]
     if failure_names:
         wipe_reason = f"螺旋毒素超时：{'、'.join(failure_names)}"
@@ -1061,6 +1064,8 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
     return {
         "reportID": report_id,
         "fightID": fight["id"],
+        "difficulty": difficulty,
+        "difficultyName": difficulty_name,
         "date": started_at.strftime("%Y-%m-%d"),
         "startClock": started_at.strftime("%H:%M:%S"),
         "startTimeIso": started_at.isoformat(),
