@@ -62,7 +62,7 @@ function confirmDialog({ title = "请确认", message = "", confirmText = "确�
     const okButton = $("#confirmDialogOk");
     okButton.textContent = confirmText;
     okButton.classList.toggle("danger", Boolean(danger));
-    $("#confirmDialogCancel").textContent = cancelText;
+    $("#confirmDialogCancelBtn").textContent = cancelText;
     const close = result => {
       $("#confirmDialogBackdrop").hidden = true;
       $("#confirmDialogOk").onclick = null;
@@ -496,7 +496,7 @@ async function saveBlackmark() {
   const raidKey = $("#blackRaid").value;
   const difficulty = $("#blackDifficulty").value;
   if (!raidKey) return notify("请选择副本。", true);
-  if (playerId && !confirmReBlackmark(playerId, selectedDate, raidKey, difficulty)) return;
+  if (playerId && !(await confirmReBlackmark(playerId, selectedDate, raidKey, difficulty))) return;
   try {
     await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
       date: selectedDate,
@@ -633,7 +633,7 @@ function allocationPayload() {
 async function addAllocation() {
   if (!canModify()) return;
   const payload = allocationPayload();
-  if (!confirmContinueIfBlack(payload.recipientId, selectedDate, payload.difficulty, payload.raidKey)) return;
+  if (!(await confirmContinueIfBlack(payload.recipientId, selectedDate, payload.difficulty, payload.raidKey))) return;
   try {
     await api("/api/loot/allocations", { method: "POST", body: JSON.stringify(payload) });
   } catch (error) {
