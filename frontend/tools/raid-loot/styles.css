@@ -144,7 +144,7 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .blackmark-section { border-color: #46303c; background: linear-gradient(145deg, #171019, #100b12); }
 .blackmark-section .section-heading p { color: #a08a97; }
 .blackmark-section .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.bm-add { white-space: nowrap; flex-shrink: 0; }
+.bm-add { width: auto !important; margin-top: 0 !important; white-space: nowrap; flex-shrink: 0; }
 .empty-bm { padding: 14px; color: var(--muted); border: 1px dashed #3d2c36; border-radius: 9px; font-size: 13px; }
 .blackmark-editor-modal { width: min(560px, 94vw); }
 /* 黑本登记 3 列紧凑表单：一行放下 副本/难度/判定 */
