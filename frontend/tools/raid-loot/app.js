@@ -175,12 +175,8 @@ async function openDay(value) {
 }
 
 // 切换到另一天时，抽屉里的表单恢复初始状态，避免把上一天的输入带到新的一天
+// 黑本编辑对话框每次打开都会重新填充，这里只需重置分配区
 function resetDrawerForms() {
-  $("#blackRaid").value = "";
-  $("#blackDifficulty").value = "heroic";
-  $("#blackVerdict").value = "black";
-  $("#blackPlayer").value = "";
-  $("#blackNotes").value = "";
   $("#recipientSelect").value = "";
   $("#itemSearch").value = "";
   $("#allocationNotes").value = "";
@@ -378,35 +374,48 @@ function toggleBoe() {
 }
 
 // ===== 黑本（BLACK LEDGER）=====
-function renderBlackmarkSection() {
+// 编辑器状态：null = 新增（干净表单），否则为待编辑记录的 {raidKey, difficulty}
+let blackmarkEditing = null;
+
+function populateBlackmarkForm({ raidKey, difficulty, playerId, verdict, notes }) {
   const select = $("#blackPlayer");
-  const current = select.value;
   const options = roster().filter(row => row.active).map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))} · ${escapeHtml(row.className || "未设置职业")}</option>`).join("");
   select.innerHTML = `<option value="">未标记（当天不黑）</option>${options}`;
-  // 副本选择：默认跟随当日团队副本；用户手动切过副本时保留手动选择
   const raidSelect = $("#blackRaid");
   const dayRaidKey = (currentDayRecord(false) || {}).raidKey || raids()[0]?.key || "";
   raidSelect.innerHTML = raids().map(raid => `<option value="${escapeHtml(raid.key)}">${escapeHtml(raid.name)}</option>`).join("");
-  if (raidSelect.dataset.userPicked === "1") {
-    // 用户手动切换过：重建 options 后恢复用户选择，不被默认值覆盖
-    if ([...raidSelect.options].some(option => option.value === raidSelect.dataset.picked)) raidSelect.value = raidSelect.dataset.picked;
-    else { delete raidSelect.dataset.userPicked; delete raidSelect.dataset.picked; }
-  } else {
-    raidSelect.value = dayRaidKey;
-  }
-  const raidKey = raidSelect.value;
-  const difficulty = $("#blackDifficulty").value;
-  const existing = markFor(selectedDate, difficulty, raidKey);
-  if (existing && [...select.options].some(option => option.value === existing.playerId)) select.value = existing.playerId;
-  else if ([...select.options].some(option => option.value === current)) select.value = current;
+  // 新增时默认当日团队副本；编辑/手动切换用传入值
+  raidSelect.value = raids().some(raid => raid.key === (raidKey || dayRaidKey)) ? (raidKey || dayRaidKey) : (raids()[0]?.key || "");
+  $("#blackDifficulty").value = difficulty || "heroic";
+  if ([...select.options].some(option => option.value === (playerId || ""))) select.value = playerId || "";
   else select.value = "";
   applySelectColor(select);
-  if (existing) {
-    $("#blackNotes").value = existing.notes || "";
-    $("#blackVerdict").value = markVerdict(existing);
-  }
+  $("#blackVerdict").value = markVerdict({ verdict: verdict });
+  $("#blackNotes").value = notes || "";
+}
+
+function renderBlackmarkSection() {
   renderExistingBlackmarks();
 }
+
+function openBlackmarkEditor(row) {
+  // row 为空 → 新增：干净表单，避免上一次的输入残留
+  blackmarkEditing = row ? { raidKey: row.raidKey, difficulty: row.difficulty } : null;
+  $("#blackmarkEditorTitle").textContent = row ? "编辑黑本记录" : "添加黑本记录";
+  $("#blackmarkEditorCopy").textContent = row
+    ? `${selectedDate} · ${raidName(row.raidKey)} · ${DIFFICULTY_NAMES[row.difficulty]}`
+    : `日期：${selectedDate} · 默认为当日团队副本`;
+  populateBlackmarkForm({
+    raidKey: row?.raidKey,
+    difficulty: row?.difficulty,
+    playerId: row?.playerId,
+    verdict: row ? markVerdict(row) : "black",
+    notes: row?.notes,
+  });
+  $("#blackmarkEditorBackdrop").hidden = false;
+}
+
+function closeBlackmarkEditor() { $("#blackmarkEditorBackdrop").hidden = true; }
 
 function renderExistingBlackmarks() {
   const rows = blackmarks().filter(row => row.date === selectedDate);
@@ -420,12 +429,10 @@ function renderExistingBlackmarks() {
       ${row.notes ? `<span class="bm-notes" title="${escapeHtml(row.notes)}">${escapeHtml(row.notes)}</span>` : ""}
       <span class="bm-actions"><button class="button danger bm-edit" data-raid="${escapeHtml(row.raidKey)}" data-diff="${row.difficulty}">编辑</button><button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除</button></span>
     </div>`;
-  }).join("") : "";
+  }).join("") : `<div class="empty-bm">当天暂无黑本记录，点右上「＋ 添加」登记。</div>`;
   box.querySelectorAll(".bm-edit").forEach(button => button.addEventListener("click", () => {
-    $("#blackRaid").value = button.dataset.raid;
-    $("#blackDifficulty").value = button.dataset.diff;
-    renderBlackmarkSection();
-    renderDay();
+    const row = blackmarks().find(item => item.date === selectedDate && item.raidKey === button.dataset.raid && item.difficulty === button.dataset.diff);
+    if (row) openBlackmarkEditor(row);
   }));
   box.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", () => deleteBlackmark(button.dataset.id)));
 }
@@ -452,6 +459,7 @@ async function saveBlackmark() {
   const playerId = $("#blackPlayer").value;
   const raidKey = $("#blackRaid").value;
   const difficulty = $("#blackDifficulty").value;
+  if (!raidKey) return notify("请选择副本。", true);
   if (playerId && !confirmReBlackmark(playerId, selectedDate, raidKey, difficulty)) return;
   try {
     await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
@@ -464,6 +472,7 @@ async function saveBlackmark() {
     }) });
     const verdictName = VERDICT_NAMES[markVerdict({ verdict: $("#blackVerdict").value })];
     notify(playerId ? `黑本记录已保存（${raidName(raidKey)}·${verdictName}）。` : "该副本该难度的黑本已清空。");
+    closeBlackmarkEditor();
     await load();
   } catch (error) { notify(error.message, true); }
 }
@@ -760,19 +769,21 @@ $("#blackHistoryFilter").addEventListener("change", renderBlackHistory);
 $("#blackHistoryRaid")?.addEventListener("change", renderBlackHistory);
 $("#blackHistoryDifficulty")?.addEventListener("change", renderBlackHistory);
 $("#blackHistoryVerdict")?.addEventListener("change", renderBlackHistory);
+// 黑本编辑对话框：＋添加 = 干净表单；编辑 = 带出该条数据
+$("#addBlackmark").addEventListener("click", () => openBlackmarkEditor(null));
+$("#closeBlackmarkEditor").addEventListener("click", closeBlackmarkEditor);
+$("#blackmarkEditorBackdrop").addEventListener("click", event => { if (event.target === $("#blackmarkEditorBackdrop")) closeBlackmarkEditor(); });
 $("#blackRaid").addEventListener("change", () => {
   const raidSelect = $("#blackRaid");
-  raidSelect.dataset.userPicked = "1";
-  raidSelect.dataset.picked = raidSelect.value;
-  renderBlackmarkSection();
+  if (blackmarkEditing) { blackmarkEditing.raidKey = raidSelect.value; }
+  const copy = $("#blackmarkEditorCopy");
+  copy.textContent = `${selectedDate} · ${raidName(raidSelect.value)} · ${DIFFICULTY_NAMES[$("#blackDifficulty").value]}`;
 });
-// 切日重置手动副本选择，恢复「跟随当日团队副本」的默认行为
-document.addEventListener("day:selected", () => {
-  const raidSelect = $("#blackRaid");
-  delete raidSelect.dataset.userPicked;
-  delete raidSelect.dataset.picked;
+$("#blackDifficulty").addEventListener("change", () => {
+  if (blackmarkEditing) { blackmarkEditing.difficulty = $("#blackDifficulty").value; }
+  const copy = $("#blackmarkEditorCopy");
+  copy.textContent = `${selectedDate} · ${raidName($("#blackRaid").value)} · ${DIFFICULTY_NAMES[$("#blackDifficulty").value]}`;
 });
-$("#blackDifficulty").addEventListener("change", () => { renderBlackmarkSection(); renderDay(); });
 $("#blackPlayer").addEventListener("change", () => applySelectColor($("#blackPlayer")));
 $("#saveBlackmark").addEventListener("click", saveBlackmark);
 $("#addPlayer").addEventListener("click", () => {

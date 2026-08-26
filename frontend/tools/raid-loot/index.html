@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>开荒 Loot 记录</title>
-  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=10">
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=11">
   <script>
     const whTooltips = {
       colorLinks: false,
@@ -108,16 +108,9 @@
     <section class="drawer-section blackmark-section">
       <div class="section-heading">
         <div><h3>黑本登记</h3><p id="blackmarkHint">记录当天第一个进本的人，判定掉落：拉了 / 神了 / 行吧。每个副本+难度各一条，同一天可黑多个副本。</p></div>
-      </div>
-      <div class="field-grid bm-form-grid no-top">
-        <label>副本<select id="blackRaid"></select></label>
-        <label>难度<select id="blackDifficulty"><option value="lfr">随机团队</option><option value="normal">普通</option><option value="heroic" selected>英雄</option><option value="mythic">史诗</option></select></label>
-        <label>判定<select id="blackVerdict"><option value="black">⚫ 拉了</option><option value="red">🔴 神了</option><option value="neutral">⚪ 行吧</option></select></label>
-        <label class="span-3">黑本玩家（首个进本）<select id="blackPlayer"><option value="">未标记（当天不黑）</option></select></label>
-        <label class="span-3">备注<input id="blackNotes" placeholder="例如：三开敏捷匕首，把出坦克饰品"></label>
+        <button id="addBlackmark" class="button primary bm-add">＋ 添加</button>
       </div>
       <div id="existingBlackmarks" class="existing-blackmarks"></div>
-      <button id="saveBlackmark" class="button primary">保存黑本记录</button>
     </section>
 
     <section class="drawer-section ledger-section">
@@ -156,6 +149,24 @@
     </section>
   </div>
 
-  <script src="/frontend/tools/raid-loot/app.js?v=14"></script>
+  <div id="blackmarkEditorBackdrop" class="modal-backdrop" hidden>
+    <section class="modal blackmark-editor-modal" role="dialog" aria-modal="true" aria-labelledby="blackmarkEditorTitle">
+      <div class="drawer-heading">
+        <div><p class="kicker">BLACK LEDGER</p><h2 id="blackmarkEditorTitle">添加黑本记录</h2></div>
+        <button id="closeBlackmarkEditor" class="close-button" aria-label="关闭">×</button>
+      </div>
+      <p class="modal-copy" id="blackmarkEditorCopy">记录当天第一个进本的人，判定掉落：拉了 / 神了 / 行吧。</p>
+      <div class="field-grid bm-form-grid no-top">
+        <label>副本<select id="blackRaid"></select></label>
+        <label>难度<select id="blackDifficulty"><option value="lfr">随机团队</option><option value="normal">普通</option><option value="heroic" selected>英雄</option><option value="mythic">史诗</option></select></label>
+        <label>判定<select id="blackVerdict"><option value="black">⚫ 拉了</option><option value="red">🔴 神了</option><option value="neutral">⚪ 行吧</option></select></label>
+        <label class="span-3">黑本玩家（首个进本）<select id="blackPlayer"><option value="">未标记（当天不黑）</option></select></label>
+        <label class="span-3">备注<input id="blackNotes" placeholder="例如：三开敏捷匕首，把出坦克饰品"></label>
+      </div>
+      <div class="modal-actions"><span></span><button id="saveBlackmark" class="button primary compact-button">保存黑本记录</button></div>
+    </section>
+  </div>
+
+  <script src="/frontend/tools/raid-loot/app.js?v=15"></script>
 <script src="/frontend/core/home-button.js?v=1"></script></body>
 </html>

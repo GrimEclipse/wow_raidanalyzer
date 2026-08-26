@@ -143,6 +143,10 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .award-grid.no-top { border-top: none; padding-top: 0; margin-top: 0; }
 .blackmark-section { border-color: #46303c; background: linear-gradient(145deg, #171019, #100b12); }
 .blackmark-section .section-heading p { color: #a08a97; }
+.blackmark-section .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.bm-add { white-space: nowrap; flex-shrink: 0; }
+.empty-bm { padding: 14px; color: var(--muted); border: 1px dashed #3d2c36; border-radius: 9px; font-size: 13px; }
+.blackmark-editor-modal { width: min(560px, 94vw); }
 /* 黑本登记 3 列紧凑表单：一行放下 副本/难度/判定 */
 .bm-form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .bm-form-grid .span-3 { grid-column: span 3; }
