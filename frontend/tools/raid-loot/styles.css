@@ -219,3 +219,10 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
   .request-row { grid-template-columns: 1fr 1fr; }
   .request-row input { grid-column: span 2; }
 }
+
+/* 通用确认对话框 */
+.confirm-dialog-modal { width: min(460px, 94vw); }
+.confirm-dialog-body { max-height: 46vh; overflow: auto; display: grid; gap: 6px; color: var(--text, #dfe6f0); font-size: 14px; line-height: 1.55; }
+.confirm-dialog-body .confirm-line { white-space: pre-wrap; word-break: break-word; }
+.button.danger { border-color: #7c3a44; background: #3a1a20; color: #ff9aa5; }
+.button.danger:hover { border-color: #b0525f; background: #4a2028; }

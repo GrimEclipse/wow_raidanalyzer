@@ -47,6 +47,37 @@ function notify(message, error = false) {
   notify.timer = setTimeout(() => { box.hidden = true; }, 4800);
 }
 
+// ===== 通用确认对话框（替代原生 confirm）=====
+function confirmDialog({ title = "请确认", message = "", confirmText = "确定", cancelText = "取消", danger = false } = {}) {
+  return new Promise(resolve => {
+    $("#confirmDialogTitle").textContent = title;
+    const body = $("#confirmDialogBody");
+    body.innerHTML = "";
+    String(message).split("\n").forEach(line => {
+      const div = document.createElement("div");
+      div.className = "confirm-line";
+      div.textContent = line;
+      body.appendChild(div);
+    });
+    const okButton = $("#confirmDialogOk");
+    okButton.textContent = confirmText;
+    okButton.classList.toggle("danger", Boolean(danger));
+    $("#confirmDialogCancel").textContent = cancelText;
+    const close = result => {
+      $("#confirmDialogBackdrop").hidden = true;
+      $("#confirmDialogOk").onclick = null;
+      $("#confirmDialogCancelBtn").onclick = null;
+      $("#confirmDialogBackdrop").onclick = null;
+      resolve(result);
+    };
+    $("#confirmDialogOk").onclick = () => close(true);
+    $("#confirmDialogCancelBtn").onclick = () => close(false);
+    $("#confirmDialogBackdrop").onclick = event => { if (event.target === $("#confirmDialogBackdrop")) close(false); };
+    $("#confirmDialogBackdrop").hidden = false;
+    okButton.focus();
+  });
+}
+
 function roster() { return documentState?.state?.roster || []; }
 function raids() { return documentState?.catalog?.raids || []; }
 function selectedRaid() { return raids().find(row => row.key === $("#dayRaid").value) || raids()[0]; }
@@ -441,7 +472,7 @@ function applySelectColor(select) {
   select.style.color = playerColor(select.value);
 }
 
-function confirmReBlackmark(playerId, dateValue, raidKey, difficulty) {
+async function confirmReBlackmark(playerId, dateValue, raidKey, difficulty) {
   // 玄学规则：该玩家在这个副本+难度下已有「拉了」的黑本记录，再建黑本时抛出提醒
   if (!playerId) return true;
   const prior = blackmarks().filter(row =>
@@ -451,7 +482,12 @@ function confirmReBlackmark(playerId, dateValue, raidKey, difficulty) {
   if (!prior.length) return true;
   const lines = prior.map(row =>
     `${playerNick(playerId)}于${row.date}让${DIFFICULTY_NAMES[difficulty]}难度的${raidName(raidKey)}掉落拉了库里，备注为${row.notes ? row.notes : "无"}，确定还要让他黑本🐎？`);
-  return confirm(lines.join("\n\n"));
+  return confirmDialog({
+    title: "⚠ 再黑本提醒",
+    message: lines.join("\n\n"),
+    confirmText: "仍然保存",
+    danger: true,
+  });
 }
 
 async function saveBlackmark() {
@@ -479,7 +515,7 @@ async function saveBlackmark() {
 
 async function deleteBlackmark(id) {
   if (!canModify()) return;
-  if (!confirm("确定删除这条黑本标记吗？")) return;
+  if (!(await confirmDialog({ title: "删除黑本标记", message: "确定删除这条黑本标记吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
   try {
     await api(`/api/loot/blackmarks/${encodeURIComponent(id)}`, { method: "DELETE" });
     notify("黑本标记已删除。");
@@ -542,7 +578,7 @@ function renderBlackHistory() {
     </article>`;
   }).join("") : "还没有任何黑本记录";
   list.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", async () => {
-    if (!confirm("确定删除这条黑本标记吗？")) return;
+    if (!(await confirmDialog({ title: "删除黑本标记", message: "确定删除这条黑本标记吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
     try {
       await api(`/api/loot/blackmarks/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
       notify("黑本标记已删除。");
@@ -554,7 +590,7 @@ function renderBlackHistory() {
   }));
 }
 
-function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "", raidKey = "") {
+async function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "", raidKey = "") {
   // 玄学规则：该玩家在相同副本+相同难度下被判过「黑」，再想黑本时抛出提示
   const sameDifficultyMarks = blackmarks().filter(row =>
     row.playerId === playerId && row.date < dateValue
@@ -563,7 +599,12 @@ function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "", raidK
     && markVerdict(row) === "black");
   if (!sameDifficultyMarks.length) return true;
   const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}】且判定为「拉了」${row.notes ? `，备注：${row.notes}` : ""}`);
-  return confirm(`⚠ 该玩家此前在${raidKey ? raidName(raidKey) : "相同副本"}·${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同难度"}下黑本时掉落「拉了」：\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`);
+  return confirmDialog({
+    title: "⚠ 该玩家此前黑本掉落「拉了」",
+    message: `${raidKey ? raidName(raidKey) : "相同副本"}·${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同难度"}\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`,
+    confirmText: "仍然分配",
+    danger: true,
+  });
 }
 
 function allocationPayload() {
@@ -598,7 +639,12 @@ async function addAllocation() {
   } catch (error) {
     if (!error.requiresConfirmation) return notify(error.message, true);
     const warningText = (error.warnings || []).map(value => `• ${value}`).join("\n");
-    if (!confirm(`${warningText}\n\n这是提醒而不是拦截。仍然创建这条分配记录吗？`)) return;
+    if (!(await confirmDialog({
+      title: "分配提醒",
+      message: `${warningText}\n\n这是提醒而不是拦截。仍然创建这条分配记录吗？`,
+      confirmText: "仍然创建",
+      danger: true,
+    }))) return;
     payload.confirmOverride = true;
     try {
       await api("/api/loot/allocations", { method: "POST", body: JSON.stringify(payload) });
@@ -611,7 +657,8 @@ async function addAllocation() {
 }
 
 async function deleteAllocation(id) {
-  if (!canModify() || !confirm("确定删除这条分配记录吗？")) return;
+  if (!canModify()) return;
+  if (!(await confirmDialog({ title: "删除分配记录", message: "确定删除这条分配记录吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
   try {
     await api(`/api/loot/allocations/${encodeURIComponent(id)}`, { method: "DELETE" });
     notify("分配记录已删除。");

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>开荒 Loot 记录</title>
-  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=11">
+  <link rel="stylesheet" href="/frontend/tools/raid-loot/styles.css?v=12">
   <script>
     const whTooltips = {
       colorLinks: false,
@@ -167,6 +167,17 @@
     </section>
   </div>
 
-  <script src="/frontend/tools/raid-loot/app.js?v=15"></script>
+  <div id="confirmDialogBackdrop" class="modal-backdrop" hidden>
+    <section class="modal confirm-dialog-modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+      <div class="drawer-heading">
+        <div><h2 id="confirmDialogTitle">请确认</h2></div>
+        <span aria-hidden="true"></span>
+      </div>
+      <div id="confirmDialogBody" class="confirm-dialog-body"></div>
+      <div class="modal-actions"><button id="confirmDialogCancelBtn" class="button secondary compact-button">取消</button><button id="confirmDialogOk" class="button primary compact-button danger">确定</button></div>
+    </section>
+  </div>
+
+  <script src="/frontend/tools/raid-loot/app.js?v=16"></script>
 <script src="/frontend/core/home-button.js?v=1"></script></body>
 </html>
