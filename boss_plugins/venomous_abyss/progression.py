@@ -60,7 +60,14 @@ CROSSWIND_LAUNCH_DEBUFF_ID = 1285447
 CROSSWIND_ROUND_WINDOW_MS = 1_200
 CROSSWIND_COLLISION_WINDOW_MS = 120
 CROSSWIND_DAMAGE_IDS = {1285616, 1312219}
-CYST_WIND_EXCLUSION_MS = 1_100
+# 囊肿激活前后的位移排除窗（非对称）：风在撞囊瞬间结束，爆炸击飞在激活后发生，
+# 实测爆炸持续 0.3-1.9s。对称窗会吞掉撞囊前的真实风尾，又把反向击飞尾巴漏在窗外，
+# 导致整段风被判反（2026-08-24 斯索拉克 kill 战 #1 掘地第三棒风）。
+CYST_WIND_EXCLUDE_BEFORE_MS = 300
+CYST_WIND_EXCLUDE_AFTER_MS = 2_500
+# 回放窗口在 25s 掘地固守之外延到本轮最后一个囊肿被撞后 2s——第四个囊肿常在
+# 掘地结束后才被撞（如 +29.5s），击飞后的场地情况需要在推演里可见。
+REPLAY_TAIL_AFTER_CYST_MS = 2_000
 # WCL 战斗事件的 Y 坐标比回放地图显示坐标高 50 码。Boss 出生点在两套坐标中分别为
 # 约 (-406.52, 388.43) 与 (-406.52, 338.43)。后端统一转成 WCL 地图坐标再输出。
 SSZORAK_WCL_MAP_Y_OFFSET = -5_000
@@ -598,7 +605,11 @@ def _infer_wind_from_frames(frames, arena, excluded_timestamps=None):
     direction_steps = defaultdict(list)
     for index in range(1, len(frames)):
         prev, curr = frames[index - 1], frames[index]
-        if any(abs(curr["timeMs"] - timestamp) <= CYST_WIND_EXCLUSION_MS for timestamp in excluded_timestamps):
+        if any(
+            timestamp - CYST_WIND_EXCLUDE_BEFORE_MS
+            <= curr["timeMs"] <= timestamp + CYST_WIND_EXCLUDE_AFTER_MS
+            for timestamp in excluded_timestamps
+        ):
             continue
         step_vectors = []
         for left, right in zip(prev["players"], curr["players"]):
@@ -622,8 +633,9 @@ def _infer_wind_from_frames(frames, arena, excluded_timestamps=None):
             step_votes.items(),
             key=lambda item: (len(item[1]), sum(math.hypot(row[0], row[1]) for row in item[1])),
         )
-        # 只有同一帧至少两名玩家同向移动，或该方向占本帧多数时，才作为持续风证据。
-        if len(selected) >= 2 or len(selected) / len(step_vectors) >= .6:
+        # 只有同一帧至少两名玩家同向移动，或该方向占本帧多数（且本帧不止一人移动）时，
+        # 才作为持续风证据——单人移动多为闪现贴囊或走位，不足以判定团风。
+        if len(selected) >= 2 or (len(step_vectors) >= 2 and len(selected) / len(step_vectors) >= .6):
             direction_steps[source_key].append({
                 "timeMs": curr["timeMs"], "selected": selected,
                 "allCount": len(step_vectors),
@@ -1371,12 +1383,33 @@ def analyze_sszorak(fight, actor_map, players, raw):
         for slot, row in enumerate(placements, start=1):
             row["slot"] = slot
 
-        end = timestamp + DIG_DURATION_MS
+        wind_end = timestamp + DIG_DURATION_MS
+        # 回放窗口延到本轮最后一个囊肿被撞后 2 秒（第四个囊肿常在掘地结束后才被撞），
+        # 但不越过下一轮掘地或战斗结束；风向推断仍只用 25s 掘地固守窗口内的帧。
+        round_placement_keys = {row["placementKey"] for row in placements}
+        round_activation_abs = [
+            fight["startTime"] + row["activatedAtMs"]
+            for row in all_cysts
+            if row.get("activatedAtMs") is not None
+            and row["placementKey"] in round_placement_keys
+        ]
+        replay_end = max(wind_end, max(round_activation_abs, default=wind_end) + REPLAY_TAIL_AFTER_CYST_MS)
+        if index + 1 < len(digs):
+            replay_end = min(replay_end, int(digs[index + 1]["timestamp"]))
+        replay_end = min(replay_end, int(fight["endTime"]))
+        wind_frames = _player_positions_over_window(
+            position_index,
+            players,
+            timestamp,
+            wind_end,
+            step_ms=REPLAY_STEP_MS,
+            death_times=death_times,
+        )
         frames = _player_positions_over_window(
             position_index,
             players,
             timestamp,
-            end,
+            replay_end,
             step_ms=REPLAY_STEP_MS,
             death_times=death_times,
         )
@@ -1387,10 +1420,10 @@ def analyze_sszorak(fight, actor_map, players, raw):
             }
             for row in all_cysts
             if row.get("activatedAtMs") is not None
-            and timestamp <= fight["startTime"] + row["activatedAtMs"] <= end
+            and timestamp <= fight["startTime"] + row["activatedAtMs"] <= wind_end
         ]
         winds = _infer_dig_winds(
-            frames, arena, segment_count=3, activation_rows=activation_rows,
+            wind_frames, arena, segment_count=3, activation_rows=activation_rows,
         )
         validated = _placement_slot_validation(placements, winds)
         cyst_rounds.append({
@@ -1404,6 +1437,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
             "timeMs": timestamp - fight["startTime"],
             "time": fmt_ms(timestamp - fight["startTime"]),
             "durationSec": DIG_DURATION_MS / 1000,
+            "windowSec": round((replay_end - timestamp) / 1000, 1),
             "placements": validated,
             "winds": winds,
             "windsComplete": len([wind for wind in winds if wind]) >= 3,
@@ -1467,7 +1501,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
             "frameStepMs": REPLAY_STEP_MS,
             "rounds": replay_rounds,
             "crosswindWaves": crosswind_waves,
-            "evidenceNote": "使用校正后的 RaidPlan 原图；WCL 轨迹旋转 60° 后映射到六个风口、三条对穿轴（12 点与 6 点是入口）；25 秒内按 200ms 插值采样；玩家死亡后停止位置预估；囊肿按光环、伤害、受迫位移和最近存活玩家证据激活后隐藏。",
+            "evidenceNote": "使用校正后的 RaidPlan 原图；WCL 轨迹旋转 60° 后映射到六个风口、三条对穿轴（12 点与 6 点是入口）；掘地固守 25 秒内按 200ms 插值采样，回放窗口延至本轮最后一个囊肿被撞后 2 秒；玩家死亡后停止位置预估；囊肿按光环、伤害、受迫位移和最近存活玩家证据激活后隐藏。",
         },
         "fallDeaths": fall_deaths,
     }

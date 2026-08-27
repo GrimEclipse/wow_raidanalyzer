@@ -232,12 +232,22 @@ def test_sszorak_dig_wind_uses_six_sources_across_three_lines():
     arena = {"centerX": 0, "centerY": 0, "radius": 6200}
     for source_key, expected in DIG_WIND_DIRECTIONS.items():
         angle = math.radians(expected["wclAngleDegrees"])
+        # 风证据要求同一帧至少两名玩家同向移动（单人移动多为闪现贴囊/走位）。
         frames = [
-            {"timeMs": 0, "players": [{"position": {"x": 0, "y": 0}}]},
-            {"timeMs": 200, "players": [{"position": {
-                "x": math.cos(angle) * 1000,
-                "y": -math.sin(angle) * 1000,
-            }}]},
+            {"timeMs": 0, "players": [
+                {"position": {"x": 0, "y": 0}},
+                {"position": {"x": 500, "y": 0}},
+            ]},
+            {"timeMs": 200, "players": [
+                {"position": {
+                    "x": math.cos(angle) * 1000,
+                    "y": -math.sin(angle) * 1000,
+                }},
+                {"position": {
+                    "x": 500 + math.cos(angle) * 1000,
+                    "y": -math.sin(angle) * 1000,
+                }},
+            ]},
         ]
         result = _infer_wind_from_frames(frames, arena)
         assert result["sourceKey"] == source_key
@@ -357,3 +367,56 @@ def test_infer_dig_winds_prefers_movement_and_never_uses_cyst_activation_as_dire
         "player": "错误放置",
     }])
     assert blocked[0] is None
+
+
+def test_sszorak_cyst_activation_window_is_asymmetric_and_solo_move_is_not_wind():
+    """2026-08-24 斯索拉克 kill 战 #1 掘地第三棒风回归：团风在撞囊瞬间结束、
+    囊肿爆炸在激活后反向击飞。对称 ±1.1s 排除窗会把真实风尾吞掉、把反向击飞
+    尾巴漏在窗外，整段风被判反。
+    验证：① 激活前 300ms / 激活后 2500ms 的非对称排除——风（激活前）仍算证据、
+    爆炸（激活后）全部排除；② 单人移动帧不再单独构成风证据（闪现贴囊不带偏）。"""
+    from boss_plugins.venomous_abyss import progression as P
+
+    arena = {"centerX": 0, "centerY": 0, "radius": 6200}
+    wind_angle = math.radians(P.DIG_WIND_DIRECTIONS["circle"]["wclAngleDegrees"])
+    # 团风：3 名玩家同向持续移动 0-1800ms（末帧距激活 100ms，须仍算风证据）。
+    frames = []
+    for i in range(10):
+        t = 200 * i
+        frames.append({"timeMs": t, "players": [
+            {"position": {"x": math.cos(wind_angle) * (1000 * j + 2000 * i),
+                          "y": -math.sin(wind_angle) * (1000 * j + 2000 * i)}}
+            for j in range(3)
+        ]})
+    # 囊肿激活 1900ms；爆炸反向击飞 2000-3000ms（全部落在激活后 2500ms 排除窗内）。
+    activation = 1900
+    back_angle = math.radians(P.DIG_WIND_DIRECTIONS["square"]["wclAngleDegrees"])
+    base = [(math.cos(wind_angle) * (1000 * j + 18000),
+             -math.sin(wind_angle) * (1000 * j + 18000)) for j in range(3)]
+    for k in range(6):
+        t = 2000 + 200 * k
+        frames.append({"timeMs": t, "players": [
+            {"position": {"x": base[j][0] + math.cos(back_angle) * 1000 * (k + 1),
+                          "y": base[j][1] - math.sin(back_angle) * 1000 * (k + 1)}}
+            for j in range(3)
+        ]})
+
+    wind = P._infer_wind_from_frames(frames, arena, excluded_timestamps=[activation])
+    assert wind is not None
+    assert wind["sourceKey"] == "circle"
+    assert wind["targetKey"] == "square"
+    assert wind["sustainedFrameCount"] == 7
+
+    # 单人移动帧：只有一名玩家大幅移动时不得单独构成风证据。
+    solo = [
+        {"timeMs": 0, "players": [
+            {"position": {"x": 0, "y": 0}},
+            {"position": {"x": 100, "y": 0}},
+        ]},
+        {"timeMs": 200, "players": [
+            {"position": {"x": math.cos(wind_angle) * 2000,
+                          "y": -math.sin(wind_angle) * 2000}},
+            {"position": {"x": 120, "y": 0}},
+        ]},
+    ]
+    assert P._infer_wind_from_frames(solo, arena) is None
