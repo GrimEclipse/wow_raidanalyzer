@@ -139,6 +139,16 @@ def test_twinfangs_tracks_stack_changes_and_explosion_nonparticipants():
     assert round_row["exploded"] is True
     assert [row["playerID"] for row in round_row["nonParticipants"]] == [2]
 
+    # 每轮吃球：甲吃 1 个（正常份额），乙在场但 0 个（没吃）
+    assert round_row["teamSize"] == 2
+    assert round_row["aliveCount"] == 2
+    assert round_row["ballCount"] == 1
+    assert [(row["playerID"], row["count"]) for row in round_row["eaten"]] == [(1, 1)]
+    assert [row["playerID"] for row in round_row["missed"]] == [2]
+    assert round_row["abnormal"] == []
+    # 该合成数据里两次叠层来源都是正常/未匹配，异常叠层记录应为空
+    assert result["eternalVenom"]["abnormalGains"] == []
+
 
 def test_sszorak_tracks_cyst_placement_consumption_and_crosswind_wave():
     fight = {"startTime": 0, "endTime": 200_000}
@@ -420,3 +430,41 @@ def test_sszorak_cyst_activation_window_is_asymmetric_and_solo_move_is_not_wind(
         ]},
     ]
     assert P._infer_wind_from_frames(solo, arena) is None
+
+
+def test_twinfangs_globule_rounds_track_eaten_counts_missed_and_abnormal_gains():
+    fight = {"startTime": 0, "endTime": 30_000}
+    players = {1: player(1, "甲"), 2: player(2, "乙"), 3: player(3, "丙")}
+    raw = {
+        "debuffs": [
+            event(6100, 1290336, "applydebuff", targetID=1, sourceID=50, stack=1),
+            event(8000, 1290336, "applydebuffstack", targetID=3, sourceID=50, stack=2),
+        ],
+        "casts": [
+            event(5000, 1289192, "cast", targetID=0),
+            event(25_000, 1291404, "begincast", targetID=0),
+        ],
+        "damage": [
+            # 腐蚀液滴（球）命中：甲×1、乙×2、丙×1
+            event(6000, 1289201, "damage", targetID=1, amount=10),
+            event(6500, 1289201, "damage", targetID=2, amount=10),
+            event(7000, 1289201, "damage", targetID=2, amount=10),
+            event(7500, 1289201, "damage", targetID=3, amount=10),
+            # 腐蚀液滴爆裂直接给丙叠 2 层（异常叠层）
+            event(8100, 1290338, "damage", targetID=3, amount=100),
+        ],
+        "friendlyBuffs": [], "deaths": [],
+    }
+    result = analyze_twinfangs(fight, {1: "甲", 2: "乙", 3: "丙", 50: "Boss"}, players, raw)
+    round_row = result["globules"]["rounds"][0]
+    assert round_row["teamSize"] == 3
+    assert round_row["aliveCount"] == 3
+    assert round_row["ballCount"] == 4
+    assert [(row["playerID"], row["count"]) for row in round_row["eaten"]] == [(2, 2), (1, 1), (3, 1)]
+    assert round_row["missed"] == []
+    assert [(row["playerID"], row["count"]) for row in round_row["abnormal"]] == [(2, 2)]
+    gains = result["eternalVenom"]["abnormalGains"]
+    # 丙的爆裂叠层是异常叠层；甲吃球的正常叠层不在此列
+    assert [(row["playerID"], row["sourceID"]) for row in gains] == [(3, 1290338)]
+    assert gains[0]["delta"] == 2
+    assert gains[0]["toStack"] == 2

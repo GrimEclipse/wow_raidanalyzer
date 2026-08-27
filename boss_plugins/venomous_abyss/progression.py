@@ -1699,13 +1699,33 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                 immunities = active_immunities(buffs, player_id, explosion_ts, 1800)
                 if not immunities:
                     missing.append(player_ref(players, actor_map, player_id))
+        eaten_counts = Counter(event.get("targetID") for event in hits if event.get("targetID") in players)
+        alive = [player_id for player_id in players if death_times[player_id] >= start]
+        eaten_rows = []
+        for player_id in sorted(eaten_counts, key=lambda item: (-eaten_counts[item], item)):
+            count = eaten_counts[player_id]
+            eaten_rows.append({**player_ref(players, actor_map, player_id), "count": count, "abnormal": count > 1})
+        missed_rows = [player_ref(players, actor_map, player_id) for player_id in alive if player_id not in eaten_counts]
         globule_rounds.append({"index": index, "timeMs": start - fight["startTime"], "time": fmt_ms(start - fight["startTime"]),
                                "endTime": fmt_ms(end - fight["startTime"]), "participantCount": len(participants),
                                "participants": [player_ref(players, actor_map, player_id) for player_id in participants],
                                "hitCount": len(hits), "exploded": bool(explosions), "explosionTime": fmt_ms(explosion_ts - fight["startTime"]) if explosion_ts else None,
-                               "nonParticipants": missing})
+                               "nonParticipants": missing,
+                               "teamSize": len(players), "aliveCount": len(alive), "ballCount": len(hits),
+                               "eaten": eaten_rows, "missed": missed_rows,
+                               "abnormal": [row for row in eaten_rows if row["abnormal"]]})
+    abnormal_gains = []
+    for history in histories:
+        for row in history["events"]:
+            if row.get("category") == "abnormal" and row.get("delta", 0) > 0:
+                abnormal_gains.append({
+                    "playerID": history["playerID"], "player": history["player"],
+                    "classColor": history.get("classColor"), "icon": history.get("icon"), "role": history.get("role"),
+                    "timeMs": row["timeMs"], "time": row["time"], "delta": row["delta"], "toStack": row["toStack"],
+                    "source": row["source"], "sourceID": row["sourceID"],
+                })
     return {
-        "eternalVenom": {"players": histories, "feastChecks": feast_checks},
+        "eternalVenom": {"players": histories, "feastChecks": feast_checks, "abnormalGains": abnormal_gains},
         "globules": {"rounds": globule_rounds},
         "mythicPlaceholder": "该部分暂时没有可用的信息。",
     }
@@ -1799,7 +1819,7 @@ def build_aggregated_json(boss_key, report_ids, options=None):
     return {
         "code": 200,
         "meta": {"version": "12.1", "raidKey": "venomous_abyss", "raidName": "烈毒之渊", "bossKey": boss_key,
-                 "bossName": config["name"], "analyzedReports": report_id_list, "mechanicVersion": f"{boss_key}-progression-2026-08-27",
+                 "bossName": config["name"], "analyzedReports": report_id_list, "mechanicVersion": f"{boss_key}-progression-2026-08-27b",
                  "tabDefinitions": [{"key": key, "label": label} for key, label in config["tabs"]],
                  "arenaImage": config["arena"], "features": {"survival": True, "fieldReplay": boss_key == "sszorak"},
                  "evidenceLimits": {"positions": "仅使用 WCL 实际坐标样本；超过采样窗只展示，不归责。"}},
