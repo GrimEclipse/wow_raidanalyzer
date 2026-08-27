@@ -20,13 +20,14 @@
         <a class="button" href="/">首页</a>
         <a id="overviewLink" class="button" href="/report">返回概览</a>
         <a id="wclLink" class="button" target="_blank" rel="noreferrer">WCL</a>
+        <select id="pullSelect" aria-label="选择战斗"></select>
         <label class="button">导入 JSON<input id="fileInput" type="file" accept=".json" hidden></label>
       </div>
     </header>
     <section id="stats" class="stats panel"></section>
     <nav id="tabs" class="page-tabs panel">
       <button data-tab="survival" class="active">全场存活情况</button>
-      <button data-tab="phase">转阶段 / 螺旋毒素</button>
+      <button data-tab="helical">转阶段 / 螺旋毒素</button>
       <button data-tab="marks">酸液 / 鲜血印记</button>
       <button data-tab="field">分摊与放水</button>
       <button data-tab="avoidable">活体毒液 / 绿球</button>

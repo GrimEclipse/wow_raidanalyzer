@@ -4,7 +4,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const num=v=>Number(v||0).toLocaleString("zh-CN");
 const row=()=>state.selected==null?null:state.pulls[state.selected];
 function playerCell(ref){return`<span style="color:${ref?.classColor||'#fff'}">${esc(ref?.player||ref?.name||'—')}</span>`}
-function spellLink(id,name){return id?`<a href="https://www.wowhead.com/spell=${id}" data-wowhead="spell=${id}">${esc(name||id)}</a>`:esc(name||'—')}
+function spellLink(id,name){return id?`<a href="https://www.wowhead.com/cn/spell=${id}" data-wowhead="domain=cn&amp;spell=${id}" target="_blank" rel="noreferrer">${esc(name||'未知技能')}</a>`:esc(name||'—')}
 function phaseKey(r){if(r.isKill)return"击杀";return({P1:"P1 · 灵魂之井","苏醒仪式":"P1.5 · 苏醒仪式",P2:"P2 · 火焰刑场",狂暴:"狂暴 · 解缚之怒"}[r.wipePhase]||r.wipePhase||"未分类")}
 const phaseOrder=["击杀","P1 · 灵魂之井","P1.5 · 苏醒仪式","P2 · 火焰刑场","狂暴 · 解缚之怒","未分类"];
 function phaseColor(r){return r.isKill?"#55dd8a":r.wipePhase?.includes("狂暴")?"#ff6578":r.wipePhase?.includes("P2")?"#a98bff":r.wipePhase?.includes("仪式")?"#e6a244":"#339ddb"}

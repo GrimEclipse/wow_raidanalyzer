@@ -1,0 +1,44 @@
+[
+  {
+    "boss": "nakzali",
+    "report": "HchJ8Ktmz7DTYrG2",
+    "file": "wcl_HchJ8Ktmz7DTYrG2_nakzali_all.json",
+    "status": "ok",
+    "pulls": 2
+  },
+  {
+    "boss": "sentinels",
+    "report": "HchJ8Ktmz7DTYrG2",
+    "file": "wcl_HchJ8Ktmz7DTYrG2_sentinels_all.json",
+    "status": "ok",
+    "pulls": 9
+  },
+  {
+    "boss": "lostexplorers",
+    "report": "ZTcf3gMPmnBFVtvx",
+    "file": "wcl_ZTcf3gMPmnBFVtvx_lostexplorers_all.json",
+    "status": "ok",
+    "pulls": 4
+  },
+  {
+    "boss": "vashnik",
+    "report": "ZTcf3gMPmnBFVtvx",
+    "file": "wcl_ZTcf3gMPmnBFVtvx_vashnik_all.json",
+    "status": "ok",
+    "pulls": 1
+  },
+  {
+    "boss": "sszorak",
+    "report": "ZTcf3gMPmnBFVtvx",
+    "file": "wcl_ZTcf3gMPmnBFVtvx_sszorak_all.json",
+    "status": "ok",
+    "pulls": 8
+  },
+  {
+    "boss": "twinfangs",
+    "report": "ZTcf3gMPmnBFVtvx",
+    "file": "wcl_ZTcf3gMPmnBFVtvx_twinfangs_all.json",
+    "status": "ok",
+    "pulls": 5
+  }
+]

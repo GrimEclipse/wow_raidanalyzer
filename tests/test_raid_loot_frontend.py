@@ -16,7 +16,8 @@ class RaidLootFrontendTests(unittest.TestCase):
     def test_allocation_item_links_enable_dynamic_wowhead_tooltips(self):
         page = (LOOT_FRONTEND / "index.html").read_text(encoding="utf-8")
         app = (LOOT_FRONTEND / "app.js").read_text(encoding="utf-8")
-        self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
+        self.assertIn('/assets/vendor/wow-tooltips.js?v=3', page)
+        self.assertNotIn("https://wow.zamimg.com/js/tooltips.js", page)
         self.assertIn("iconizeLinks: false", page)
         self.assertIn('data-wowhead="domain=cn"', app)
         self.assertIn("function refreshWowheadTooltips()", app)

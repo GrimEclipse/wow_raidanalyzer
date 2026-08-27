@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import threading
 import webbrowser
 from http import HTTPStatus
@@ -93,6 +94,19 @@ class OfflineHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
+        tooltip_match = re.fullmatch(r"/wowhead-tooltip/tooltip/spell/(\d+)", parsed.path)
+        if tooltip_match:
+            from boss_plugins.venomous_abyss.shared import local_spell_tooltip
+
+            body = json.dumps(
+                local_spell_tooltip(int(tooltip_match.group(1))), ensure_ascii=False,
+            ).encode("utf-8")
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if parsed.path == "/api/raid-cooldowns/options":
             from analyzer_core.raid_cooldowns import options_document
 

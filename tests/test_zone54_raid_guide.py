@@ -171,7 +171,8 @@ class Zone54RaidGuideTests(unittest.TestCase):
 
     def test_static_page_uses_chinese_tooltips_and_generated_payload(self):
         page = (ROOT / "frontend" / "tools" / "raid-guide" / "index.html").read_text(encoding="utf-8")
-        self.assertIn("https://wow.zamimg.com/js/tooltips.js", page)
+        self.assertIn('assets/vendor/wow-tooltips.js?v=3', page)
+        self.assertNotIn("https://wow.zamimg.com/js/tooltips.js", page)
         self.assertIn("data-wowhead=\"domain=cn&amp;dd=15\"", page)
         self.assertIn('data-wh-rename-link="true"', page)
         self.assertIn("https://www.wowhead.com/cn/spell=${spellID}", page)

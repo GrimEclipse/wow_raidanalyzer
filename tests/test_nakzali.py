@@ -89,7 +89,7 @@ def test_corpse_wither_is_not_classified_as_avoidable_damage():
     ]
     result = analyze_avoidable(fight, {7: "测试玩家"}, {7: "Player"}, damage, [])
     assert "1307939" not in result
-    assert result["1288554"][0]["spellName"] == "移动黑圈"
+    assert result["1288554"][0]["spellName"] == "潜藏的教徒"
 
 
 def test_player_catalog_only_contains_current_fight_combatants():

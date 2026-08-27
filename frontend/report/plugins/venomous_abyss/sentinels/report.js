@@ -179,7 +179,7 @@ async function loadPath(path) {
   load(await window.MythicReportRuntime.loadPayload(path));
 }
 
-$("pullSelect").onchange = event => enterPull(Number(event.target.value));
+$("pullSelect")?.addEventListener("change", event => enterPull(Number(event.target.value)));
 $("fileInput").onchange = async event => { try { load(JSON.parse(await event.target.files[0].text())); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
 document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => { state.tab = button.dataset.tab; render(); });
 const path = new URLSearchParams(location.search).get("json");

@@ -301,6 +301,14 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "registrationRequiresInvite": bool(INVITE_CODE),
             }))
 
+        tooltip_match = re.fullmatch(r"/wowhead-tooltip/tooltip/spell/(\d+)", path)
+        if tooltip_match:
+            from boss_plugins.venomous_abyss.shared import local_spell_tooltip
+
+            return self.send_response_body(*json_bytes(
+                local_spell_tooltip(int(tooltip_match.group(1)))
+            ))
+
         user = self.require_user(path)
         if not user:
             return None

@@ -9,7 +9,7 @@
     "analyzedReports": [
       "ZTcf3gMPmnBFVtvx"
     ],
-    "mechanicVersion": "lostexplorers-progression-2026-08-26",
+    "mechanicVersion": "lostexplorers-progression-2026-08-27",
     "tabDefinitions": [
       {
         "key": "survival",
@@ -36,26 +36,14 @@
     "evidenceLimits": {
       "positions": "仅使用 WCL 实际坐标样本；超过采样窗只展示，不归责。"
     },
-    "analysisIdentity": {
-      "version": "12.1",
-      "raidKey": "venomous_abyss",
-      "bossKey": "lostexplorers",
-      "reports": [
-        "ZTcf3gMPmnBFVtvx"
-      ],
-      "date": "2026-08-25",
-      "key": "12.1/venomous_abyss/lostexplorers/9ed091cc8772a625"
-    },
-    "analysisId": "12.1/venomous_abyss/lostexplorers/9ed091cc8772a625",
-    "capabilitySchemaVersion": 1,
     "capabilities": {
       "wipe": {
         "enabled": true,
-        "renderer": "generic-wipe"
+        "renderer": "venomous-progression"
       },
       "avoidable": {
         "enabled": true,
-        "renderer": "generic-avoidable"
+        "renderer": "venomous-progression"
       },
       "interrupts": {
         "enabled": false,
@@ -75,9 +63,21 @@
       },
       "replay": {
         "enabled": false,
-        "renderer": "field-audit"
+        "renderer": "venomous-progression"
       }
     },
+    "analysisIdentity": {
+      "version": "12.1",
+      "raidKey": "venomous_abyss",
+      "bossKey": "lostexplorers",
+      "reports": [
+        "ZTcf3gMPmnBFVtvx"
+      ],
+      "date": "2026-08-25",
+      "key": "12.1/venomous_abyss/lostexplorers/9ed091cc8772a625"
+    },
+    "analysisId": "12.1/venomous_abyss/lostexplorers/9ed091cc8772a625",
+    "capabilitySchemaVersion": 1,
     "mistakeTracker": {
       "schemaVersion": 1,
       "enabled": false,
@@ -1320,63 +1320,33 @@
           "unitedDefense": [
             {
               "index": 1,
-              "timeMs": 46782,
-              "time": "00:46.8",
-              "endTimeMs": 48068,
-              "endTime": "00:48.1",
-              "durationSec": 1.3,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 2,
               "timeMs": 46762,
               "time": "00:46.8",
               "endTimeMs": 48085,
               "endTime": "00:48.1",
               "durationSec": 1.3,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 3,
-              "timeMs": 46807,
-              "time": "00:46.8",
-              "endTimeMs": 48085,
-              "endTime": "00:48.1",
-              "durationSec": 1.3,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 4,
+              "index": 2,
               "timeMs": 78629,
               "time": "01:18.6",
               "endTimeMs": null,
               "endTime": "战斗结束仍未结束",
               "durationSec": 1.6,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 5,
-              "timeMs": 78629,
-              "time": "01:18.6",
-              "endTimeMs": null,
-              "endTime": "战斗结束仍未结束",
-              "durationSec": 1.6,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 6,
-              "timeMs": 78774,
-              "time": "01:18.8",
-              "endTimeMs": null,
-              "endTime": "战斗结束仍未结束",
-              "durationSec": 1.4,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             }
           ],
           "avoidable": {
@@ -2422,8 +2392,8 @@
               "time": "02:18.5",
               "absoluteTime": 445738,
               "abilityID": 3,
-              "ability": "技能 3",
-              "abilityLabel": "技能 3",
+              "ability": "法术 3",
+              "abilityLabel": "法术 3",
               "deathCause": "ability"
             },
             {
@@ -2665,8 +2635,8 @@
             "time": "02:18.5",
             "absoluteTime": 445738,
             "abilityID": 3,
-            "ability": "技能 3",
-            "abilityLabel": "技能 3",
+            "ability": "法术 3",
+            "abilityLabel": "法术 3",
             "deathCause": "ability"
           },
           {
@@ -2779,83 +2749,33 @@
           "unitedDefense": [
             {
               "index": 1,
-              "timeMs": 41049,
-              "time": "00:41.0",
-              "endTimeMs": 44167,
-              "endTime": "00:44.2",
-              "durationSec": 3.1,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 2,
-              "timeMs": 41022,
-              "time": "00:41.0",
-              "endTimeMs": 44178,
-              "endTime": "00:44.2",
-              "durationSec": 3.2,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 3,
               "timeMs": 41005,
               "time": "00:41.0",
               "endTimeMs": 44178,
               "endTime": "00:44.2",
               "durationSec": 3.2,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 4,
+              "index": 2,
               "timeMs": 47557,
               "time": "00:47.6",
-              "endTimeMs": 47602,
-              "endTime": "00:47.6",
-              "durationSec": 0.0,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 5,
-              "timeMs": 47575,
-              "time": "00:47.6",
-              "endTimeMs": 47602,
-              "endTime": "00:47.6",
-              "durationSec": 0.0,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 6,
-              "timeMs": 47721,
-              "time": "00:47.7",
-              "endTimeMs": 48057,
-              "endTime": "00:48.1",
-              "durationSec": 0.3,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 7,
-              "timeMs": 47708,
-              "time": "00:47.7",
               "endTimeMs": 48058,
               "endTime": "00:48.1",
-              "durationSec": 0.3,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 8,
-              "timeMs": 47732,
-              "time": "00:47.7",
-              "endTimeMs": 48058,
-              "endTime": "00:48.1",
-              "durationSec": 0.3,
-              "bossID": 35,
-              "bossName": "商人盖博"
+              "durationSec": 0.5,
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             }
           ],
           "avoidable": {
@@ -4028,8 +3948,8 @@
               "time": "01:22.6",
               "absoluteTime": 607520,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4043,8 +3963,8 @@
               "time": "01:23.6",
               "absoluteTime": 608536,
               "abilityID": 1310662,
-              "ability": "技能 1310662",
-              "abilityLabel": "技能 1310662",
+              "ability": "法术 1310662",
+              "abilityLabel": "法术 1310662",
               "deathCause": "ability"
             },
             {
@@ -4103,8 +4023,8 @@
               "time": "01:26.7",
               "absoluteTime": 611622,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4118,8 +4038,8 @@
               "time": "01:26.7",
               "absoluteTime": 611623,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4133,8 +4053,8 @@
               "time": "01:26.7",
               "absoluteTime": 611623,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4148,8 +4068,8 @@
               "time": "01:26.7",
               "absoluteTime": 611624,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4163,8 +4083,8 @@
               "time": "01:26.7",
               "absoluteTime": 611624,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4178,8 +4098,8 @@
               "time": "01:26.7",
               "absoluteTime": 611625,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4193,8 +4113,8 @@
               "time": "01:26.7",
               "absoluteTime": 611625,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4208,8 +4128,8 @@
               "time": "01:26.7",
               "absoluteTime": 611626,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4223,8 +4143,8 @@
               "time": "01:26.7",
               "absoluteTime": 611627,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4238,8 +4158,8 @@
               "time": "01:26.7",
               "absoluteTime": 611627,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4253,8 +4173,8 @@
               "time": "01:32.0",
               "absoluteTime": 616954,
               "abilityID": 1310616,
-              "ability": "技能 1310616",
-              "abilityLabel": "技能 1310616",
+              "ability": "法术 1310616",
+              "abilityLabel": "法术 1310616",
               "deathCause": "ability"
             },
             {
@@ -4268,8 +4188,8 @@
               "time": "01:34.4",
               "absoluteTime": 619299,
               "abilityID": 1309786,
-              "ability": "技能 1309786",
-              "abilityLabel": "技能 1309786",
+              "ability": "法术 1309786",
+              "abilityLabel": "法术 1309786",
               "deathCause": "ability"
             },
             {
@@ -4283,8 +4203,8 @@
               "time": "01:36.8",
               "absoluteTime": 621695,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4298,8 +4218,8 @@
               "time": "01:36.8",
               "absoluteTime": 621696,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4313,8 +4233,8 @@
               "time": "01:36.8",
               "absoluteTime": 621696,
               "abilityID": 1310027,
-              "ability": "技能 1310027",
-              "abilityLabel": "技能 1310027",
+              "ability": "法术 1310027",
+              "abilityLabel": "法术 1310027",
               "deathCause": "ability"
             },
             {
@@ -4358,8 +4278,8 @@
               "time": "01:38.1",
               "absoluteTime": 623013,
               "abilityID": 3,
-              "ability": "技能 3",
-              "abilityLabel": "技能 3",
+              "ability": "法术 3",
+              "abilityLabel": "法术 3",
               "deathCause": "ability"
             },
             {
@@ -4373,8 +4293,8 @@
               "time": "01:43.4",
               "absoluteTime": 628347,
               "abilityID": 1308853,
-              "ability": "技能 1308853",
-              "abilityLabel": "技能 1308853",
+              "ability": "法术 1308853",
+              "abilityLabel": "法术 1308853",
               "deathCause": "ability"
             }
           ]
@@ -4391,8 +4311,8 @@
             "time": "01:22.6",
             "absoluteTime": 607520,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4406,8 +4326,8 @@
             "time": "01:23.6",
             "absoluteTime": 608536,
             "abilityID": 1310662,
-            "ability": "技能 1310662",
-            "abilityLabel": "技能 1310662",
+            "ability": "法术 1310662",
+            "abilityLabel": "法术 1310662",
             "deathCause": "ability"
           },
           {
@@ -4466,8 +4386,8 @@
             "time": "01:26.7",
             "absoluteTime": 611622,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4481,8 +4401,8 @@
             "time": "01:26.7",
             "absoluteTime": 611623,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4496,8 +4416,8 @@
             "time": "01:26.7",
             "absoluteTime": 611623,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4511,8 +4431,8 @@
             "time": "01:26.7",
             "absoluteTime": 611624,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4526,8 +4446,8 @@
             "time": "01:26.7",
             "absoluteTime": 611624,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4541,8 +4461,8 @@
             "time": "01:26.7",
             "absoluteTime": 611625,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4556,8 +4476,8 @@
             "time": "01:26.7",
             "absoluteTime": 611625,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4571,8 +4491,8 @@
             "time": "01:26.7",
             "absoluteTime": 611626,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4586,8 +4506,8 @@
             "time": "01:26.7",
             "absoluteTime": 611627,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4601,8 +4521,8 @@
             "time": "01:26.7",
             "absoluteTime": 611627,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4616,8 +4536,8 @@
             "time": "01:32.0",
             "absoluteTime": 616954,
             "abilityID": 1310616,
-            "ability": "技能 1310616",
-            "abilityLabel": "技能 1310616",
+            "ability": "法术 1310616",
+            "abilityLabel": "法术 1310616",
             "deathCause": "ability"
           },
           {
@@ -4631,8 +4551,8 @@
             "time": "01:34.4",
             "absoluteTime": 619299,
             "abilityID": 1309786,
-            "ability": "技能 1309786",
-            "abilityLabel": "技能 1309786",
+            "ability": "法术 1309786",
+            "abilityLabel": "法术 1309786",
             "deathCause": "ability"
           },
           {
@@ -4646,8 +4566,8 @@
             "time": "01:36.8",
             "absoluteTime": 621695,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4661,8 +4581,8 @@
             "time": "01:36.8",
             "absoluteTime": 621696,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4676,8 +4596,8 @@
             "time": "01:36.8",
             "absoluteTime": 621696,
             "abilityID": 1310027,
-            "ability": "技能 1310027",
-            "abilityLabel": "技能 1310027",
+            "ability": "法术 1310027",
+            "abilityLabel": "法术 1310027",
             "deathCause": "ability"
           },
           {
@@ -4721,8 +4641,8 @@
             "time": "01:38.1",
             "absoluteTime": 623013,
             "abilityID": 3,
-            "ability": "技能 3",
-            "abilityLabel": "技能 3",
+            "ability": "法术 3",
+            "abilityLabel": "法术 3",
             "deathCause": "ability"
           },
           {
@@ -4736,8 +4656,8 @@
             "time": "01:43.4",
             "absoluteTime": 628347,
             "abilityID": 1308853,
-            "ability": "技能 1308853",
-            "abilityLabel": "技能 1308853",
+            "ability": "法术 1308853",
+            "abilityLabel": "法术 1308853",
             "deathCause": "ability"
           }
         ],
@@ -4747,31 +4667,16 @@
               "index": 1,
               "timeMs": 69613,
               "time": "01:09.6",
-              "endTimeMs": 76974,
-              "endTime": "01:17.0",
-              "durationSec": 7.4,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 2,
-              "timeMs": 69627,
-              "time": "01:09.6",
-              "endTimeMs": 76995,
-              "endTime": "01:17.0",
-              "durationSec": 7.4,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 3,
-              "timeMs": 69613,
-              "time": "01:09.6",
               "endTimeMs": 76996,
               "endTime": "01:17.0",
               "durationSec": 7.4,
-              "bossID": 35,
-              "bossName": "商人盖博"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             }
           ],
           "avoidable": {
@@ -4908,9 +4813,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 597984,
+                  "removeTimestamp": 600991,
+                  "removeTime": "01:16.1",
+                  "durationMs": 3007,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:15.9"
                 },
                 {
                   "playerID": 1,
@@ -4920,9 +4832,16 @@
                   "role": "range-healer",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 597984,
+                  "removeTimestamp": 607003,
+                  "removeTime": "01:22.1",
+                  "durationMs": 9019,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:21.8"
                 },
                 {
                   "playerID": 21,
@@ -4932,9 +4851,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 597984,
+                  "removeTimestamp": 607496,
+                  "removeTime": "01:22.6",
+                  "durationMs": 9512,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:22.1"
                 },
                 {
                   "playerID": 10,
@@ -4944,9 +4870,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 597984,
+                  "removeTimestamp": 603992,
+                  "removeTime": "01:19.1",
+                  "durationMs": 6008,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:18.8"
                 },
                 {
                   "playerID": 6,
@@ -4956,9 +4889,16 @@
                   "role": "range-healer",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 597984,
+                  "removeTimestamp": 602493,
+                  "removeTime": "01:17.6",
+                  "durationMs": 4509,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:17.3"
                 },
                 {
                   "playerID": 9,
@@ -4968,9 +4908,16 @@
                   "role": "tank",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 598492,
+                  "removeTimestamp": 610483,
+                  "removeTime": "01:25.6",
+                  "durationMs": 11991,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:25.2"
                 },
                 {
                   "playerID": 7,
@@ -4980,9 +4927,14 @@
                   "role": "melee-healer",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 598492,
+                  "removeTimestamp": 599983,
+                  "removeTime": "01:15.1",
+                  "durationMs": 1491,
                   "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "resolutionReason": "remove-without-opposite-color-window",
+                  "leftPatchRisk": true,
+                  "collisionPartner": null
                 },
                 {
                   "playerID": 19,
@@ -4992,9 +4944,14 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 598493,
+                  "removeTimestamp": 608521,
+                  "removeTime": "01:23.6",
+                  "durationMs": 10028,
                   "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "resolutionReason": "remove-without-opposite-color-window",
+                  "leftPatchRisk": true,
+                  "collisionPartner": null
                 },
                 {
                   "playerID": 22,
@@ -5004,9 +4961,20 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
-                  "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "applyTimestamp": 598493,
+                  "removeTimestamp": 600483,
+                  "removeTime": "01:15.6",
+                  "durationMs": 1990,
+                  "resolution": "correct",
+                  "resolutionReason": "opposite-color-synchronized-remove",
+                  "leftPatchRisk": false,
+                  "collisionPartner": {
+                    "playerID": 91,
+                    "player": "Superhunter",
+                    "classColor": "#AAD372",
+                    "icon": "hunter-marksmanship",
+                    "role": "range-dps"
+                  }
                 },
                 {
                   "playerID": 11,
@@ -5016,9 +4984,20 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
-                  "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "applyTimestamp": 598535,
+                  "removeTimestamp": 601984,
+                  "removeTime": "01:17.1",
+                  "durationMs": 3449,
+                  "resolution": "correct",
+                  "resolutionReason": "opposite-color-synchronized-remove",
+                  "leftPatchRisk": false,
+                  "collisionPartner": {
+                    "playerID": 6,
+                    "player": "小树暖暖",
+                    "classColor": "#FFFFFF",
+                    "icon": "priest-discipline",
+                    "role": "range-healer"
+                  }
                 }
               ]
             },
@@ -5037,9 +5016,14 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 625491,
+                  "removeTimestamp": 628325,
+                  "removeTime": "01:43.4",
+                  "durationMs": 2834,
                   "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "resolutionReason": "remove-without-opposite-color-window",
+                  "leftPatchRisk": true,
+                  "collisionPartner": null
                 }
               ]
             }
@@ -6144,8 +6128,8 @@
               "time": "03:40.2",
               "absoluteTime": 994460,
               "abilityID": 1310616,
-              "ability": "技能 1310616",
-              "abilityLabel": "技能 1310616",
+              "ability": "法术 1310616",
+              "abilityLabel": "法术 1310616",
               "deathCause": "ability"
             },
             {
@@ -6177,8 +6161,8 @@
             "time": "03:40.2",
             "absoluteTime": 994460,
             "abilityID": 1310616,
-            "ability": "技能 1310616",
-            "abilityLabel": "技能 1310616",
+            "ability": "法术 1310616",
+            "abilityLabel": "法术 1310616",
             "deathCause": "ability"
           },
           {
@@ -6201,343 +6185,153 @@
           "unitedDefense": [
             {
               "index": 1,
-              "timeMs": 40066,
-              "time": "00:40.1",
-              "endTimeMs": 40667,
-              "endTime": "00:40.7",
-              "durationSec": 0.6,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 2,
               "timeMs": 40048,
               "time": "00:40.0",
               "endTimeMs": 40677,
               "endTime": "00:40.7",
               "durationSec": 0.6,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
+            },
+            {
+              "index": 2,
+              "timeMs": 48163,
+              "time": "00:48.2",
+              "endTimeMs": 50043,
+              "endTime": "00:50.0",
+              "durationSec": 1.9,
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
               "index": 3,
-              "timeMs": 40066,
-              "time": "00:40.1",
-              "endTimeMs": 40677,
-              "endTime": "00:40.7",
-              "durationSec": 0.6,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 4,
-              "timeMs": 48163,
-              "time": "00:48.2",
-              "endTimeMs": 50017,
-              "endTime": "00:50.0",
-              "durationSec": 1.9,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 5,
-              "timeMs": 48163,
-              "time": "00:48.2",
-              "endTimeMs": 50043,
-              "endTime": "00:50.0",
-              "durationSec": 1.9,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 6,
-              "timeMs": 48188,
-              "time": "00:48.2",
-              "endTimeMs": 50043,
-              "endTime": "00:50.0",
-              "durationSec": 1.9,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 7,
-              "timeMs": 72929,
-              "time": "01:12.9",
-              "endTimeMs": 72948,
-              "endTime": "01:12.9",
-              "durationSec": 0.0,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 8,
-              "timeMs": 74151,
-              "time": "01:14.2",
-              "endTimeMs": 77707,
-              "endTime": "01:17.7",
-              "durationSec": 3.6,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 9,
               "timeMs": 74130,
               "time": "01:14.1",
               "endTimeMs": 77718,
               "endTime": "01:17.7",
               "durationSec": 3.6,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 10,
-              "timeMs": 74252,
-              "time": "01:14.3",
-              "endTimeMs": 77718,
-              "endTime": "01:17.7",
-              "durationSec": 3.5,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 11,
-              "timeMs": 79220,
-              "time": "01:19.2",
-              "endTimeMs": 79294,
-              "endTime": "01:19.3",
-              "durationSec": 0.1,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 12,
+              "index": 4,
               "timeMs": 79207,
               "time": "01:19.2",
-              "endTimeMs": 79305,
-              "endTime": "01:19.3",
-              "durationSec": 0.1,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 13,
-              "timeMs": 79220,
-              "time": "01:19.2",
-              "endTimeMs": 79305,
-              "endTime": "01:19.3",
-              "durationSec": 0.1,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 14,
-              "timeMs": 79433,
-              "time": "01:19.4",
-              "endTimeMs": 81959,
-              "endTime": "01:22.0",
-              "durationSec": 2.5,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 15,
-              "timeMs": 79420,
-              "time": "01:19.4",
               "endTimeMs": 81970,
               "endTime": "01:22.0",
-              "durationSec": 2.5,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "durationSec": 2.8,
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 16,
-              "timeMs": 79433,
-              "time": "01:19.4",
-              "endTimeMs": 81970,
-              "endTime": "01:22.0",
-              "durationSec": 2.5,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 17,
-              "timeMs": 92073,
-              "time": "01:32.1",
-              "endTimeMs": 92226,
-              "endTime": "01:32.2",
-              "durationSec": 0.2,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 18,
+              "index": 5,
               "timeMs": 92052,
               "time": "01:32.1",
               "endTimeMs": 92248,
               "endTime": "01:32.2",
               "durationSec": 0.2,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 19,
-              "timeMs": 92073,
-              "time": "01:32.1",
-              "endTimeMs": 92248,
-              "endTime": "01:32.2",
-              "durationSec": 0.2,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 20,
-              "timeMs": 108879,
-              "time": "01:48.9",
-              "endTimeMs": 109773,
-              "endTime": "01:49.8",
-              "durationSec": 0.9,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 21,
+              "index": 6,
               "timeMs": 108857,
               "time": "01:48.9",
               "endTimeMs": 109784,
               "endTime": "01:49.8",
               "durationSec": 0.9,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 22,
-              "timeMs": 108879,
-              "time": "01:48.9",
-              "endTimeMs": 109784,
-              "endTime": "01:49.8",
-              "durationSec": 0.9,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 23,
-              "timeMs": 162367,
-              "time": "02:42.4",
-              "endTimeMs": 164658,
-              "endTime": "02:44.7",
-              "durationSec": 2.3,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 24,
+              "index": 7,
               "timeMs": 162246,
               "time": "02:42.2",
               "endTimeMs": 164667,
               "endTime": "02:44.7",
               "durationSec": 2.4,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 25,
-              "timeMs": 162367,
-              "time": "02:42.4",
-              "endTimeMs": 164667,
-              "endTime": "02:44.7",
-              "durationSec": 2.3,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 26,
-              "timeMs": 201562,
-              "time": "03:21.6",
-              "endTimeMs": 201844,
-              "endTime": "03:21.8",
-              "durationSec": 0.3,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 27,
+              "index": 8,
               "timeMs": 201550,
               "time": "03:21.6",
               "endTimeMs": 201845,
               "endTime": "03:21.8",
               "durationSec": 0.3,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 28,
-              "timeMs": 201690,
-              "time": "03:21.7",
-              "endTimeMs": 201845,
-              "endTime": "03:21.8",
-              "durationSec": 0.2,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 29,
-              "timeMs": 210051,
-              "time": "03:30.1",
-              "endTimeMs": 210242,
-              "endTime": "03:30.2",
-              "durationSec": 0.2,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 30,
+              "index": 9,
               "timeMs": 210027,
               "time": "03:30.0",
               "endTimeMs": 210253,
               "endTime": "03:30.3",
               "durationSec": 0.2,
-              "bossID": 24,
-              "bossName": "大副纳玛"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             },
             {
-              "index": 31,
-              "timeMs": 210051,
-              "time": "03:30.1",
-              "endTimeMs": 210253,
-              "endTime": "03:30.3",
-              "durationSec": 0.2,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
-            },
-            {
-              "index": 32,
-              "timeMs": 235346,
-              "time": "03:55.3",
-              "endTimeMs": 241173,
-              "endTime": "04:01.2",
-              "durationSec": 5.8,
-              "bossID": 35,
-              "bossName": "商人盖博"
-            },
-            {
-              "index": 33,
+              "index": 10,
               "timeMs": 235319,
               "time": "03:55.3",
               "endTimeMs": 241190,
               "endTime": "04:01.2",
               "durationSec": 5.9,
-              "bossID": 24,
-              "bossName": "大副纳玛"
-            },
-            {
-              "index": 34,
-              "timeMs": 235346,
-              "time": "03:55.3",
-              "endTimeMs": 241190,
-              "endTime": "04:01.2",
-              "durationSec": 5.8,
-              "bossID": 26,
-              "bossName": "书卷贤者伊库"
+              "bossNames": [
+                "书卷贤者伊库",
+                "商人盖博",
+                "大副纳玛"
+              ],
+              "bossName": "书卷贤者伊库、商人盖博、大副纳玛",
+              "bossCount": 3
             }
           ],
           "avoidable": {
@@ -6730,9 +6524,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 853532,
+                  "removeTimestamp": 855042,
+                  "removeTime": "01:20.8",
+                  "durationMs": 1510,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:20.6"
                 },
                 {
                   "playerID": 5,
@@ -6742,9 +6543,20 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
-                  "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "applyTimestamp": 853541,
+                  "removeTimestamp": 858534,
+                  "removeTime": "01:24.3",
+                  "durationMs": 4993,
+                  "resolution": "correct",
+                  "resolutionReason": "opposite-color-synchronized-remove",
+                  "leftPatchRisk": false,
+                  "collisionPartner": {
+                    "playerID": 11,
+                    "player": "劉浩然",
+                    "classColor": "#00FF98",
+                    "icon": "monk-windwalker",
+                    "role": "melee-dps"
+                  }
                 },
                 {
                   "playerID": 21,
@@ -6754,9 +6566,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 853542,
+                  "removeTimestamp": 856036,
+                  "removeTime": "01:21.8",
+                  "durationMs": 2494,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:21.8"
                 },
                 {
                   "playerID": 18,
@@ -6766,9 +6585,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 853542,
+                  "removeTimestamp": 854544,
+                  "removeTime": "01:20.3",
+                  "durationMs": 1002,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:20.1"
                 },
                 {
                   "playerID": 12,
@@ -6778,9 +6604,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 853542,
+                  "removeTimestamp": 861039,
+                  "removeTime": "01:26.8",
+                  "durationMs": 7497,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:26.6"
                 },
                 {
                   "playerID": 22,
@@ -6790,9 +6623,16 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 854032,
+                  "removeTimestamp": 855042,
+                  "removeTime": "01:20.8",
+                  "durationMs": 1010,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:20.3"
                 },
                 {
                   "playerID": 19,
@@ -6802,9 +6642,16 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 854032,
+                  "removeTimestamp": 856036,
+                  "removeTime": "01:21.8",
+                  "durationMs": 2004,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:21.5"
                 },
                 {
                   "playerID": 11,
@@ -6814,9 +6661,16 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 854033,
+                  "removeTimestamp": 859039,
+                  "removeTime": "01:24.8",
+                  "durationMs": 5006,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:24.7"
                 },
                 {
                   "playerID": 14,
@@ -6826,9 +6680,20 @@
                   "role": "tank",
                   "color": "frost",
                   "debuffID": 1295954,
-                  "resolution": "wrong",
-                  "resolutionReason": "removed-without-opposite-patch",
-                  "leftPatchRisk": true
+                  "applyTimestamp": 854033,
+                  "removeTimestamp": 855034,
+                  "removeTime": "01:20.8",
+                  "durationMs": 1001,
+                  "resolution": "correct",
+                  "resolutionReason": "opposite-color-synchronized-remove",
+                  "leftPatchRisk": false,
+                  "collisionPartner": {
+                    "playerID": 16,
+                    "player": "Loveating",
+                    "classColor": "#8788EE",
+                    "icon": "warlock-destruction",
+                    "role": "range-dps"
+                  }
                 },
                 {
                   "playerID": 4,
@@ -6838,9 +6703,14 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
-                  "resolution": "unresolved",
-                  "resolutionReason": "debuff-not-removed",
-                  "leftPatchRisk": true
+                  "applyTimestamp": 854033,
+                  "removeTimestamp": 935058,
+                  "removeTime": "02:40.8",
+                  "durationMs": 81025,
+                  "resolution": "timeout",
+                  "resolutionReason": "timeout-remove-left-patch",
+                  "leftPatchRisk": true,
+                  "collisionPartner": null
                 }
               ]
             },
@@ -6859,9 +6729,16 @@
                   "role": "range-healer",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 880530,
+                  "removeTimestamp": 884538,
+                  "removeTime": "01:50.3",
+                  "durationMs": 4008,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:49.9"
                 },
                 {
                   "playerID": 21,
@@ -6871,9 +6748,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 880530,
+                  "removeTimestamp": 881543,
+                  "removeTime": "01:47.3",
+                  "durationMs": 1013,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:47.2"
                 },
                 {
                   "playerID": 20,
@@ -6883,9 +6767,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 880530,
+                  "removeTimestamp": 883047,
+                  "removeTime": "01:48.8",
+                  "durationMs": 2517,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:48.5"
                 },
                 {
                   "playerID": 2,
@@ -6895,9 +6786,16 @@
                   "role": "range-healer",
                   "color": "fire",
                   "debuffID": 1295928,
-                  "resolution": "unresolved",
-                  "resolutionReason": "debuff-not-removed",
-                  "leftPatchRisk": true
+                  "applyTimestamp": 880531,
+                  "removeTimestamp": 909042,
+                  "removeTime": "02:14.8",
+                  "durationMs": 28511,
+                  "resolution": "correct",
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "02:14.4"
                 },
                 {
                   "playerID": 3,
@@ -6907,9 +6805,16 @@
                   "role": "range-dps",
                   "color": "fire",
                   "debuffID": 1295928,
+                  "applyTimestamp": 880531,
+                  "removeTimestamp": 883047,
+                  "removeTime": "01:48.8",
+                  "durationMs": 2516,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297648,
+                  "oppositePatchSince": "01:48.4"
                 },
                 {
                   "playerID": 7,
@@ -6919,9 +6824,16 @@
                   "role": "melee-healer",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 881055,
+                  "removeTimestamp": 887036,
+                  "removeTime": "01:52.8",
+                  "durationMs": 5981,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:52.4"
                 },
                 {
                   "playerID": 22,
@@ -6931,9 +6843,16 @@
                   "role": "melee-dps",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 881055,
+                  "removeTimestamp": 882033,
+                  "removeTime": "01:47.8",
+                  "durationMs": 978,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:47.7"
                 },
                 {
                   "playerID": 14,
@@ -6943,9 +6862,16 @@
                   "role": "tank",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 881055,
+                  "removeTimestamp": 885537,
+                  "removeTime": "01:51.3",
+                  "durationMs": 4482,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:50.8"
                 },
                 {
                   "playerID": 9,
@@ -6955,9 +6881,16 @@
                   "role": "tank",
                   "color": "frost",
                   "debuffID": 1295954,
+                  "applyTimestamp": 881055,
+                  "removeTimestamp": 888032,
+                  "removeTime": "01:53.8",
+                  "durationMs": 6977,
                   "resolution": "correct",
-                  "resolutionReason": "opposite-patch-collision",
-                  "leftPatchRisk": false
+                  "resolutionReason": "opposite-patch-cleansing",
+                  "leftPatchRisk": false,
+                  "collisionPartner": null,
+                  "oppositePatchID": 1297649,
+                  "oppositePatchSince": "01:53.5"
                 }
               ]
             }
@@ -7087,6 +7020,99 @@
                       "player": "那个猎刃",
                       "classColor": "#AAD372",
                       "icon": "hunter-beastmastery",
+                      "role": "range-dps"
+                    }
+                  ]
+                },
+                {
+                  "wave": 3,
+                  "timeMs": 205732,
+                  "time": "03:25.7",
+                  "targetID": 8,
+                  "target": "三坑不二",
+                  "participants": [
+                    {
+                      "playerID": 1,
+                      "player": "Leviac",
+                      "classColor": "#33937F",
+                      "icon": "evoker-preservation",
+                      "role": "range-healer"
+                    },
+                    {
+                      "playerID": 2,
+                      "player": "狐不理",
+                      "classColor": "#0070DD",
+                      "icon": "shaman-restoration",
+                      "role": "range-healer"
+                    },
+                    {
+                      "playerID": 3,
+                      "player": "贪睡熊熊",
+                      "classColor": "#FF7C0A",
+                      "icon": "druid-balance",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 5,
+                      "player": "小心胡大海",
+                      "classColor": "#3FC7EB",
+                      "icon": "mage-arcane",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 6,
+                      "player": "小树暖暖",
+                      "classColor": "#FFFFFF",
+                      "icon": "priest-discipline",
+                      "role": "range-healer"
+                    },
+                    {
+                      "playerID": 7,
+                      "player": "阿塔尼斯",
+                      "classColor": "#F48CBA",
+                      "icon": "paladin-holy",
+                      "role": "melee-healer"
+                    },
+                    {
+                      "playerID": 8,
+                      "player": "三坑不二",
+                      "classColor": "#3FC7EB",
+                      "icon": "mage-arcane",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 14,
+                      "player": "黑心貓",
+                      "classColor": "#F48CBA",
+                      "icon": "paladin-protection",
+                      "role": "tank"
+                    },
+                    {
+                      "playerID": 15,
+                      "player": "茶喵不吃糖",
+                      "classColor": "#8788EE",
+                      "icon": "warlock-destruction",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 20,
+                      "player": "Kaminadeko",
+                      "classColor": "#0070DD",
+                      "icon": "shaman-elemental",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 21,
+                      "player": "那个猎刃",
+                      "classColor": "#AAD372",
+                      "icon": "hunter-beastmastery",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 23,
+                      "player": "叮咚好烦",
+                      "classColor": "#8788EE",
+                      "icon": "warlock-destruction",
                       "role": "range-dps"
                     }
                   ]
@@ -7224,6 +7250,99 @@
                       "player": "Superhunter",
                       "classColor": "#AAD372",
                       "icon": "hunter-marksmanship",
+                      "role": "range-dps"
+                    }
+                  ]
+                },
+                {
+                  "wave": 3,
+                  "timeMs": 237713,
+                  "time": "03:57.7",
+                  "targetID": 6,
+                  "target": "小树暖暖",
+                  "participants": [
+                    {
+                      "playerID": 1,
+                      "player": "Leviac",
+                      "classColor": "#33937F",
+                      "icon": "evoker-preservation",
+                      "role": "range-healer"
+                    },
+                    {
+                      "playerID": 3,
+                      "player": "贪睡熊熊",
+                      "classColor": "#FF7C0A",
+                      "icon": "druid-balance",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 5,
+                      "player": "小心胡大海",
+                      "classColor": "#3FC7EB",
+                      "icon": "mage-arcane",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 6,
+                      "player": "小树暖暖",
+                      "classColor": "#FFFFFF",
+                      "icon": "priest-discipline",
+                      "role": "range-healer"
+                    },
+                    {
+                      "playerID": 7,
+                      "player": "阿塔尼斯",
+                      "classColor": "#F48CBA",
+                      "icon": "paladin-holy",
+                      "role": "melee-healer"
+                    },
+                    {
+                      "playerID": 8,
+                      "player": "三坑不二",
+                      "classColor": "#3FC7EB",
+                      "icon": "mage-arcane",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 15,
+                      "player": "茶喵不吃糖",
+                      "classColor": "#8788EE",
+                      "icon": "warlock-destruction",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 16,
+                      "player": "Loveating",
+                      "classColor": "#8788EE",
+                      "icon": "warlock-destruction",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 17,
+                      "player": "小楚唯",
+                      "classColor": "#FF7C0A",
+                      "icon": "druid-balance",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 20,
+                      "player": "Kaminadeko",
+                      "classColor": "#0070DD",
+                      "icon": "shaman-elemental",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 21,
+                      "player": "那个猎刃",
+                      "classColor": "#AAD372",
+                      "icon": "hunter-beastmastery",
+                      "role": "range-dps"
+                    },
+                    {
+                      "playerID": 23,
+                      "player": "叮咚好烦",
+                      "classColor": "#8788EE",
+                      "icon": "warlock-destruction",
                       "role": "range-dps"
                     }
                   ]

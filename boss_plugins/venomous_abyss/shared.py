@@ -36,8 +36,12 @@ HOLLOWING_STACK_IDS = {1284109, 1284110}
 FALL_DEATH_LABEL = "跌落"
 GUIDE_SOURCE = Path(__file__).resolve().parents[2] / "skills/venomous-abyss-raid-development/references/source-data/raid-guide-source.json"
 EXTRA_SPELL_NAMES = {
+    1: "近战攻击",
     1288554: "潜藏的教徒",
+    1294605: "邪恶洪流",
+    1295085: "灵魂转移",
     1305844: "爆炸惊喜冲击波",
+    1307939: "残骸凋零",
     1291918: "旋壳",
     1305963: "腐蚀囊肿",
 }
@@ -66,9 +70,32 @@ def spell_name(spell_id, local_names=None):
     if not spell_id:
         return FALL_DEATH_LABEL
     spell_id = int(spell_id)
+    if spell_id == 1:
+        return "近战攻击"
     if local_names and local_names.get(spell_id):
         return local_names[spell_id]
-    return load_confirmed_spell_names().get(spell_id, f"技能 {spell_id}")
+    return load_confirmed_spell_names().get(spell_id, "未知技能")
+
+
+def local_spell_tooltip(spell_id):
+    """Return a small Wowhead-compatible payload when PTR tooltip data is absent.
+
+    The live tooltip service often has no page for newly datamined raid spells.
+    Keeping the response shape compatible avoids noisy local 404s while the
+    visible name remains sourced from the checked-in Chinese raid guide.
+    """
+    spell_id = int(spell_id)
+    name = spell_name(spell_id)
+    return {
+        "name": name,
+        "icon": "inv_misc_questionmark",
+        "tooltip": (
+            '<table><tr><td><b class="q">'
+            + name
+            + '</b><br><span class="q0">团长手册本地法术存根</span>'
+            + f'<br><span class="q0">法术 ID：{spell_id}</span></td></tr></table>'
+        ),
+    }
 
 
 def load_confirmed_source_names():

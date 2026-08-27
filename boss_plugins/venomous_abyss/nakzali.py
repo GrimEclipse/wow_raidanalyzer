@@ -24,7 +24,9 @@ from boss_plugins.venomous_abyss.shared import (
     build_survival_timeline,
     difficulty_fields,
     load_confirmed_spell_names,
+    load_confirmed_source_names,
     player_ref,
+    source_name,
     spell_name,
 )
 
@@ -35,6 +37,7 @@ ENCOUNTER_IDS = {ENCOUNTER_ID, *LEGACY_ENCOUNTER_IDS}
 CN_TZ = timezone(timedelta(hours=8))
 
 SPELLS = load_confirmed_spell_names()
+SOURCE_NAMES = load_confirmed_source_names()
 SPELLS.update({
     1284034: "解缚之怒",
     1284103: "附身弹幕",
@@ -58,7 +61,7 @@ SPELLS.update({
     1299722: "祈求打断",
     1300239: "盘旋灵魂",
     1306666: "葬火点名",
-    1307939: "尸体枯萎",
+    1307939: "残骸凋零",
     1308227: "不朽盘卷",
 })
 
@@ -749,12 +752,28 @@ def analyze_tank_swap(fight, actor_map, players, debuffs, friendly_casts, barrag
     tank_ids = {player_id for player_id, player in players.items() if player.get("role") == "tank"}
     stack_rows = []
     stacks_by_player = defaultdict(list)
-    for event in debuffs:
+    stack_events = [
+        event for event in debuffs
+        if int(ability_id(event) or 0) in HOLLOWING_STACK_IDS
+        and event.get("targetID") in tank_ids
+    ]
+    explicit_stack_keys = {
+        (event.get("targetID"), int(event.get("timestamp") or 0))
+        for event in stack_events
+        if event_type(event) in {"applydebuffstack", "removedebuffstack"}
+    }
+    for event in sorted(stack_events, key=lambda row: int(row.get("timestamp") or 0)):
         spell_id = int(ability_id(event) or 0)
         if spell_id not in HOLLOWING_STACK_IDS or event.get("targetID") not in tank_ids:
             continue
         timestamp = int(event.get("timestamp") or 0)
         kind = event_type(event)
+        if kind in {"refreshdebuff", "refreshdebuffstack"} and (
+            event.get("targetID"), timestamp
+        ) in explicit_stack_keys:
+            # WCL 会在同一毫秒同时给出 stack=N 和 refresh(stack=1)；后者只是刷新持续时间，
+            # 不能覆盖真实层数。
+            continue
         if kind in {"applydebuff", "applydebuffstack", "refreshdebuff", "refreshdebuffstack"}:
             stack = int(event.get("stack") or 1)
         elif kind in {"removedebuff", "removedebuffstack"}:
@@ -791,7 +810,7 @@ def analyze_tank_swap(fight, actor_map, players, debuffs, friendly_casts, barrag
             "spellID": spell_id,
             "spell": TAUNT_SPELLS[spell_id],
             "targetID": target_id,
-            "target": actor_name(actor_map, target_id).split("-", 1)[0] if target_id else "—",
+            "target": source_name(actor_map, target_id, SOURCE_NAMES) if target_id else "—",
         })
     tank_deaths = []
     for row in survival.get("timeline", []):
@@ -1035,6 +1054,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
         "payload": payload,
         "markers": markers,
         "players": player_catalog,
+        "actorMap": actor_map,
         "essenceRend": essence_rend,
         "leaks": analyze_leaks(fight, payload["casts"], markers, options),
         "barrage": barrage,
@@ -1070,7 +1090,7 @@ def render_fight(raw, baseline, options):
     )
     tank_swap = analyze_tank_swap(
         fight,
-        {player_id: player["name"] for player_id, player in raw["players"].items()},
+        raw.get("actorMap") or {player_id: player["name"] for player_id, player in raw["players"].items()},
         raw["players"],
         raw["payload"]["debuffs"],
         raw["payload"].get("friendlyCasts") or [],
