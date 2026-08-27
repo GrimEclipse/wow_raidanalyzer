@@ -1,0 +1,39 @@
+[Unit]
+Description=WoW Raid Analyzer (Mythic Analyzer) — WCL 团队副本复盘工具
+Documentation=file:/opt/wow_raidanalyzer/README.md
+After=network-online.target mihomo.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/wow_raidanalyzer
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/opt/wow_raidanalyzer/.env
+ExecStart=/opt/wow_raidanalyzer/.venv/bin/python /opt/wow_raidanalyzer/server.py --host 127.0.0.1 --port 8766
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=yes
+ReadWritePaths=/opt/wow_raidanalyzer
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+
+# 本机内存仅 4G，给个上限防止分析任务把机器拖垮
+MemoryHigh=400M
+MemoryMax=700M
+
+StandardOutput=append:/var/log/wow-raidanalyzer.log
+StandardError=append:/var/log/wow-raidanalyzer.log
+
+[Install]
+WantedBy=multi-user.target
