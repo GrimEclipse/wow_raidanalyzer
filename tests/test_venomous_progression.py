@@ -2,6 +2,7 @@ import math
 
 from boss_plugins.venomous_abyss.progression import (
     DIG_WIND_DIRECTIONS,
+    _infer_dig_winds,
     _infer_wind_from_frames,
     _placement_slot_validation,
     analyze_lost,
@@ -329,3 +330,30 @@ def test_twinfangs_inserts_death_when_feast_clears_multiple_stacks():
 def test_spell_name_maps_melee_attack():
     assert spell_name(1) == "近战攻击"
     assert spell_name(999999999) == "未知技能"
+
+
+def test_infer_dig_winds_prefers_movement_and_never_uses_cyst_activation_as_direction():
+    arena = {"centerX": 0, "centerY": 0, "radius": 6200}
+    cross_angle = math.radians(DIG_WIND_DIRECTIONS["cross"]["wclAngleDegrees"])
+    frames = [
+        {"timeMs": 16000, "players": [{"position": {"x": 0, "y": 0}}, {"position": {"x": 0, "y": 0}}]},
+        {"timeMs": 16200, "players": [
+            {"position": {"x": math.cos(cross_angle) * 1000, "y": -math.sin(cross_angle) * 1000}},
+            {"position": {"x": math.cos(cross_angle) * 1000, "y": -math.sin(cross_angle) * 1000}},
+        ]},
+        {"timeMs": 16400, "players": [
+            {"position": {"x": math.cos(cross_angle) * 2000, "y": -math.sin(cross_angle) * 2000}},
+            {"position": {"x": math.cos(cross_angle) * 2000, "y": -math.sin(cross_angle) * 2000}},
+        ]},
+    ]
+    expected = _infer_wind_from_frames(frames, arena)
+    assert expected["sourceKey"] == "cross"
+    winds = _infer_dig_winds(frames, arena, segment_count=1, activation_rows=[])
+    assert winds[0]["directionLabel"] == expected["directionLabel"]
+    blocked = _infer_dig_winds(frames, arena, segment_count=1, activation_rows=[{
+        "activatedTimestamp": 16350,
+        "windSide": "circle",
+        "placementKey": "circle",
+        "player": "错误放置",
+    }])
+    assert blocked[0] is None

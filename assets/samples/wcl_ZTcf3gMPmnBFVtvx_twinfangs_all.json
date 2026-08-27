@@ -36,14 +36,26 @@
     "evidenceLimits": {
       "positions": "仅使用 WCL 实际坐标样本；超过采样窗只展示，不归责。"
     },
+    "analysisIdentity": {
+      "version": "12.1",
+      "raidKey": "venomous_abyss",
+      "bossKey": "twinfangs",
+      "reports": [
+        "ZTcf3gMPmnBFVtvx"
+      ],
+      "date": "2026-08-25",
+      "key": "12.1/venomous_abyss/twinfangs/ee62bb6b7422af4a"
+    },
+    "analysisId": "12.1/venomous_abyss/twinfangs/ee62bb6b7422af4a",
+    "capabilitySchemaVersion": 1,
     "capabilities": {
       "wipe": {
         "enabled": true,
-        "renderer": "venomous-progression"
+        "renderer": "generic-wipe"
       },
       "avoidable": {
-        "enabled": true,
-        "renderer": "venomous-progression"
+        "enabled": false,
+        "renderer": "generic-avoidable"
       },
       "interrupts": {
         "enabled": false,
@@ -63,21 +75,9 @@
       },
       "replay": {
         "enabled": false,
-        "renderer": "venomous-progression"
+        "renderer": "field-audit"
       }
     },
-    "analysisIdentity": {
-      "version": "12.1",
-      "raidKey": "venomous_abyss",
-      "bossKey": "twinfangs",
-      "reports": [
-        "ZTcf3gMPmnBFVtvx"
-      ],
-      "date": "2026-08-25",
-      "key": "12.1/venomous_abyss/twinfangs/ee62bb6b7422af4a"
-    },
-    "analysisId": "12.1/venomous_abyss/twinfangs/ee62bb6b7422af4a",
-    "capabilitySchemaVersion": 1,
     "mistakeTracker": {
       "schemaVersion": 1,
       "enabled": false,
@@ -760,8 +760,8 @@
               "time": "04:37.7",
               "absoluteTime": 9085298,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -775,8 +775,8 @@
               "time": "04:37.7",
               "absoluteTime": 9085300,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -790,8 +790,8 @@
               "time": "04:37.9",
               "absoluteTime": 9085430,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -820,8 +820,8 @@
               "time": "04:43.0",
               "absoluteTime": 9090564,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -835,8 +835,8 @@
               "time": "04:45.0",
               "absoluteTime": 9092589,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -850,8 +850,8 @@
               "time": "04:50.0",
               "absoluteTime": 9097611,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -940,8 +940,8 @@
               "time": "05:10.0",
               "absoluteTime": 9117609,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -985,8 +985,8 @@
               "time": "05:47.7",
               "absoluteTime": 9155245,
               "abilityID": 1295107,
-              "ability": "法术 1295107",
-              "abilityLabel": "法术 1295107",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -1000,8 +1000,8 @@
               "time": "05:48.4",
               "absoluteTime": 9155932,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -1015,8 +1015,8 @@
               "time": "05:50.6",
               "absoluteTime": 9158203,
               "abilityID": 1295115,
-              "ability": "法术 1295115",
-              "abilityLabel": "法术 1295115",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -1030,8 +1030,8 @@
               "time": "05:52.4",
               "absoluteTime": 9159988,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -1045,8 +1045,8 @@
               "time": "05:53.5",
               "absoluteTime": 9161101,
               "abilityID": 1295115,
-              "ability": "法术 1295115",
-              "abilityLabel": "法术 1295115",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -1183,8 +1183,8 @@
             "time": "04:37.7",
             "absoluteTime": 9085298,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1198,8 +1198,8 @@
             "time": "04:37.7",
             "absoluteTime": 9085300,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1213,8 +1213,8 @@
             "time": "04:37.9",
             "absoluteTime": 9085430,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1243,8 +1243,8 @@
             "time": "04:43.0",
             "absoluteTime": 9090564,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1258,8 +1258,8 @@
             "time": "04:45.0",
             "absoluteTime": 9092589,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1273,8 +1273,8 @@
             "time": "04:50.0",
             "absoluteTime": 9097611,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1363,8 +1363,8 @@
             "time": "05:10.0",
             "absoluteTime": 9117609,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1408,8 +1408,8 @@
             "time": "05:47.7",
             "absoluteTime": 9155245,
             "abilityID": 1295107,
-            "ability": "法术 1295107",
-            "abilityLabel": "法术 1295107",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1423,8 +1423,8 @@
             "time": "05:48.4",
             "absoluteTime": 9155932,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -1438,8 +1438,8 @@
             "time": "05:50.6",
             "absoluteTime": 9158203,
             "abilityID": 1295115,
-            "ability": "法术 1295115",
-            "abilityLabel": "法术 1295115",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1453,8 +1453,8 @@
             "time": "05:52.4",
             "absoluteTime": 9159988,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -1468,8 +1468,8 @@
             "time": "05:53.5",
             "absoluteTime": 9161101,
             "abilityID": 1295115,
-            "ability": "法术 1295115",
-            "abilityLabel": "法术 1295115",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -1601,13 +1601,15 @@
                     "timeMs": 325547,
                     "time": "05:25.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "邪恶洪流",
+                    "sourceID": 1294605,
+                    "category": "death",
+                    "deathAtMs": 325547,
+                    "deathAbilityID": 1294605
                   }
                 ]
               },
@@ -1757,13 +1759,15 @@
                     "timeMs": 283000,
                     "time": "04:43.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 283000,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -1937,13 +1941,15 @@
                     "timeMs": 347704,
                     "time": "05:47.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295107,
+                    "category": "death",
+                    "deathAtMs": 347681,
+                    "deathAbilityID": 1295107
                   }
                 ]
               },
@@ -2093,13 +2099,15 @@
                     "timeMs": 295725,
                     "time": "04:55.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 295735,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -2273,13 +2281,15 @@
                     "timeMs": 348354,
                     "time": "05:48.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 348368,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -2405,13 +2415,15 @@
                     "timeMs": 277717,
                     "time": "04:37.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 277736,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -2561,13 +2573,15 @@
                     "timeMs": 350626,
                     "time": "05:50.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295115,
+                    "category": "death",
+                    "deathAtMs": 350639,
+                    "deathAbilityID": 1295115
                   }
                 ]
               },
@@ -2765,13 +2779,15 @@
                     "timeMs": 291739,
                     "time": "04:51.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 291740,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -2945,13 +2961,15 @@
                     "timeMs": 352424,
                     "time": "05:52.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 352424,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -3125,13 +3143,15 @@
                     "timeMs": 334942,
                     "time": "05:34.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "致命毒液",
+                    "sourceID": 1297338,
+                    "category": "death",
+                    "deathAtMs": 334942,
+                    "deathAbilityID": 1297338
                   }
                 ]
               },
@@ -3209,13 +3229,15 @@
                     "timeMs": 122298,
                     "time": "02:02.3",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 122299,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -3413,13 +3435,15 @@
                     "timeMs": 290025,
                     "time": "04:50.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 290047,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },
@@ -3461,13 +3485,15 @@
                     "timeMs": 53521,
                     "time": "00:53.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 53540,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -3641,13 +3667,15 @@
                     "timeMs": 357543,
                     "time": "05:57.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "致命毒液",
+                    "sourceID": 1297338,
+                    "category": "death",
+                    "deathAtMs": 357543,
+                    "deathAbilityID": 1297338
                   }
                 ]
               },
@@ -3809,13 +3837,15 @@
                     "timeMs": 292723,
                     "time": "04:52.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 292743,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -4025,13 +4055,15 @@
                     "timeMs": 353537,
                     "time": "05:53.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295115,
+                    "category": "death",
+                    "deathAtMs": 353537,
+                    "deathAbilityID": 1295115
                   }
                 ]
               },
@@ -4133,13 +4165,15 @@
                     "timeMs": 138873,
                     "time": "02:18.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 138873,
+                    "deathAbilityID": 1290662
                   },
                   {
                     "timeMs": 209707,
@@ -4181,13 +4215,15 @@
                     "timeMs": 308362,
                     "time": "05:08.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 308395,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -4397,13 +4433,15 @@
                     "timeMs": 310019,
                     "time": "05:10.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 310045,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },
@@ -4553,13 +4591,15 @@
                     "timeMs": 277716,
                     "time": "04:37.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 277734,
+                    "deathAbilityID": 1292348
                   },
                   {
                     "timeMs": 290996,
@@ -4577,13 +4617,15 @@
                     "timeMs": 304865,
                     "time": "05:04.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 304902,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -4649,13 +4691,15 @@
                     "timeMs": 71128,
                     "time": "01:11.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 71144,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -4805,13 +4849,15 @@
                     "timeMs": 285008,
                     "time": "04:45.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 285025,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -4961,13 +5007,15 @@
                     "timeMs": 277835,
                     "time": "04:37.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 277866,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -5009,13 +5057,15 @@
                     "timeMs": 54742,
                     "time": "00:54.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "腐蚀唾液",
+                    "sourceID": 1293295,
+                    "category": "death",
+                    "deathAtMs": 54744,
+                    "deathAbilityID": 1293295
                   }
                 ]
               }
@@ -7043,8 +7093,8 @@
               "time": "04:20.8",
               "absoluteTime": 9632484,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7058,8 +7108,8 @@
               "time": "04:23.8",
               "absoluteTime": 9635477,
               "abilityID": 1289153,
-              "ability": "法术 1289153",
-              "abilityLabel": "法术 1289153",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7073,8 +7123,8 @@
               "time": "04:24.0",
               "absoluteTime": 9635672,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7088,8 +7138,8 @@
               "time": "04:37.5",
               "absoluteTime": 9649167,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7103,8 +7153,8 @@
               "time": "04:37.9",
               "absoluteTime": 9649514,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7223,8 +7273,8 @@
               "time": "05:50.9",
               "absoluteTime": 9722546,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7238,8 +7288,8 @@
               "time": "05:58.1",
               "absoluteTime": 9729739,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7253,8 +7303,8 @@
               "time": "06:19.1",
               "absoluteTime": 9750717,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7268,8 +7318,8 @@
               "time": "06:19.1",
               "absoluteTime": 9750788,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7283,8 +7333,8 @@
               "time": "06:19.3",
               "absoluteTime": 9750918,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7298,8 +7348,8 @@
               "time": "06:19.4",
               "absoluteTime": 9751014,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7313,8 +7363,8 @@
               "time": "06:21.4",
               "absoluteTime": 9753044,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -7328,8 +7378,8 @@
               "time": "06:23.4",
               "absoluteTime": 9755090,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -7343,8 +7393,8 @@
               "time": "06:25.8",
               "absoluteTime": 9757492,
               "abilityID": 1295107,
-              "ability": "法术 1295107",
-              "abilityLabel": "法术 1295107",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7358,8 +7408,8 @@
               "time": "06:28.0",
               "absoluteTime": 9759645,
               "abilityID": 1295107,
-              "ability": "法术 1295107",
-              "abilityLabel": "法术 1295107",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7373,8 +7423,8 @@
               "time": "06:30.2",
               "absoluteTime": 9761870,
               "abilityID": 1295115,
-              "ability": "法术 1295115",
-              "abilityLabel": "法术 1295115",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -7388,8 +7438,8 @@
               "time": "06:30.7",
               "absoluteTime": 9762392,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -7403,8 +7453,8 @@
               "time": "06:35.0",
               "absoluteTime": 9766615,
               "abilityID": 1295115,
-              "ability": "法术 1295115",
-              "abilityLabel": "法术 1295115",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             }
           ]
@@ -7481,8 +7531,8 @@
             "time": "04:20.8",
             "absoluteTime": 9632484,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7496,8 +7546,8 @@
             "time": "04:23.8",
             "absoluteTime": 9635477,
             "abilityID": 1289153,
-            "ability": "法术 1289153",
-            "abilityLabel": "法术 1289153",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7511,8 +7561,8 @@
             "time": "04:24.0",
             "absoluteTime": 9635672,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7526,8 +7576,8 @@
             "time": "04:37.5",
             "absoluteTime": 9649167,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7541,8 +7591,8 @@
             "time": "04:37.9",
             "absoluteTime": 9649514,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7661,8 +7711,8 @@
             "time": "05:50.9",
             "absoluteTime": 9722546,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7676,8 +7726,8 @@
             "time": "05:58.1",
             "absoluteTime": 9729739,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7691,8 +7741,8 @@
             "time": "06:19.1",
             "absoluteTime": 9750717,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7706,8 +7756,8 @@
             "time": "06:19.1",
             "absoluteTime": 9750788,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7721,8 +7771,8 @@
             "time": "06:19.3",
             "absoluteTime": 9750918,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7736,8 +7786,8 @@
             "time": "06:19.4",
             "absoluteTime": 9751014,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7751,8 +7801,8 @@
             "time": "06:21.4",
             "absoluteTime": 9753044,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -7766,8 +7816,8 @@
             "time": "06:23.4",
             "absoluteTime": 9755090,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -7781,8 +7831,8 @@
             "time": "06:25.8",
             "absoluteTime": 9757492,
             "abilityID": 1295107,
-            "ability": "法术 1295107",
-            "abilityLabel": "法术 1295107",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7796,8 +7846,8 @@
             "time": "06:28.0",
             "absoluteTime": 9759645,
             "abilityID": 1295107,
-            "ability": "法术 1295107",
-            "abilityLabel": "法术 1295107",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7811,8 +7861,8 @@
             "time": "06:30.2",
             "absoluteTime": 9761870,
             "abilityID": 1295115,
-            "ability": "法术 1295115",
-            "abilityLabel": "法术 1295115",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -7826,8 +7876,8 @@
             "time": "06:30.7",
             "absoluteTime": 9762392,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -7841,8 +7891,8 @@
             "time": "06:35.0",
             "absoluteTime": 9766615,
             "abilityID": 1295115,
-            "ability": "法术 1295115",
-            "abilityLabel": "法术 1295115",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           }
         ],
@@ -8043,13 +8093,15 @@
                     "timeMs": 387983,
                     "time": "06:28.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295107,
+                    "category": "death",
+                    "deathAtMs": 387983,
+                    "deathAbilityID": 1295107
                   }
                 ]
               },
@@ -8247,13 +8299,15 @@
                     "timeMs": 350872,
                     "time": "05:50.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 350884,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -8475,13 +8529,15 @@
                     "timeMs": 379026,
                     "time": "06:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 379055,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -8691,13 +8747,15 @@
                     "timeMs": 306843,
                     "time": "05:06.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 306877,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -8835,13 +8893,15 @@
                     "timeMs": 227942,
                     "time": "03:47.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 227956,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -9015,13 +9075,15 @@
                     "timeMs": 291912,
                     "time": "04:51.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "永恒毒液",
+                    "sourceID": 1290480,
+                    "category": "death",
+                    "deathAtMs": 291933,
+                    "deathAbilityID": 1290480
                   }
                 ]
               },
@@ -9219,13 +9281,15 @@
                     "timeMs": 260819,
                     "time": "04:20.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 260822,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -9423,13 +9487,15 @@
                     "timeMs": 277494,
                     "time": "04:37.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 277505,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -9591,13 +9657,15 @@
                     "timeMs": 263813,
                     "time": "04:23.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1289153,
+                    "category": "death",
+                    "deathAtMs": 263815,
+                    "deathAbilityID": 1289153
                   },
                   {
                     "timeMs": 296998,
@@ -9615,13 +9683,15 @@
                     "timeMs": 296999,
                     "time": "04:57.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "腐蚀唾液",
+                    "sourceID": 1293295,
+                    "category": "death",
+                    "deathAtMs": 297000,
+                    "deathAbilityID": 1293295
                   }
                 ]
               },
@@ -9843,13 +9913,15 @@
                     "timeMs": 379115,
                     "time": "06:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 379126,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -9999,13 +10071,15 @@
                     "timeMs": 294703,
                     "time": "04:54.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 294729,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -10095,13 +10169,15 @@
                     "timeMs": 135429,
                     "time": "02:15.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 135431,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -10287,13 +10363,15 @@
                     "timeMs": 304835,
                     "time": "05:04.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 304851,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -10467,13 +10545,15 @@
                     "timeMs": 390207,
                     "time": "06:30.2",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295115,
+                    "category": "death",
+                    "deathAtMs": 390208,
+                    "deathAbilityID": 1295115
                   }
                 ]
               },
@@ -10683,13 +10763,15 @@
                     "timeMs": 383419,
                     "time": "06:23.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 383428,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -10911,13 +10993,15 @@
                     "timeMs": 358068,
                     "time": "05:58.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 358077,
+                    "deathAbilityID": 1292348
                   },
                   {
                     "timeMs": 379453,
@@ -10947,13 +11031,15 @@
                     "timeMs": 394952,
                     "time": "06:35.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295115,
+                    "category": "death",
+                    "deathAtMs": 394953,
+                    "deathAbilityID": 1295115
                   }
                 ]
               },
@@ -11127,13 +11213,15 @@
                     "timeMs": 277851,
                     "time": "04:37.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 277852,
+                    "deathAbilityID": 1292348
                   },
                   {
                     "timeMs": 305450,
@@ -11199,13 +11287,15 @@
                     "timeMs": 390710,
                     "time": "06:30.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 390730,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -11283,13 +11373,15 @@
                     "timeMs": 135428,
                     "time": "02:15.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 135432,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -11487,13 +11579,15 @@
                     "timeMs": 379255,
                     "time": "06:19.3",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 379256,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -11715,13 +11809,15 @@
                     "timeMs": 379351,
                     "time": "06:19.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 379352,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -11919,13 +12015,15 @@
                     "timeMs": 385828,
                     "time": "06:25.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295107,
+                    "category": "death",
+                    "deathAtMs": 385830,
+                    "deathAbilityID": 1295107
                   }
                 ]
               },
@@ -12075,13 +12173,15 @@
                     "timeMs": 264009,
                     "time": "04:24.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 264010,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },
@@ -12291,13 +12391,15 @@
                     "timeMs": 381371,
                     "time": "06:21.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 381382,
+                    "deathAbilityID": 1
                   }
                 ]
               }
@@ -15404,13 +15506,15 @@
                     "timeMs": 139027,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139078,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -15512,13 +15616,15 @@
                     "timeMs": 139045,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 3,
                     "toStack": 0,
                     "delta": -3,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139075,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -15620,13 +15726,15 @@
                     "timeMs": 141992,
                     "time": "02:22.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 3,
                     "toStack": 0,
                     "delta": -3,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 141964,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -15716,13 +15824,15 @@
                     "timeMs": 139028,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139080,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -15800,13 +15910,15 @@
                     "timeMs": 139069,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139075,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -15884,13 +15996,15 @@
                     "timeMs": 139069,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139073,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16028,13 +16142,15 @@
                     "timeMs": 139044,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139072,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16112,13 +16228,15 @@
                     "timeMs": 139070,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139076,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16196,13 +16314,15 @@
                     "timeMs": 139041,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139078,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16280,13 +16400,15 @@
                     "timeMs": 139070,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139079,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16400,13 +16522,15 @@
                     "timeMs": 122513,
                     "time": "02:02.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "腐蚀唾液",
+                    "sourceID": 1293295,
+                    "category": "death",
+                    "deathAtMs": 122513,
+                    "deathAbilityID": 1293295
                   }
                 ]
               },
@@ -16508,13 +16632,15 @@
                     "timeMs": 139070,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 3,
                     "toStack": 0,
                     "delta": -3,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139074,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16592,13 +16718,15 @@
                     "timeMs": 139068,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139073,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16676,13 +16804,15 @@
                     "timeMs": 139043,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139081,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16772,13 +16902,15 @@
                     "timeMs": 139046,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139078,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16856,13 +16988,15 @@
                     "timeMs": 139069,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139076,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -16976,13 +17110,15 @@
                     "timeMs": 139069,
                     "time": "02:19.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 4,
                     "toStack": 0,
                     "delta": -4,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139073,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -17072,13 +17208,15 @@
                     "timeMs": 122288,
                     "time": "02:02.3",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 4,
                     "toStack": 0,
                     "delta": -4,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 122306,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -17132,13 +17270,15 @@
                     "timeMs": 139045,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139071,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -17228,13 +17368,15 @@
                     "timeMs": 139043,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139079,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -17348,13 +17490,15 @@
                     "timeMs": 139028,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 4,
                     "toStack": 0,
                     "delta": -4,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139080,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -17420,13 +17564,15 @@
                     "timeMs": 69599,
                     "time": "01:09.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 69600,
+                    "deathAbilityID": 1290662
                   },
                   {
                     "timeMs": 78668,
@@ -17480,13 +17626,15 @@
                     "timeMs": 139044,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139072,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -17576,13 +17724,15 @@
                     "timeMs": 139027,
                     "time": "02:19.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 139072,
+                    "deathAbilityID": 1290662
                   }
                 ]
               }
@@ -19082,8 +19232,8 @@
               "time": "03:46.0",
               "absoluteTime": 10522242,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19127,8 +19277,8 @@
               "time": "04:37.7",
               "absoluteTime": 10573925,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19142,8 +19292,8 @@
               "time": "04:52.0",
               "absoluteTime": 10588231,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19157,8 +19307,8 @@
               "time": "04:56.0",
               "absoluteTime": 10592227,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19172,8 +19322,8 @@
               "time": "06:25.7",
               "absoluteTime": 10681868,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19187,8 +19337,8 @@
               "time": "06:26.6",
               "absoluteTime": 10682850,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19202,8 +19352,8 @@
               "time": "06:32.7",
               "absoluteTime": 10688872,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19217,8 +19367,8 @@
               "time": "06:33.6",
               "absoluteTime": 10689845,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19232,8 +19382,8 @@
               "time": "06:34.0",
               "absoluteTime": 10690255,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19337,8 +19487,8 @@
               "time": "06:50.5",
               "absoluteTime": 10706713,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -19352,8 +19502,8 @@
               "time": "06:54.9",
               "absoluteTime": 10711095,
               "abilityID": 1295115,
-              "ability": "法术 1295115",
-              "abilityLabel": "法术 1295115",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19367,8 +19517,8 @@
               "time": "06:57.4",
               "absoluteTime": 10713634,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -19397,8 +19547,8 @@
               "time": "07:00.7",
               "absoluteTime": 10716939,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             },
             {
@@ -19412,8 +19562,8 @@
               "time": "07:03.9",
               "absoluteTime": 10720101,
               "abilityID": 1295115,
-              "ability": "法术 1295115",
-              "abilityLabel": "法术 1295115",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -19427,8 +19577,8 @@
               "time": "07:04.3",
               "absoluteTime": 10720476,
               "abilityID": 1,
-              "ability": "法术 1",
-              "abilityLabel": "法术 1",
+              "ability": "近战攻击",
+              "abilityLabel": "近战攻击",
               "deathCause": "ability"
             }
           ]
@@ -19505,8 +19655,8 @@
             "time": "03:46.0",
             "absoluteTime": 10522242,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19550,8 +19700,8 @@
             "time": "04:37.7",
             "absoluteTime": 10573925,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19565,8 +19715,8 @@
             "time": "04:52.0",
             "absoluteTime": 10588231,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19580,8 +19730,8 @@
             "time": "04:56.0",
             "absoluteTime": 10592227,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19595,8 +19745,8 @@
             "time": "06:25.7",
             "absoluteTime": 10681868,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19610,8 +19760,8 @@
             "time": "06:26.6",
             "absoluteTime": 10682850,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19625,8 +19775,8 @@
             "time": "06:32.7",
             "absoluteTime": 10688872,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19640,8 +19790,8 @@
             "time": "06:33.6",
             "absoluteTime": 10689845,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19655,8 +19805,8 @@
             "time": "06:34.0",
             "absoluteTime": 10690255,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19760,8 +19910,8 @@
             "time": "06:50.5",
             "absoluteTime": 10706713,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -19775,8 +19925,8 @@
             "time": "06:54.9",
             "absoluteTime": 10711095,
             "abilityID": 1295115,
-            "ability": "法术 1295115",
-            "abilityLabel": "法术 1295115",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19790,8 +19940,8 @@
             "time": "06:57.4",
             "absoluteTime": 10713634,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -19820,8 +19970,8 @@
             "time": "07:00.7",
             "absoluteTime": 10716939,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           },
           {
@@ -19835,8 +19985,8 @@
             "time": "07:03.9",
             "absoluteTime": 10720101,
             "abilityID": 1295115,
-            "ability": "法术 1295115",
-            "abilityLabel": "法术 1295115",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -19850,8 +20000,8 @@
             "time": "07:04.3",
             "absoluteTime": 10720476,
             "abilityID": 1,
-            "ability": "法术 1",
-            "abilityLabel": "法术 1",
+            "ability": "近战攻击",
+            "abilityLabel": "近战攻击",
             "deathCause": "ability"
           }
         ],
@@ -19980,13 +20130,15 @@
                     "timeMs": 239092,
                     "time": "03:59.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 3,
                     "toStack": 0,
                     "delta": -3,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 239116,
+                    "deathAbilityID": 1290662
                   },
                   {
                     "timeMs": 261165,
@@ -20076,13 +20228,15 @@
                     "timeMs": 424260,
                     "time": "07:04.3",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 3,
                     "toStack": 0,
                     "delta": -3,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 424267,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -20136,13 +20290,15 @@
                     "timeMs": 69620,
                     "time": "01:09.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 1,
                     "toStack": 0,
                     "delta": -1,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 69621,
+                    "deathAbilityID": 1290662
                   },
                   {
                     "timeMs": 108211,
@@ -20280,13 +20436,15 @@
                     "timeMs": 395417,
                     "time": "06:35.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 395432,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -20508,13 +20666,15 @@
                     "timeMs": 410079,
                     "time": "06:50.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 410108,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -20700,13 +20860,15 @@
                     "timeMs": 296016,
                     "time": "04:56.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 296018,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },
@@ -20796,13 +20958,15 @@
                     "timeMs": 137399,
                     "time": "02:17.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 137401,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -21024,13 +21188,15 @@
                     "timeMs": 393624,
                     "time": "06:33.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 393636,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -21240,13 +21406,15 @@
                     "timeMs": 414885,
                     "time": "06:54.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295115,
+                    "category": "death",
+                    "deathAtMs": 414886,
+                    "deathAbilityID": 1295115
                   }
                 ]
               },
@@ -21480,13 +21648,15 @@
                     "timeMs": 410486,
                     "time": "06:50.5",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 410504,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -21720,13 +21890,15 @@
                     "timeMs": 417425,
                     "time": "06:57.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 417425,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -21936,13 +22108,15 @@
                     "timeMs": 420729,
                     "time": "07:00.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "近战攻击",
+                    "sourceID": 1,
+                    "category": "death",
+                    "deathAtMs": 420730,
+                    "deathAbilityID": 1
                   }
                 ]
               },
@@ -22152,13 +22326,15 @@
                     "timeMs": 408556,
                     "time": "06:48.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 408557,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -22248,13 +22424,15 @@
                     "timeMs": 137400,
                     "time": "02:17.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 2,
                     "toStack": 0,
                     "delta": -2,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 137401,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -22488,13 +22666,15 @@
                     "timeMs": 410058,
                     "time": "06:50.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 410126,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -22716,13 +22896,15 @@
                     "timeMs": 392650,
                     "time": "06:32.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 392663,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -22896,13 +23078,15 @@
                     "timeMs": 385638,
                     "time": "06:25.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 385659,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -23040,13 +23224,15 @@
                     "timeMs": 292020,
                     "time": "04:52.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 4,
                     "toStack": 0,
                     "delta": -4,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 292022,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },
@@ -23244,13 +23430,15 @@
                     "timeMs": 418634,
                     "time": "06:58.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "腐蚀洪流",
+                    "sourceID": 1289237,
+                    "category": "death",
+                    "deathAtMs": 418671,
+                    "deathAbilityID": 1289237
                   }
                 ]
               },
@@ -23460,13 +23648,15 @@
                     "timeMs": 408556,
                     "time": "06:48.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 408557,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -23688,13 +23878,15 @@
                     "timeMs": 386640,
                     "time": "06:26.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 386641,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -23880,13 +24072,15 @@
                     "timeMs": 423878,
                     "time": "07:03.9",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1295115,
+                    "category": "death",
+                    "deathAtMs": 423892,
+                    "deathAbilityID": 1295115
                   }
                 ]
               },
@@ -24120,13 +24314,15 @@
                     "timeMs": 410059,
                     "time": "06:50.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "贪婪盛宴",
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 410127,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -24276,13 +24472,15 @@
                     "timeMs": 277715,
                     "time": "04:37.7",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 277716,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -24384,13 +24582,15 @@
                     "timeMs": 226010,
                     "time": "03:46.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 3,
                     "toStack": 0,
                     "delta": -3,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 226033,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },
@@ -24576,13 +24776,15 @@
                     "timeMs": 394022,
                     "time": "06:34.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 8,
                     "toStack": 0,
                     "delta": -8,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 394046,
+                    "deathAbilityID": 1294976
                   }
                 ]
               }
@@ -27493,8 +27695,8 @@
               "time": "05:32.8",
               "absoluteTime": 11296635,
               "abilityID": 1244091,
-              "ability": "法术 1244091",
-              "abilityLabel": "法术 1244091",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -27553,8 +27755,8 @@
               "time": "05:52.3",
               "absoluteTime": 11316137,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -27598,8 +27800,8 @@
               "time": "06:19.3",
               "absoluteTime": 11343229,
               "abilityID": 1292348,
-              "ability": "法术 1292348",
-              "abilityLabel": "法术 1292348",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -27628,8 +27830,8 @@
               "time": "06:34.0",
               "absoluteTime": 11357921,
               "abilityID": 1294976,
-              "ability": "法术 1294976",
-              "abilityLabel": "法术 1294976",
+              "ability": "未知技能",
+              "abilityLabel": "未知技能",
               "deathCause": "ability"
             },
             {
@@ -27661,8 +27863,8 @@
             "time": "05:32.8",
             "absoluteTime": 11296635,
             "abilityID": 1244091,
-            "ability": "法术 1244091",
-            "abilityLabel": "法术 1244091",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -27721,8 +27923,8 @@
             "time": "05:52.3",
             "absoluteTime": 11316137,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -27766,8 +27968,8 @@
             "time": "06:19.3",
             "absoluteTime": 11343229,
             "abilityID": 1292348,
-            "ability": "法术 1292348",
-            "abilityLabel": "法术 1292348",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -27796,8 +27998,8 @@
             "time": "06:34.0",
             "absoluteTime": 11357921,
             "abilityID": 1294976,
-            "ability": "法术 1294976",
-            "abilityLabel": "法术 1294976",
+            "ability": "未知技能",
+            "abilityLabel": "未知技能",
             "deathCause": "ability"
           },
           {
@@ -27989,13 +28191,15 @@
                     "timeMs": 393432,
                     "time": "06:33.4",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 5,
                     "toStack": 0,
                     "delta": -5,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "盘卷脓液",
+                    "sourceID": 1290878,
+                    "category": "death",
+                    "deathAtMs": 393445,
+                    "deathAbilityID": 1290878
                   }
                 ]
               },
@@ -28577,13 +28781,15 @@
                     "timeMs": 352251,
                     "time": "05:52.3",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 352253,
+                    "deathAbilityID": 1292348
                   },
                   {
                     "timeMs": 379403,
@@ -28829,13 +29035,15 @@
                     "timeMs": 337089,
                     "time": "05:37.1",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "邪恶洪流",
+                    "sourceID": 1294605,
+                    "category": "death",
+                    "deathAtMs": 337140,
+                    "deathAbilityID": 1294605
                   }
                 ]
               },
@@ -30809,13 +31017,15 @@
                     "timeMs": 332750,
                     "time": "05:32.8",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1244091,
+                    "category": "death",
+                    "deathAtMs": 332751,
+                    "deathAbilityID": 1244091
                   }
                 ]
               },
@@ -31205,13 +31415,15 @@
                     "timeMs": 408590,
                     "time": "06:48.6",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 6,
                     "toStack": 0,
                     "delta": -6,
                     "source": "贪婪盛宴",
-                    "sourceID": 1290516,
-                    "category": "feast"
+                    "sourceID": 1290662,
+                    "category": "death",
+                    "deathAtMs": 408591,
+                    "deathAbilityID": 1290662
                   }
                 ]
               },
@@ -31853,13 +32065,15 @@
                     "timeMs": 379345,
                     "time": "06:19.3",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 9,
                     "toStack": 0,
                     "delta": -9,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1292348,
+                    "category": "death",
+                    "deathAtMs": 379345,
+                    "deathAbilityID": 1292348
                   }
                 ]
               },
@@ -32021,13 +32235,15 @@
                     "timeMs": 337964,
                     "time": "05:38.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 4,
                     "toStack": 0,
                     "delta": -4,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "邪恶洪流",
+                    "sourceID": 1294605,
+                    "category": "death",
+                    "deathAtMs": 337979,
+                    "deathAbilityID": 1294605
                   },
                   {
                     "timeMs": 379412,
@@ -32249,13 +32465,15 @@
                     "timeMs": 394017,
                     "time": "06:34.0",
                     "eventType": "removedebuff",
-                    "action": "clear",
+                    "action": "death_clear",
                     "fromStack": 7,
                     "toStack": 0,
                     "delta": -7,
-                    "source": "光环完全移除",
-                    "sourceID": null,
-                    "category": "clear"
+                    "source": "未知技能",
+                    "sourceID": 1294976,
+                    "category": "death",
+                    "deathAtMs": 394037,
+                    "deathAbilityID": 1294976
                   }
                 ]
               },

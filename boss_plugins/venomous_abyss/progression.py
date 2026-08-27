@@ -687,27 +687,16 @@ def _infer_dig_winds(frames, arena, segment_count=3, activation_rows=None):
             row for row in activation_rows
             if seg_start <= row["activatedTimestamp"] <= seg_end and row.get("windSide")
         ]
-        if activations:
+        if activations and wind is not None:
             activation = min(activations, key=lambda row: row["activatedTimestamp"])
-            target_side = activation["windSide"]
-            source_side = DIG_WIND_OPPOSITES[target_side]
-            corrected = dict(DIG_WIND_DIRECTIONS[source_side])
-            if wind:
-                corrected.update({
-                    key: value for key, value in wind.items()
-                    if key not in {
-                        "key", "directionKey", "directionLabel", "sourceKey", "sourceMarker",
-                        "targetKey", "targetMarker", "lineKey", "angleDegrees", "wclAngleDegrees",
-                    }
-                })
-            corrected.update({
-                "directionKey": corrected["key"],
-                "directionLabel": corrected["label"],
-                "orientationSource": "activated-cyst",
-                "activationPlacementKey": activation.get("placementKey"),
-                "activationPlayer": activation.get("player"),
-            })
-            wind = corrected
+            placement_side = activation["windSide"]
+            wind = dict(wind)
+            wind["nearbyActivation"] = {
+                "placementKey": activation.get("placementKey"),
+                "player": activation.get("player"),
+                "windSide": placement_side,
+                "windSideLabel": DIG_WIND_MARKERS.get(placement_side, {}).get("label"),
+            }
         winds.append(wind)
     return winds
 

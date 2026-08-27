@@ -408,6 +408,20 @@ th {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.replay-scrub {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+  flex: 1 1 220px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.replay-scrub input[type="range"] {
+  flex: 1;
+  min-width: 120px;
 }
 .wind-arrow {
   display: inline-block;
