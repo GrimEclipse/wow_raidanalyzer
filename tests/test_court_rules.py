@@ -1,7 +1,16 @@
 import unittest
 
 from analyzer_core.court_rules import evaluate_court_evidence
-from boss_plugins.venomous_abyss.court_profiles import COURT_PROFILES
+from boss_plugins.venomous_abyss.nakzali import COURT_PROFILE as NAKZALI_COURT_PROFILE
+from boss_plugins.venomous_abyss.sentinels import COURT_PROFILE as SENTINELS_COURT_PROFILE
+from boss_plugins.venomous_abyss.vashnik import COURT_PROFILE as VASHNIK_COURT_PROFILE
+
+
+COURT_PROFILES = {
+    "nakzali": NAKZALI_COURT_PROFILE,
+    "sentinels": SENTINELS_COURT_PROFILE,
+    "vashnik": VASHNIK_COURT_PROFILE,
+}
 
 
 class CourtRuleTests(unittest.TestCase):

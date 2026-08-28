@@ -26,6 +26,6 @@
 
 场地分析页的离线 JSON 选择功能由以下文件提供：
 
-`assets/vendor/offline-data-loader.js`
+`frontend/core/report-data-loader.js`
 
 对外提供静态文件时，需保留 `frontend/report/plugins/void_spire/crown_of_the_cosmos/`、`data/`、`assets/` 的相对目录结构。通过 `file://` 双击页面时会弹出 JSON 文件选择框；通过本地 HTTP 服务访问时会继续自动读取 URL 中的 `source` 参数。

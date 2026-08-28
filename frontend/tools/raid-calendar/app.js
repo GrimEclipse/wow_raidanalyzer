@@ -117,7 +117,7 @@ function refreshWowheadTooltips() {
 }
 
 async function load() {
-  documentState = await api(`/api/loot?date=${selectedDate}&difficulty=${$("#difficultySelect").value}`);
+  documentState = await api(`/api/raid-calendar?date=${selectedDate}&difficulty=${$("#difficultySelect").value}`);
   renderAll();
 }
 
@@ -291,7 +291,7 @@ async function saveDay(silent = false) {
   if (!canModify()) return;
   try {
     captureDay();
-    await api("/api/loot/setup", { method: "PUT", body: JSON.stringify({ days: documentState.state.days }) });
+    await api("/api/raid-calendar/setup", { method: "PUT", body: JSON.stringify({ days: documentState.state.days }) });
     if (!silent) notify("当天出勤与备注已保存。");
     await load();
   } catch (error) { notify(error.message, true); }
@@ -303,7 +303,7 @@ async function toggleProgressionDay() {
   try {
     captureDay();
     currentDayRecord(true).progressionOverride = !wasProgression;
-    await api("/api/loot/setup", { method: "PUT", body: JSON.stringify({ days: documentState.state.days }) });
+    await api("/api/raid-calendar/setup", { method: "PUT", body: JSON.stringify({ days: documentState.state.days }) });
     notify(wasProgression ? "已取消该日期的开荒日标记。" : "已将该日期设为开荒日。");
     await load();
   } catch (error) { notify(error.message, true); }
@@ -498,7 +498,7 @@ async function saveBlackmark() {
   if (!raidKey) return notify("请选择副本。", true);
   if (playerId && !(await confirmReBlackmark(playerId, selectedDate, raidKey, difficulty))) return;
   try {
-    await api("/api/loot/blackmarks", { method: "POST", body: JSON.stringify({
+    await api("/api/raid-calendar/blackmarks", { method: "POST", body: JSON.stringify({
       date: selectedDate,
       difficulty,
       raidKey,
@@ -517,7 +517,7 @@ async function deleteBlackmark(id) {
   if (!canModify()) return;
   if (!(await confirmDialog({ title: "删除黑本标记", message: "确定删除这条黑本标记吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
   try {
-    await api(`/api/loot/blackmarks/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await api(`/api/raid-calendar/blackmarks/${encodeURIComponent(id)}`, { method: "DELETE" });
     notify("黑本标记已删除。");
     await load();
   } catch (error) { notify(error.message, true); }
@@ -580,7 +580,7 @@ function renderBlackHistory() {
   list.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", async () => {
     if (!(await confirmDialog({ title: "删除黑本标记", message: "确定删除这条黑本标记吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
     try {
-      await api(`/api/loot/blackmarks/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
+      await api(`/api/raid-calendar/blackmarks/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" });
       notify("黑本标记已删除。");
       await load();
       renderBlackHistory();
@@ -635,7 +635,7 @@ async function addAllocation() {
   const payload = allocationPayload();
   if (!(await confirmContinueIfBlack(payload.recipientId, selectedDate, payload.difficulty, payload.raidKey))) return;
   try {
-    await api("/api/loot/allocations", { method: "POST", body: JSON.stringify(payload) });
+    await api("/api/raid-calendar/allocations", { method: "POST", body: JSON.stringify(payload) });
   } catch (error) {
     if (!error.requiresConfirmation) return notify(error.message, true);
     const warningText = (error.warnings || []).map(value => `• ${value}`).join("\n");
@@ -647,7 +647,7 @@ async function addAllocation() {
     }))) return;
     payload.confirmOverride = true;
     try {
-      await api("/api/loot/allocations", { method: "POST", body: JSON.stringify(payload) });
+      await api("/api/raid-calendar/allocations", { method: "POST", body: JSON.stringify(payload) });
     } catch (secondError) { return notify(secondError.message, true); }
   }
   $("#allocationNotes").value = "";
@@ -660,7 +660,7 @@ async function deleteAllocation(id) {
   if (!canModify()) return;
   if (!(await confirmDialog({ title: "删除分配记录", message: "确定删除这条分配记录吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
   try {
-    await api(`/api/loot/allocations/${encodeURIComponent(id)}`, { method: "DELETE" });
+    await api(`/api/raid-calendar/allocations/${encodeURIComponent(id)}`, { method: "DELETE" });
     notify("分配记录已删除。");
     await load();
   } catch (error) { notify(error.message, true); }
@@ -714,7 +714,7 @@ function captureRoster() {
 async function saveRoster() {
   try {
     captureRoster();
-    await api("/api/loot/setup", { method: "PUT", body: JSON.stringify({ roster: roster(), days: documentState.state.days }) });
+    await api("/api/raid-calendar/setup", { method: "PUT", body: JSON.stringify({ roster: roster(), days: documentState.state.days }) });
     notify("团队名单已保存，并会自动应用到所有开荒日。");
     closeRoster();
     await load();
@@ -725,7 +725,7 @@ async function toggleMythicSchedule() {
   const current = Number(documentState.state.settings.mythicCadenceWeeks || 2);
   const cadence = current === 2 ? 1 : 2;
   try {
-    await api("/api/loot/settings", { method: "PUT", body: JSON.stringify({ mythicCadenceWeeks: cadence }) });
+    await api("/api/raid-calendar/settings", { method: "PUT", body: JSON.stringify({ mythicCadenceWeeks: cadence }) });
     notify(cadence === 2 ? "史诗难度已切换为双周刷新，锚点为 2026-08-20。" : "史诗难度已切换为单周刷新，每周四显示绿点。");
     await load();
   } catch (error) { notify(error.message, true); }

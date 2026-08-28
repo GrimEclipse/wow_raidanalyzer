@@ -76,12 +76,12 @@ def _safe_int(x: Any, default: int = 0) -> int:
 
 
 def resolve_export_dir(preferred: str | Path | None = None) -> Path:
-    """优先使用可写目录：显式路径 > 桌面 > 项目 verdicts/。"""
+    """优先使用可写目录：显式路径 > 桌面 > 项目 data/exports/。"""
     candidates: List[Path] = []
     if preferred:
         candidates.append(Path(preferred))
     candidates.append(Path.home() / "Desktop")
-    candidates.append(Path(__file__).resolve().parents[1] / "verdicts")
+    candidates.append(Path(__file__).resolve().parents[1] / "data" / "exports")
     for path in candidates:
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -91,7 +91,7 @@ def resolve_export_dir(preferred: str | Path | None = None) -> Path:
             return path
         except Exception:
             continue
-    fallback = Path.cwd() / "verdicts"
+    fallback = Path.cwd() / "data" / "exports"
     fallback.mkdir(parents=True, exist_ok=True)
     return fallback
 

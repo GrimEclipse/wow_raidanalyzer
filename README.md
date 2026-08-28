@@ -22,7 +22,7 @@ start_app.bat
 - `/spec-compare`：单场单专精与 WCL 对标日志的 Buff、资源溢出、爆发窗口和施法序列报告；支持下载独立 HTML 留档
 - `/raid-guide`：团本手册
 - `/cooldowns`：团队技能时间轴查询与 MRT/NSRT 导出
-- `/loot`：开荒出勤、需求权与装备分配日历
+- `/raid-calendar`：开荒出勤、需求权与装备分配日历（旧 `/loot` 地址继续兼容）
 - `/audit`：奥蕾莉亚场地明细
 
 命令行仍可用于开发和自动化：
@@ -42,18 +42,9 @@ py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --repo
 - `skills/`：项目维护规范与 Boss 研究资料
 - `config/player_abilities.json`：按职业/专精维护的 WCL 已验证爆发、减伤、功能、打断与控制技能公共目录
 - `tools/debug/`：手工调试入口
-- `host/OfflineHost.cs`：无需 Python 的离线宿主
+- `data/raid_calendar.db`：团本日历、出勤和拾取分配的本地持久化数据（不纳入 Git）
 
 新增 Boss 时注册后端插件，并创建
 `frontend/report/plugins/<raidKey>/<bossKey>/plugin.js`。只有通用报告无法表达时，才增加该 Boss 的专用 `report.html`。
 
-## 归档打包
-
-离线宿主不属于产品运行入口，仅用于生成和复核历史归档包。日常使用、正式部署
-和所有 WCL 查询功能统一由 `server.py` 提供。
-
-```powershell
-.\build_offline_package.bat
-```
-
-产物位于 `dist/wow_raidanalyzer_offline/`。最终用户将 JSON 放入 `data/` 后运行 `start.bat`。
+产品仅由 `server.py` 提供在线服务，不再维护离线宿主或离线打包链路。

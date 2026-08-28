@@ -15,6 +15,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from analyzer_core.concurrency import run_parallel_indexed
+from analyzer_core.court_rules import validate_court_profile
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
 from boss_plugins.combat_config import PERSONAL_DEFENSIVES
@@ -58,6 +59,39 @@ DEFAULT_OPTIONS = {
     "livingVenomReviewEnabled": True,
     "toxicDropletReviewEnabled": True,
 }
+
+COURT_PROFILE = {
+    "bossKey": "sentinels",
+    "phaseModel": "energy_cycle",
+    "rules": [
+        {
+            "key": "toxic_droplet_missed", "label": "剧毒水滴漏踩", "mode": "direct",
+            "spellIDs": [1284434, 1284451, 1284452],
+            "requiredEvidence": ["droplet cast", "raid explosion 1284452"],
+            "countOption": "toxicDropletCountEnabled", "defaultCountEnabled": True, "severityUnits": 1,
+        },
+        {
+            "key": "helical_toxin_timeout", "label": "合星座（螺旋剧毒）未在 28 秒内完成", "mode": "direct",
+            "spellIDs": [1284590, 1284941, 1311488],
+            "requiredEvidence": ["stasis round", "Cultivated Burst"],
+            "countOption": "helicalToxinCountEnabled", "defaultCountEnabled": True, "severityUnits": 1,
+        },
+        {
+            "key": "protovenom_eruption", "label": "变换原毒错误碰撞", "mode": "direct",
+            "spellIDs": [1296878, 1296882, 1296962],
+            "requiredEvidence": ["round cast", "eruption center", "victim set"],
+            "countOption": "protovenomCountEnabled", "defaultCountEnabled": True, "severityUnits": 1,
+        },
+        {
+            "key": "red_water_placement", "label": "红水放置位置", "mode": "review",
+            "spellIDs": [1284210, 1284471, 1284491, 1288260, 1288297],
+            "requiredEvidence": ["water source", "source debuff remove timestamp", "nearest position", "water radius by source"],
+            "calibration": "不同来源红水半径尚未确认",
+            "countOption": "redWaterPlacementCountEnabled", "defaultCountEnabled": False, "severityUnits": 1,
+        },
+    ],
+}
+validate_court_profile(COURT_PROFILE)
 
 IMMUNITY_ABILITIES = {
     spell_id: details

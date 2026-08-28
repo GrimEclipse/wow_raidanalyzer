@@ -4,9 +4,7 @@
 
 - `analyze.py`: CLI compatibility entry.
 - `server.py`: development HTTP API and static route host.
-- `offline_server.py`: Python offline host.
-- `host/OfflineHost.cs`: zero-dependency packaged host.
-- `analyzer_core/`: catalog, contracts, runner, WCL path policy, notebook store, and shared spell/spec configuration.
+- `analyzer_core/`: catalog, contracts, runner, WCL path policy, raid calendar store, and shared spell/spec configuration.
 - `boss_catalog.json`: backend plugin registration, configuration schema, and frontend capability declarations.
 
 ## Frontend
@@ -21,11 +19,10 @@
 - `frontend/tools/analysis-runner/`: UI-driven WCL analysis.
 - `frontend/tools/single-fight/`: manual guild report/day/Fight selection, single-fight jobs, cache status, and roster-filtered player timeline.
 - `frontend/tools/mythic-dungeon/`: stable Mythic+ route samples and per-Pull timelines.
-- `frontend/offline/`: offline package landing page.
 
 ## Stable public routes
 
-Use `/report`, `/online`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, `/loot`, and `/audit` on every host. `/single-fight` is intentionally online-server-only because it requires authenticated WCL credentials and background jobs; do not advertise it in the offline package. Physical paths may change; update the applicable hosts and packaging together.
+Use `/report`, `/online`, `/cooldowns`, `/mythic-dungeon`, `/raid-guide`, `/raid-calendar`, `/audit`, and `/single-fight` through `server.py`. `/loot` remains a compatibility alias for the raid calendar; its store is `data/raid_calendar.db`.
 
 ## Shared player ability evidence
 

@@ -916,7 +916,7 @@
 </div>
 
 <script src="./assets/vendor/wcl_hardcore_api.js"></script>
-<script src="./assets/vendor/offline-data-loader.js"></script>
+<script src="./frontend/core/report-data-loader.js"></script>
 <script src="./assets/vendor/analysis-capabilities.js"></script>
 <script>
 const { createApp } = Vue;
@@ -2464,7 +2464,7 @@ createApp({
                 var apiErr = await res.text();
                 throw new Error(apiErr || (`HTTP ${res.status}`));
             } catch (apiError) {
-                // 2) Browser-side real .xlsx (works on OfflineHost / static / missing openpyxl).
+                // 2) Browser-side real .xlsx fallback when the server export is unavailable.
                 try {
                     if (!window.VerdictXlsx || typeof window.VerdictXlsx.downloadVerdictXlsx !== 'function') {
                         throw new Error('缺少 assets/vendor/verdict-xlsx.js');

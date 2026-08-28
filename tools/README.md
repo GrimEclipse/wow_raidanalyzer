@@ -155,7 +155,7 @@ py -3 tools/diagnose_runtime.py
 py -3 tools/export_verdict_excel.py
 ```
 
-（该脚本目前主要被 `offline_server.py` 的 `/api/export-verdict-excel` 调用。）
+（该脚本由 `server.py` 的 `/api/export-verdict-excel` 调用。）
 
 ---
 

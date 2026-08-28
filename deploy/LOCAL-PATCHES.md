@@ -211,4 +211,4 @@ systemctl restart wow-raidanalyzer
 ## 遗留
 - raid-guide 页技能名/物品名是**文本链接**（`wowhead.com/cn/spell=...`），点击跳转 wowhead 详情页仍需 VPN
   （图标已本地化；详情页代理成本高，未做）。
-- raid-loot（掉落）页无图标，仅文本链接，不受影响。
+- raid-calendar（团本日历与掉落）页无图标，仅文本链接，不受影响。
