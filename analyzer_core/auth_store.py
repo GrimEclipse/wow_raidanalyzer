@@ -22,7 +22,7 @@ from analyzer_core.wcl_context import WclCredentials
 ROOT = Path(__file__).resolve().parents[1]
 AUTH_DIR = Path(os.getenv("APP_AUTH_DIR") or (ROOT / "auth"))
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
-PASSWORD_MIN_LENGTH = 12
+PASSWORD_MIN_LENGTH = 1
 SESSION_HOURS = max(1, int(os.getenv("APP_SESSION_HOURS", "24") or 24))
 ROLES = {"viewer", "editor", "admin"}
 
@@ -39,11 +39,11 @@ def normalize_username(username: str) -> str:
 
 
 def validate_password(password: str) -> str:
+    """密码强度规则已放开（2026-08-28 机主拍板）：非空即可登录，
+    不再要求最小长度与大小写+数字组合。"""
     value = str(password or "")
     if len(value) < PASSWORD_MIN_LENGTH:
         raise AuthError(f"密码至少需要 {PASSWORD_MIN_LENGTH} 个字符。")
-    if value.lower() == value or value.upper() == value or not any(ch.isdigit() for ch in value):
-        raise AuthError("密码需要同时包含大小写字母和数字。")
     return value
 
 

@@ -56,9 +56,9 @@
 
     <form id="registerForm" class="hidden">
       <label class="field"><span class="label-row">用户名</span><span class="field-wrap"><input name="username" autocomplete="username" required minlength="3" maxlength="32" placeholder="3–32 位字母或数字"></span></label>
-      <label class="field"><span class="label-row">密码</span><span class="field-wrap"><input name="password" type="password" autocomplete="new-password" required minlength="12" placeholder="设置高强度密码"><button class="reveal" type="button" aria-label="显示密码" data-reveal>◉</button></span></label>
+      <label class="field"><span class="label-row">密码</span><span class="field-wrap"><input name="password" type="password" autocomplete="new-password" required minlength="1" placeholder="设置密码"><button class="reveal" type="button" aria-label="显示密码" data-reveal>◉</button></span></label>
       <label id="inviteField" class="field hidden"><span class="label-row">邀请码</span><span class="field-wrap"><input name="inviteCode" autocomplete="off" placeholder="向管理员索取邀请码"></span></label>
-      <p id="registerHint" class="hint">密码至少 12 位，并同时包含大写字母、小写字母和数字。新账号默认为只读权限。</p>
+      <p id="registerHint" class="hint">密码只需 1 位以上即可，无大小写和数字要求。新账号默认为只读权限。</p>
       <button class="primary" type="submit"><span>创建只读账号　→</span></button>
     </form>
     <div id="message" class="message" role="alert" aria-live="polite"></div>
@@ -319,8 +319,8 @@
       inviteField.classList.toggle('hidden', !required);
       inviteInput.required = required;
       registerHint.textContent = required
-        ? '密码至少 12 位，并同时包含大写字母、小写字母和数字。注册需要管理员邀请码。'
-        : '密码至少 12 位，并同时包含大写字母、小写字母和数字。新账号默认为只读权限。';
+        ? '密码只需 1 位以上即可，无大小写和数字要求。注册需要管理员邀请码。'
+        : '密码只需 1 位以上即可，无大小写和数字要求。新账号默认为只读权限。';
     })
     .catch(() => {});
   if (new URLSearchParams(location.search).get('mode') === 'register') setMode('register');
