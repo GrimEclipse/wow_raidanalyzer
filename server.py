@@ -345,9 +345,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             query = parse_qs(urlparse(self.path).query)
             selected_date = str((query.get("date") or [""])[0]).strip()
             limit = int((query.get("limit") or ["20"])[0])
+            guild_value = str((query.get("guildID") or [""])[0]).strip()
+            try:
+                guild_id = int(guild_value) if guild_value else None
+                if guild_id is not None and guild_id <= 0:
+                    raise ValueError
+            except ValueError:
+                return self.json_error("WCL 工会 ID 必须是正整数。", HTTPStatus.BAD_REQUEST)
             with use_wcl_credentials(credentials):
                 return self.send_response_body(*json_bytes(recent_guild_reports(
-                    selected_date=selected_date, limit=limit,
+                    selected_date=selected_date, limit=limit, guild_id=guild_id,
                 )))
         single_report = re.fullmatch(r"/api/single-fight/reports/([A-Za-z0-9]+)", path)
         if single_report:

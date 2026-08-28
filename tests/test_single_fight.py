@@ -72,6 +72,7 @@ class SingleFightDiscoveryTests(unittest.TestCase):
     def test_recent_reports_filters_short_and_non_encounter_fights(self):
         class FakeClient:
             def graphql_data(self, query, variables):
+                self.variables = variables
                 return {
                     "reportData": {"reports": {"data": [{
                         "code": "ABC123", "title": "night", "startTime": 1786550400000,
@@ -85,10 +86,13 @@ class SingleFightDiscoveryTests(unittest.TestCase):
                     "rateLimitData": {"limitPerHour": 18000, "pointsSpentThisHour": 20},
                 }
 
-        result = recent_guild_reports(FakeClient(), limit=1)
+        client = FakeClient()
+        result = recent_guild_reports(client, limit=1, guild_id=123456)
         self.assertEqual(len(result["reports"]), 1)
         self.assertEqual([row["id"] for row in result["reports"][0]["fights"]], [3])
         self.assertTrue(result["reports"][0]["lastFight"]["supported"])
+        self.assertEqual(client.variables["guildID"], 123456)
+        self.assertEqual(result["guild"], {"id": 123456, "name": "自定义工会"})
 
     def test_report_overview_joins_friendly_players_and_specs(self):
         class FakeClient:
@@ -110,6 +114,10 @@ class SingleFightDiscoveryTests(unittest.TestCase):
         self.assertTrue(fight["supported"])
         self.assertGreater(fight["abilitySelection"]["abilityCount"], 1)
 
+    def test_recent_reports_rejects_non_positive_guild_id(self):
+        with self.assertRaisesRegex(ValueError, "正整数"):
+            recent_guild_reports(object(), guild_id=0)
+
 
 class SingleFightFrontendTests(unittest.TestCase):
     def test_route_and_manual_fetch_are_wired(self):
@@ -118,6 +126,8 @@ class SingleFightFrontendTests(unittest.TestCase):
         page = (root / "frontend" / "tools" / "single-fight" / "index.html").read_text(encoding="utf-8")
         self.assertIn('"/single-fight": "/frontend/tools/single-fight/index.html"', server)
         self.assertIn('/api/single-fight/analyze', page)
+        self.assertIn('id="guildInput"', page)
+        self.assertIn('&guildID=${encodeURIComponent(guildID)}', page)
         self.assertIn('$("loadReports").addEventListener("click",loadReports)', page)
         self.assertNotIn("then(loadReports)", page)
 

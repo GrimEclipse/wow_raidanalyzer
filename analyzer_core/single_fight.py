@@ -131,9 +131,23 @@ def _candidate_fights(report: dict, config: dict) -> list[dict]:
     return sorted(rows, key=lambda row: (row["absoluteStartTime"], row["id"]))
 
 
-def recent_guild_reports(client: WclClient | None = None, *, selected_date: str = "", limit: int | None = None) -> dict:
+def recent_guild_reports(
+    client: WclClient | None = None,
+    *,
+    selected_date: str = "",
+    limit: int | None = None,
+    guild_id: int | None = None,
+) -> dict:
     config = load_single_fight_config()
     client = client or WclClient()
+    configured_guild_id = int(config["guild"]["id"])
+    selected_guild_id = configured_guild_id if guild_id is None else int(guild_id)
+    if selected_guild_id <= 0:
+        raise ValueError("WCL 工会 ID 必须是正整数。")
+    selected_guild = dict(config["guild"])
+    selected_guild["id"] = selected_guild_id
+    if selected_guild_id != configured_guild_id:
+        selected_guild["name"] = "自定义工会"
     report_limit = max(1, min(50, int(limit or config.get("recentReportLimit") or 20)))
     query = """
     query($guildID: Int!, $limit: Int!) {
@@ -144,7 +158,7 @@ def recent_guild_reports(client: WclClient | None = None, *, selected_date: str 
       rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn }
     }
     """
-    data = client.graphql_data(query, {"guildID": config["guild"]["id"], "limit": report_limit})
+    data = client.graphql_data(query, {"guildID": selected_guild_id, "limit": report_limit})
     reports = []
     for raw in ((data.get("reportData") or {}).get("reports") or {}).get("data") or []:
         report = {**raw, "code": str(raw.get("code") or "")}
@@ -168,7 +182,7 @@ def recent_guild_reports(client: WclClient | None = None, *, selected_date: str 
         })
     return {
         "schemaVersion": 1,
-        "guild": config["guild"],
+        "guild": selected_guild,
         "raidNight": config["raidNight"],
         "selectedDate": selected_date,
         "reports": reports,

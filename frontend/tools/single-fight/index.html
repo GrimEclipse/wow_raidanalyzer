@@ -22,6 +22,7 @@
     <aside class="panel">
       <div class="panel-head"><div class="split"><h2>1 · 获取开荒日</h2><span id="guildLabel" class="muted">工会…</span></div></div>
       <div class="panel-body stack">
+        <label class="stack"><span class="muted">WCL 工会 ID</span><input id="guildInput" type="number" min="1" step="1" inputmode="numeric" value="774422" aria-label="WCL 工会 ID"></label>
         <div class="controls"><input id="dateInput" type="date"><button id="loadReports" class="primary">获取数据</button></div>
         <div class="controls"><input id="reportInput" placeholder="或输入 WCL Report ID"><button id="openReport">读取</button></div>
         <div id="reportMessage" class="muted">尚未请求 WCL。</div>
@@ -69,6 +70,7 @@
     const response=await fetch("/api/single-fight/config",{cache:"no-store"});
     if(!response.ok)throw new Error(await errorMessage(response));
     const data=await response.json();
+    $("guildInput").value=String(data.guild.id||774422);
     $("guildLabel").textContent=`${data.guild.name||"工会"} · ${data.guild.id}`;
   }
 
@@ -76,9 +78,12 @@
     $("loadReports").disabled=true;$("reportMessage").textContent="正在读取工会 report…";
     try{
       const date=$("dateInput").value;
-      const response=await fetch(`/api/single-fight/reports?date=${encodeURIComponent(date)}&limit=20`,{cache:"no-store"});
+      const guildID=Number($("guildInput").value);
+      if(!Number.isInteger(guildID)||guildID<=0)throw new Error("请输入有效的 WCL 工会 ID。");
+      const response=await fetch(`/api/single-fight/reports?date=${encodeURIComponent(date)}&limit=20&guildID=${encodeURIComponent(guildID)}`,{cache:"no-store"});
       if(!response.ok)throw new Error(await errorMessage(response));
       const data=await response.json();state.reports=data.reports||[];
+      $("guildLabel").textContent=`${data.guild?.name||"工会"} · ${data.guild?.id||guildID}`;
       const rate=data.rateLimit||{};
       $("reportMessage").textContent=`找到 ${state.reports.length} 份 report；WCL 本小时 ${rate.pointsSpentThisHour??"?"}/${rate.limitPerHour??"?"} 点。`;
       renderReports();

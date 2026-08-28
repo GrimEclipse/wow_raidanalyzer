@@ -368,8 +368,9 @@ def test_lost_throw_junk_tracks_steps_immunity_missing_and_relic_rupture():
     assert [row["playerID"] for row in first["missing"]] == [3]
     assert first["relicRuptureTriggered"] is True
     assert first["relicRuptureHitCount"] == 1
-    assert first["relicRuptureDamage"] == 1234
-    assert first["relicRuptureVictims"][0]["playerID"] == 3
+    assert "relicRuptureTime" not in first
+    assert "relicRuptureVictims" not in first
+    assert "relicRuptureDamage" not in first
     assert result["rounds"][1]["relicRuptureTriggered"] is False
 
 

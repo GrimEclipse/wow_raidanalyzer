@@ -460,11 +460,6 @@ def analyze_throw_junk(fight, actor_map, players, casts, damage, debuffs, friend
             and int(ability_id(event) or 0) in {1310027, 1311587}
             and event.get("targetID") in players
         ]
-        rupture_ts = min((int(event.get("timestamp") or 0) for event in rupture_hits), default=None)
-        rupture_ids = sorted(
-            {event.get("targetID") for event in rupture_hits},
-            key=lambda value: actor_name(actor_map, value),
-        )
         rounds.append({
             "index": group_index + 1,
             "timeMs": start - fight["startTime"],
@@ -484,9 +479,6 @@ def analyze_throw_junk(fight, actor_map, players, casts, damage, debuffs, friend
             "relicRuptureSpellID": 1310028,
             "relicRuptureTriggered": bool(rupture_hits),
             "relicRuptureHitCount": len(rupture_hits),
-            "relicRuptureTime": fmt_ms(rupture_ts - fight["startTime"]) if rupture_ts is not None else None,
-            "relicRuptureVictims": [player_ref(players, actor_map, player_id) for player_id in rupture_ids],
-            "relicRuptureDamage": sum(event_amount(event) for event in rupture_hits),
         })
     return {
         "rounds": rounds,
