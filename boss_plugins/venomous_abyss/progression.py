@@ -201,7 +201,6 @@ def _wind_side_from_position(x, y, arena):
         key=lambda marker_key: _angle_delta(angle, DIG_WIND_MARKERS[marker_key]["angleDegrees"]),
     )
 VENOM_GAIN_DAMAGE = {
-    1289994: "腐蚀洪流",
     1289201: "腐蚀液滴",
     1291404: "剧毒涌现",
     1308122: "剧毒涌现",
@@ -210,6 +209,7 @@ VENOM_GAIN_DAMAGE = {
     1293979: "腐蚀唾液",
 }
 VENOM_ABNORMAL_DAMAGE = {
+    1289994: "腐蚀洪流",
     1290338: "腐蚀液滴爆裂",
     1292806: "搅动深渊",
     1292807: "搅动深渊",
@@ -1538,8 +1538,14 @@ def _venom_attribution(damage_events, casts, timestamp, player_id):
     if targeted_cast:
         spell_id = int(ability_id(targeted_cast) or 0)
         return VENOM_GAIN_DAMAGE.get(spell_id, spell_name(spell_id)), spell_id, "normal"
-    if any(abs(int(cast.get("timestamp") or 0) - timestamp) <= 3500 for cast in casts if int(ability_id(cast) or 0) in FEAST_IDS):
-        return spell_name(1290516), 1290516, "feast"
+    direct_cast = min(
+        (cast for cast in casts if int(ability_id(cast) or 0) == 1290336
+         and abs(int(cast.get("timestamp") or 0) - timestamp) <= 5000),
+        key=lambda cast: abs(int(cast.get("timestamp") or 0) - timestamp),
+        default=None,
+    )
+    if direct_cast:
+        return "Boss 直接叠层", 1290336, "normal"
     return "未匹配到已知叠层伤害", None, "unknown"
 
 

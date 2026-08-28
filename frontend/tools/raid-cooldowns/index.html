@@ -400,7 +400,7 @@
         .then(response => response.json())
         .then(options => {
             state.options = options;
-            const versions = options.versions || [...new Set(options.raids.map(row => row.version).filter(Boolean))].map(key => ({key, label:key}));
+            const versions = (options.versions || [...new Set(options.raids.map(row => row.version).filter(Boolean))].map(key => ({key, label:key}))).filter(row => row.key !== '12.0');
             version.innerHTML = versions.map(row => `<option value="${escapeHtml(row.key)}">${escapeHtml(row.label)}</option>`).join('');
             difficulty.innerHTML = options.difficulties.map(row => `<option value="${row.value}">${escapeHtml(row.label)}</option>`).join('');
             difficulty.value = '4';

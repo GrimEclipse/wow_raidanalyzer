@@ -186,6 +186,7 @@ def _client_graphql(token: str, query: str, variables: dict) -> dict:
 
 def options_document() -> dict:
     versions = list(dict.fromkeys(raid["version"] for raid in RAIDS.values()))
+    versions.sort(reverse=True)
     return {
         "schemaVersion": 2,
         "versions": [

@@ -146,7 +146,7 @@ def find_boss_by_encounter(encounter_id: int) -> Optional[BossEntry]:
 
 def to_frontend_catalog() -> dict:
     versions = []
-    for version in iter_versions():
+    for version in sorted(iter_versions(), reverse=True):
         raids = []
         version_entries = [entry for entry in CATALOG if entry.version == version]
         for raid_key in dict.fromkeys(entry.raid_key for entry in version_entries):

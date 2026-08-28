@@ -468,3 +468,21 @@ def test_twinfangs_globule_rounds_track_eaten_counts_missed_and_abnormal_gains()
     assert [(row["playerID"], row["sourceID"]) for row in gains] == [(3, 1290338)]
     assert gains[0]["delta"] == 2
     assert gains[0]["toStack"] == 2
+
+
+def test_twinfangs_deluge_green_circle_hit_is_abnormal_gain():
+    fight = {"startTime": 0, "endTime": 30_000}
+    players = {1: player(1, "甲")}
+    raw = {
+        "debuffs": [
+            event(10_000, 1290336, "applydebuff", targetID=1, sourceID=50, stack=1),
+        ],
+        "casts": [event(5_000, 1289192, "cast", targetID=0)],
+        "damage": [event(9_990, 1289994, "damage", targetID=1, amount=50)],
+        "friendlyBuffs": [], "deaths": [],
+    }
+    result = analyze_twinfangs(fight, {1: "甲", 50: "Boss"}, players, raw)
+    row = result["eternalVenom"]["players"][0]["events"][0]
+    assert row["category"] == "abnormal"
+    assert row["sourceID"] == 1289994
+    assert result["eternalVenom"]["abnormalGains"][0]["sourceID"] == 1289994

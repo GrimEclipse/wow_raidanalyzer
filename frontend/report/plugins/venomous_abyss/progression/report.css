@@ -445,3 +445,10 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+.venom-picker{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12px;color:var(--muted)}
+.venom-picker select{border:1px solid #2a4145;border-radius:8px;background:#0a1214;color:var(--ink);padding:6px 10px;font-size:12px}
+tr.abnormal-row td{background:rgba(255,107,107,.13)}
+tr.abnormal-row td:first-child{border-left:3px solid #ff6b6b}
+.abnormal-panel{border-color:#93434b !important;background:#150e11}
+.abnormal-panel h2{color:#ff9ba4}

@@ -43,7 +43,6 @@
         <div class="panel-body">
           <div class="progress"><i id="progressBar"></i></div>
           <div class="status"><span id="statusText">等待选择</span><span id="percentText">0%</span></div>
-          <div id="analysisNote" class="note">阵容确定后才加载该职业/专精的已验证技能。事件提取使用整场 Casts 与 Buffs 批量流，不按技能逐个请求。</div>
           <div id="result" class="result">
             <div id="resultStats" class="result-grid"></div>
             <div class="split" style="margin-top:12px"><strong>玩家关键技能时间轴</strong><a id="detailLink" class="button" href="#">打开 Boss 专属完整报告</a></div>
@@ -71,7 +70,6 @@
     if(!response.ok)throw new Error(await errorMessage(response));
     const data=await response.json();
     $("guildLabel").textContent=`${data.guild.name||"工会"} · ${data.guild.id}`;
-    $("analysisNote").textContent=`公共目录 ${data.abilityCatalog.abilityCount} 项 / ${data.abilityCatalog.spellIdCount} 个已验证 ID。阵容确定后才裁剪到当前职业与专精；WCL 使用 Casts/Buffs 批量流，不按技能逐个请求。`;
   }
 
   async function loadReports(){
@@ -116,11 +114,12 @@
   }
 
   function renderFights(){
-    const rows=(state.report?.fights||[]).filter(row=>!$("dateInput").value||row.raidNightDate===$("dateInput").value);
+    const rows=(state.report?.fights||[]).filter(row=>!$("dateInput").value||row.raidNightDate===$("dateInput").value).sort((a,b)=>b.id-a.id);
+    const lastId=rows.length?Math.max(...rows.map(row=>row.id)):-1;
     $("fightEmpty").classList.toggle("hidden",Boolean(rows.length));
     $("fightList").innerHTML=rows.map((fight,index)=>`<button class="fight" data-fight="${fight.id}">
       <div class="split"><strong>${escapeHtml(fight.analysisIdentity?.bossName||fight.name)} · Fight ${fight.id}</strong><span>${formatDuration(fight.durationMs)}</span></div>
-      <div class="meta"><span>${new Date(fight.absoluteStartTime).toLocaleTimeString("zh-CN",{hour12:false})}</span><span class="tag">${escapeHtml(fight.difficultyName)}</span>${fight.kill?'<span class="tag kill">击杀</span>':''}${fight.supported?'<span class="tag ok">可分析</span>':`<span class="tag no">规则未接入</span>`}${index===rows.length-1?'<span class="tag ok">本日最后一场</span>':''}</div>
+      <div class="meta"><span>${new Date(fight.absoluteStartTime).toLocaleTimeString("zh-CN",{hour12:false})}</span><span class="tag">${escapeHtml(fight.difficultyName)}</span>${fight.kill?'<span class="tag kill">击杀</span>':''}${fight.supported?'<span class="tag ok">可分析</span>':`<span class="tag no">规则未接入</span>`}${fight.id===lastId?'<span class="tag ok">本日最后一场</span>':''}</div>
       <div class="roster">${(fight.roster||[]).map(player=>`<span class="player ${escapeHtml(player.class)}">${escapeHtml(player.name)} · ${escapeHtml(player.spec)}</span>`).join("")}</div>
     </button>`).join("");
     document.querySelectorAll("[data-fight]").forEach(button=>button.addEventListener("click",()=>selectFight(Number(button.dataset.fight))));

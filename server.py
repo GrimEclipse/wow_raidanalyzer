@@ -94,6 +94,8 @@ def publish(job: Job, event: dict):
     event.setdefault("message", job.message)
     event.setdefault("stage", job.stage)
     job.events.append(event)
+    if len(job.events) > 400:
+        del job.events[: len(job.events) - 400]
     for subscriber in list(job.subscribers):
         subscriber.put(event)
 
@@ -421,6 +423,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         admin_reset_match = re.fullmatch(r"/api/admin/users/(\d+)/password", path)
         if admin_reset_match:
             return self.handle_admin_reset_password(user, int(admin_reset_match.group(1)))
+        if path == "/api/auth/wcl-credentials/test":
+            return self.handle_wcl_credentials_test(user)
         return self.handle_write(path, user)
 
     def do_PUT(self):
@@ -640,6 +644,37 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes({"ok": True, "wcl": AUTH.wcl_summary(user["id"])}))
         except (AuthError, ValueError, json.JSONDecodeError) as error:
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
+
+    def handle_wcl_credentials_test(self, user):
+        try:
+            credentials = AUTH.get_wcl_credentials(user["id"])
+            if not credentials:
+                return self.json_error("尚未配置 WCL 凭据，请先保存再测试。", HTTPStatus.BAD_REQUEST)
+            from analyzer_core.single_fight import load_single_fight_config
+            from analyzer_core.wcl_api import WclClient
+            client = WclClient()
+            with use_wcl_credentials(credentials):
+                client.token()
+                guild_id = int(load_single_fight_config()["guild"]["id"])
+                data = client.graphql_data(
+                    """
+                    query($guildID: Int!) {
+                      reportData { reports(guildID: $guildID, limit: 1) { data { code title startTime } } }
+                      rateLimitData { limitPerHour pointsSpentThisHour }
+                    }
+                    """,
+                    {"guildID": guild_id},
+                )
+            reports = ((data.get("reportData") or {}).get("reports") or {}).get("data") or []
+            last = reports[0] if reports else None
+            return self.send_response_body(*json_bytes({
+                "ok": True,
+                "clientIdHint": AUTH.wcl_summary(user["id"]).get("clientIdHint", ""),
+                "guildReport": ({k: last.get(k) for k in ("code", "title", "startTime")}) if last else None,
+                "rateLimit": data.get("rateLimitData") or {},
+            }))
+        except Exception as error:
+            return self.json_error(f"API 不可用：{error}", HTTPStatus.BAD_REQUEST)
 
     def handle_admin_update(self, actor, target_user_id):
         if not actor["isAdmin"]:

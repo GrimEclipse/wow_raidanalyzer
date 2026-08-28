@@ -32,7 +32,7 @@ class RaidCooldownTests(unittest.TestCase):
 
     def test_options_include_live_12_0_and_12_1_boss_lists(self):
         options = options_document()
-        self.assertEqual([row["key"] for row in options["versions"]], ["12.0", "12.1"])
+        self.assertEqual([row["key"] for row in options["versions"]], ["12.1", "12.0"])
         raids = {row["key"]: row for row in options["raids"]}
         self.assertEqual(raids["void_spire"]["version"], "12.0")
         self.assertEqual(
