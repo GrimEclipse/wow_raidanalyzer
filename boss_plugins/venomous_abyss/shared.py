@@ -44,6 +44,10 @@ EXTRA_SPELL_NAMES = {
     1307939: "残骸凋零",
     1291918: "旋壳",
     1305963: "腐蚀囊肿",
+    1308853: "木刺爆裂",
+    1310027: "遗物爆裂",
+    1310028: "遗物爆裂",
+    1311587: "遗物爆裂",
 }
 IMMUNITY_SPELLS = {
     int(spell_id): details.get("name", str(spell_id))

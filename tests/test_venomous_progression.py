@@ -6,6 +6,7 @@ from boss_plugins.venomous_abyss.progression import (
     _infer_wind_from_frames,
     _placement_slot_validation,
     analyze_lost,
+    analyze_throw_junk,
     analyze_sszorak,
     analyze_twinfangs,
     analyze_vashnik,
@@ -324,6 +325,64 @@ def test_lost_tracks_united_defense_total_duration():
     )
     assert len(result["unitedDefense"]) == 2
     assert result["unitedDefenseTotalSec"] == 5.0
+
+
+def test_lost_throw_junk_tracks_steps_immunity_missing_and_relic_rupture():
+    fight = {"startTime": 0, "endTime": 50_000}
+    players = {
+        1: player(1, "踩箱者"),
+        2: player(2, "免疫者"),
+        3: player(3, "未踩者"),
+        4: player(4, "阵亡者"),
+    }
+    casts = [
+        event(1_000, 1291933, "begincast"),
+        event(5_000, 1291933, "begincast"),
+        event(9_000, 1306145, "begincast"),
+        event(30_000, 1291933, "begincast"),
+    ]
+    debuffs = [
+        event(7_000, 1308853, "applydebuff", targetID=1, stack=1),
+        event(8_000, 1308853, "applydebuffstack", targetID=1, stack=2),
+    ]
+    friendly_buffs = [
+        event(6_500, 642, "applybuff", targetID=2),
+        event(8_500, 642, "removebuff", targetID=2),
+    ]
+    damage = [event(7_500, 1310027, "damage", targetID=3, amount=1234)]
+    deaths = [event(9_500, 1, "death", targetID=4, killingAbilityGameID=1)]
+
+    result = analyze_throw_junk(
+        fight, {1: "踩箱者", 2: "免疫者", 3: "未踩者", 4: "阵亡者"},
+        players, casts, damage, debuffs, friendly_buffs, deaths, [],
+    )
+
+    assert result["roundCount"] == 2
+    first = result["rounds"][0]
+    assert first["throwCount"] == 3
+    assert first["stepped"][0]["playerID"] == 1
+    assert first["stepped"][0]["stepCount"] == 2
+    assert first["stepped"][0]["peakStack"] == 2
+    assert first["immunityPlayers"][0]["playerID"] == 2
+    assert first["immunityPlayers"][0]["immunities"][0]["spellName"] == "圣盾术"
+    assert [row["playerID"] for row in first["missing"]] == [3]
+    assert first["relicRuptureTriggered"] is True
+    assert first["relicRuptureHitCount"] == 1
+    assert first["relicRuptureDamage"] == 1234
+    assert first["relicRuptureVictims"][0]["playerID"] == 3
+    assert result["rounds"][1]["relicRuptureTriggered"] is False
+
+
+def test_lost_throw_junk_reincludes_player_after_combat_res():
+    fight = {"startTime": 0, "endTime": 30_000}
+    players = {1: player(1, "战复玩家"), 2: player(2, "施法者")}
+    result = analyze_throw_junk(
+        fight, {1: "战复玩家", 2: "施法者"}, players,
+        [event(20_000, 1291933, "begincast")], [], [], [],
+        [event(5_000, 1, "death", targetID=1, killingAbilityGameID=1)],
+        [event(10_000, 20484, "cast", sourceID=2, targetID=1)],
+    )
+    assert {row["playerID"] for row in result["rounds"][0]["missing"]} == {1, 2}
 
 
 def test_twinfangs_inserts_death_when_feast_clears_multiple_stacks():
