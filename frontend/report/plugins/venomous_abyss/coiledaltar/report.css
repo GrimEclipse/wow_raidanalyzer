@@ -1,0 +1,102 @@
+@import url("../progression/report.css");
+.replay-map {
+  aspect-ratio: 1997 / 1118;
+}
+.arena-square {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(217, 244, 255, 0.45);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.runout-range,
+.cone-radius {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+.runout-range {
+  border: 2px solid #ff7380;
+  background: #ff738018;
+  opacity: 0.7;
+}
+.cone-radius {
+  border: 1px dashed rgba(99, 202, 208, 0.45);
+}
+.cone-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+.cone-map path {
+  fill: rgba(99, 202, 208, 0.22);
+  stroke: rgba(99, 202, 208, 0.9);
+  stroke-width: 0.4;
+  stroke-linejoin: round;
+}
+.marker.share { background: #fbbf24; }
+.marker.inside { background: #ff7380; }
+.field-diagram-list {
+  display: grid;
+  gap: 10px;
+}
+.field-diagram-item {
+  display: grid;
+  gap: 8px;
+}
+.field-diagram-item .round-button {
+  width: 100%;
+}
+.field-diagram-map {
+  padding: 0 2px 4px;
+}
+.spread-target {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 2px solid #edbd63;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.55;
+}
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+.marker.venom { background: #66d68a; }
+.marker.venom-spawn { background: #2dd4bf; border-color: #99f6e4; }
+.marker.manifest { background: #c084fc; border-color: #e9d5ff; width: 14px; height: 14px; }
+.marker.manifest-target { background: #fb7185; border-color: #fecdd3; }
+.marker.tank { background: #38bdf8; border-color: #e0f2fe; width: 14px; height: 14px; }
+.marker.bomb { background: #ff7380; }
+.link-map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 3;
+}
+.link-map line {
+  stroke: #ff4d6d;
+  stroke-width: 0.45;
+  stroke-opacity: 0.95;
+}
+.legend {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #9fb0b8;
+}
+.legend.warn { color: #edbd63; }

@@ -563,18 +563,18 @@
               ]
             },
             {
-              "key": "bargained",
+              "key": "coiledaltar",
               "order": 7,
-              "name": "The Coiled Altar（中文名待定）",
+              "name": "盘卷祭坛",
               "englishName": "The Coiled Altar",
-              "externalKey": "wow.venomabyss,07.bargained",
-              "aliases": [],
-              "plugin": "boss_plugins.venomous_abyss.bargained",
-              "supported": false,
-              "disabledReason": "12.1 中文名与机制数据待接入",
+              "externalKey": "wow.venomabyss,07.coiledaltar",
+              "aliases": ["盘卷祭坛"],
+              "plugin": "boss_plugins.venomous_abyss.coiledaltar",
+              "supported": true,
+              "disabledReason": "",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/07-bargained.jpg", "width": 1997, "height": 1118 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/07-coiledaltar.jpg", "width": 1997, "height": 1118 }
               ]
             },
             {
