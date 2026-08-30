@@ -4,28 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <base href="../../../../../">
-  <title>哨兵 · 开荒断案</title>
-  <link rel="stylesheet" href="frontend/report/plugins/venomous_abyss/sentinels/report.css">
-  <link rel="stylesheet" href="frontend/report/plugins/venomous_abyss/sentinels/revision.css">
+  <title>陵寝哨兵 · 技能分析</title>
+  <link rel="stylesheet" href="frontend/report/plugins/venomous_abyss/sentinels/report.css?v=1.3.0-20260830">
+  <link rel="stylesheet" href="frontend/report/plugins/venomous_abyss/sentinels/revision.css?v=1.3.0-20260830">
 </head>
 <body>
-  <main class="shell">
-    <header class="report-head">
-      <div>
-        <div class="eyebrow">12.1 · 烈毒之渊</div>
-        <h1 id="title">哨兵</h1>
-      </div>
-      <div id="meta" class="muted">等待载入…</div>
-      <div class="toolbar">
-        <a class="button" href="/">首页</a>
-        <a id="overviewLink" class="button" href="/report">返回概览</a>
-        <a id="wclLink" class="button" target="_blank" rel="noreferrer">WCL</a>
-        <select id="pullSelect" aria-label="选择战斗"></select>
-        <label class="button">导入 JSON<input id="fileInput" type="file" accept=".json" hidden></label>
-      </div>
-    </header>
-    <section id="stats" class="stats panel"></section>
-    <nav id="tabs" class="page-tabs panel">
+  <header class="head">
+    <div><span>12.1 · 烈毒之渊</span><h1 id="pageTitle">陵寝哨兵 · 技能分析</h1></div>
+    <div class="tools">
+      <a class="button" href="/">首页</a>
+      <a id="overviewLink" class="button" href="/report">全场概览</a>
+      <select id="pullSelect" aria-label="选择战斗"></select>
+      <a id="wclLink" class="button" target="_blank" rel="noreferrer">WCL 原始记录</a>
+      <label class="button">导入 JSON<input id="fileInput" type="file" accept=".json" hidden></label>
+    </div>
+  </header>
+  <main>
+    <div id="error" class="error"></div>
+    <section id="summary" class="stats"></section>
+    <nav class="tabs" id="tabs">
       <button data-tab="survival" class="active">全场存活情况</button>
       <button data-tab="helical">转阶段 / 螺旋毒素</button>
       <button data-tab="marks">酸液 / 鲜血印记</button>
@@ -36,7 +33,7 @@
   </main>
   <script src="frontend/core/report-plugin-runtime.js?v=1.2.0-20260826"></script>
   <script src="https://wow.zamimg.com/js/tooltips.js"></script>
-  <script src="frontend/report/plugins/venomous_abyss/sentinels/report.js?v=1.2.0-20260826"></script>
+  <script src="frontend/report/plugins/venomous_abyss/sentinels/report.js?v=1.3.0-20260830"></script>
   <script src="/frontend/core/home-button.js?v=1"></script>
 </body>
 </html>
