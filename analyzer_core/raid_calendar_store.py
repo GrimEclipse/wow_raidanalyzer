@@ -1,8 +1,9 @@
-"""Local progression attendance and loot allocation store."""
+"""Persistent raid calendar, attendance, and loot-allocation store."""
 from __future__ import annotations
 
 import copy
 import json
+import shutil
 import sqlite3
 import uuid
 from contextlib import closing
@@ -12,7 +13,8 @@ from typing import Any, Dict, Iterable, List
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = ROOT / "scoreboard" / "loot.db"
+DB_PATH = ROOT / "data" / "raid_calendar.db"
+LEGACY_DB_PATH = ROOT / "scoreboard" / "loot.db"
 CATALOG_PATH = ROOT / "assets" / "loot" / "raid_loot_12_1.json"
 DIFFICULTIES = {"lfr", "normal", "heroic", "mythic"}
 DIFFICULTY_NAMES = {"lfr": "随机团队", "normal": "普通", "heroic": "英雄", "mythic": "史诗"}
@@ -79,6 +81,9 @@ def _empty_state() -> Dict[str, Any]:
 
 
 def _connect() -> sqlite3.Connection:
+    if not DB_PATH.exists() and LEGACY_DB_PATH.exists():
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.execute(

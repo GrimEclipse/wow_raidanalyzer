@@ -1,16 +1,15 @@
 import math
 
-from boss_plugins.venomous_abyss.progression import (
+from boss_plugins.venomous_abyss.lostexplorers import analyze_lost, analyze_throw_junk
+from boss_plugins.venomous_abyss.sszorak import (
     DIG_WIND_DIRECTIONS,
     _infer_dig_winds,
     _infer_wind_from_frames,
     _placement_slot_validation,
-    analyze_lost,
-    analyze_throw_junk,
     analyze_sszorak,
-    analyze_twinfangs,
-    analyze_vashnik,
 )
+from boss_plugins.venomous_abyss.twinfangs import analyze_twinfangs
+from boss_plugins.venomous_abyss.vashnik import analyze_vashnik
 from boss_plugins.venomous_abyss.shared import (
     build_position_index,
     build_survival_timeline,
@@ -445,7 +444,7 @@ def test_sszorak_cyst_activation_window_is_asymmetric_and_solo_move_is_not_wind(
     尾巴漏在窗外，整段风被判反。
     验证：① 激活前 300ms / 激活后 2500ms 的非对称排除——风（激活前）仍算证据、
     爆炸（激活后）全部排除；② 单人移动帧不再单独构成风证据（闪现贴囊不带偏）。"""
-    from boss_plugins.venomous_abyss import progression as P
+    from boss_plugins.venomous_abyss import sszorak as P
 
     arena = {"centerX": 0, "centerY": 0, "radius": 6200}
     wind_angle = math.radians(P.DIG_WIND_DIRECTIONS["circle"]["wclAngleDegrees"])

@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from analyzer_core.concurrency import run_parallel_indexed
+from analyzer_core.court_rules import validate_court_profile
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
 from boss_plugins.common import (
@@ -89,6 +90,32 @@ DEFAULT_OPTIONS = {
     "invokeInterruptReviewEnabled": True,
     "avoidableDamageReviewEnabled": True,
 }
+
+COURT_PROFILE = {
+    "bossKey": "nakzali",
+    "phaseModel": "event_driven",
+    "rules": [
+        {
+            "key": "amani_reached_well", "label": "无眠的阿曼尼漏进灵魂之井", "mode": "direct",
+            "spellIDs": [1287533, 1297624],
+            "requiredEvidence": ["add identity", "well entry", "adjacent Ritual Burn"],
+            "countOption": "amaniLeakCountEnabled", "defaultCountEnabled": True, "severityUnits": 1,
+        },
+        {
+            "key": "possession_barrage_intercept", "label": "附身弹幕路径拦截", "mode": "assignment",
+            "spellIDs": [1284103, 1292034], "assignmentKey": "possessionBarrageTankLane",
+            "requiredEvidence": ["cast target", "boss facing", "hit players", "position samples"],
+            "countOption": "possessionBarrageCountEnabled", "defaultCountEnabled": False, "severityUnits": 1,
+        },
+        {
+            "key": "essence_rend_placement", "label": "精华撕裂解除位置", "mode": "assignment",
+            "spellIDs": [1287426, 1287434, 1287198], "assignmentKey": "essenceRendAllowedRegions",
+            "requiredEvidence": ["remove timestamp", "nearest position sample", "sample offset"],
+            "countOption": "essenceRendPlacementCountEnabled", "defaultCountEnabled": False, "severityUnits": 1,
+        },
+    ],
+}
+validate_court_profile(COURT_PROFILE)
 
 
 def progress(message, percent=None):

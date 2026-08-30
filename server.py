@@ -21,7 +21,7 @@ from analyzer_core.auth_store import AuthError, default_auth_store, validate_pas
 from analyzer_core.catalog import find_boss, to_frontend_catalog
 from analyzer_core.concurrency import MAX_JOB_THREADS
 from analyzer_core.runner import analyze_report
-from analyzer_core import loot_store
+from analyzer_core import raid_calendar_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 from analyzer_core.wcl_paths import iter_wcl_json_files, list_wcl_data_files, write_data_manifest
 
@@ -47,12 +47,11 @@ def environment_setting(key, default=""):
 
 JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
-VERDICT_DIR = ROOT / "verdicts"
-VERDICT_DIR.mkdir(exist_ok=True)
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
+EXPORT_DIR = DATA_DIR / "exports"
 _DESKTOP = Path.home() / "Desktop"
-DEFAULT_EXPORT_EXCEL_DIR = _DESKTOP if _DESKTOP.is_dir() else VERDICT_DIR
+DEFAULT_EXPORT_EXCEL_DIR = _DESKTOP if _DESKTOP.is_dir() else EXPORT_DIR
 AUTH = default_auth_store()
 SESSION_COOKIE = "wra_session"
 MAX_JSON_BODY = 10 * 1024 * 1024
@@ -375,12 +374,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.handle_job_status(path, user)
         if path.startswith("/api/jobs/") and path.endswith("/result"):
             return self.handle_result(path, user)
-        if path == "/api/loot":
+        if path in {"/api/raid-calendar", "/api/loot"}:
             query = parse_qs(urlparse(self.path).query)
             selected_date = (query.get("date") or [None])[0]
             difficulty = (query.get("difficulty") or ["heroic"])[0]
             try:
-                document = loot_store.load_document(selected_date, difficulty)
+                document = raid_calendar_store.load_document(selected_date, difficulty)
                 document["permissions"] = {"isAdmin": user["isAdmin"], "canModify": user["canModify"]}
                 return self.send_response_body(*json_bytes(document))
             except ValueError as error:
@@ -468,16 +467,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.handle_admin_delete(user, int(admin_delete_match.group(1)))
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
-        allocation_match = re.fullmatch(r"/api/loot/allocations/([A-Za-z0-9_-]+)", path)
+        allocation_match = re.fullmatch(r"/api/(?:raid-calendar|loot)/allocations/([A-Za-z0-9_-]+)", path)
         if allocation_match:
             try:
-                return self.send_response_body(*json_bytes(loot_store.delete_allocation(allocation_match.group(1))))
+                return self.send_response_body(*json_bytes(raid_calendar_store.delete_allocation(allocation_match.group(1))))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.NOT_FOUND)
-        blackmark_match = re.fullmatch(r"/api/loot/blackmarks/([A-Za-z0-9_-]+)", path)
+        blackmark_match = re.fullmatch(r"/api/(?:raid-calendar|loot)/blackmarks/([A-Za-z0-9_-]+)", path)
         if blackmark_match:
             try:
-                return self.send_response_body(*json_bytes(loot_store.delete_blackmark(blackmark_match.group(1))))
+                return self.send_response_body(*json_bytes(raid_calendar_store.delete_blackmark(blackmark_match.group(1))))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.NOT_FOUND)
         return self.json_error("not found", HTTPStatus.NOT_FOUND)
@@ -736,16 +735,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         try:
-            if path == "/api/loot/setup":
-                return self.send_response_body(*json_bytes(loot_store.save_setup(self.read_json_body())))
-            if path == "/api/loot/settings":
+            if path in {"/api/raid-calendar/setup", "/api/loot/setup"}:
+                return self.send_response_body(*json_bytes(raid_calendar_store.save_setup(self.read_json_body())))
+            if path in {"/api/raid-calendar/settings", "/api/loot/settings"}:
                 if not user["isAdmin"]:
                     return self.json_error("仅管理员可以修改史诗难度刷新设置。", HTTPStatus.FORBIDDEN)
-                return self.send_response_body(*json_bytes(loot_store.save_settings(self.read_json_body())))
-            if path == "/api/loot/allocations":
-                return self.send_response_body(*json_bytes(loot_store.add_allocation(self.read_json_body())))
-            if path == "/api/loot/blackmarks":
-                return self.send_response_body(*json_bytes(loot_store.add_blackmark(self.read_json_body())))
+                return self.send_response_body(*json_bytes(raid_calendar_store.save_settings(self.read_json_body())))
+            if path in {"/api/raid-calendar/allocations", "/api/loot/allocations"}:
+                return self.send_response_body(*json_bytes(raid_calendar_store.add_allocation(self.read_json_body())))
+            if path in {"/api/raid-calendar/blackmarks", "/api/loot/blackmarks"}:
+                return self.send_response_body(*json_bytes(raid_calendar_store.add_blackmark(self.read_json_body())))
             if path == "/api/export-verdict-excel":
                 return self.handle_export_verdict_excel()
             if path == "/api/raid-cooldowns/search":
@@ -811,7 +810,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "statusUrl": f"/api/jobs/{job.id}/status",
                 "resultUrl": f"/api/jobs/{job.id}/result",
             }, HTTPStatus.ACCEPTED))
-        except loot_store.LootConflictWarning as warning:
+        except raid_calendar_store.LootConflictWarning as warning:
             return self.send_response_body(*json_bytes({
                 "error": "该分配存在需求权提醒，请确认后继续。",
                 "requiresConfirmation": True,
@@ -927,7 +926,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/single-fight": "/frontend/tools/single-fight/index.html",
             "/spec-compare": "/frontend/tools/spec-comparison/index.html",
             "/report": "/frontend/report/index.html",
-            "/loot": "/frontend/tools/raid-loot/index.html",
+            "/raid-calendar": "/frontend/tools/raid-calendar/index.html",
+            "/loot": "/frontend/tools/raid-calendar/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",

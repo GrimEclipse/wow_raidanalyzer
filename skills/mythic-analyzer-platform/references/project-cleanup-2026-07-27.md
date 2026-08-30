@@ -13,10 +13,10 @@
 
 保留并补充以下规则：
 
-- `dist/`：离线包构建产物，不再纳入源码版本管理。
+- `dist/`：发布构建产物，不纳入源码版本管理。
 - `data/*`：WCL 分析 JSON 等运行数据；仅保留 `data/.gitkeep`。
 - `data/wcl_hardcore_api.json`：兼容输出，不纳入版本管理。
-- `tmp/`、`verdict_data.json`、`verdicts/`、`scoreboard/*.db`：本地临时或持久化数据。
+- `tmp/`、`verdict_data.json`、`data/*`：本地临时或持久化数据。团本日历使用 `data/raid_calendar.db`。
 - `.tools/`、`.video_work/`、`audio_material_license_notes.txt`：防止其他任务的素材再次误入项目。
 - `*.zip`、`*.rar`、`*.exe`：发布产物和本地工具二进制。
 - `*.doc`、`*.docx`：本地生成的 Word 文档。
