@@ -91,13 +91,12 @@ class RaidCalendarStoreTests(unittest.TestCase):
         self.assertIn("2026-08-25", document["calendar"]["progressionDates"])
         self.assertIn("2026-08-27", document["calendar"]["progressionDates"])
         resets = document["calendar"]["mythicResetDates"]
-        self.assertIn("2026-08-20", resets)
-        self.assertIn("2026-09-03", resets)
-        self.assertNotIn("2026-08-27", resets)
+        self.assertIn("2026-08-27", resets)
+        self.assertIn("2026-09-10", resets)
+        self.assertNotIn("2026-09-03", resets)
 
         calendar_store.save_settings({"mythicCadenceWeeks": 1})
         resets = calendar_store.load_document("2026-09-01")["calendar"]["mythicResetDates"]
-        self.assertIn("2026-08-20", resets)
         self.assertIn("2026-08-27", resets)
         self.assertIn("2026-09-03", resets)
         self.assertIn("2026-09-10", resets)
@@ -148,14 +147,14 @@ class RaidCalendarStoreTests(unittest.TestCase):
         self.assertTrue(tank["needEligible"])
 
     def test_mythic_need_uses_two_week_period_by_default(self):
-        calendar_store.add_allocation(self.allocation(date="2026-08-24", difficulty="mythic", itemNameZh="毒灼护腕"))
+        calendar_store.add_allocation(self.allocation(date="2026-08-27", difficulty="mythic", itemNameZh="毒灼护腕"))
         with self.assertRaises(calendar_store.LootConflictWarning) as caught:
-            calendar_store.add_allocation(self.allocation(date="2026-08-27", difficulty="mythic", itemNameZh="咒魇裂魂匕首"))
-        self.assertIn("于 2026-08-24 获得了「毒灼护腕」", caught.exception.warnings[0])
+            calendar_store.add_allocation(self.allocation(date="2026-09-03", difficulty="mythic", itemNameZh="咒魇裂魂匕首"))
+        self.assertIn("于 2026-08-27 获得了「毒灼护腕」", caught.exception.warnings[0])
 
         calendar_store.save_settings({"mythicCadenceWeeks": 1})
         self.assertTrue(calendar_store.add_allocation(self.allocation(
-            date="2026-08-27", difficulty="mythic", itemNameZh="咒魇裂魂匕首"
+            date="2026-09-03", difficulty="mythic", itemNameZh="咒魇裂魂匕首"
         ))["ok"])
 
     def test_need_lockout_starts_on_thursday(self):

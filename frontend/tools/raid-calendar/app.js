@@ -726,7 +726,7 @@ async function toggleMythicSchedule() {
   const cadence = current === 2 ? 1 : 2;
   try {
     await api("/api/raid-calendar/settings", { method: "PUT", body: JSON.stringify({ mythicCadenceWeeks: cadence }) });
-    notify(cadence === 2 ? "史诗难度已切换为双周刷新，锚点为 2026-08-20。" : "史诗难度已切换为单周刷新，每周四显示绿点。");
+    notify(cadence === 2 ? "史诗难度已切换为双周刷新，锚点为 2026-08-27。" : "史诗难度已切换为单周刷新，每周四显示绿点。");
     await load();
   } catch (error) { notify(error.message, true); }
 }

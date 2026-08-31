@@ -43,3 +43,24 @@ def test_explicit_insecure_remote_proxy_warning_is_not_hidden(monkeypatch):
 
     assert client.verify_tls is False
     assert client._suppress_local_proxy_tls_warning is False
+
+
+def test_event_page_passes_wcl_filter_expression(monkeypatch):
+    client = wcl_api.WclClient()
+    captured = {}
+
+    def fake_graphql(query, variables):
+        captured["query"] = query
+        captured["variables"] = variables
+        return {"events": {"data": [], "nextPageTimestamp": None}}
+
+    monkeypatch.setattr(client, "graphql", fake_graphql)
+    client.event_page(
+        "report",
+        "All",
+        {"id": 1, "startTime": 0, "endTime": 1000},
+        filter_expression="source.id = 272110 OR target.id = 272110",
+    )
+
+    assert "filterExpression: $filterExpression" in captured["query"]
+    assert captured["variables"]["filterExpression"] == "source.id = 272110 OR target.id = 272110"

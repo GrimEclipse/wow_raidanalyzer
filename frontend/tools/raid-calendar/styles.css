@@ -58,7 +58,8 @@ a { color: inherit; text-decoration: none; }
 .raid-mark { background: var(--gold); }
 .reset-mark { background: var(--green); box-shadow: 0 0 8px rgba(85,214,155,.6); }
 .weekday-row, .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.weekday-row { gap: 7px; padding: 0 0 7px; color: #687784; font-size: 11px; text-align: right; }
+.weekday-row { gap: 7px; padding: 0 0 7px; color: #687784; font-size: 11px; text-align: center; }
+.weekday-row > span { display: block; }
 .calendar { gap: 7px; }
 .calendar-day { position: relative; min-height: clamp(68px, 6vw, 82px); overflow: hidden; border: 1px solid #222d37; border-radius: 10px; background: rgba(11,16,21,.92); color: #a9b6c1; padding: 9px; text-align: left; transition: .15s ease; }
 .calendar-day:hover { z-index: 1; transform: translateY(-2px); border-color: #546270; background: #131b23; box-shadow: 0 12px 30px rgba(0,0,0,.25); color: white; }

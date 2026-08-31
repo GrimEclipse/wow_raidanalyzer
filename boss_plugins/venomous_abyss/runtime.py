@@ -32,9 +32,15 @@ def progress(config, message, percent=None):
     emit_progress(message, percent=percent, stage="analyze")
 
 
-def fetch_payload(client, report_id, fight, config, boss_id=None):
+def fetch_payload(client, report_id, fight, config, boss_id=None, tracked_actor_ids=()):
     payload = {
-        "casts": client.events(report_id, "Casts", fight, hostility_type="Enemies"),
+        "casts": client.events(
+            report_id,
+            "Casts",
+            fight,
+            hostility_type="Enemies",
+            include_resources=bool(config.get("fetchCastResources")),
+        ),
         "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies"),
         "damage": client.events(report_id, "DamageTaken", fight, include_resources=True),
         "debuffs": client.events(report_id, "Debuffs", fight, include_resources=True),
@@ -44,8 +50,32 @@ def fetch_payload(client, report_id, fight, config, boss_id=None):
         "combatants": client.events(report_id, "CombatantInfo", fight),
         "resources": [],
         "bossPositionEvents": [],
+        "trackedActorEvents": [],
         "bossID": boss_id,
     }
+    tracked_filters = config.get("trackedActorEventFilters") or []
+    if tracked_filters:
+        for filter_expression in tracked_filters:
+            payload["trackedActorEvents"].extend(
+                client.events(
+                    report_id,
+                    "All",
+                    fight,
+                    filter_expression=filter_expression,
+                    include_resources=True,
+                )
+            )
+    else:
+        for actor_id in tracked_actor_ids:
+            payload["trackedActorEvents"].extend(
+                client.events(
+                    report_id,
+                    "All",
+                    fight,
+                    source_id=actor_id,
+                    include_resources=True,
+                )
+            )
     if config.get("fetchPositionResources"):
         payload["resources"] = client.events(report_id, "Resources", fight, include_resources=True)
         if boss_id is not None:
@@ -127,6 +157,10 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
         actors = client.actors(report_id)
         actor_map = {actor["id"]: actor["name"] for actor in actors}
         actor_type = {actor["id"]: actor.get("type") for actor in actors}
+        tracked_actor_ids = [
+            actor["id"] for actor in actors
+            if int(actor.get("gameID") or 0) in set(config.get("trackedActorGameIDs") or ())
+        ]
         boss_id = None
         if config.get("bossGameID"):
             boss_id = resolve_boss_actor_id(
@@ -139,7 +173,14 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
         def fetch_one(item):
             index, fight = item
             progress(config, f"读取 Fight {fight['id']}（{index}/{len(fights)}）")
-            raw = fetch_payload(client, report_id, fight, config, boss_id=boss_id)
+            raw = fetch_payload(
+                client,
+                report_id,
+                fight,
+                config,
+                boss_id=boss_id,
+                tracked_actor_ids=tracked_actor_ids,
+            )
             return index, render_fight(
                 config,
                 analyzer,

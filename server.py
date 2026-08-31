@@ -66,6 +66,11 @@ COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
 MATCHED_FIGHTS_RE = re.compile(r"匹配到\s+(\d+)\s+场")
 
 
+def normalize_static_request_path(path):
+    """Keep application entry points compatible with optional trailing slashes."""
+    return path.rstrip("/") if path != "/" and path.endswith("/") else path
+
+
 @dataclass
 class Job:
     id: str
@@ -272,6 +277,50 @@ def json_bytes(data, status=HTTPStatus.OK):
     return status, "application/json; charset=utf-8", body
 
 
+def local_wowhead_data(path):
+    """Return the minimum data tables expected by the bundled Wowhead client."""
+    data_name_match = re.fullmatch(
+        r"/wowhead-tooltip/data/(spell-scaling|item-scaling|spec-spells)(?:&.*)?",
+        path,
+    )
+    if not data_name_match:
+        return None
+
+    data_name = data_name_match.group(1)
+    if data_name == "spell-scaling":
+        return {
+            "scalingValue": {},
+            "spellInformation": {},
+            "randPropPoints": {},
+        }
+    if data_name == "item-scaling":
+        return {
+            "staminaByIlvl": {},
+            "ratingsToPercentRM": {},
+            "ratingsToPercentLT": {},
+            "itemScalingValue": {},
+            "scalingFactors": {},
+            "curvePoints": {},
+            "scalingData": {},
+            "contentTuningLevels": {},
+            "reforgeStats": {},
+        }
+    return {"specMap": {}, "class": {}, "spec": {}}
+
+
+def wowhead_static_asset_url(path, query=""):
+    """Map the bundled tooltip client's /zamimg asset prefix to its trusted CDN."""
+    if not path.startswith("/zamimg/") or "\\" in path:
+        return None
+    relative_path = path[len("/zamimg/"):]
+    if not relative_path or any(part in {"", ".", ".."} for part in relative_path.split("/")):
+        return None
+    if any(ord(char) < 32 for char in path + query):
+        return None
+    suffix = f"?{query}" if query else ""
+    return f"https://wow.zamimg.com/{relative_path}{suffix}"
+
+
 def safe_redirect_target(value, default="/online"):
     target = str(value or "").strip()
     parsed = urlparse(target)
@@ -292,6 +341,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.request_path()
+        wowhead_asset = wowhead_static_asset_url(path, urlparse(self.path).query)
+        if wowhead_asset is not None:
+            return self.redirect_resource(wowhead_asset)
+        if path == "/favicon.ico":
+            return self.send_response_body(HTTPStatus.NO_CONTENT, "image/x-icon", b"")
         if path == "/login":
             if self.current_user():
                 return self.redirect("/online")
@@ -301,6 +355,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes({
                 "registrationRequiresInvite": bool(INVITE_CODE),
             }))
+
+        wowhead_data = local_wowhead_data(path)
+        if wowhead_data is not None:
+            return self.send_response_body(*json_bytes(wowhead_data))
 
         tooltip_match = re.fullmatch(r"/wowhead-tooltip/tooltip/spell/(\d+)", path)
         if tooltip_match:
@@ -918,6 +976,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         return self.send_response_body(HTTPStatus.OK, "application/json; charset=utf-8", body)
 
     def handle_static(self, path, public=False):
+        path = normalize_static_request_path(path)
         route_map = {
             "/": "/index.html",
             "/login": "/frontend/auth/login.html",
@@ -931,6 +990,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",
+            "/frontend/tools/raid-guide": "/frontend/tools/raid-guide/index.html",
             "/audit": "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
             "/LuraJudgement.html": "/frontend/report/index.html",
         }
@@ -972,6 +1032,13 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.SEE_OTHER)
         self.send_header("Location", location)
         self.send_header("Cache-Control", "no-store")
+        self.send_security_headers()
+        self.end_headers()
+
+    def redirect_resource(self, location):
+        self.send_response(HTTPStatus.FOUND)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "public, max-age=3600")
         self.send_security_headers()
         self.end_headers()
 

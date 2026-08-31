@@ -50,7 +50,7 @@ ARMOR_TYPES = {
 SCHEDULED_WEEKDAYS = {3, 4, 5}  # Thursday, Friday, Saturday (Monday=0)
 FIRST_PROGRESSION_DATE = date_type(2026, 8, 20)
 DELAYED_PROGRESSION_DATES = {date_type(2026, 8, 24), date_type(2026, 8, 25)}
-MYTHIC_RESET_ANCHOR = date_type(2026, 8, 20)
+MYTHIC_RESET_ANCHOR = date_type(2026, 8, 27)
 
 
 class LootConflictWarning(ValueError):

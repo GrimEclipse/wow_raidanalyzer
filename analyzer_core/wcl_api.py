@@ -154,6 +154,7 @@ class WclClient:
         include_resources=False,
         source_id=None,
         target_id=None,
+        filter_expression=None,
     ) -> dict:
         optional_args = []
         optional_filters = []
@@ -184,6 +185,10 @@ class WclClient:
             optional_args.append("$targetID: Int")
             optional_filters.append("targetID: $targetID")
             variables["targetID"] = int(target_id)
+        if filter_expression:
+            optional_args.append("$filterExpression: String")
+            optional_filters.append("filterExpression: $filterExpression")
+            variables["filterExpression"] = str(filter_expression)
         args = ", " + ", ".join(optional_args) if optional_args else ""
         filters = ", " + ", ".join(optional_filters) if optional_filters else ""
         query = f"""

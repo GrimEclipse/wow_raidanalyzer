@@ -7,6 +7,10 @@ CALENDAR_FRONTEND = ROOT / "frontend" / "tools" / "raid-calendar"
 
 
 class RaidCalendarFrontendTests(unittest.TestCase):
+    def test_weekday_labels_are_centered(self):
+        styles = (CALENDAR_FRONTEND / "styles.css").read_text(encoding="utf-8")
+        self.assertIn(".weekday-row { gap: 7px; padding: 0 0 7px; color: #687784; font-size: 11px; text-align: center; }", styles)
+
     def test_recipient_options_keep_each_players_class_color(self):
         app = (CALENDAR_FRONTEND / "app.js").read_text(encoding="utf-8")
         self.assertIn('const color = CLASS_COLORS[player.classKey] || "#edf2f7";', app)

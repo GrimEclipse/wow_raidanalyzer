@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <base href="../../">
   <title>全场战斗概览</title>
-  <link rel="stylesheet" href="frontend/report/overview.css?v=20260826a">
+  <link rel="stylesheet" href="frontend/report/overview.css?v=20260831b">
 </head>
 <body>
   <main class="shell">
@@ -23,23 +23,32 @@
     </header>
 
     <section class="panel overview-body">
-      <div class="overview-tools">
-        <div class="toolbar">
-          <button id="wipesFilter" class="filter-link wipes" type="button">全部灭团</button>
-          <button id="allFilter" class="filter-link all active" type="button">全部战斗</button>
-        </div>
-        <div class="toolbar">
-          <label class="check">难度 <select id="difficultyFilter"><option value="all">全部难度（分组展示）</option></select></label>
-          <label class="check"><input id="separatePhases" type="checkbox" checked> 按阶段分组</label>
-          <button id="sortButton" class="button" type="button">时间正序</button>
-        </div>
-      </div>
       <div id="error" class="error"></div>
-      <div id="pullBoard" class="pull-board"><div class="empty">正在读取整场 Pull…</div></div>
+      <div class="overview-tabs" role="tablist" aria-label="概览内容">
+        <button id="pullsTab" class="overview-tab active" type="button" role="tab" aria-selected="true">战斗列表</button>
+        <button id="mechanicsTab" class="overview-tab" type="button" role="tab" aria-selected="false">机制统计</button>
+      </div>
+      <div id="pullsPanel" class="overview-panel" role="tabpanel">
+        <div class="overview-tools">
+          <div class="toolbar">
+            <button id="wipesFilter" class="filter-link wipes" type="button">全部灭团</button>
+            <button id="allFilter" class="filter-link all active" type="button">全部战斗</button>
+          </div>
+          <div class="toolbar">
+            <label class="check">难度 <select id="difficultyFilter"><option value="all">全部难度（分组展示）</option></select></label>
+            <label class="check"><input id="separatePhases" type="checkbox" checked> 按阶段分组</label>
+            <button id="sortButton" class="button" type="button">时间正序</button>
+          </div>
+        </div>
+        <div id="pullBoard" class="pull-board"><div class="empty">正在读取整场 Pull…</div></div>
+      </div>
+      <div id="mechanicsPanel" class="overview-panel" role="tabpanel" hidden>
+        <div id="mechanicOverview" class="mechanic-overview"></div>
+      </div>
     </section>
   </main>
   <script src="frontend/core/report-plugin-runtime.js?v=1.2.0-20260826"></script>
-  <script src="frontend/report/overview.js?v=1.2.0-20260826"></script>
+  <script src="frontend/report/overview.js?v=1.4.1-20260831"></script>
   <script src="/frontend/core/home-button.js?v=1"></script>
 </body>
 </html>

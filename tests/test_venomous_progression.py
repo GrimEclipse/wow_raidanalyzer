@@ -109,6 +109,7 @@ def test_lost_explorers_groups_defense_uses_opposite_patch_and_keeps_three_thuds
     assignments = result["frostfireVolley"][0]["assignments"]
     assert assignments[0]["resolution"] == "correct"
     assert assignments[1]["resolution"] == "timeout"
+    assert assignments[1]["failureCounted"] is True
     assert len(result["mightyThud"][0]["waves"]) == 3
 
 
@@ -383,6 +384,359 @@ def test_lost_throw_junk_reincludes_player_after_combat_res():
         [event(10_000, 20484, "cast", sourceID=2, targetID=1)],
     )
     assert {row["playerID"] for row in result["rounds"][0]["missing"]} == {1, 2}
+
+
+def test_lost_mythic_splinters_reports_stack_violation_without_inventing_stepper():
+    fight = {"startTime": 0, "endTime": 30_000}
+    players = {1: player(1, "甲"), 2: player(2, "乙"), 3: player(3, "丙")}
+    debuffs = [
+        event(5_000 + player_id, 1312853, "applydebuff", targetID=player_id, stack=1)
+        for player_id in players
+    ] + [
+        event(7_000 + player_id, 1312853, "applydebuffstack", targetID=player_id, stack=3)
+        for player_id in players
+    ]
+    result = analyze_throw_junk(
+        fight, {1: "甲", 2: "乙", 3: "丙"}, players,
+        [event(1_000, 1291933, "begincast")], [], debuffs, [], [], [],
+    )
+    assert result["evidenceMode"] == "mythic-raidwide-stacks"
+    assert result["stackViolationCount"] == 1
+    assert result["dangerousStackViolationCount"] == 0
+    violation = result["stackViolations"][0]
+    assert violation["stack"] == 3
+    assert {row["playerID"] for row in violation["affectedPlayers"]} == {1, 2, 3}
+    assert violation["confirmedStepper"] is None
+    assert violation["attributionStatus"] == "box-instance-unmatched"
+    assert result["rounds"][0]["missing"] == []
+
+
+def test_lost_mythic_crate_entity_position_confirms_nearest_stepper():
+    fight = {"startTime": 0, "endTime": 20_000}
+    players = {1: player(1, "踩箱者"), 2: player(2, "远处玩家")}
+    debuffs = [
+        event(7_000, 1312853, "applydebuffstack", targetID=1, stack=3),
+        event(7_000, 1312853, "applydebuffstack", targetID=2, stack=3),
+    ]
+    resources = [
+        {"timestamp": 6_900, "sourceID": 1, "resourceActor": 1, "x": 100, "y": 0},
+        {"timestamp": 6_900, "sourceID": 2, "resourceActor": 1, "x": 2000, "y": 0},
+    ]
+    tracked = [
+        event(1_000, 1291935, "summon", sourceID=21, targetID=52, targetInstance=7),
+        event(6_900, 1310028, "cast", sourceID=52, sourceInstance=7, x=0, y=0),
+        event(7_000, 1306692, "instakill", sourceID=-1, targetID=52, targetInstance=7),
+        event(7_050, 0, "death", sourceID=-1, targetID=52, targetInstance=7),
+    ]
+    result = analyze_throw_junk(
+        fight, {1: "踩箱者", 2: "远处玩家", 52: "Useless Junk"}, players,
+        [event(500, 1291933, "begincast")], [], debuffs, [], [], [], resources, tracked,
+    )
+    violation = result["stackViolations"][0]
+    assert violation["boxEntity"]["instance"] == 7
+    assert violation["boxEntity"]["triggerEvidence"] == "explicit-stomp"
+    assert violation["boxEntity"]["ageMs"] == 6_000
+    assert violation["premature"] is True
+    assert violation["confirmedStepper"]["playerID"] == 1
+    assert violation["confirmedStepper"]["distanceYards"] == 1.0
+    assert violation["attributionStatus"] == "confirmed-by-box-position"
+    assert violation["isPrematureStackViolation"] is True
+    assert result["dangerousStackViolationCount"] == 1
+
+
+def test_lost_mythic_direct_throw_impact_is_not_reported_as_misstep():
+    fight = {"startTime": 0, "endTime": 20_000}
+    players = {1: player(1, "直接命中者"), 2: player(2, "其他玩家")}
+    debuffs = [
+        event(1_200, 1312853, "applydebuffstack", targetID=1, stack=3),
+        event(1_200, 1312853, "applydebuffstack", targetID=2, stack=3),
+    ]
+    damage = [event(1_050, 1291935, "damage", sourceID=21, targetID=1)]
+    tracked = [
+        event(1_000, 1291935, "summon", sourceID=21, targetID=52, targetInstance=2),
+        event(1_200, 1306692, "instakill", sourceID=-1, targetID=52, targetInstance=2),
+        event(1_230, 0, "death", sourceID=-1, targetID=52, targetInstance=2),
+    ]
+
+    result = analyze_throw_junk(
+        fight, {1: "直接命中者", 2: "其他玩家", 52: "无用的垃圾"}, players,
+        [event(500, 1291933, "begincast")], damage, debuffs, [], [], [], [], tracked,
+    )
+
+    violation = result["stackViolations"][0]
+    assert violation["directImpactPlayer"]["playerID"] == 1
+    assert violation["confirmedStepper"] is None
+    assert violation["requiresStepperAttribution"] is False
+    assert violation["attributionStatus"] == "direct-impact"
+    assert result["dangerousStackViolationCount"] == 0
+
+
+def test_lost_mythic_timer_expiry_is_not_reported_as_player_misstep():
+    fight = {"startTime": 0, "endTime": 30_000}
+    players = {1: player(1, "附近玩家"), 2: player(2, "远处玩家")}
+    debuffs = [
+        event(16_000, 1312853, "applydebuffstack", targetID=1, stack=3),
+        event(16_000, 1312853, "applydebuffstack", targetID=2, stack=3),
+    ]
+    resources = [
+        {"timestamp": 16_000, "sourceID": 1, "resourceActor": 1, "x": 100, "y": 0},
+        {"timestamp": 16_000, "sourceID": 2, "resourceActor": 1, "x": 2_000, "y": 0},
+    ]
+    tracked = [
+        event(1_000, 1291935, "summon", sourceID=21, targetID=52, targetInstance=7),
+        event(15_900, 1310028, "cast", sourceID=52, sourceInstance=7, x=0, y=0),
+        event(16_000, 1306692, "instakill", sourceID=-1, targetID=52, targetInstance=7),
+    ]
+
+    result = analyze_throw_junk(
+        fight, {1: "附近玩家", 2: "远处玩家", 52: "无用的垃圾"}, players,
+        [event(500, 1291933, "begincast")], [], debuffs, [], [], [], resources, tracked,
+    )
+
+    violation = result["stackViolations"][0]
+    assert violation["boxEntity"]["ageMs"] == 15_000
+    assert violation["confirmedStepper"] is None
+    assert violation["attributionStatus"] == "timer-expired"
+    assert violation["isPrematureStackViolation"] is False
+    assert result["dangerousStackViolationCount"] == 0
+
+
+def test_lost_mythic_specials_track_blast_mushroom_explosion_and_shell_crossing():
+    fight = {"startTime": 0, "endTime": 40_000}
+    players = {1: player(1, "近战"), 2: player(2, "远程"), 3: player(3, "火圈")}
+    players[1]["role"] = "melee-dps"
+    players[2]["role"] = "range-dps"
+    players[3]["role"] = "range-healer"
+    raw = {
+        "casts": [
+            event(1_000, 1295891, "cast"),
+            event(7_000, 1299855, "cast", sourceID=58, sourceInstance=7,
+                  resourceActor=1, x=0, y=0),
+            event(10_000, 1296062, "cast", sourceID=21, targetID=1,
+                  resourceActor=1, x=-49_018, y=69_725),
+        ],
+        "damage": [
+            event(6_000, 1305844, "damage", targetID=2, amount=100),
+            event(6_500, 1305844, "damage", targetID=2, amount=100),
+            event(5_050, 1295952, "damage", sourceID=1, targetID=3, amount=500),
+        ],
+        "debuffs": [
+            event(1_200, 1295928, "applydebuff", targetID=1),
+            event(1_300, 1295954, "applydebuff", targetID=3),
+            event(5_000, 1295928, "removedebuff", targetID=1),
+            event(5_040, 1295954, "removedebuff", targetID=3),
+            event(8_000, 1299854, "applydebuff", targetID=2, sourceInstance=7),
+            event(8_100, 1299854, "applydebuff", targetID=1, sourceInstance=7),
+            event(10_500, 1291918, "applydebuff", targetID=2),
+        ],
+        "enemyBuffs": [], "friendlyBuffs": [], "deaths": [],
+        "resources": [
+            event(7_900, 0, "resourcechange", sourceID=2, resourceActor=1, x=200, y=0),
+            event(8_100, 0, "resourcechange", sourceID=2, resourceActor=1, x=220, y=0),
+            event(7_900, 0, "resourcechange", sourceID=1, resourceActor=1, x=1500, y=0),
+            event(8_100, 0, "resourcechange", sourceID=1, resourceActor=1, x=1500, y=0),
+            event(9_900, 0, "resourcechange", sourceID=1, resourceActor=1, x=-48_018, y=69_725),
+            event(10_100, 0, "resourcechange", sourceID=1, resourceActor=1, x=-48_018, y=69_725),
+            event(9_900, 0, "resourcechange", sourceID=2, resourceActor=1, x=-44_018, y=69_725),
+            event(10_100, 0, "resourcechange", sourceID=2, resourceActor=1, x=-44_018, y=69_725),
+            event(9_900, 0, "resourcechange", sourceID=3, resourceActor=1, x=-43_818, y=69_825),
+            event(10_100, 0, "resourcechange", sourceID=3, resourceActor=1, x=-43_818, y=69_825),
+        ],
+    }
+    result = analyze_lost(fight, {1: "近战", 2: "远程", 3: "火圈"}, players, raw)
+    assert result["blastWave"]["players"][0]["hitCount"] == 2
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["triggerPlayers"][0]["playerID"] == 2
+    assert mushroom["mushroomEntity"]["instance"] == 7
+    assert mushroom["mushroomEntity"]["position"] == {"x": 0.0, "y": 0.0}
+    assert mushroom["triggerPlayers"][0]["distanceYards"] == 2.1
+    assert mushroom["positionConfirmed"] is True
+    assert mushroom["triggerConfidence"] == "first-bounce-target-and-position"
+    assert result["elementalExplosions"][0]["likelyPair"]["firePlayer"]["playerID"] == 1
+    shell = result["shellSpins"][0]
+    assert shell["crossedRangedStack"] is True
+    assert shell["crossedMiddle"] is True
+    assert shell["geometryConfirmed"] is True
+    assert shell["directionVerdict"] == "crossed-middle"
+    assert shell["namedMeleePlayer"]["playerID"] == 1
+    assert shell["rangedHitPlayers"][0]["playerID"] == 2
+
+
+def test_lost_shell_crosses_middle_even_when_no_player_is_hit():
+    fight = {"startTime": 0, "endTime": 20_000}
+    players = {1: player(1, "近战"), 2: player(2, "远程甲"), 3: player(3, "远程乙")}
+    players[1]["role"] = "melee-dps"
+    players[2]["role"] = "range-dps"
+    players[3]["role"] = "range-healer"
+    raw = {
+        "casts": [
+            event(10_000, 1296062, "cast", sourceID=21, targetID=1,
+                  resourceActor=1, x=-49_018, y=69_725),
+        ],
+        "damage": [], "debuffs": [], "enemyBuffs": [], "friendlyBuffs": [], "deaths": [],
+        "resources": [
+            event(9_900, 0, "resourcechange", sourceID=1, resourceActor=1, x=-48_018, y=69_725),
+            event(10_100, 0, "resourcechange", sourceID=1, resourceActor=1, x=-48_018, y=69_725),
+            event(9_900, 0, "resourcechange", sourceID=2, resourceActor=1, x=-44_018, y=69_825),
+            event(10_100, 0, "resourcechange", sourceID=2, resourceActor=1, x=-44_018, y=69_825),
+            event(9_900, 0, "resourcechange", sourceID=3, resourceActor=1, x=-43_818, y=69_625),
+            event(10_100, 0, "resourcechange", sourceID=3, resourceActor=1, x=-43_818, y=69_625),
+        ],
+    }
+    result = analyze_lost(fight, {1: "近战", 2: "远程甲", 3: "远程乙", 21: "Boss"}, players, raw)
+    shell = result["shellSpins"][0]
+    assert shell["hitPlayers"] == []
+    assert shell["crossedMiddle"] is True
+    assert shell["namedMeleePlayer"]["playerID"] == 1
+
+
+def test_lost_shell_guided_outward_does_not_depend_on_ranged_hits():
+    fight = {"startTime": 0, "endTime": 20_000}
+    players = {1: player(1, "近战"), 2: player(2, "远程甲"), 3: player(3, "远程乙")}
+    players[1]["role"] = "melee-dps"
+    players[2]["role"] = "range-dps"
+    players[3]["role"] = "range-healer"
+    raw = {
+        "casts": [
+            event(10_000, 1296062, "cast", sourceID=21, targetID=1,
+                  resourceActor=1, x=-49_018, y=69_725),
+        ],
+        "damage": [],
+        "debuffs": [event(10_500, 1291918, "applydebuff", targetID=2)],
+        "enemyBuffs": [], "friendlyBuffs": [], "deaths": [],
+        "resources": [
+            event(9_900, 0, "resourcechange", sourceID=1, resourceActor=1, x=-50_018, y=69_725),
+            event(10_100, 0, "resourcechange", sourceID=1, resourceActor=1, x=-50_018, y=69_725),
+            event(9_900, 0, "resourcechange", sourceID=2, resourceActor=1, x=-44_018, y=69_825),
+            event(10_100, 0, "resourcechange", sourceID=2, resourceActor=1, x=-44_018, y=69_825),
+            event(9_900, 0, "resourcechange", sourceID=3, resourceActor=1, x=-43_818, y=69_625),
+            event(10_100, 0, "resourcechange", sourceID=3, resourceActor=1, x=-43_818, y=69_625),
+        ],
+    }
+    result = analyze_lost(fight, {1: "近战", 2: "远程甲", 3: "远程乙", 21: "Boss"}, players, raw)
+    shell = result["shellSpins"][0]
+    assert shell["rangedHitPlayers"][0]["playerID"] == 2
+    assert shell["crossedMiddle"] is False
+    assert shell["directionVerdict"] == "guided-outward"
+
+
+def test_lost_premature_mushroom_attributes_trigger_and_wave_wipe():
+    fight = {"startTime": 0, "endTime": 25_000}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 6)}
+    raw = {
+        "casts": [event(1_000, 1299855, "cast", sourceID=58, sourceInstance=7, x=0, y=0)],
+        "damage": [event(23_200, 1305844, "damage", targetID=1, amount=1_000_000)],
+        "debuffs": [event(1_100, 1299854, "applydebuff", targetID=1, sourceInstance=7)],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [
+            {"timestamp": 23_300 + index * 100, "targetID": index, "killingAbilityGameID": 1305844}
+            for index in players
+        ],
+    }
+    result = analyze_lost(fight, {index: f"玩家{index}" for index in players}, players, raw)
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["triggerPlayers"][0]["playerID"] == 1
+    assert mushroom["activationDelayMs"] == 100
+    assert mushroom["prematureActivation"] is True
+    assert mushroom["massWaveDeaths"] is True
+    assert mushroom["prematureCausedWipe"] is True
+    assert mushroom["individualWaveFailures"] == []
+
+
+def test_lost_normal_mushroom_keeps_single_wave_death_as_individual_failure():
+    fight = {"startTime": 0, "endTime": 40_000}
+    players = {1: player(1, "甲")}
+    raw = {
+        "casts": [event(1_000, 1299855, "cast", sourceID=58, sourceInstance=7, x=0, y=0)],
+        "damage": [event(23_200, 1305844, "damage", targetID=1, amount=1_000_000)],
+        "debuffs": [event(23_000, 1299854, "applydebuff", targetID=1, sourceInstance=7)],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [{"timestamp": 23_300, "targetID": 1, "killingAbilityGameID": 1305844}],
+    }
+    result = analyze_lost(fight, {1: "甲"}, players, raw)
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["prematureActivation"] is False
+    assert mushroom["waveCausedWipe"] is False
+    assert mushroom["individualWaveFailures"][0]["playerID"] == 1
+
+
+def test_lost_premature_mushroom_near_pull_end_counts_without_majority_deaths():
+    fight = {"startTime": 0, "endTime": 24_000}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 7)}
+    raw = {
+        "casts": [event(1_000, 1299855, "cast", sourceID=58, sourceInstance=7, x=0, y=0)],
+        "damage": [event(23_200, 1305844, "damage", targetID=1, amount=1_000_000)],
+        "debuffs": [event(1_100, 1299854, "applydebuff", targetID=1, sourceInstance=7)],
+        "enemyBuffs": [], "friendlyBuffs": [],
+        "deaths": [
+            {"timestamp": 23_300, "targetID": 1, "killingAbilityGameID": 1305844},
+            {"timestamp": 23_400, "targetID": 2, "killingAbilityGameID": 1305844},
+        ],
+    }
+    result = analyze_lost(fight, {index: f"玩家{index}" for index in players}, players, raw)
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["majorityWaveDeaths"] is False
+    assert mushroom["fightEndsNearWave"] is True
+    assert mushroom["waveCausedWipe"] is True
+    assert mushroom["prematureCausedWipe"] is True
+
+
+def test_lost_mushroom_uses_surprise_remove_window_and_selects_nearest_first_target():
+    fight = {"startTime": 0, "endTime": 28_500}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 5)}
+    raw = {
+        "casts": [event(10_000, 1299855, "cast", sourceID=58, sourceInstance=7, x=0, y=0)],
+        "damage": [event(27_900, 1305844, "damage", targetID=1, amount=1_000_000)],
+        "debuffs": [
+            event(9_900, 1297625, "applydebuff", targetID=4),
+            event(10_050, 1299854, "applydebuff", targetID=1, sourceInstance=7),
+            event(10_050, 1299854, "applydebuff", targetID=2, sourceInstance=7),
+            event(19_900, 1297625, "removedebuff", targetID=4),
+        ],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [
+            {"timestamp": 28_000 + index * 50, "targetID": index, "killingAbilityGameID": 1305844}
+            for index in range(1, 4)
+        ],
+        "resources": [
+            event(10_000, 0, "resourcechange", sourceID=1, resourceActor=1, x=450, y=0),
+            event(10_000, 0, "resourcechange", sourceID=2, resourceActor=1, x=120, y=0),
+        ],
+    }
+    result = analyze_lost(
+        fight,
+        {index: f"玩家{index}" for index in players},
+        players,
+        raw,
+    )
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["timingBasis"] == "explosive-surprise-remove"
+    assert mushroom["triggerOffsetFromSurpriseRemoveMs"] == -9_850
+    assert mushroom["simultaneousFirstTargetCount"] == 2
+    assert mushroom["triggerPlayers"][0]["playerID"] == 2
+    assert mushroom["majorityDeathThreshold"] == 3
+    assert mushroom["prematureCausedWipe"] is True
+
+
+def test_lost_unresolved_frostfire_uses_five_second_end_of_pull_grace():
+    fight = {"startTime": 0, "endTime": 6_000}
+    players = {1: player(1, "甲")}
+    raw = {
+        "casts": [event(1_000, 1295891, "cast")],
+        "damage": [],
+        "debuffs": [event(2_000, 1295928, "applydebuff", targetID=1)],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [],
+    }
+    result = analyze_lost(fight, {1: "甲"}, players, raw)
+    assignment = result["frostfireVolley"][0]["assignments"][0]
+    assert assignment["resolution"] == "unresolved"
+    assert assignment["reviewWindowMs"] == 4_000
+    assert assignment["failureCounted"] is False
 
 
 def test_twinfangs_inserts_death_when_feast_clears_multiple_stacks():
