@@ -10,7 +10,6 @@ from boss_plugins.venomous_abyss.runtime import build_aggregated_json as _build
 from boss_plugins.venomous_abyss.shared import (
     IMMUNITY_SPELLS,
     ability_id,
-    active_immunities,
     actor_name,
     avoidable_board as _avoidable_board,
     completed_casts as _completed_casts,
@@ -43,7 +42,7 @@ BOSS_CONFIG = {
         ["avoidable", "可规避机制"],
         ["special", "特殊技能处理"],
     ],
-    "mechanicVersion": "lostexplorers-mythic-2026-08-31-shell-geometry-v5",
+    "mechanicVersion": "lostexplorers-mythic-2026-08-31-frostfire-death-grace-mushroom-wave-v6",
     "features": {"survival": True, "fieldReplay": False},
     "fetchCastResources": True,
     "fetchPositionResources": True,
@@ -57,6 +56,10 @@ RELIC_RUPTURE = 1310028
 STOMP = 1306692
 CRATE_WARNING_DELAY_MS = 15_000
 MAX_ALLOWED_SPLINTER_STACK = 2
+FROSTFIRE_EXPECTED_PER_COLOR = 5
+FROSTFIRE_EARLY_DEATH_GRACE_MS = 2_000
+FROSTFIRE_DEATH_REMOVE_WINDOW_MS = 500
+RAID_COLLAPSE_DEATH_THRESHOLD = 8
 SHELL_SPREAD_ANGLE_RADIANS = math.radians(20)
 SHELL_MIDDLE_RADIUS = 800
 SHELL_RAY_LENGTH = 10_000
@@ -68,22 +71,17 @@ def _frostfire_remove(debuffs, player_id, debuff_id, applied_at, fight_end):
                  and event_type(event) == "removedebuff"
                  and applied_at <= int(event.get("timestamp") or 0) <= fight_end), None)
 
-def _opposite_patch_at_remove(debuffs, player_id, patch_id, remove_ts):
-    patch_events = sorted(
-        (event for event in debuffs if event.get("targetID") == player_id
-         and int(ability_id(event) or 0) == patch_id
-         and event_type(event) in {"applydebuff", "refreshdebuff", "removedebuff"}
-         and remove_ts - 15_000 <= int(event.get("timestamp") or 0) <= remove_ts + 150),
+
+def _first_player_death(deaths, player_id, start, end):
+    return min(
+        (
+            event for event in deaths
+            if event.get("targetID") == player_id
+            and start <= int(event.get("timestamp") or 0) <= end
+        ),
         key=lambda event: int(event.get("timestamp") or 0),
+        default=None,
     )
-    active_since = None
-    for event in patch_events:
-        timestamp = int(event.get("timestamp") or 0)
-        if event_type(event) in {"applydebuff", "refreshdebuff"}:
-            active_since = timestamp
-        elif timestamp < remove_ts - 150:
-            active_since = None
-    return active_since
 
 def _immunity_intervals(buff_events, fight_end):
     """Build player immunity windows from WCL aura events."""
@@ -525,6 +523,19 @@ def _mushroom_activations(
         )
         spawn_timestamp = int(mushroom_cast.get("timestamp") or 0) if mushroom_cast else None
         activation_delay_ms = max(0, timestamp - spawn_timestamp) if spawn_timestamp is not None else None
+        prior_deaths = sorted(
+            (
+                death for death in deaths
+                if death.get("targetID") in players
+                and int(death.get("timestamp") or 0) < timestamp
+            ),
+            key=lambda death: int(death.get("timestamp") or 0),
+        )
+        prior_death_ids = sorted(
+            {death.get("targetID") for death in prior_deaths},
+            key=lambda player_id: actor_name(actor_map, player_id),
+        )
+        raid_already_collapsed = len(prior_deaths) >= RAID_COLLAPSE_DEATH_THRESHOLD
 
         cycle_anchor = spawn_timestamp if spawn_timestamp is not None else timestamp
         surprise_candidates = [
@@ -563,13 +574,21 @@ def _mushroom_activations(
         )
         surprise_remove_timestamp = int(surprise_remove.get("timestamp") or 0) if surprise_remove else None
         if surprise_remove_timestamp is not None:
-            expected_wave_timestamp = surprise_remove_timestamp + 10_000
-            wave_window_start = surprise_remove_timestamp + 5_000
+            # Explosive Surprise fading is the observable start of the shockwave
+            # mechanic.  There is no fixed ten-second delay: activating the
+            # mushroom before this boundary consumes it before the wave arrives.
+            mechanic_arrival_timestamp = surprise_remove_timestamp
+            expected_wave_timestamp = surprise_remove_timestamp
+            wave_window_start = surprise_remove_timestamp - 1_000
             wave_window_end = next_surprise_apply_timestamp or int(fight["endTime"])
             trigger_offset_from_remove_ms = timestamp - surprise_remove_timestamp
-            premature_activation = timestamp < wave_window_start
+            premature_activation = timestamp < surprise_remove_timestamp
             timing_basis = "explosive-surprise-remove"
         else:
+            # Old/partial payloads can omit the aura removal.  Keep the spawn-age
+            # fallback only for those payloads; actual blast damage still anchors
+            # the replay below.
+            mechanic_arrival_timestamp = None
             expected_wave_timestamp = spawn_timestamp + 22_200 if spawn_timestamp is not None else timestamp
             wave_window_start = expected_wave_timestamp - 5_200
             wave_window_end = min(expected_wave_timestamp + 4_800, int(fight["endTime"]))
@@ -593,7 +612,12 @@ def _mushroom_activations(
             ),
             default=None,
         )
-        wave_timestamp = actual_wave_timestamp or bounce_wave_timestamp or expected_wave_timestamp
+        wave_timestamp = (
+            actual_wave_timestamp
+            or mechanic_arrival_timestamp
+            or bounce_wave_timestamp
+            or expected_wave_timestamp
+        )
         wave_hit_ids = sorted(
             {event.get("targetID") for event in blast_candidates},
             key=lambda value: actor_name(actor_map, value),
@@ -611,7 +635,7 @@ def _mushroom_activations(
                 continue
             if not wave_timestamp - 2_500 <= death_timestamp <= death_window_end:
                 continue
-            if killing_spell_id not in {0, 1305844}:
+            if killing_spell_id not in {0, 3, 1305844}:
                 continue
             seen_wave_death_ids.add(death_player_id)
             wave_deaths.append({
@@ -631,7 +655,11 @@ def _mushroom_activations(
         fight_end_delta_ms = int(fight["endTime"]) - wave_timestamp
         fight_ends_near_wave = bool(wave_deaths) and -2_000 <= fight_end_delta_ms <= 10_000
         wave_caused_wipe = mass_wave_deaths or fight_ends_near_wave
-        premature_caused_wipe = premature_activation and wave_caused_wipe
+        premature_caused_wipe = (
+            premature_activation
+            and wave_caused_wipe
+            and not raid_already_collapsed
+        )
         rows.append({
             "index": index,
             "timeMs": timestamp - fight["startTime"],
@@ -668,6 +696,17 @@ def _mushroom_activations(
             "affectedPlayers": [player_ref(players, actor_map, player_id) for player_id in all_ids],
             "activationDelayMs": activation_delay_ms,
             "prematureActivation": premature_activation,
+            "priorDeathCount": len(prior_deaths),
+            "priorUniqueDeathCount": len(prior_death_ids),
+            "priorDeathPlayers": [
+                player_ref(players, actor_map, player_id) for player_id in prior_death_ids
+            ],
+            "raidCollapseDeathThreshold": RAID_COLLAPSE_DEATH_THRESHOLD,
+            "raidAlreadyCollapsed": raid_already_collapsed,
+            "attributionSuppressedReason": (
+                f"触发前已有 {len(prior_deaths)} 次玩家死亡，达到大团崩溃阈值 {RAID_COLLAPSE_DEATH_THRESHOLD}"
+                if raid_already_collapsed else None
+            ),
             "timingBasis": timing_basis,
             "triggerOffsetFromSurpriseRemoveMs": trigger_offset_from_remove_ms,
             "explosiveSurprise": {
@@ -680,12 +719,16 @@ def _mushroom_activations(
                 "nextApplyTimestamp": next_surprise_apply_timestamp,
             },
             "expectedWaveTimestamp": expected_wave_timestamp,
+            "mechanicArrivalTimestamp": mechanic_arrival_timestamp,
             "waveTimestamp": wave_timestamp,
             "waveTimeMs": wave_timestamp - fight["startTime"],
             "waveTime": fmt_ms(wave_timestamp - fight["startTime"]),
             "waveTimestampSource": (
                 "blast-damage" if actual_wave_timestamp is not None
-                else ("bounce-window" if bounce_wave_timestamp is not None else "mechanic-timer")
+                else (
+                    "explosive-surprise-remove" if mechanic_arrival_timestamp is not None
+                    else ("bounce-window" if bounce_wave_timestamp is not None else "spawn-fallback")
+                )
             ),
             "waveHitPlayers": [player_ref(players, actor_map, player_id) for player_id in wave_hit_ids],
             "waveDeaths": wave_deaths,
@@ -1155,74 +1198,185 @@ def analyze_lost(fight, actor_map, players, raw):
     for index, cast in enumerate(volley_casts, start=1):
         start = int(cast["timestamp"])
         end = int(volley_casts[index]["timestamp"]) if index < len(volley_casts) else int(fight["endTime"])
+        warning_start = max(
+            (
+                int(event.get("timestamp") or 0) for event in casts
+                if int(ability_id(event) or 0) == 1295891
+                and event_type(event) == "begincast"
+                and start - 8_000 <= int(event.get("timestamp") or 0) <= start
+            ),
+            default=start - 6_000,
+        )
         assignments = [event for event in _events_between(debuffs, start - 1000, start + 6000, {1295928, 1295954}) if event_type(event) == "applydebuff"]
         assignment_rows = []
         for assignment in assignments:
             player_id = assignment.get("targetID")
             color = "fire" if int(ability_id(assignment) or 0) == 1295928 else "frost"
             debuff_id = int(ability_id(assignment))
-            removed = _frostfire_remove(debuffs, player_id, debuff_id, int(assignment["timestamp"]), int(fight["endTime"]))
+            apply_ts = int(assignment["timestamp"])
+            removed = _frostfire_remove(debuffs, player_id, debuff_id, apply_ts, int(fight["endTime"]))
             remove_ts = int(removed["timestamp"]) if removed else None
+            # The aura can survive into the next volley.  Search until the fight
+            # ends so a later death-removal is not mistaken for a normal clear.
+            death = _first_player_death(raw["deaths"], player_id, apply_ts, int(fight["endTime"]))
+            death_ts = int(death.get("timestamp") or 0) if death else None
+            early_death = bool(
+                death_ts is not None
+                and death_ts - apply_ts <= FROSTFIRE_EARLY_DEATH_GRACE_MS
+            )
+            death_removed = bool(
+                death_ts is not None
+                and (
+                    remove_ts is None
+                    or abs(remove_ts - death_ts) <= FROSTFIRE_DEATH_REMOVE_WINDOW_MS
+                )
+            )
             assignment_rows.append({
                 **player_ref(players, actor_map, player_id),
                 "color": color,
                 "debuffID": debuff_id,
-                "applyTimestamp": int(assignment["timestamp"]),
-                "applyTimeMs": int(assignment["timestamp"]) - fight["startTime"],
-                "applyTime": fmt_ms(int(assignment["timestamp"]) - fight["startTime"]),
+                "applyTimestamp": apply_ts,
+                "applyTimeMs": apply_ts - fight["startTime"],
+                "applyTime": fmt_ms(apply_ts - fight["startTime"]),
                 "removeTimestamp": remove_ts,
                 "removeTime": fmt_ms(remove_ts - fight["startTime"]) if remove_ts else None,
-                "durationMs": remove_ts - int(assignment["timestamp"]) if remove_ts else None,
+                "durationMs": remove_ts - apply_ts if remove_ts else None,
+                "deathTimestamp": death_ts,
+                "deathTime": fmt_ms(death_ts - fight["startTime"]) if death_ts else None,
+                "deathWithinGrace": early_death,
+                "deathRemovedDebuff": death_removed,
                 "resolution": "unresolved",
                 "resolutionReason": "debuff-not-removed",
                 "leftPatchRisk": True,
                 "collisionPartner": None,
+                "strandedExempt": False,
             })
         for row in assignment_rows:
             remove_ts = row["removeTimestamp"]
-            opposite_patch_id = 1297648 if row["color"] == "fire" else 1297649
-            patch_since = (
-                _opposite_patch_at_remove(debuffs, row["playerID"], opposite_patch_id, remove_ts)
-                if remove_ts is not None else None
-            )
-            if patch_since is not None:
-                row["resolution"] = "correct"
-                row["resolutionReason"] = "opposite-patch-cleansing"
-                row["oppositePatchID"] = opposite_patch_id
-                row["oppositePatchSince"] = fmt_ms(patch_since - fight["startTime"])
+            if row["deathWithinGrace"]:
+                row["resolution"] = "early-death-exempt"
+                row["resolutionReason"] = "death-within-two-second-grace"
                 row["leftPatchRisk"] = False
-            elif remove_ts and active_immunities(friendly_buffs, row["playerID"], remove_ts, 1800):
-                row["resolution"], row["resolutionReason"] = "immunity", "immunity-remove"
-            elif row["durationMs"] is not None and row["durationMs"] >= 20_000:
-                row["resolution"], row["resolutionReason"] = "timeout", "timeout-remove-left-patch"
+            elif row["deathRemovedDebuff"]:
+                row["resolution"] = "death"
+                row["resolutionReason"] = "carried-debuff-until-death"
             elif remove_ts is not None:
-                row["resolution"], row["resolutionReason"] = "wrong", "remove-without-opposite-color-window"
-        for row in assignment_rows:
-            if row["resolution"] not in {"wrong", "unresolved"} or row["removeTimestamp"] is None:
+                # WCL can omit the private collision/patch aura.  A live player
+                # receiving a normal removedebuff is sufficient completion
+                # evidence, regardless of collision, cloak, or another immunity.
+                row["resolution"] = "correct"
+                row["resolutionReason"] = "debuff-removed-while-alive"
+                row["leftPatchRisk"] = False
+
+        first_apply_timestamp = min(
+            (row["applyTimestamp"] for row in assignment_rows),
+            default=start + 6_000,
+        )
+        assigned_player_ids = {row["playerID"] for row in assignment_rows}
+        pre_apply_deaths = []
+        for death in sorted(raw["deaths"], key=lambda event: int(event.get("timestamp") or 0)):
+            death_ts = int(death.get("timestamp") or 0)
+            player_id = death.get("targetID")
+            if player_id not in players or player_id in assigned_player_ids:
                 continue
-            opposite = "frost" if row["color"] == "fire" else "fire"
-            candidates = [
-                candidate for candidate in assignment_rows
-                if candidate["color"] == opposite and candidate["removeTimestamp"] is not None
-                and abs(candidate["removeTimestamp"] - row["removeTimestamp"]) <= 650
-            ]
-            if not candidates:
+            if not warning_start <= death_ts <= first_apply_timestamp:
                 continue
-            partner = min(candidates, key=lambda candidate: abs(candidate["removeTimestamp"] - row["removeTimestamp"]))
-            row["resolution"] = "correct"
-            row["resolutionReason"] = "opposite-color-synchronized-remove"
-            row["collisionPartner"] = player_ref(players, actor_map, partner["playerID"])
-            row["leftPatchRisk"] = False
+            pre_apply_deaths.append({
+                **player_ref(players, actor_map, player_id),
+                "timestamp": death_ts,
+                "timeMs": death_ts - fight["startTime"],
+                "time": fmt_ms(death_ts - fight["startTime"]),
+                "killingSpellID": int(death.get("killingAbilityGameID") or ability_id(death) or 0) or None,
+            })
+
+        color_counts = Counter(row["color"] for row in assignment_rows)
+        pre_apply_slots = len(pre_apply_deaths)
+        missing_fire = min(
+            max(0, FROSTFIRE_EXPECTED_PER_COLOR - color_counts["fire"]),
+            pre_apply_slots,
+        )
+        pre_apply_slots -= missing_fire
+        missing_frost = min(
+            max(0, FROSTFIRE_EXPECTED_PER_COLOR - color_counts["frost"]),
+            pre_apply_slots,
+        )
+        missing_fire += sum(
+            row["color"] == "fire" and row["deathWithinGrace"]
+            for row in assignment_rows
+        )
+        missing_frost += sum(
+            row["color"] == "frost" and row["deathWithinGrace"]
+            for row in assignment_rows
+        )
+        early_deaths = [
+            {
+                **player_ref(players, actor_map, row["playerID"]),
+                "color": row["color"],
+                "timestamp": row["deathTimestamp"],
+                "timeMs": row["deathTimestamp"] - fight["startTime"],
+                "time": row["deathTime"],
+            }
+            for row in assignment_rows
+            if row["deathWithinGrace"]
+        ]
+        linked_deaths = pre_apply_deaths + early_deaths
+
         for row in assignment_rows:
             review_window_ms = int(fight["endTime"]) - row["applyTimestamp"]
             row["reviewWindowMs"] = review_window_ms
-            row["failureCounted"] = row["resolution"] in {"wrong", "timeout"} or (
+            row["failureCounted"] = row["resolution"] == "death" or (
                 row["resolution"] == "unresolved" and review_window_ms > 5_000
             )
             row["failureGraceMs"] = 5_000
+
+        exemptions = []
+        for stranded_color, capacity, missing_color in (
+            ("frost", missing_fire, "fire"),
+            ("fire", missing_frost, "frost"),
+        ):
+            candidates = sorted(
+                (
+                    row for row in assignment_rows
+                    if row["color"] == stranded_color and row["failureCounted"]
+                ),
+                key=lambda row: (
+                    row["resolution"] != "unresolved",
+                    -(row["durationMs"] or row["reviewWindowMs"]),
+                    actor_name(actor_map, row["playerID"]),
+                ),
+            )
+            for row in candidates[:capacity]:
+                row["strandedExempt"] = True
+                row["failureCounted"] = False
+                row["resolution"] = "stranded-exempt"
+                row["resolutionReason"] = f"missing-{missing_color}-counterpart"
+                row["linkedDeaths"] = linked_deaths
+                row["leftPatchRisk"] = False
+                exemptions.append({
+                    **player_ref(players, actor_map, row["playerID"]),
+                    "color": row["color"],
+                    "missingCounterpartColor": missing_color,
+                    "reason": row["resolutionReason"],
+                })
         volley_target = cast.get("targetID") if cast.get("targetID") in players else None
-        volley_rounds.append({"index": index, "timeMs": start - fight["startTime"], "time": fmt_ms(start - fight["startTime"]),
-                              "targetID": volley_target, "target": actor_name(actor_map, volley_target) if volley_target else "全团冰火分配", "assignments": assignment_rows})
+        volley_rounds.append({
+            "index": index,
+            "timeMs": start - fight["startTime"],
+            "time": fmt_ms(start - fight["startTime"]),
+            "warningTimeMs": warning_start - fight["startTime"],
+            "warningTime": fmt_ms(warning_start - fight["startTime"]),
+            "targetID": volley_target,
+            "target": actor_name(actor_map, volley_target) if volley_target else "全团冰火分配",
+            "expectedPerColor": FROSTFIRE_EXPECTED_PER_COLOR,
+            "fireCount": color_counts["fire"],
+            "frostCount": color_counts["frost"],
+            "missingFireSlots": missing_fire,
+            "missingFrostSlots": missing_frost,
+            "preApplyDeaths": pre_apply_deaths,
+            "earlyDeaths": early_deaths,
+            "exemptions": exemptions,
+            "assignments": assignment_rows,
+        })
 
     thud_casts = _completed_casts(casts, 1296094)
     thud_rounds = []
@@ -1393,8 +1547,7 @@ def _mechanic_overview(rendered):
                     continue
                 color = "火" if assignment.get("color") == "fire" else "冰"
                 reason = {
-                    "wrong": "错误移除",
-                    "timeout": "超时移除",
+                    "death": "一直携带至死亡",
                     "unresolved": "战斗结束前仍未移除",
                 }.get(assignment.get("resolution"), "未正常移除")
                 frostfire_failures.append(detail(
@@ -1447,7 +1600,7 @@ def _mechanic_overview(rendered):
                 "value": len(premature_wipes),
                 "unit": "次",
                 "tone": "danger",
-                "description": "爆炸惊喜结束后的冲击波窗口前，蘑菇已被提前触发；随后至少 5 人死于冲击波/坠落，或战斗在该波冲击后 10 秒内结束。",
+                "description": f"蘑菇在爆炸惊喜结束、冲击波机制到场前已被触发；随后至少 5 人死于冲击波/坠落，或战斗在该波冲击后 10 秒内结束。触发前已有 {RAID_COLLAPSE_DEATH_THRESHOLD} 次及以上玩家死亡时，仅保留事件，不再归因为蘑菇导致灭团。",
                 "players": player_totals(premature_wipes),
                 "events": premature_wipes,
             },
@@ -1467,7 +1620,7 @@ def _mechanic_overview(rendered):
                 "value": len(frostfire_failures),
                 "unit": "次",
                 "tone": "warning",
-                "description": "错误移除、超时移除，或战斗结束前仍未移除；最后一种情况给予 5 秒宽限。",
+                "description": "只统计一直携带冰火直到死亡，或战斗结束前仍未移除；正常移除不再猜测解除手段。点名后 2 秒内死亡，以及因此失去对侧搭档的玩家均豁免。",
                 "players": player_totals(frostfire_failures),
                 "events": frostfire_failures,
             },

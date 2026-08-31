@@ -108,8 +108,8 @@ def test_lost_explorers_groups_defense_uses_opposite_patch_and_keeps_three_thuds
     assert result["unitedDefenseTotalSec"] == 2.0
     assignments = result["frostfireVolley"][0]["assignments"]
     assert assignments[0]["resolution"] == "correct"
-    assert assignments[1]["resolution"] == "timeout"
-    assert assignments[1]["failureCounted"] is True
+    assert assignments[1]["resolution"] == "correct"
+    assert assignments[1]["failureCounted"] is False
     assert len(result["mightyThud"][0]["waves"]) == 3
 
 
@@ -737,6 +737,134 @@ def test_lost_unresolved_frostfire_uses_five_second_end_of_pull_grace():
     assert assignment["resolution"] == "unresolved"
     assert assignment["reviewWindowMs"] == 4_000
     assert assignment["failureCounted"] is False
+
+
+def test_lost_frostfire_pre_apply_death_exempts_one_stranded_opposite_color():
+    fight = {"startTime": 0, "endTime": 70_000}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 11)}
+    raw = {
+        "casts": [
+            event(1_000, 1295891, "begincast"),
+            event(6_000, 1295891, "cast"),
+        ],
+        "damage": [],
+        "debuffs": [
+            *[event(8_000, 1295928, "applydebuff", targetID=index) for index in range(1, 6)],
+            *[event(8_100, 1295954, "applydebuff", targetID=index) for index in range(6, 10)],
+            *[event(12_000, 1295928, "removedebuff", targetID=index) for index in range(1, 5)],
+            *[event(12_100, 1295954, "removedebuff", targetID=index) for index in range(6, 10)],
+        ],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [event(2_000, 1312853, "death", targetID=10, killingAbilityGameID=1312853)],
+    }
+    result = analyze_lost(fight, {index: f"玩家{index}" for index in players}, players, raw)
+    round_row = result["frostfireVolley"][0]
+    stranded = next(row for row in round_row["assignments"] if row["playerID"] == 5)
+    assert round_row["fireCount"] == 5
+    assert round_row["frostCount"] == 4
+    assert round_row["missingFrostSlots"] == 1
+    assert round_row["preApplyDeaths"][0]["playerID"] == 10
+    assert stranded["resolution"] == "stranded-exempt"
+    assert stranded["failureCounted"] is False
+
+
+def test_lost_frostfire_death_within_two_seconds_exempts_dead_and_counterpart():
+    fight = {"startTime": 0, "endTime": 70_000}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 11)}
+    raw = {
+        "casts": [event(6_000, 1295891, "cast")],
+        "damage": [],
+        "debuffs": [
+            *[event(8_000, 1295928, "applydebuff", targetID=index) for index in range(1, 6)],
+            *[event(8_100, 1295954, "applydebuff", targetID=index) for index in range(6, 11)],
+            event(9_500, 1295928, "removedebuff", targetID=1),
+            *[event(12_000, 1295928, "removedebuff", targetID=index) for index in range(2, 5)],
+            *[event(12_100, 1295954, "removedebuff", targetID=index) for index in range(6, 10)],
+        ],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [event(9_500, 1, "death", targetID=1, killingAbilityGameID=1)],
+    }
+    result = analyze_lost(fight, {index: f"玩家{index}" for index in players}, players, raw)
+    round_row = result["frostfireVolley"][0]
+    dead = next(row for row in round_row["assignments"] if row["playerID"] == 1)
+    stranded = next(row for row in round_row["assignments"] if row["playerID"] == 10)
+    assert dead["resolution"] == "early-death-exempt"
+    assert dead["failureCounted"] is False
+    assert round_row["missingFireSlots"] == 1
+    assert stranded["resolution"] == "stranded-exempt"
+    assert stranded["failureCounted"] is False
+
+
+def test_lost_frostfire_carried_until_death_after_grace_is_failure():
+    fight = {"startTime": 0, "endTime": 70_000}
+    players = {1: player(1, "甲")}
+    raw = {
+        "casts": [event(1_000, 1295891, "cast")],
+        "damage": [],
+        "debuffs": [
+            event(2_000, 1295928, "applydebuff", targetID=1),
+            event(22_000, 1295928, "removedebuff", targetID=1),
+        ],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [event(22_100, 1, "death", targetID=1, killingAbilityGameID=1)],
+    }
+    result = analyze_lost(fight, {1: "甲"}, players, raw)
+    assignment = result["frostfireVolley"][0]["assignments"][0]
+    assert assignment["resolution"] == "death"
+    assert assignment["failureCounted"] is True
+
+
+def test_lost_mushroom_uses_surprise_fade_as_arrival_and_counts_fall_wipe():
+    fight = {"startTime": 0, "endTime": 21_000}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 7)}
+    raw = {
+        "casts": [event(1_000, 1299855, "cast", sourceID=58, sourceInstance=7, x=0, y=0)],
+        "damage": [],
+        "debuffs": [
+            event(1_000, 1297625, "applydebuff", targetID=6),
+            event(1_100, 1299854, "applydebuff", targetID=1, sourceInstance=7),
+            event(11_000, 1297625, "removedebuff", targetID=6),
+        ],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [
+            event(10_950 + index * 100, 3, "death", targetID=index, killingAbilityGameID=3)
+            for index in players
+        ],
+    }
+    result = analyze_lost(fight, {index: f"玩家{index}" for index in players}, players, raw)
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["waveTimestamp"] == 11_000
+    assert mushroom["waveTimestampSource"] == "explosive-surprise-remove"
+    assert len(mushroom["waveDeaths"]) == 6
+    assert mushroom["prematureCausedWipe"] is True
+
+
+def test_lost_premature_mushroom_does_not_claim_wipe_after_raid_already_collapsed():
+    fight = {"startTime": 0, "endTime": 30_000}
+    players = {index: player(index, f"玩家{index}") for index in range(1, 14)}
+    raw = {
+        "casts": [event(1_000, 1299855, "cast", sourceID=58, sourceInstance=7, x=0, y=0)],
+        "damage": [event(23_000, 1305844, "damage", targetID=9, amount=1_000_000)],
+        "debuffs": [event(1_100, 1299854, "applydebuff", targetID=9, sourceInstance=7)],
+        "enemyBuffs": [],
+        "friendlyBuffs": [],
+        "deaths": [
+            *[event(index * 100, 1, "death", targetID=index, killingAbilityGameID=1) for index in range(1, 9)],
+            *[event(23_100 + index * 100, 1305844, "death", targetID=index, killingAbilityGameID=1305844) for index in range(9, 14)],
+        ],
+    }
+    result = analyze_lost(fight, {index: f"玩家{index}" for index in players}, players, raw)
+    mushroom = result["mushroomActivations"][0]
+    assert mushroom["prematureActivation"] is True
+    assert mushroom["waveCausedWipe"] is True
+    assert mushroom["priorDeathCount"] == 8
+    assert mushroom["raidAlreadyCollapsed"] is True
+    assert mushroom["prematureCausedWipe"] is False
+    assert "达到大团崩溃阈值 8" in mushroom["attributionSuppressedReason"]
 
 
 def test_twinfangs_inserts_death_when_feast_clears_multiple_stacks():
