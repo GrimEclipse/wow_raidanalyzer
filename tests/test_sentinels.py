@@ -236,6 +236,23 @@ def test_marks_returns_compact_overlap_and_total_stack_summary():
     assert "timeline" not in player["cycles"][0]["acid"]
 
 
+def test_marks_counts_death_when_red_and_green_total_exceeds_thirty():
+    fight = {"startTime": 0, "endTime": 100_000}
+    players = {1: {"id": 1, "name": "鸟德", "specID": 102, "classColor": "#ff7c0a"}}
+    marks = [
+        event(5_000, ACID_MARK_ID, "applydebuffstack", 1, stack=16),
+        event(6_000, BLOOD_MARK_ID, "applydebuffstack", 1, stack=15),
+    ]
+    deaths = [event(7_000, 0, "death", 1)]
+
+    result = analyze_marks(fight, {1: "鸟德"}, players, marks, [], deaths=deaths)
+
+    assert result["deathOverThirty"] == [{
+        **players[1], "playerID": 1, "player": "鸟德", "timeMs": 7_000,
+        "time": "00:07.0", "acidStack": 16, "bloodStack": 15, "totalStack": 31,
+    }]
+
+
 def test_clinging_murk_reports_missing_blood_side_and_dispersed_players():
     fight = {"startTime": 0, "endTime": 30_000}
     players = {

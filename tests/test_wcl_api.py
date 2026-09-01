@@ -64,3 +64,17 @@ def test_event_page_passes_wcl_filter_expression(monkeypatch):
 
     assert "filterExpression: $filterExpression" in captured["query"]
     assert captured["variables"]["filterExpression"] == "source.id = 272110 OR target.id = 272110"
+
+
+def test_events_emits_user_facing_fetch_progress(monkeypatch):
+    client = wcl_api.WclClient()
+    updates = []
+
+    monkeypatch.setattr(client, "event_page", lambda *args, **kwargs: {
+        "data": [], "nextPageTimestamp": None,
+    })
+    monkeypatch.setattr(wcl_api, "emit_progress", lambda message, **kwargs: updates.append((message, kwargs)))
+
+    client.events("report", "Debuffs", {"id": 1, "startTime": 0, "endTime": 1000})
+
+    assert updates == [("读取减益与叠层记录", {"percent": 54, "stage": "fetch", "detail": True})]

@@ -27,7 +27,12 @@ from boss_plugins.common import (
     spec_localization,
     write_json_result,
 )
-from boss_plugins.venomous_abyss.shared import build_survival_timeline, difficulty_fields
+from boss_plugins.venomous_abyss.shared import (
+    build_survival_timeline,
+    difficulty_fields,
+    nightly_detail,
+    nightly_player_totals,
+)
 
 
 ENCOUNTER_ID = 3445
@@ -500,7 +505,8 @@ def _mark_summary(events, initial_state=None):
     }
 
 
-def analyze_marks(fight, actor_map, player_catalog, mark_events, stasis_events, watch_players=None):
+def analyze_marks(fight, actor_map, player_catalog, mark_events, stasis_events, deaths=None, watch_players=None):
+    deaths = deaths or []
     windows = stasis_windows(fight, stasis_events)
     split_windows = []
     cursor = int(fight["startTime"])
@@ -557,9 +563,30 @@ def analyze_marks(fight, actor_map, player_catalog, mark_events, stasis_events, 
             "cycles": cycle_rows,
         })
     players.sort(key=lambda row: (-row["highestTotalStack"], -row["simultaneousBuffCount"], row["name"]))
+    death_over_thirty = []
+    for death in deaths:
+        player_id = death.get("targetID")
+        if player_id not in player_catalog:
+            continue
+        timestamp = int(death.get("timestamp") or 0)
+        stacks = _mark_state_at(by_player[player_id], timestamp - 1)
+        total_stack = stacks[ACID_MARK_ID] + stacks[BLOOD_MARK_ID]
+        if total_stack <= 30:
+            continue
+        death_over_thirty.append({
+            **player_catalog[player_id],
+            "playerID": player_id,
+            "player": player_catalog[player_id]["name"],
+            "timeMs": timestamp - int(fight["startTime"]),
+            "time": fmt_ms(timestamp - int(fight["startTime"])),
+            "acidStack": stacks[ACID_MARK_ID],
+            "bloodStack": stacks[BLOOD_MARK_ID],
+            "totalStack": total_stack,
+        })
     return {
         "players": players,
         "cycleCount": len(split_windows),
+        "deathOverThirty": death_over_thirty,
     }
 
 
@@ -954,7 +981,8 @@ def analyze_toxic_droplets(
     return {"rounds": rounds, "missedRoundCount": sum(row["missed"] for row in rounds)}
 
 
-def analyze_living_venom(fight, actor_map, damage, deaths):
+def analyze_living_venom(fight, actor_map, damage, deaths, player_catalog=None):
+    player_catalog = player_catalog or {}
     rows = defaultdict(list)
     for event in damage:
         if ability_id(event) == LIVING_VENOM_ID:
@@ -963,6 +991,7 @@ def analyze_living_venom(fight, actor_map, damage, deaths):
     players = []
     for target_id, events in rows.items():
         players.append({
+            **(player_catalog.get(target_id) or {}),
             "playerID": target_id,
             "player": actor_name(actor_map, target_id),
             "hitCount": len(events),
@@ -1058,6 +1087,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         player_catalog,
         mark_events,
         stasis_events,
+        player_deaths,
     ) if options["markReviewEnabled"] else {"players": [], "cycleCount": 0}
     water = analyze_clinging_murk(
         fight,
@@ -1080,7 +1110,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         position_index,
     ) if options["toxicDropletReviewEnabled"] else {"rounds": [], "missedRoundCount": 0}
     living = analyze_living_venom(
-        fight, actor_map, payload["damage"], player_deaths
+        fight, actor_map, payload["damage"], player_deaths, player_catalog
     ) if options["livingVenomReviewEnabled"] else {
         "spellID": LIVING_VENOM_ID, "players": [], "totalHits": 0, "totalDamage": 0,
     }
@@ -1146,6 +1176,59 @@ def merge_living_venom(global_rows, fight):
             target["maxHit"] = max(target["maxHit"], row["maxHit"])
             target["deathCount"] += row["deathCount"]
         target["events"].extend({**event, "fightID": fight["fightID"]} for event in row["events"])
+
+
+def _mechanic_overview(rendered):
+    high_stack_deaths = []
+    spear_hits = []
+    spear_death_count = 0
+    first_wrong_collisions = []
+    for pull in rendered:
+        mechanics = pull.get("sentinels") or {}
+        for row in (mechanics.get("marks") or {}).get("deathOverThirty") or []:
+            high_stack_deaths.append(nightly_detail(
+                pull, row.get("time"),
+                f"{row.get('player') or '未知玩家'} 死亡时红 {row.get('bloodStack')} + 绿 {row.get('acidStack')} = {row.get('totalStack')} 层",
+                player=row.get("player"), classColor=row.get("classColor"),
+            ))
+        for row in (mechanics.get("livingVenom") or {}).get("players") or []:
+            spear_death_count += int(row.get("deathCount") or 0)
+            for event in row.get("events") or []:
+                spear_hits.append(nightly_detail(
+                    pull, event.get("time"),
+                    f"{row.get('player') or '未知玩家'} 命中绿色长矛",
+                    player=row.get("player"), classColor=row.get("classColor"), spellID=LIVING_VENOM_ID,
+                ))
+        for round_row in (mechanics.get("helicalToxins") or {}).get("rounds") or []:
+            first = next((row for row in round_row.get("collisions") or [] if row.get("firstWrongCollision")), None)
+            if not first:
+                continue
+            names = "、".join(row.get("player") or "未知玩家" for row in first.get("players") or [])
+            first_wrong_collisions.append(nightly_detail(
+                pull, first.get("time"),
+                f"本轮第一次错误碰撞：{names or first.get('collisionCombination') or '未识别组合'}",
+            ))
+    return {
+        "title": "整夜机制统计",
+        "subtitle": "按所有 Pull 汇总死亡层数、绿色长矛与每轮第一次错误碰撞。",
+        "metrics": [
+            {
+                "key": "deathOverThirty", "label": "死亡时红绿总层数超过 30", "value": len(high_stack_deaths), "unit": "次",
+                "tone": "danger", "description": "读取死亡前一毫秒的红色与绿色印记层数，总和严格大于 30 才计数。",
+                "players": nightly_player_totals(high_stack_deaths), "events": high_stack_deaths,
+            },
+            {
+                "key": "greenSpearHits", "label": "绿色长矛命中 / 死亡", "value": f"{len(spear_hits)} / {spear_death_count}", "unit": "次",
+                "tone": "warning", "description": "前一个数字为绿色长矛伤害命中总人次，后一个数字为该技能致死次数。",
+                "players": nightly_player_totals(spear_hits), "events": spear_hits,
+            },
+            {
+                "key": "firstWrongCollisions", "label": "团队内第一个撞错", "value": len(first_wrong_collisions), "unit": "次",
+                "tone": "danger", "description": "每一轮螺旋毒素最多计一次，只取该轮第一次明确的错误碰撞。",
+                "players": [], "events": first_wrong_collisions,
+            },
+        ],
+    }
 
 
 def build_aggregated_json(report_ids, options=None):
@@ -1214,6 +1297,7 @@ def build_aggregated_json(report_ids, options=None):
         "data": {
             "page1_wipeAnalysis": rendered,
             "page2_avoidableBoard": {"1284209": sorted(global_living.values(), key=lambda row: (row["deathCount"], row["hitCount"], row["totalDamage"]), reverse=True)},
+            "mechanicOverview": _mechanic_overview(rendered),
         },
     }
 

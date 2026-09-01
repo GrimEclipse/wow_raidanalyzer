@@ -61,7 +61,7 @@ REGISTRATION_ATTEMPTS: Dict[str, List[float]] = {}
 REGISTRATION_ATTEMPTS_LOCK = threading.Lock()
 INVITE_CODE = environment_setting("APP_INVITE_CODE")
 
-FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
+FIGHT_RE = re.compile(r"(读取|分析) Fight .*?[（(](\d+)/(\d+)[）)]")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
 MATCHED_FIGHTS_RE = re.compile(r"匹配到\s+(\d+)\s+场")
 
@@ -150,9 +150,11 @@ def translate_plugin_progress(job: Job, raw_event: dict):
 
     fight = FIGHT_RE.search(message)
     if fight:
-        index = int(fight.group(1))
-        total = max(1, int(fight.group(2)))
-        percent = 20 + round(index / total * 68)
+        action = fight.group(1)
+        index = int(fight.group(2))
+        total = max(1, int(fight.group(3)))
+        completed_before = max(0, index - 1) if action == "读取" else index
+        percent = 20 + round(completed_before / total * 68)
         set_job_progress(job, percent=percent, message=f"分析战斗 {index}/{total}", stage="analyze")
         return
 

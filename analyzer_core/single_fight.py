@@ -24,7 +24,7 @@ from analyzer_core.wcl_api import WclClient
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "single_fight.json"
 CACHE_DIR = ROOT / ".single_fight_cache"
-ANALYSIS_SCHEMA = "single-fight-v1"
+ANALYSIS_SCHEMA = "single-fight-v2"
 
 DIFFICULTIES = {1: "普通", 3: "普通", 4: "英雄", 5: "史诗", 10: "史诗钥石"}
 
@@ -151,6 +151,7 @@ def recent_guild_reports(
     report_limit = max(1, min(50, int(limit or config.get("recentReportLimit") or 20)))
     query = """
     query($guildID: Int!, $limit: Int!) {
+      guildData { guild(id: $guildID) { id name } }
       reportData { reports(guildID: $guildID, limit: $limit) { data {
         code title startTime endTime zone { id name }
         fights { id name encounterID difficulty kill startTime endTime bossPercentage fightPercentage }
@@ -159,6 +160,12 @@ def recent_guild_reports(
     }
     """
     data = client.graphql_data(query, {"guildID": selected_guild_id, "limit": report_limit})
+    wcl_guild = (data.get("guildData") or {}).get("guild") or {}
+    if wcl_guild:
+        selected_guild = {
+            "id": int(wcl_guild.get("id") or selected_guild_id),
+            "name": str(wcl_guild.get("name") or selected_guild.get("name") or "工会"),
+        }
     reports = []
     for raw in ((data.get("reportData") or {}).get("reports") or {}).get("data") or []:
         report = {**raw, "code": str(raw.get("code") or "")}
@@ -199,7 +206,7 @@ def report_overview(report_code: str, client: WclClient | None = None) -> dict:
     client = client or WclClient()
     query = """
     query($code: String!) { reportData { report(code: $code) {
-      title startTime endTime
+      title startTime endTime guild { id name }
       fights { id name encounterID difficulty kill startTime endTime bossPercentage fightPercentage friendlyPlayers friendlySpecs }
       masterData { actors { id name type subType petOwner gameID } }
     } } }
@@ -238,7 +245,7 @@ def report_overview(report_code: str, client: WclClient | None = None) -> dict:
         "schemaVersion": 1,
         "code": code,
         "title": report.get("title") or code,
-        "guild": config["guild"],
+        "guild": report.get("guild") or config["guild"],
         "raidNightDates": sorted({row["raidNightDate"] for row in fights}),
         "fights": fights,
     }
@@ -396,13 +403,6 @@ def analyze_single_fight(
         )
 
     result = json.loads(output_path.read_text(encoding="utf-8-sig"))
-    raw_fight = {
-        "id": fight["id"],
-        "startTime": fight["relativeStartTime"],
-        "endTime": fight["relativeEndTime"],
-    }
-    emit_progress("按阵容提取职业技能与控制技能", percent=92, stage="player-abilities")
-    player_timeline = player_ability_timeline(client, code, raw_fight, fight["roster"])
     elapsed = round(time.perf_counter() - started, 3)
     result.setdefault("meta", {})["singleFight"] = {
         "schemaVersion": ANALYSIS_SCHEMA,
@@ -417,10 +417,9 @@ def analyze_single_fight(
         "elapsedSeconds": elapsed,
         "abilitySelection": fight["abilitySelection"],
     }
-    result.setdefault("data", {})["singleFightPlayerTimeline"] = player_timeline
     result = apply_analysis_contract(result)
     output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(output_path, cache_path)
-    emit_progress("单场结论与职业技能时间轴已写入缓存", percent=99, stage="write")
+    emit_progress("单场结论已写入缓存", percent=99, stage="write")
     return {"path": output_path, "cacheHit": False, "cacheKey": cache_key}

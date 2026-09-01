@@ -26,6 +26,8 @@ from boss_plugins.venomous_abyss.shared import (
     difficulty_fields,
     load_confirmed_spell_names,
     load_confirmed_source_names,
+    nightly_detail,
+    nightly_player_totals,
     player_ref,
     source_name,
     spell_name,
@@ -79,6 +81,7 @@ POSITION_DAMAGE_IDS = set(AVOIDABLE_DAMAGE) | {1287434, 1292034, 1293214}
 DEFAULT_OPTIONS = {
     "essenceRendReviewEnabled": True,
     "essenceRendPlacementCountEnabled": False,
+    "essenceRendMinDistanceYards": 20,
     "essenceRendMaxSampleOffsetMs": 1250,
     "essenceRendEdgeRatio": 0.72,
     "amaniLeakReviewEnabled": True,
@@ -496,6 +499,7 @@ def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options, play
         return {"enabled": False, "placements": []}
     placements = []
     edge_ratio = float(options["essenceRendEdgeRatio"])
+    minimum_distance_yards = float(options.get("essenceRendMinDistanceYards") or 20)
     if arena:
         arena["radiusYards"] = round(float(arena["radius"]) / 100, 1)
         arena["edgeThresholdYards"] = round(float(arena["radius"]) * edge_ratio / 100, 1)
@@ -532,10 +536,10 @@ def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options, play
                 relative_radius = distance_from_center / arena["radius"]
                 row["relativeRadius"] = round(relative_radius, 3)
                 row["distanceFromCenterYards"] = round(distance_from_center / 100, 1)
-                row["placementEstimate"] = "贴边" if relative_radius >= edge_ratio else "未贴边"
-                if options["essenceRendPlacementCountEnabled"] and relative_radius < edge_ratio:
+                row["placementEstimate"] = "距离中场安全" if distance_from_center / 100 >= minimum_distance_yards else "太靠近中场"
+                if options["essenceRendPlacementCountEnabled"] and distance_from_center / 100 < minimum_distance_yards:
                     row["counted"] = True
-                    row["countReason"] = f"估算半径 {relative_radius:.2f} 低于配置阈值 {edge_ratio:.2f}"
+                    row["countReason"] = f"距中场 {distance_from_center / 100:.1f} 码，小于 20 码"
             elif position["positionReliable"]:
                 row["placementEstimate"] = "场地中心未标定"
             else:
@@ -546,6 +550,7 @@ def analyze_essence_rend(fight, actor_map, debuffs, damage, arena, options, play
     return {
         "enabled": True,
         "spellID": 1287434,
+        "minimumDistanceYards": minimum_distance_yards,
         "placementRule": "窗口内坐标用于落点；窗口外仍返回最近样本时间但不参与判责；不使用死亡事件代替落点",
         "arenaEstimate": arena,
         "placements": placements,
@@ -663,7 +668,64 @@ def analyze_leaks(fight, casts, markers, options):
     }
 
 
-def analyze_barrage(fight, actor_map, casts, damage, deaths):
+def infer_barrage_interceptor(
+    timestamp, cast_timestamp, target_id, players, position_index, boss_ids,
+    *, maximum_line_distance_yards=3.0,
+):
+    """Find the first player physically crossing the Boss-to-target projectile lane."""
+    boss_state = next((
+        state for state in (
+            actor_state_at(position_index, boss_id, cast_timestamp, reliable_window_ms=3_000)
+            for boss_id in boss_ids
+        ) if state and state.get("reliable")
+    ), None)
+    target_state = actor_state_at(position_index, target_id, cast_timestamp, reliable_window_ms=3_000)
+    if not boss_state or not target_state or not target_state.get("reliable"):
+        return None
+    bx, by = boss_state["x"], boss_state["y"]
+    tx, ty = target_state["x"], target_state["y"]
+    dx, dy = tx - bx, ty - by
+    length_squared = dx * dx + dy * dy
+    if length_squared <= 0:
+        return None
+    lane_length = math.sqrt(length_squared)
+    candidates = []
+    for player_id in players:
+        if player_id == target_id:
+            continue
+        state = actor_state_at(position_index, player_id, timestamp, reliable_window_ms=3_000)
+        if not state or not state.get("reliable"):
+            continue
+        projection = ((state["x"] - bx) * dx + (state["y"] - by) * dy) / length_squared
+        # Ignore players behind the Boss, standing almost on the Boss, or already at
+        # the intended target endpoint. They cannot explain an early collision.
+        if not 0.08 <= projection <= 0.92:
+            continue
+        nearest_x = bx + projection * dx
+        nearest_y = by + projection * dy
+        line_distance = math.dist((state["x"], state["y"]), (nearest_x, nearest_y))
+        if line_distance / 100 > maximum_line_distance_yards:
+            continue
+        candidates.append((projection, line_distance, player_id, state))
+    if not candidates:
+        return None
+    projection, line_distance, player_id, state = min(candidates, key=lambda row: (row[0], row[1]))
+    return {
+        **player_ref(players, {}, player_id),
+        "distanceToLaneYards": round(line_distance / 100, 1),
+        "distanceFromBossYards": round(projection * lane_length / 100, 1),
+        "targetDistanceYards": round(lane_length / 100, 1),
+        "sampleOffsetMs": state.get("sampleOffsetMs"),
+        "evidence": "first-player-on-boss-target-segment",
+    }
+
+
+def analyze_barrage(
+    fight, actor_map, casts, damage, deaths, players=None, position_index=None, boss_ids=None,
+):
+    players = players or {}
+    position_index = position_index or {}
+    boss_ids = boss_ids or []
     cast_rows = sorted((event for event in casts if ability_id(event) == 1284103 and event_type(event) == "cast"), key=lambda event: event["timestamp"])
     damage_rows = [event for event in damage if ability_id(event) == 1292034]
     death_rows = [event for event in deaths if ability_id(event) == 1292034 or event.get("killingAbilityGameID") == 1292034]
@@ -686,11 +748,15 @@ def analyze_barrage(fight, actor_map, casts, damage, deaths):
                     if before / float(maximum) < 0.45:
                         low_health.append(actor_name(actor_map, hit.get("targetID")).split("-", 1)[0])
             wave_rows.append({
+                "timestamp": wave_ts,
                 "timeMs": wave_ts - fight["startTime"],
                 "delayFromCastMs": wave_ts - start,
                 "hitCount": len({event.get("targetID") for event in wave_hits}),
                 "totalDamage": total,
                 "lowHealthPlayers": sorted(set(low_health)),
+                "interceptorCandidate": infer_barrage_interceptor(
+                    wave_ts, start, cast.get("targetID"), players, position_index, boss_ids,
+                ),
             })
         round_deaths = [event for event in death_rows if start <= int(event.get("timestamp") or 0) < end]
         rounds.append({
@@ -1049,6 +1115,74 @@ def merge_avoidable(global_board, local_board):
             target["events"].extend(row["events"])
 
 
+def _mechanic_overview(rendered):
+    barrage_rounds = []
+    close_essence = []
+    missing_inner = []
+    for pull in rendered:
+        mechanics = pull.get("nakzali") or {}
+        for round_row in (mechanics.get("possessionBarrage") or {}).get("rounds") or []:
+            abnormal = [
+                wave for wave in round_row.get("waves") or []
+                if "提前拦截" in str(wave.get("verdict") or "")
+            ]
+            if not abnormal:
+                continue
+            candidate = next((
+                wave.get("interceptorCandidate") for wave in abnormal
+                if wave.get("interceptorCandidate")
+            ), None)
+            candidate_text = (
+                f"；坐标候选拦截者：{candidate.get('player')}（距弹道 {candidate.get('distanceToLaneYards')} 码）"
+                if candidate else "；未取得可闭环的个人坐标"
+            )
+            barrage_rounds.append(nightly_detail(
+                pull, round_row.get("time"),
+                f"附身弹幕 #{round_row.get('index')} 疑似被提前拦截并造成过高全团伤害；弹幕目标：{round_row.get('target') or '未知'}{candidate_text}",
+                player=candidate.get("player") if candidate else None,
+                classColor=candidate.get("classColor") if candidate else None,
+            ))
+        for placement in (mechanics.get("essenceRend") or {}).get("placements") or []:
+            if placement.get("placementEstimate") != "太靠近中场":
+                continue
+            close_essence.append(nightly_detail(
+                pull, placement.get("time"),
+                f"{placement.get('player') or '未知玩家'} 的精华撕裂距中场 {placement.get('distanceFromCenterYards')} 码（要求至少 20 码）",
+                player=placement.get("player"), classColor=placement.get("classColor"),
+            ))
+        if int(pull.get("difficulty") or 0) == 5:
+            for player_row in (mechanics.get("avoidableBoard") or {}).get("1308227") or []:
+                events = player_row.get("events") or []
+                if not events:
+                    continue
+                missing_inner.append(nightly_detail(
+                    pull, events[0].get("time"),
+                    f"{player_row.get('player') or '未知玩家'} 进入中央井口并受到不朽盘卷伤害（{len(events)} 跳）",
+                    player=player_row.get("player"), classColor=player_row.get("classColor"),
+                ))
+    return {
+        "title": "整夜机制统计",
+        "subtitle": "每轮附身弹幕最多计一次；精华撕裂使用固定 20 码阈值；错误进入内场仅统计史诗。",
+        "metrics": [
+            {
+                "key": "barrageIntercepts", "label": "附身弹幕过早拦截", "value": len(barrage_rounds), "unit": "次",
+                "tone": "danger", "description": "同一轮即使多发弹幕均异常也只计一次；只有可靠坐标显示某名玩家最先穿过 Boss 到点名目标的弹道线段时才归到个人，缺坐标的轮次仍保留但不强行归人。",
+                "players": nightly_player_totals(barrage_rounds), "events": barrage_rounds,
+            },
+            {
+                "key": "closeEssenceRends", "label": "精华撕裂太靠近中场", "value": len(close_essence), "unit": "次",
+                "tone": "warning", "description": "可靠落点距估算场地中心小于 20 码时计数。",
+                "players": nightly_player_totals(close_essence), "events": close_essence,
+            },
+            {
+                "key": "missingInnerRealm", "label": "未按要求进入内场", "value": len(missing_inner), "unit": "人次",
+                "tone": "danger", "description": "仅史诗难度；玩家进入中央盘魂之井并实际受到不朽盘卷 1308227 伤害时计数，每场 Pull 每名玩家最多计一次。",
+                "players": nightly_player_totals(missing_inner), "events": missing_inner,
+            },
+        ],
+    }
+
+
 def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_rows, fight, payload, options):
     payload["deaths"] = [
         event for event in payload["deaths"]
@@ -1071,7 +1205,10 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
         options,
         player_catalog,
     )
-    barrage = analyze_barrage(fight, actor_map, payload["casts"], payload["damage"], payload["deaths"])
+    barrage = analyze_barrage(
+        fight, actor_map, payload["casts"], payload["damage"], payload["deaths"],
+        player_catalog, position_index, boss_ids,
+    )
     hungering_pyre = analyze_hungering_pyre(fight, actor_map, payload["debuffs"], payload["damage"], options, payload["casts"])
     analyze_transition_assignments(fight, actor_map, player_catalog, hungering_pyre["rounds"], payload["debuffs"], payload["damage"])
     raw = {
@@ -1237,6 +1374,7 @@ def build_aggregated_json(report_ids, options=None):
             "page1_wipeAnalysis": rendered,
             "page2_avoidableBoard": global_rows,
             "barrageBaseline": baseline,
+            "mechanicOverview": _mechanic_overview(rendered),
         },
     }
 

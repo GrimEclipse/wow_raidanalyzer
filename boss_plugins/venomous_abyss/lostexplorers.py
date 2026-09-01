@@ -32,7 +32,7 @@ SOURCE_NAMES = load_confirmed_source_names()
 
 BOSS_CONFIG = {
     "key": "lostexplorers",
-    "encounterIDs": {3497},
+    "encounterIDs": {3497, 53497},
     "name": "迷失的探险者",
     "arena": "assets/raids/venomous_abyss/04-lostexplorers.jpg",
     "spellNames": GUIDE_SPELLS,

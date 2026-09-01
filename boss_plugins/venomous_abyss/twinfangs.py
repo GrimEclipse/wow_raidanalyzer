@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
-from boss_plugins.venomous_abyss.runtime import analyze_boss, build_aggregated_json as _build
+from boss_plugins.common import write_json_result
+from boss_plugins.venomous_abyss.runtime import build_aggregated_json as _build
 from boss_plugins.venomous_abyss.shared import (
     ability_id,
     active_immunities,
+    avoidable_board as _avoidable_board,
     completed_casts as _completed_casts,
     death_near as _death_near,
     event_type,
@@ -15,6 +17,8 @@ from boss_plugins.venomous_abyss.shared import (
     fmt_ms,
     group_nearby,
     load_confirmed_spell_names,
+    nightly_detail,
+    nightly_player_totals,
     player_ref,
     spell_name,
 )
@@ -23,7 +27,7 @@ GUIDE_SPELLS = load_confirmed_spell_names()
 
 BOSS_CONFIG = {
     "key": "twinfangs",
-    "encounterIDs": {3421},
+    "encounterIDs": {3421, 53421},
     "name": "双子毒牙",
     "arena": "assets/raids/venomous_abyss/06-twinfangs.jpg",
     "spellNames": GUIDE_SPELLS,
@@ -279,20 +283,51 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                     "timeMs": row["timeMs"], "time": row["time"], "delta": row["delta"], "toStack": row["toStack"],
                     "source": row["source"], "sourceID": row["sourceID"],
                 })
+    wave_hits = _avoidable_board(
+        fight, actor_map, players, damage, deaths, {1289994: "腐蚀洪流波浪"}
+    )
     return {
         "eternalVenom": {"players": histories, "feastChecks": feast_checks, "abnormalGains": abnormal_gains},
         "globules": {"rounds": globule_rounds},
+        "waveHits": {"spellID": 1289994, "players": wave_hits},
         "mythicPlaceholder": "该部分暂时没有可用的信息。",
     }
 
 analyze_mechanics = analyze_twinfangs
 
 
+def _mechanic_overview(rendered):
+    wave_hits = []
+    for pull in rendered:
+        mechanics = pull.get(BOSS_CONFIG["key"]) or {}
+        for player_row in (mechanics.get("waveHits") or {}).get("players") or []:
+            for event in player_row.get("events") or []:
+                wave_hits.append(nightly_detail(
+                    pull, event.get("time"),
+                    f"{player_row.get('player') or '未知玩家'} 命中腐蚀洪流波浪",
+                    player=player_row.get("player"), classColor=player_row.get("classColor"),
+                    spellID=1289994,
+                ))
+    return {
+        "title": "整夜机制统计",
+        "subtitle": "按所有 Pull 汇总实际命中事件；单场毒液与吃球明细保持原样。",
+        "metrics": [{
+            "key": "waveHits", "label": "命中波浪", "value": len(wave_hits), "unit": "次",
+            "tone": "warning", "description": "腐蚀洪流波浪 1289994 对玩家造成伤害的总人次。",
+            "players": nightly_player_totals(wave_hits), "events": wave_hits,
+        }],
+    }
+
+
 def build_aggregated_json(report_ids, options=None):
-    return _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    result["data"]["mechanicOverview"] = _mechanic_overview(
+        result.get("data", {}).get("page1_wipeAnalysis") or []
+    )
+    return result
 
 
 def analyze(report_ids, output_path=None, catalog_entry=None, options=None, progress_callback=None):
-    return analyze_boss(
-        BOSS_CONFIG, analyze_mechanics, report_ids, output_path, catalog_entry, options
+    return write_json_result(
+        build_aggregated_json(report_ids, options), output_path, catalog_entry=catalog_entry
     )

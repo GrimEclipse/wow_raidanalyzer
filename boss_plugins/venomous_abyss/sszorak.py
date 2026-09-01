@@ -5,7 +5,8 @@ from __future__ import annotations
 import math
 from collections import Counter, defaultdict
 
-from boss_plugins.venomous_abyss.runtime import analyze_boss, build_aggregated_json as _build
+from boss_plugins.common import write_json_result
+from boss_plugins.venomous_abyss.runtime import build_aggregated_json as _build
 from boss_plugins.venomous_abyss.shared import (
     IMMUNITY_SPELLS,
     ability_id,
@@ -19,6 +20,8 @@ from boss_plugins.venomous_abyss.shared import (
     fmt_ms,
     group_nearby,
     load_confirmed_spell_names,
+    nightly_detail,
+    nightly_player_totals,
     player_ref,
     position_at_interpolated,
     spell_name,
@@ -28,7 +31,7 @@ GUIDE_SPELLS = load_confirmed_spell_names()
 
 BOSS_CONFIG = {
     "key": "sszorak",
-    "encounterIDs": {3420},
+    "encounterIDs": {3420, 53420},
     "name": "斯索拉克",
     "arena": "assets/raids/venomous_abyss/05-sszorak-arena.png",
     "bossIcon": "assets/raids/venomous_abyss/05-sszorak-boss.png",
@@ -1176,11 +1179,55 @@ def analyze_sszorak(fight, actor_map, players, raw):
 analyze_mechanics = analyze_sszorak
 
 
+def _mechanic_overview(rendered):
+    bad_cysts = []
+    storm_hits = []
+    for pull in rendered:
+        mechanics = pull.get(BOSS_CONFIG["key"]) or {}
+        for round_row in (mechanics.get("cysts") or {}).get("rounds") or []:
+            for placement in round_row.get("placements") or []:
+                if placement.get("placementOk") is not False:
+                    continue
+                bad_cysts.append(nightly_detail(
+                    pull, placement.get("time"),
+                    f"{placement.get('player') or '未知玩家'} 囊肿放置错误：{placement.get('expected') or '未落在本轮要求位置'}",
+                    player=placement.get("player"), classColor=placement.get("classColor"),
+                ))
+        for player_row in (mechanics.get("apexPredator") or {}).get("tempestDamage") or []:
+            for event in player_row.get("events") or []:
+                storm_hits.append(nightly_detail(
+                    pull, event.get("time"),
+                    f"{player_row.get('player') or '未知玩家'} 命中风暴",
+                    player=player_row.get("player"), classColor=player_row.get("classColor"),
+                    spellID=1287083,
+                ))
+    return {
+        "title": "整夜机制统计",
+        "subtitle": "按所有 Pull 汇总囊肿放置判定与风暴实际伤害。",
+        "metrics": [
+            {
+                "key": "badCystPlacements", "label": "囊肿放置错误", "value": len(bad_cysts), "unit": "次",
+                "tone": "danger", "description": "只统计已有坐标和风向证据、明确判定 placementOk=false 的放置。",
+                "players": nightly_player_totals(bad_cysts), "events": bad_cysts,
+            },
+            {
+                "key": "stormHits", "label": "命中风暴", "value": len(storm_hits), "unit": "次",
+                "tone": "warning", "description": "风暴伤害 1287083 命中玩家的总人次。",
+                "players": nightly_player_totals(storm_hits), "events": storm_hits,
+            },
+        ],
+    }
+
+
 def build_aggregated_json(report_ids, options=None):
-    return _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    result["data"]["mechanicOverview"] = _mechanic_overview(
+        result.get("data", {}).get("page1_wipeAnalysis") or []
+    )
+    return result
 
 
 def analyze(report_ids, output_path=None, catalog_entry=None, options=None, progress_callback=None):
-    return analyze_boss(
-        BOSS_CONFIG, analyze_mechanics, report_ids, output_path, catalog_entry, options
+    return write_json_result(
+        build_aggregated_json(report_ids, options), output_path, catalog_entry=catalog_entry
     )

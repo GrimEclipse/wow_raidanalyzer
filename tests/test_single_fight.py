@@ -74,6 +74,7 @@ class SingleFightDiscoveryTests(unittest.TestCase):
             def graphql_data(self, query, variables):
                 self.variables = variables
                 return {
+                    "guildData": {"guild": {"id": 123456, "name": "测试工会"}},
                     "reportData": {"reports": {"data": [{
                         "code": "ABC123", "title": "night", "startTime": 1786550400000,
                         "endTime": 1786550800000, "zone": {"id": 54, "name": "raid"},
@@ -92,13 +93,14 @@ class SingleFightDiscoveryTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in result["reports"][0]["fights"]], [3])
         self.assertTrue(result["reports"][0]["lastFight"]["supported"])
         self.assertEqual(client.variables["guildID"], 123456)
-        self.assertEqual(result["guild"], {"id": 123456, "name": "自定义工会"})
+        self.assertEqual(result["guild"], {"id": 123456, "name": "测试工会"})
 
     def test_report_overview_joins_friendly_players_and_specs(self):
         class FakeClient:
             def graphql_data(self, query, variables):
                 return {"reportData": {"report": {
                     "title": "progress", "startTime": 1786550400000, "endTime": 1786550800000,
+                    "guild": {"id": 123456, "name": "测试工会"},
                     "fights": [{
                         "id": 9, "name": "Crown", "encounterID": 3181, "difficulty": 5,
                         "kill": False, "startTime": 1000, "endTime": 61000,
@@ -113,6 +115,7 @@ class SingleFightDiscoveryTests(unittest.TestCase):
         self.assertEqual(fight["roster"][0]["class"], "DeathKnight")
         self.assertTrue(fight["supported"])
         self.assertGreater(fight["abilitySelection"]["abilityCount"], 1)
+        self.assertEqual(result["guild"], {"id": 123456, "name": "测试工会"})
 
     def test_recent_reports_rejects_non_positive_guild_id(self):
         with self.assertRaisesRegex(ValueError, "正整数"):
@@ -130,6 +133,23 @@ class SingleFightFrontendTests(unittest.TestCase):
         self.assertIn('&guildID=${encodeURIComponent(guildID)}', page)
         self.assertIn('$("loadReports").addEventListener("click",loadReports)', page)
         self.assertNotIn("then(loadReports)", page)
+        self.assertIn('id="waitScreen"', page)
+        self.assertNotIn("singleFightPlayerTimeline", page)
+        self.assertNotIn("爆发药", page)
+
+
+class SingleFightProgressTests(unittest.TestCase):
+    def test_single_fight_starts_at_twenty_then_advances_by_wcl_stream(self):
+        from server import Job, translate_plugin_progress
+
+        job = Job(id="test", owner_user_id=1)
+        translate_plugin_progress(job, {"message": "读取 Fight 33（1/1）", "stage": "analyze"})
+        self.assertEqual(job.percent, 20)
+        translate_plugin_progress(job, {
+            "message": "读取减益与叠层记录", "percent": 54, "stage": "fetch", "detail": True,
+        })
+        self.assertEqual(job.percent, 54)
+        self.assertEqual(job.message, "读取减益与叠层记录")
 
 
 if __name__ == "__main__":

@@ -305,6 +305,35 @@ def avoidable_board(fight, actor_map, players, damage, deaths, labels):
     )
 
 
+def nightly_detail(pull, time_value, text, **extra):
+    """Create one generic clickable nightly-overview record."""
+    return {
+        "reportID": pull.get("reportID"),
+        "fightID": pull.get("fightID"),
+        "date": pull.get("date"),
+        "startClock": pull.get("startClock"),
+        "time": time_value,
+        "text": text,
+        **extra,
+    }
+
+
+def nightly_player_totals(events):
+    """Aggregate mechanic event attribution without owning Boss rules."""
+    totals = {}
+    for event in events:
+        player_name = event.get("player")
+        if not player_name:
+            continue
+        row = totals.setdefault(player_name, {
+            "player": player_name,
+            "count": 0,
+            "classColor": event.get("classColor") or "#e5e7eb",
+        })
+        row["count"] += int(event.get("count") or 1)
+    return sorted(totals.values(), key=lambda row: (-row["count"], row["player"]))
+
+
 def death_near(deaths, player_id, timestamp, window_ms=500):
     """Return a player's nearest death event around a mechanic timestamp."""
     candidates = [
