@@ -1,10 +1,12 @@
 import unittest
+from unittest.mock import Mock, patch
 
 from server import (
     AnalyzerHandler,
     local_wowhead_data,
     normalize_static_request_path,
     safe_redirect_target,
+    wowhead_spell_tooltip,
     wowhead_static_asset_url,
 )
 
@@ -58,6 +60,24 @@ class ServerAuthRouteTests(unittest.TestCase):
         )
         self.assertIsNone(wowhead_static_asset_url("/zamimg/../server.py"))
         self.assertIsNone(wowhead_static_asset_url("/assets/app.css"))
+
+    @patch("server.requests_module")
+    def test_wowhead_spell_tooltip_uses_real_nether_payload(self, requests_module):
+        response = Mock()
+        response.json.return_value = {
+            "name": "腐蚀浪潮",
+            "icon": "inv_ability_poison_wave",
+            "tooltip": "<table><tr><td>真实说明</td></tr></table>",
+        }
+        response.raise_for_status.return_value = None
+        requests_module.return_value.get.return_value = response
+
+        payload = wowhead_spell_tooltip(1292403, "dd=15&dataEnv=1&locale=4")
+
+        self.assertEqual(payload["name"], "腐蚀浪潮")
+        self.assertNotIn("本地法术存根", payload["tooltip"])
+        url = requests_module.return_value.get.call_args.args[0]
+        self.assertTrue(url.startswith("https://nether.wowhead.com/tooltip/spell/1292403?"))
 
 
 if __name__ == "__main__":

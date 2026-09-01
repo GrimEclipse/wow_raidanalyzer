@@ -32,7 +32,15 @@ def progress(config, message, percent=None):
     emit_progress(message, percent=percent, stage="analyze")
 
 
-def fetch_payload(client, report_id, fight, config, boss_id=None, tracked_actor_ids=()):
+def fetch_payload(
+    client,
+    report_id,
+    fight,
+    config,
+    boss_id=None,
+    tracked_actor_ids=(),
+    tracked_damage_target_ids=(),
+):
     payload = {
         "casts": client.events(
             report_id,
@@ -51,6 +59,7 @@ def fetch_payload(client, report_id, fight, config, boss_id=None, tracked_actor_
         "resources": [],
         "bossPositionEvents": [],
         "trackedActorEvents": [],
+        "trackedDamageTaken": [],
         "bossID": boss_id,
     }
     tracked_filters = config.get("trackedActorEventFilters") or []
@@ -87,6 +96,16 @@ def fetch_payload(client, report_id, fight, config, boss_id=None, tracked_actor_
                 include_resources=True,
             )
             payload["bossPositionEvents"] = compact_actor_position_events(boss_damage, boss_id)
+    for target_id in tracked_damage_target_ids:
+        payload["trackedDamageTaken"].extend(
+            client.events(
+                report_id,
+                "DamageDone",
+                fight,
+                target_id=target_id,
+                include_resources=False,
+            )
+        )
     return payload
 
 
@@ -161,6 +180,11 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
             actor["id"] for actor in actors
             if int(actor.get("gameID") or 0) in set(config.get("trackedActorGameIDs") or ())
         ]
+        tracked_damage_target_ids = [
+            actor["id"] for actor in actors
+            if int(actor.get("gameID") or 0)
+            in set(config.get("trackedDamageTargetGameIDs") or ())
+        ]
         boss_id = None
         if config.get("bossGameID"):
             boss_id = resolve_boss_actor_id(
@@ -180,6 +204,7 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 config,
                 boss_id=boss_id,
                 tracked_actor_ids=tracked_actor_ids,
+                tracked_damage_target_ids=tracked_damage_target_ids,
             )
             return index, render_fight(
                 config,

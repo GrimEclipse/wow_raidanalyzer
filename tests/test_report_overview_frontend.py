@@ -22,6 +22,15 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
             ROOT / "frontend/report/plugins/venomous_abyss/sentinels/revision.css"
         ).read_text(encoding="utf-8")
         cls.report_index = (ROOT / "frontend/report/index.html").read_text(encoding="utf-8")
+        cls.ulatek = (
+            ROOT / "frontend/report/plugins/venomous_abyss/ulatek/report.html"
+        ).read_text(encoding="utf-8")
+        cls.ulatek_js = (
+            ROOT / "frontend/report/plugins/venomous_abyss/ulatek/report.js"
+        ).read_text(encoding="utf-8")
+        cls.ulatek_plugin = (
+            ROOT / "frontend/report/plugins/venomous_abyss/ulatek/plugin.js"
+        ).read_text(encoding="utf-8")
 
     def test_all_reports_route_through_shared_pull_overview(self):
         self.assertIn('function overviewUrl(sourcePath)', self.runtime)
@@ -72,9 +81,25 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('assets/samples/report_manifest.json', self.report_index)
         self.assertIn('appendFiles((await response.json()).files)', self.report_index)
 
+    def test_ulatek_has_dedicated_tabs_navigation_and_tooltips(self):
+        self.assertIn('renderer: "ulatek"', self.ulatek_plugin)
+        self.assertIn('ulatek/report.html', self.ulatek_plugin)
+        self.assertIn('id="overviewLink"', self.ulatek)
+        self.assertIn('href="/"', self.ulatek)
+        self.assertIn('data-wowhead=', self.ulatek_js)
+        self.assertIn('function renderWaves()', self.ulatek_js)
+        self.assertIn('function renderHeart()', self.ulatek_js)
+        self.assertIn('第 2 → 第 3 平台高压流程', self.ulatek_js)
+        self.assertIn('new URLSearchParams(location.search).get("fight")', self.ulatek_js)
+
     def test_published_guild_kill_report_has_complete_safe_collision_evidence(self):
         manifest = json.loads((ROOT / "assets/samples/report_manifest.json").read_text(encoding="utf-8"))
-        row = next(item for item in manifest["files"] if "GJx48AgjRMt3KrpZ" in item["path"])
+        row = next(
+            (item for item in manifest["files"] if "GJx48AgjRMt3KrpZ" in item["path"]),
+            None,
+        )
+        if row is None:
+            self.skipTest("已按本地清理策略移除可再生成的 WCL 样本")
         payload = json.loads((ROOT / row["path"]).read_text(encoding="utf-8-sig"))
         pulls = payload["data"]["page1_wipeAnalysis"]
         self.assertTrue(any(pull["fightID"] == 21 and pull["isKill"] for pull in pulls))

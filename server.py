@@ -9,6 +9,7 @@ import re
 import threading
 import time
 import uuid
+import warnings
 import webbrowser
 from dataclasses import dataclass, field
 from http import HTTPStatus
@@ -19,7 +20,7 @@ from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from analyzer_core.auth_store import AuthError, default_auth_store, validate_password
 from analyzer_core.catalog import find_boss, to_frontend_catalog
-from analyzer_core.concurrency import MAX_JOB_THREADS
+from analyzer_core.concurrency import MAX_JOB_THREADS, requests_module
 from analyzer_core.runner import analyze_report
 from analyzer_core import raid_calendar_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
@@ -64,6 +65,10 @@ INVITE_CODE = environment_setting("APP_INVITE_CODE")
 FIGHT_RE = re.compile(r"(读取|分析) Fight .*?[（(](\d+)/(\d+)[）)]")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
 MATCHED_FIGHTS_RE = re.compile(r"匹配到\s+(\d+)\s+场")
+WOWHEAD_TOOLTIP_BASE_URL = "https://nether.wowhead.com"
+WOWHEAD_TOOLTIP_CACHE_TTL_SECONDS = 24 * 60 * 60
+WOWHEAD_TOOLTIP_CACHE: Dict[tuple, tuple] = {}
+WOWHEAD_TOOLTIP_CACHE_LOCK = threading.Lock()
 
 
 def normalize_static_request_path(path):
@@ -323,6 +328,75 @@ def wowhead_static_asset_url(path, query=""):
     return f"https://wow.zamimg.com/{relative_path}{suffix}"
 
 
+def wowhead_spell_tooltip(spell_id, query=""):
+    """Fetch the real Chinese Wowhead tooltip, with a local-name fallback.
+
+    The bundled tooltip client deliberately calls this same-origin route.  The
+    public ``www.wowhead.com/tooltip`` path returns 404 for current raid spells;
+    Wowhead's tooltip client uses ``nether.wowhead.com`` instead.
+    """
+    from boss_plugins.venomous_abyss.shared import local_spell_tooltip
+
+    spell_id = int(spell_id)
+    incoming = parse_qs(query, keep_blank_values=False)
+    params = {}
+    for key in ("dd", "dataEnv", "locale"):
+        value = str((incoming.get(key) or [""])[0]).strip()
+        if value.isdigit():
+            params[key] = value
+    params.setdefault("dataEnv", "1")
+    params.setdefault("locale", "4")
+    cache_key = (spell_id, tuple(sorted(params.items())))
+    now = time.time()
+    with WOWHEAD_TOOLTIP_CACHE_LOCK:
+        cached = WOWHEAD_TOOLTIP_CACHE.get(cache_key)
+        if cached and now - cached[0] < WOWHEAD_TOOLTIP_CACHE_TTL_SECONDS:
+            return cached[1]
+
+    url = f"{WOWHEAD_TOOLTIP_BASE_URL}/tooltip/spell/{spell_id}?{urlencode(params)}"
+    proxy_url = environment_setting("WCL_PROXY", "http://127.0.0.1:7890")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    loopback_proxy = bool(
+        proxy_url
+        and (urlparse(proxy_url).hostname or "").lower()
+        in {"127.0.0.1", "localhost", "::1"}
+    )
+    verify_tls = environment_setting(
+        "WOWHEAD_TLS_VERIFY", "0" if loopback_proxy else "1"
+    ).lower() not in {"0", "false", "no", "off"}
+    try:
+        requests = requests_module()
+        if loopback_proxy and not verify_tls:
+            from urllib3.exceptions import InsecureRequestWarning
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", InsecureRequestWarning)
+                response = requests.get(
+                    url,
+                    headers={"User-Agent": "MythicAnalyzer/0.2"},
+                    proxies=proxies,
+                    verify=False,
+                    timeout=12,
+                )
+        else:
+            response = requests.get(
+                url,
+                headers={"User-Agent": "MythicAnalyzer/0.2"},
+                proxies=proxies,
+                verify=verify_tls,
+                timeout=12,
+            )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or not payload.get("name") or not payload.get("tooltip"):
+            raise ValueError("Wowhead tooltip payload is incomplete")
+        with WOWHEAD_TOOLTIP_CACHE_LOCK:
+            WOWHEAD_TOOLTIP_CACHE[cache_key] = (now, payload)
+        return payload
+    except Exception:
+        return local_spell_tooltip(spell_id)
+
+
 def safe_redirect_target(value, default="/online"):
     target = str(value or "").strip()
     parsed = urlparse(target)
@@ -364,10 +438,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
         tooltip_match = re.fullmatch(r"/wowhead-tooltip/tooltip/spell/(\d+)", path)
         if tooltip_match:
-            from boss_plugins.venomous_abyss.shared import local_spell_tooltip
-
             return self.send_response_body(*json_bytes(
-                local_spell_tooltip(int(tooltip_match.group(1)))
+                wowhead_spell_tooltip(
+                    int(tooltip_match.group(1)),
+                    urlparse(self.path).query,
+                )
             ))
 
         user = self.require_user(path)

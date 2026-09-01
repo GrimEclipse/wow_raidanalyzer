@@ -44,6 +44,8 @@ class BossCatalogTests(unittest.TestCase):
         self.assertEqual([boss["order"] for boss in raid["bosses"]], list(range(1, 9)))
         self.assertEqual(raid["bosses"][0]["externalKey"], "wow.venomabyss,01.nakzali")
         self.assertEqual(raid["bosses"][-1]["externalKey"], "wow.venomabyss,08.ulatek")
+        self.assertTrue(raid["bosses"][-1]["supported"])
+        self.assertEqual(raid["bosses"][-1]["encounterIds"], [3492, 53492])
 
     def test_venomous_abyss_arena_assets_exist(self):
         root = CATALOG_PATH.parent

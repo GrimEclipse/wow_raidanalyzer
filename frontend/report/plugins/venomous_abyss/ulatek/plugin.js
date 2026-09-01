@@ -1,6 +1,6 @@
 window.MythicReportPlugin = {
   id: "venomous_abyss/ulatek",
-  renderer: "generic",
-  reportPage: "frontend/report/generic.html",
-  sections: ["wipe", "avoidable"]
+  renderer: "ulatek",
+  reportPage: "frontend/report/plugins/venomous_abyss/ulatek/report.html",
+  sections: ["survival", "waves", "heart", "fangs", "critical"]
 };

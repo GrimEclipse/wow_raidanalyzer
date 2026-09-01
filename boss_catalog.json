@@ -585,8 +585,9 @@
               "externalKey": "wow.venomabyss,08.ulatek",
               "aliases": [],
               "plugin": "boss_plugins.venomous_abyss.ulatek",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
+              "encounterIds": [3492, 53492],
+              "supported": true,
+              "disabledReason": "",
               "configSchema": [],
               "arenaAssets": [
                 { "key": "arena", "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg", "width": 1997, "height": 1118 },
