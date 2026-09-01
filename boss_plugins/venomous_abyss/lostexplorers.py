@@ -42,7 +42,7 @@ BOSS_CONFIG = {
         ["avoidable", "可规避机制"],
         ["special", "特殊技能处理"],
     ],
-    "mechanicVersion": "lostexplorers-mythic-2026-08-31-frostfire-death-grace-mushroom-wave-v6",
+    "mechanicVersion": "lostexplorers-mythic-2026-09-01-event-local-blast-avoid-v8",
     "features": {"survival": True, "fieldReplay": False},
     "fetchCastResources": True,
     "fetchPositionResources": True,
@@ -353,10 +353,27 @@ def _splinter_activations(fight, actor_map, players, debuffs, damage, resources=
         })
     return rows
 
-def _blast_wave_summary(fight, actor_map, players, damage):
+def _counts_as_blast_wave_hit(event, deaths=None):
+    # WCL preserves immune/reflect/dodge/deflect outcomes in DamageTaken with
+    # amount=0 (Fight 18/23 hitType=9 for Spell Reflection).  Those are
+    # successful avoids even if the same player later dies to another wave in
+    # the same pull, so death matching must be event-local, never player-wide.
+    if event.get("amount") is not None:
+        return int(event.get("amount") or 0) > 0
+    timestamp = int(event.get("timestamp") or 0)
+    return any(
+        death.get("targetID") == event.get("targetID")
+        and int(death.get("killingAbilityGameID") or ability_id(death) or 0) == 1305844
+        and 0 <= int(death.get("timestamp") or 0) - timestamp <= 500
+        for death in deaths or []
+    )
+
+
+def _blast_wave_summary(fight, actor_map, players, damage, deaths=None):
     hits = [
         event for event in damage
         if int(ability_id(event) or 0) == 1305844 and event.get("targetID") in players
+        and _counts_as_blast_wave_hit(event, deaths)
     ]
     by_player = defaultdict(list)
     for hit in hits:
@@ -599,6 +616,7 @@ def _mushroom_activations(
             event for event in damage
             if int(ability_id(event) or 0) == 1305844
             and event.get("targetID") in players
+            and _counts_as_blast_wave_hit(event, deaths)
             and wave_window_start <= int(event.get("timestamp") or 0) < wave_window_end
         ]
         actual_wave_timestamp = min(
@@ -1186,7 +1204,15 @@ def analyze_lost(fight, actor_map, players, raw):
             "bossCount": len(boss_names),
         })
     total_defense_duration_sec = round(sum(row["durationSec"] for row in defense_rows), 1)
-    avoidable = _avoidable_board(fight, actor_map, players, damage, raw["deaths"], {1305844: spell_name(1305844)})
+    avoidable_damage = [
+        event for event in damage
+        if int(ability_id(event) or 0) != 1305844
+        or _counts_as_blast_wave_hit(event, raw["deaths"])
+    ]
+    avoidable = _avoidable_board(
+        fight, actor_map, players, avoidable_damage, raw["deaths"],
+        {1305844: spell_name(1305844)},
+    )
     shell_hits = [event for event in debuffs if int(ability_id(event) or 0) == 1291918 and event_type(event) in {"applydebuff", "refreshdebuff"}]
     shell_board = Counter(event.get("targetID") for event in shell_hits if event.get("targetID") in players)
     avoidable.extend([{**player_ref(players, actor_map, player_id), "spellID": 1291918, "spellName": spell_name(1291918), "hitCount": count,
@@ -1415,7 +1441,7 @@ def analyze_lost(fight, actor_map, players, raw):
         raw.get("resources"),
         raw.get("trackedActorEvents"),
     )
-    blast_wave = _blast_wave_summary(fight, actor_map, players, damage)
+    blast_wave = _blast_wave_summary(fight, actor_map, players, damage, raw["deaths"])
     mushrooms = _mushroom_activations(
         fight,
         actor_map,

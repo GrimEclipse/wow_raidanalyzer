@@ -518,6 +518,7 @@ def test_lost_mythic_specials_track_blast_mushroom_explosion_and_shell_crossing(
         "damage": [
             event(6_000, 1305844, "damage", targetID=2, amount=100),
             event(6_500, 1305844, "damage", targetID=2, amount=100),
+            event(6_700, 1305844, "damage", targetID=1, amount=0, unmitigatedAmount=99_999, hitType=14),
             event(5_050, 1295952, "damage", sourceID=1, targetID=3, amount=500),
         ],
         "debuffs": [
@@ -545,6 +546,7 @@ def test_lost_mythic_specials_track_blast_mushroom_explosion_and_shell_crossing(
     }
     result = analyze_lost(fight, {1: "近战", 2: "远程", 3: "火圈"}, players, raw)
     assert result["blastWave"]["players"][0]["hitCount"] == 2
+    assert result["blastWave"]["totalHitCount"] == 2
     mushroom = result["mushroomActivations"][0]
     assert mushroom["triggerPlayers"][0]["playerID"] == 2
     assert mushroom["mushroomEntity"]["instance"] == 7
@@ -560,6 +562,25 @@ def test_lost_mythic_specials_track_blast_mushroom_explosion_and_shell_crossing(
     assert shell["directionVerdict"] == "crossed-middle"
     assert shell["namedMeleePlayer"]["playerID"] == 1
     assert shell["rangedHitPlayers"][0]["playerID"] == 2
+
+
+def test_lost_blast_wave_keeps_zero_amount_event_when_it_is_lethal():
+    fight = {"startTime": 0, "endTime": 20_000}
+    players = {1: player(1, "战士"), 2: player(2, "死者")}
+    raw = {
+        "casts": [], "friendlyCasts": [], "debuffs": [], "enemyBuffs": [],
+        "friendlyBuffs": [], "resources": [], "trackedActorEvents": [],
+        "damage": [
+            event(10_000, 1305844, "damage", targetID=1, amount=0, unmitigatedAmount=99_999, hitType=14),
+            event(10_000, 1305844, "damage", targetID=2, unmitigatedAmount=99_999),
+        ],
+        "deaths": [event(10_001, 1305844, "death", targetID=2, killingAbilityGameID=1305844)],
+    }
+
+    result = analyze_lost(fight, {1: "战士", 2: "死者"}, players, raw)
+
+    assert result["blastWave"]["totalHitCount"] == 1
+    assert result["blastWave"]["players"][0]["playerID"] == 2
 
 
 def test_lost_shell_crosses_middle_even_when_no_player_is_hit():
