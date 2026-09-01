@@ -410,6 +410,142 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
         self.assertEqual(target["position"]["y"], 5000.0)
         self.assertEqual(target["explodeTimeMs"], 106_000)
 
+    def test_gloombomb_flags_unnamed_players_inside_radius_with_gravebound(self):
+        fight = {"startTime": 0, "endTime": 300_000, "kill": False}
+        players = {
+            10: {"id": 10, "name": "Mage", "classColor": "#fff", "role": "dps"},
+            11: {"id": 11, "name": "Priest", "classColor": "#fff", "role": "healer"},
+            12: {"id": 12, "name": "Hunter", "classColor": "#fff", "role": "dps"},
+            13: {"id": 13, "name": "Rogue", "classColor": "#fff", "role": "dps"},
+            14: {"id": 14, "name": "Warlock", "classColor": "#fff", "role": "dps"},
+        }
+        index = coiledaltar.build_position_index([
+            {"timestamp": 106_000, "type": "cast", "sourceID": 10, "x": 0.0, "y": 0.0},
+            {"timestamp": 106_000, "type": "cast", "sourceID": 11, "x": 800.0, "y": 0.0},
+            {"timestamp": 106_000, "type": "cast", "sourceID": 12, "x": 1_600.0, "y": 0.0},
+            {"timestamp": 106_000, "type": "cast", "sourceID": 13, "x": 4_000.0, "y": 0.0},
+            {"timestamp": 106_000, "type": "cast", "sourceID": 14, "x": 900.0, "y": 0.0},
+        ])
+        result = coiledaltar.analyze_gloombomb(
+            fight,
+            [{"timestamp": 100_000, "type": "cast", "abilityGameID": 1286895}],
+            [
+                {"timestamp": 100_200, "type": "applydebuff", "abilityGameID": 1310881, "targetID": 10},
+                {"timestamp": 100_300, "type": "applydebuff", "abilityGameID": 1310881, "targetID": 14},
+                {"timestamp": 106_000, "type": "removedebuff", "abilityGameID": 1310881, "targetID": 10},
+                {"timestamp": 106_000, "type": "removedebuff", "abilityGameID": 1310881, "targetID": 14},
+                {"timestamp": 106_080, "type": "applydebuff", "abilityGameID": 1286837, "targetID": 10},
+                {"timestamp": 106_100, "type": "applydebuff", "abilityGameID": 1286837, "targetID": 11},
+                {"timestamp": 106_100, "type": "applydebuff", "abilityGameID": 1286837, "targetID": 14},
+            ],
+            index,
+            {10: "Mage", 11: "Priest", 12: "Hunter", 13: "Rogue", 14: "Warlock"},
+            players,
+            [{"key": "p2", "label": "P2", "timeMs": 0}],
+        )
+        round_row = result["rounds"][0]
+        nearby_names = {row["player"] for row in round_row["nearbyUnnamed"]}
+        collateral_names = {row["player"] for row in round_row["collateralHits"]}
+        self.assertIn("Priest", nearby_names)
+        self.assertIn("Hunter", nearby_names)
+        self.assertNotIn("Rogue", nearby_names)
+        self.assertNotIn("Warlock", nearby_names)
+        self.assertNotIn("Mage", nearby_names)
+        self.assertEqual(collateral_names, {"Priest"})
+        self.assertEqual(round_row["collateralCount"], 1)
+        self.assertTrue(round_row["failed"])
+        priest = next(row for row in round_row["nearbyUnnamed"] if row["player"] == "Priest")
+        hunter = next(row for row in round_row["nearbyUnnamed"] if row["player"] == "Hunter")
+        self.assertTrue(priest["receivedGravebound"])
+        self.assertFalse(hunter["receivedGravebound"])
+        self.assertLess(priest["distanceYards"], coiledaltar.GLOOMBOMB_RADIUS_YARDS)
+        self.assertTrue(any(pair["tooClose"] for pair in round_row["tooClosePairs"]))
+
+    def test_eternal_nightfall_reports_shield_damage_by_player(self):
+        fight = {"startTime": 0, "endTime": 400_000, "kill": False}
+        players = {
+            10: {"id": 10, "name": "Mage", "classColor": "#fff", "role": "dps"},
+            11: {"id": 11, "name": "Warrior", "classColor": "#fff", "role": "dps"},
+        }
+        result = coiledaltar.analyze_eternal_nightfall(
+            fight,
+            [{"timestamp": 100_000, "type": "begincast", "sourceID": 25, "abilityGameID": 1286918}],
+            [
+                {"timestamp": 100_000, "type": "applybuff", "abilityGameID": 1286912, "targetID": 25},
+                {"timestamp": 105_400, "type": "removebuff", "abilityGameID": 1286912, "targetID": 25},
+            ],
+            [{"timestamp": 106_000, "type": "interrupt", "sourceID": 11, "extraAbilityGameID": 1286918}],
+            {10: "Mage", 11: "Warrior", 25: "玛拉卡斯", 99: "水元素"},
+            players=players,
+            friendly_damage=[
+                {"timestamp": 101_000, "type": "damage", "sourceID": 10, "targetID": 25, "amount": 0, "absorbed": 50_000},
+                {"timestamp": 102_000, "type": "damage", "sourceID": 11, "targetID": 25, "amount": 0, "absorbed": 30_000},
+                {"timestamp": 103_000, "type": "damage", "sourceID": 99, "targetID": 25, "amount": 0, "absorbed": 20_000},
+                {"timestamp": 106_500, "type": "damage", "sourceID": 10, "targetID": 25, "amount": 80_000, "absorbed": 0},
+            ],
+            actor_rows=[{"id": 99, "name": "水元素", "petOwner": 10}],
+            shield_target_id=25,
+        )
+        round_row = result["rounds"][0]
+        self.assertTrue(round_row["shieldRemoved"])
+        self.assertEqual(round_row["shieldDamageMethod"], "absorbed")
+        self.assertEqual(round_row["shieldDamageTotal"], 100_000)
+        by_name = {row["player"]: row for row in round_row["shieldDamageByPlayer"]}
+        self.assertEqual(by_name["Mage"]["damage"], 70_000)
+        self.assertEqual(by_name["Warrior"]["damage"], 30_000)
+        self.assertEqual(by_name["Mage"]["percent"], 70.0)
+        self.assertEqual(len(round_row["shieldDamageByPlayer"]), 2)
+        self.assertEqual(round_row["phase"], "p1")
+
+    def test_eternal_nightfall_phase_follows_markers(self):
+        fight = {"startTime": 0, "endTime": 700_000, "kill": False}
+        result = coiledaltar.analyze_eternal_nightfall(
+            fight,
+            [
+                {"timestamp": 100_000, "type": "begincast", "sourceID": 25, "abilityGameID": 1286918},
+                {"timestamp": 600_000, "type": "begincast", "sourceID": 25, "abilityGameID": 1286918},
+            ],
+            [
+                {"timestamp": 100_000, "type": "applybuff", "abilityGameID": 1286912, "targetID": 25},
+                {"timestamp": 105_000, "type": "removebuff", "abilityGameID": 1286912, "targetID": 25},
+                {"timestamp": 600_000, "type": "applybuff", "abilityGameID": 1286912, "targetID": 25},
+                {"timestamp": 605_000, "type": "removebuff", "abilityGameID": 1286912, "targetID": 25},
+            ],
+            [],
+            {25: "玛拉卡斯"},
+            markers=[
+                {"key": "p1", "label": "P1", "timeMs": 0},
+                {"key": "p2", "label": "P2", "timeMs": 80_000},
+                {"key": "intermission", "label": "转阶段", "timeMs": 500_000},
+                {"key": "p3", "label": "P3", "timeMs": 540_000},
+            ],
+        )
+        self.assertEqual([row["phase"] for row in result["rounds"]], ["p2", "p3"])
+
+    def test_eternal_nightfall_falls_back_to_amount_without_absorb(self):
+        fight = {"startTime": 0, "endTime": 400_000, "kill": False}
+        players = {10: {"id": 10, "name": "Mage", "classColor": "#fff", "role": "dps"}}
+        result = coiledaltar.analyze_eternal_nightfall(
+            fight,
+            [{"timestamp": 200_000, "type": "begincast", "sourceID": 25, "abilityGameID": 1286918}],
+            [
+                {"timestamp": 200_000, "type": "applybuff", "abilityGameID": 1286912, "targetID": 25},
+                {"timestamp": 205_000, "type": "removebuff", "abilityGameID": 1286912, "targetID": 25},
+            ],
+            [],
+            {10: "Mage", 25: "玛拉卡斯"},
+            players=players,
+            friendly_damage=[
+                {"timestamp": 202_000, "type": "damage", "sourceID": 10, "targetID": 25, "amount": 12_000},
+                {"timestamp": 203_000, "type": "damage", "sourceID": 10, "targetID": 25, "amount": 8_000},
+            ],
+            shield_target_id=25,
+        )
+        round_row = result["rounds"][0]
+        self.assertEqual(round_row["shieldDamageMethod"], "amount")
+        self.assertEqual(round_row["shieldDamageTotal"], 20_000)
+        self.assertEqual(round_row["shieldDamageByPlayer"][0]["hitCount"], 2)
+
     def test_sever_cone_origin_uses_boss_current_position(self):
         index = coiledaltar.build_position_index([
             {
@@ -717,6 +853,8 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
                 "time": "03:00.0",
                 "targetCount": 1,
                 "targets": [{"player": "Mage", "position": {"x": 100.0, "y": 200.0}}],
+                "collateralHits": [{"player": "Priest", "position": {"x": 150.0, "y": 200.0}, "receivedGravebound": True, "distanceYards": 4.0}],
+                "collateralCount": 1,
                 "spreadRadiusYards": 15,
                 "tooClosePairs": [],
             }]},
@@ -742,6 +880,8 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
         self.assertEqual(audit["diagrams"][0]["targets"][1]["kind"], "dropped-venom")
         self.assertEqual(audit["diagrams"][1]["origin"]["x"], 100.0)
         self.assertEqual(audit["diagrams"][2]["targets"][0]["player"], "Mage")
+        self.assertEqual(audit["diagrams"][2]["nearbyPlayers"][0]["player"], "Priest")
+        self.assertIn("误伤墓缚 1", audit["diagrams"][2]["annotation"])
 
     def test_active_venom_points_use_ground_intervals_not_every_drop(self):
         toxic = {

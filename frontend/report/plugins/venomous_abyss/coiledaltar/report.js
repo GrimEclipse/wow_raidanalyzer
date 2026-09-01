@@ -81,7 +81,65 @@ function renderGuillotineTable(title, data) {
   const insideCol = isGrim ? "死亡之拥（仍在圈内）" : "寡妇之吻（仍在圈内）";
   return `<section class="panel"><h2>${esc(title)}</h2><p class="muted">${esc(evidence)}</p>${table(["轮次", "时间", "分摊人数", "参与者", insideCol], rounds.map((row) => [`#${row.index}`, esc(row.time), row.participantCount, players(row.participants), players(stillInsideRows(row).map((p) => ({ player: p.player, classColor: p.classColor })))]))}</section>`;
 }
-function renderP1() { const data = boss(); const deluge = data.toxicDeluge || {}, sever = data.sever || {}, guillotine = data.guillotine || {}; return `<section class="panel"><h2>剧毒洪流 · 凝结毒液搬运</h2><div class="cards">${(deluge.rounds || []).map((round) => `<article class="card"><h3>#${round.index} · ${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(["玩家", "拾起", "掉落", "持有时长", "落点"], (round.carriers || []).map((row) => [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)]))}</article>`).join("") || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section><section class="panel"><h2>撕裂清场</h2>${table(["轮次", "时间", "几何命中", "推断清理", "爆裂层数线索"], (sever.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.inferredClearedCount, (row.ruptureEvents || []).length]))}</section>${renderGuillotineTable("处斩分摊", guillotine)}`; }
+function renderGloombomb(data) {
+  const rounds = data?.rounds || [];
+  const splashRows = [];
+  (rounds || []).forEach((row) => {
+    (row.collateralHits || []).forEach((hit) => {
+      splashRows.push([
+        `#${row.index}`,
+        esc(hit.fromPlayer || "—"),
+        player(hit),
+        hit.distanceYards == null ? "—" : `${hit.distanceYards}码`,
+        `<span class="badge bad">墓缚 ${esc(hit.graveboundApplyTime || "")}</span>`,
+      ]);
+    });
+  });
+  return `<section class="panel"><h2>幽暗炸弹分散</h2><p class="muted">${esc(data?.evidenceNote || "只列出爆炸时 15 码内、且 2 秒内获得墓缚 1286837 的非点名玩家。")}</p>${table(["轮次", "时间", "点名数", "点名过近", "误伤墓缚"], rounds.map((row) => [`#${row.index}`, esc(row.time), row.targetCount, (row.tooClosePairs || []).map((pair) => `${esc(pair.left)}↔${esc(pair.right)} ${pair.distanceYards}码`).join("；") || "—", row.collateralCount ?? (row.collateralHits || []).length]))}${splashRows.length ? `<h3>圈内误伤墓缚</h3>${table(["轮次", "点名", "误伤玩家", "距离", "墓缚"], splashRows)}` : '<div class="empty">本场没有圈内误伤墓缚。</div>'}</section>`;
+}
+function phaseKey(row) { return String(row?.phase || "").toLowerCase(); }
+function withPhaseRounds(data, phase, untaggedPhase = "p2") {
+  return { ...(data || {}), rounds: phaseRows(data?.rounds, phase, untaggedPhase) };
+}
+function phaseRows(rows, phase, untaggedPhase = "p2") {
+  const list = rows || [];
+  const tagged = list.some((row) => row.phase);
+  if (!tagged) return phase === untaggedPhase ? list : [];
+  return list.filter((row) => phaseKey(row) === phase);
+}
+function venomRoundsForPhase(rounds, phase) {
+  const list = rounds || [];
+  const tagged = list.some((row) => row.phase);
+  if (!tagged) return phase === "p1" ? list : [];
+  return list.flatMap((round) => {
+    const roundPhase = phaseKey(round) || "p1";
+    const carriers = (round.carriers || []).filter((row) => (phaseKey(row) || roundPhase) === phase);
+    if (roundPhase === phase) return [{ ...round, carriers }];
+    if (!carriers.length) return [];
+    return [{ ...round, index: round.index, time: carriers[0]?.applyTime || carriers[0]?.removeTime || round.time, carriers }];
+  });
+}
+function renderToxicDeluge(rounds) {
+  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index} · ${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(["玩家", "拾起", "掉落", "持有时长", "落点"], (round.carriers || []).map((row) => [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)]))}</article>`).join("");
+  return `<section class="panel"><h2>剧毒洪流 · 凝结毒液搬运</h2><div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
+}
+function renderManifestations(fixations) {
+  return `<section class="panel"><h2>恐惧具象 / 凝视</h2><p class="muted">具象坐标为恐惧具象 NPC；玩家坐标为被凝视者。</p>${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section>`;
+}
+function renderEternalNightfall(data) {
+  const rounds = data?.rounds || [];
+  const cards = rounds.map((row) => {
+    const damageRows = (row.shieldDamageByPlayer || []).map((hit) => [
+      player(hit),
+      num(hit.damage),
+      hit.hitCount ?? "—",
+      hit.percent == null ? "—" : `${hit.percent}%`,
+    ]);
+    return `<article class="card"><h3>#${row.index} · ${esc(row.time)}</h3><p class="muted">破盾 ${row.shieldRemoved ? esc(row.shieldRemoveTime || "是") : "未破盾"} · 打断 ${row.interrupted ? esc(row.interruptSource || "是") : "无"} · 护盾伤害合计 ${num(row.shieldDamageTotal)}</p>${table(["玩家", "护盾伤害", "命中", "占比"], damageRows)}</article>`;
+  }).join("") || '<div class="empty">没有永恒夜幕记录。</div>';
+  return `<section class="panel"><h2>永恒夜幕</h2><p class="muted">${esc(data?.evidenceNote || "先破盾再打断；破盾窗口内统计各玩家对护盾的伤害。")}</p>${table(["轮次", "开始", "破盾", "打断", "读条完成", "护盾伤害"], rounds.map((row) => [`#${row.index}`, esc(row.time), row.shieldRemoved ? `<span class="badge good">${esc(row.shieldRemoveTime)}</span>` : '<span class="badge bad">未破盾</span>', row.interrupted ? `<span class="badge good">${esc(row.interruptSource)}</span>` : '<span class="badge warn">无打断</span>', row.castCompleted ? '<span class="badge bad">完成</span>' : '<span class="badge good">未完成</span>', num(row.shieldDamageTotal)]))}<div class="cards">${cards}</div></section>`;
+}
+function renderP1() { const data = boss(); const sever = data.sever || {}, guillotine = data.guillotine || {}; return `${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p1"))}<section class="panel"><h2>撕裂清场</h2>${table(["轮次", "时间", "几何命中", "推断清理", "爆裂层数线索"], (sever.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.inferredClearedCount, (row.ruptureEvents || []).length]))}</section>${renderGuillotineTable("处斩分摊", guillotine)}`; }
 function renderP2() {
   const data = boss();
   const showResonance = Boolean(data.dreadmarch?.useMalevolentResonance);
@@ -96,7 +154,7 @@ function renderP2() {
     if (showResonance) base.push(row.manifestCollisionDebuff ? "是" : "否");
     return base;
   });
-  return `<section class="panel"><h2>恐惧行军</h2><p class="muted">救援以被控 debuff（1297445）移除为准。首次救人后至下一轮释放前再次被心控，记为撞到恐惧具象（可结合凝视变化${showResonance ? "；史诗另用恶毒共鸣印证" : ""}）。</p><p class="muted">${esc(data.dreadmarch?.evidenceNote || "")}</p>${table(["轮次", "时间", "点名人数", "成功救人", "失败", "撞具象"], (data.dreadmarch?.rounds || []).map((row) => [`#${row.index}${row.unassigned ? "（未对齐轮次）" : ""}`, esc(row.time), row.targetCount, row.rescuedCount, row.failedCount, row.manifestCollisionCount ?? 0]))}${table(["玩家", "轮次", "拾起", "解除", "来源", "友方命中", "结果"], (data.dreadmarch?.applications || []).map((row) => [player(row), row.roundIndex ?? "—", esc(row.appliedTime), esc(row.removedTime || "—"), collisionBadge(row), row.friendlyHitCount ?? 0, row.rescued ? '<span class="badge good">救出</span>' : row.diedWhileControlled ? '<span class="badge bad">控中死亡</span>' : '<span class="badge bad">未解除</span>']))}<h3>撞具象触发的恐惧行军</h3>${(data.dreadmarch?.manifestCollisions || []).length ? table(collisionHeaders, collisionRows) : '<div class="empty">本场没有记录到救人后的二次心控。</div>'}</section><section class="panel"><h2>恐惧具象 / 凝视</h2><p class="muted">具象坐标为恐惧具象 NPC；玩家坐标为被凝视者。</p>${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (data.manifestations?.fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section><section class="panel"><h2>灵魂撕裂</h2><p class="muted">具象取释放前位置；清掉=释放后短窗口内凝视移除；红线对应未消掉。</p>${table(["轮次", "时间", "释放前具象", "锥内", "debuff 清掉", "未消掉", "add 死亡"], (data.soulSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), (row.nearbyPoints || []).length, row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.addDeathSignals]))}</section><section class="panel"><h2>幽暗炸弹分散</h2>${table(["轮次", "时间", "点名数", "过近组合"], (data.gloombomb?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.targetCount, (row.tooClosePairs || []).map((pair) => `${esc(pair.left)}↔${esc(pair.right)} ${pair.distanceYards}码`).join("；") || "—"]))}</section><section class="panel"><h2>墓缚伤害致死</h2><p class="muted">仅统计收到墓缚伤害致死（1308330/1297906/1286837）；并标注死亡时是否仍带墓缚。</p>${table(["时间", "玩家", "致死技能", "当时带墓缚"], (data.graveboundFailures?.failures || []).map((row) => [esc(row.time), player(row), spellLink(row.deathAbilityID, row.deathAbility), row.graveboundActive ? '<span class="badge bad">是</span>' : '<span class="badge">否</span>']))}</section><section class="panel"><h2>永恒夜幕</h2>${table(["轮次", "开始", "破盾", "打断", "读条完成"], (data.eternalNightfall?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.shieldRemoved ? `<span class="badge good">${esc(row.shieldRemoveTime)}</span>` : '<span class="badge bad">未破盾</span>', row.interrupted ? `<span class="badge good">${esc(row.interruptSource)}</span>` : '<span class="badge warn">无打断</span>', row.castCompleted ? '<span class="badge bad">完成</span>' : '<span class="badge good">未完成</span>']))}</section>`;
+  return `<section class="panel"><h2>恐惧行军</h2><p class="muted">救援以被控 debuff（1297445）移除为准。首次救人后至下一轮释放前再次被心控，记为撞到恐惧具象（可结合凝视变化${showResonance ? "；史诗另用恶毒共鸣印证" : ""}）。</p><p class="muted">${esc(data.dreadmarch?.evidenceNote || "")}</p>${table(["轮次", "时间", "点名人数", "成功救人", "失败", "撞具象"], (data.dreadmarch?.rounds || []).map((row) => [`#${row.index}${row.unassigned ? "（未对齐轮次）" : ""}`, esc(row.time), row.targetCount, row.rescuedCount, row.failedCount, row.manifestCollisionCount ?? 0]))}${table(["玩家", "轮次", "拾起", "解除", "来源", "友方命中", "结果"], (data.dreadmarch?.applications || []).map((row) => [player(row), row.roundIndex ?? "—", esc(row.appliedTime), esc(row.removedTime || "—"), collisionBadge(row), row.friendlyHitCount ?? 0, row.rescued ? '<span class="badge good">救出</span>' : row.diedWhileControlled ? '<span class="badge bad">控中死亡</span>' : '<span class="badge bad">未解除</span>']))}<h3>撞具象触发的恐惧行军</h3>${(data.dreadmarch?.manifestCollisions || []).length ? table(collisionHeaders, collisionRows) : '<div class="empty">本场没有记录到救人后的二次心控。</div>'}</section>${renderManifestations(phaseRows(data.manifestations?.fixations, "p2"))}<section class="panel"><h2>灵魂撕裂</h2><p class="muted">具象取释放前位置；清掉=释放后短窗口内凝视移除；红线对应未消掉。</p>${table(["轮次", "时间", "释放前具象", "锥内", "debuff 清掉", "未消掉", "add 死亡"], (data.soulSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), (row.nearbyPoints || []).length, row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.addDeathSignals]))}</section>${renderGloombomb(data.gloombomb)}<section class="panel"><h2>墓缚伤害致死</h2><p class="muted">仅统计收到墓缚伤害致死（1308330/1297906/1286837）；并标注死亡时是否仍带墓缚。</p>${table(["时间", "玩家", "致死技能", "当时带墓缚"], (data.graveboundFailures?.failures || []).map((row) => [esc(row.time), player(row), spellLink(row.deathAbilityID, row.deathAbility), row.graveboundActive ? '<span class="badge bad">是</span>' : '<span class="badge">否</span>']))}</section>${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p2"))}`;
 }
 function renderIntermission() {
   const data = boss().intermission || {};
@@ -104,10 +162,11 @@ function renderIntermission() {
   const leakCount = data.leakedSoulCount ?? data.leakCount ?? 0;
   return `<section class="panel"><h2>被夺取的容器</h2><p class="muted">开始 ${esc(data.startTime)} · 持续 ${esc(data.duration)} · 漏掉灵魂 <b>${leakCount}</b>（收回精华 1287718）</p><p class="muted">${esc(data.evidenceNote || "漏掉的灵魂=残片抵达祖尔加时的收回精华次数。")}</p><h3>漏掉的灵魂（收回精华）</h3>${(data.leakedFragments || []).length ? table(["时间", "来源", "治疗量"], (data.leakedFragments || []).map((row) => [esc(row.time), esc(row.source || row.target || "—"), row.amount == null ? "—" : Number(row.amount).toLocaleString()])) : '<div class="empty">本场转阶段没有记录到收回精华，漏片为 0。</div>'}<h3>踩片（灵魂抹除）</h3>${table(["时间", "玩家"], (data.spiritErasureSteps || []).map((row) => [esc(row.time), player(row)]))}</section>`;
 }
-function renderP3() { const data = boss(); return `<section class="panel"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (data.blightedSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}`; }
+function renderP3() { const data = boss(); return `<section class="panel"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (data.blightedSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p3"))}${renderManifestations(phaseRows(data.manifestations?.fixations, "p3"))}${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p3"))}`; }
 function diagramHasContent(diagram) {
   if (!diagram) return false;
   if ((diagram.targets || []).some((row) => row.position || row.manifestPosition || row.playerPosition)) return true;
+  if ((diagram.nearbyPlayers || []).some((row) => row.position)) return true;
   if ((diagram.links || []).length) return true;
   if (diagram.origin && (Number.isFinite(Number(diagram.facingRadians)) || diagram.tankPosition || (diagram.conePolygon || []).length >= 3)) return true;
   if (diagram.kind === "runout" && diagram.origin) return true;
@@ -141,8 +200,8 @@ function fieldMap(data, diagram) {
     const position = row.kind === "manifestation" ? (row.manifestPosition || row.position) : (row.position || row.manifestPosition);
     const p = pct(position, arena);
     if (!p) return "";
-                const cls = diagram.mechanic?.includes("炸弹")
-      ? "bomb"
+    const cls = diagram.mechanic?.includes("炸弹")
+      ? (row.kind === "bomb-splash" ? "bomb-splash" : row.kind === "bomb-nearby" ? "bomb-nearby" : "bomb")
       : row.kind === "tank"
         ? "tank"
         : row.kind === "guillotine-inside"
@@ -171,6 +230,12 @@ function fieldMap(data, diagram) {
     const size = pctSize(diagram.spreadRadiusYards || 15, arena);
     return p ? `<span class="spread-target" style="left:${p.left}%;top:${p.top}%;width:${size.width * 2}%;height:${size.height * 2}%"></span><span class="actor" style="left:${p.left}%;top:${p.top}%;--color:${row.classColor || "#fff"}"><b>${esc(row.player)}</b></span>` : "";
   }).join("") : "";
+  const nearbyActors = diagram.kind === "spread" ? (diagram.nearbyPlayers || []).filter((row) => row.receivedGravebound !== false).map((row) => {
+    const p = pct(row.position, arena);
+    if (!p) return "";
+    const label = `误伤墓缚 · ${row.player || ""} · ${row.distanceYards ?? "?"}码`;
+    return `<span class="marker bomb-splash" title="${esc(label)}" style="left:${p.left}%;top:${p.top}%"></span><span class="actor nearby" style="left:${p.left}%;top:${p.top}%;--color:${row.classColor || "#fff"}"><b>${esc(row.player)}</b></span>`;
+  }).join("") : "";
   const runout = diagram.kind === "runout" && diagram.origin ? (() => {
     const actors = (diagram.targets || []).map((row) => {
       const p = pct(row.position, arena);
@@ -191,8 +256,11 @@ function fieldMap(data, diagram) {
     : (diagram.mechanic === "灵魂撕裂" || diagram.mechanic === "凋零撕裂")
       ? '<p class="legend">本轮凝视均已清掉或缺少坐标，无红线。</p>'
       : "";
-  const empty = !markers && !spread && !cone && !runout ? '<p class="legend">该轮次缺少可绘制的坐标样本。</p>' : "";
-  return `<div class="replay-map" style="background-image:url('${esc(bg)}')">${square}${bossDot}${cone}${links}${spread}${runout}${markers}</div>${legend}${linkLegend}${empty}<p class="muted">${esc(diagram.annotation || diagram.mechanic || "")}</p>`;
+  const nearbyLegend = diagram.kind === "spread"
+    ? '<p class="legend">黄圈=点名爆炸 15 码；粉点=圈内且 2 秒内获得墓缚的非点名玩家。</p>'
+    : "";
+  const empty = !markers && !spread && !nearbyActors && !cone && !runout ? '<p class="legend">该轮次缺少可绘制的坐标样本。</p>' : "";
+  return `<div class="replay-map" style="background-image:url('${esc(bg)}')">${square}${bossDot}${cone}${links}${spread}${nearbyActors}${runout}${markers}</div>${legend}${linkLegend}${nearbyLegend}${empty}<p class="muted">${esc(diagram.annotation || diagram.mechanic || "")}</p>`;
 }
 function renderField() {
   const data = boss().fieldAudit || {}, diagrams = data.diagrams || [];

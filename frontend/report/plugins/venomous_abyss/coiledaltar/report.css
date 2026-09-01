@@ -80,6 +80,9 @@
 .marker.manifest-target { background: #fb7185; border-color: #fecdd3; }
 .marker.tank { background: #38bdf8; border-color: #e0f2fe; width: 14px; height: 14px; }
 .marker.bomb { background: #ff7380; }
+.marker.bomb-nearby { background: #fbbf24; border-color: #fde68a; }
+.marker.bomb-splash { background: #fb7185; border-color: #fecdd3; width: 14px; height: 14px; }
+.actor.nearby { opacity: 0.85; font-size: 11px; }
 .link-map {
   position: absolute;
   inset: 0;

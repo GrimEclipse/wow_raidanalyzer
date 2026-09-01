@@ -163,8 +163,11 @@ GRAVEBOUND_IDS = {1286837, 1308330}
 GRAVEBOUND_DEBUFF_IDS = {1286837}
 # 墓缚伤害致死（WCL 死亡归因 / DamageTaken）
 GRAVEBOUND_DAMAGE_IDS = {1308330, 1297906, 1286837}
+# 炸弹爆炸后短窗口内的 1286837 施加，视为本次幽暗炸弹溅射。
+GLOOMBOMB_GRAVEBOUND_WINDOW_MS = 2_000
 ETERNAL_NIGHTFALL = 1286918
 VEIL_SHIELD = 1286912
+NIGHTFALL_SHIELD_WINDOW_MS = 12_000
 UNASSAILABLE = 1285847
 RECLAIM_ESSENCE = 1287718
 SPIRIT_ERASURE = 1287722
@@ -960,6 +963,43 @@ def _first_remove_after(events, target_id, apply_ts, spell_ids):
         ),
         None,
     )
+
+
+def _gravebound_apply_in_window(events, target_id, start, end):
+    return next(
+        (
+            event for event in events
+            if event.get("targetID") == target_id
+            and int(ability_id(event) or 0) in GRAVEBOUND_DEBUFF_IDS
+            and is_apply(event)
+            and start <= int(event.get("timestamp") or 0) <= end
+        ),
+        None,
+    )
+
+
+def _pet_owner_map(actor_rows):
+    mapping = {}
+    for row in actor_rows or []:
+        owner = row.get("petOwner")
+        if owner is None:
+            continue
+        mapping[int(row["id"])] = int(owner)
+    return mapping
+
+
+def _resolve_player_source(event, players, pet_owners):
+    source_id = event.get("sourceID")
+    if source_id in players:
+        return source_id
+    owner_id = pet_owners.get(source_id)
+    if owner_id in players:
+        return owner_id
+    return None
+
+
+def event_absorb_amount(event):
+    return int(event.get("absorbed") or 0)
 
 
 def _venom_spawn_point(event):
@@ -2167,6 +2207,7 @@ def analyze_soul_sever(
 def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players, markers):
     completed = [event for event in casts if int(ability_id(event) or 0) in GLOOMBOMB_CAST_IDS and is_cast_complete(event)]
     debuff_rows = sorted(debuffs, key=lambda row: int(row.get("timestamp") or 0))
+    fight_start = int(fight["startTime"])
     rounds = []
     for index, cast in enumerate(completed, start=1):
         timestamp = int(cast["timestamp"])
@@ -2187,12 +2228,13 @@ def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players,
             position = _position_sample(position_index, target_id, explode_ts) if explode_ts else None
             targets.append({
                 **player_ref(players, actor_map, target_id),
-                "applyTimeMs": apply_ts - int(fight["startTime"]),
-                "applyTime": fmt_ms(apply_ts - int(fight["startTime"])),
-                "explodeTimeMs": (explode_ts - int(fight["startTime"])) if explode_ts else None,
-                "explodeTime": fmt_ms(explode_ts - int(fight["startTime"])) if explode_ts else None,
+                "applyTimeMs": apply_ts - fight_start,
+                "applyTime": fmt_ms(apply_ts - fight_start),
+                "explodeTimeMs": (explode_ts - fight_start) if explode_ts else None,
+                "explodeTime": fmt_ms(explode_ts - fight_start) if explode_ts else None,
                 "position": position,
             })
+        named_ids = {row["playerID"] for row in targets}
         spacing = []
         for left_index, left in enumerate(targets):
             for right in targets[left_index + 1:]:
@@ -2208,18 +2250,80 @@ def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players,
                     "distanceYards": round(distance, 1),
                     "tooClose": distance < GLOOMBOMB_RADIUS_YARDS,
                 })
+        nearby_unnamed = []
+        collateral_hits = []
+        seen_nearby = set()
+        seen_collateral = set()
+        for target in targets:
+            explode_rel = target.get("explodeTimeMs")
+            origin = target.get("position")
+            if explode_rel is None or not origin:
+                target["nearbyUnnamed"] = []
+                target["collateralGravebound"] = []
+                continue
+            explode_ts = fight_start + int(explode_rel)
+            gb_start = explode_ts - 250
+            gb_end = explode_ts + GLOOMBOMB_GRAVEBOUND_WINDOW_MS
+            nearby_rows = []
+            collateral_rows = []
+            for player_id in players:
+                if player_id in named_ids:
+                    continue
+                other_pos = _position_sample(position_index, player_id, explode_ts)
+                if not other_pos:
+                    continue
+                distance = distance_yards(
+                    (origin["x"], origin["y"]),
+                    (other_pos["x"], other_pos["y"]),
+                )
+                if distance >= GLOOMBOMB_RADIUS_YARDS:
+                    continue
+                gravebound = _gravebound_apply_in_window(debuff_rows, player_id, gb_start, gb_end)
+                row = {
+                    **player_ref(players, actor_map, player_id),
+                    "distanceYards": round(distance, 1),
+                    "position": other_pos,
+                    "fromPlayer": target["player"],
+                    "fromPlayerID": target["playerID"],
+                    "receivedGravebound": bool(gravebound),
+                    "graveboundApplyTimeMs": (int(gravebound["timestamp"]) - fight_start) if gravebound else None,
+                    "graveboundApplyTime": fmt_ms(int(gravebound["timestamp"]) - fight_start) if gravebound else None,
+                }
+                nearby_rows.append(row)
+                if player_id not in seen_nearby:
+                    nearby_unnamed.append(row)
+                    seen_nearby.add(player_id)
+                if gravebound:
+                    collateral_rows.append(row)
+                    if player_id not in seen_collateral:
+                        collateral_hits.append(row)
+                        seen_collateral.add(player_id)
+            nearby_rows.sort(key=lambda row: (row["distanceYards"], row["player"]))
+            target["nearbyUnnamed"] = nearby_rows
+            target["collateralGravebound"] = collateral_rows
+        too_close = [row for row in spacing if row["tooClose"]]
         rounds.append({
             "index": index,
-            "phase": phase_at(timestamp - int(fight["startTime"]), markers),
-            "timeMs": timestamp - int(fight["startTime"]),
-            "time": fmt_ms(timestamp - int(fight["startTime"])),
+            "phase": phase_at(timestamp - fight_start, markers),
+            "timeMs": timestamp - fight_start,
+            "time": fmt_ms(timestamp - fight_start),
             "targetCount": len(targets),
             "targets": targets,
             "spreadRadiusYards": GLOOMBOMB_RADIUS_YARDS,
             "pairSpacing": spacing,
-            "tooClosePairs": [row for row in spacing if row["tooClose"]],
+            "tooClosePairs": too_close,
+            "nearbyUnnamed": nearby_unnamed,
+            "collateralHits": collateral_hits,
+            "nearbyUnnamedCount": len(nearby_unnamed),
+            "collateralCount": len(collateral_hits),
+            "failed": bool(too_close or collateral_hits),
         })
-    return {"rounds": rounds}
+    return {
+        "rounds": rounds,
+        "evidenceNote": (
+            "点名以 1310881 施加/移除为准；只列出爆炸时 15 码内、且 2 秒内获得墓缚 1286837 的非点名玩家。"
+        ),
+    }
 
 
 def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, damage_events=None):
@@ -2310,16 +2414,43 @@ def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, dama
     }
 
 
-def analyze_eternal_nightfall(fight, casts, enemy_buffs, interrupts, actor_map):
+def analyze_eternal_nightfall(
+    fight,
+    casts,
+    enemy_buffs,
+    interrupts,
+    actor_map,
+    players=None,
+    friendly_damage=None,
+    actor_rows=None,
+    shield_target_id=None,
+    markers=None,
+):
+    players = players or {}
+    pet_owners = _pet_owner_map(actor_rows)
     casts_rows = [event for event in casts if int(ability_id(event) or 0) == ETERNAL_NIGHTFALL and event_type(event) == "begincast"]
     interrupt_rows = interrupts or []
+    buff_rows = sorted(enemy_buffs or [], key=lambda row: int(row.get("timestamp") or 0))
+    damage_rows = [
+        event for event in (friendly_damage or [])
+        if event_type(event) == "damage"
+    ]
     rounds = []
     for index, cast in enumerate(casts_rows, start=1):
         timestamp = int(cast["timestamp"])
-        end = timestamp + 12_000
+        end = timestamp + NIGHTFALL_SHIELD_WINDOW_MS
+        shield_apply = next(
+            (
+                event for event in buff_rows
+                if int(ability_id(event) or 0) == VEIL_SHIELD
+                and is_apply(event)
+                and timestamp - 1_000 <= int(event["timestamp"]) <= end
+            ),
+            None,
+        )
         shield_remove = next(
             (
-                event for event in enemy_buffs
+                event for event in buff_rows
                 if int(ability_id(event) or 0) == VEIL_SHIELD
                 and is_remove(event)
                 and timestamp <= int(event["timestamp"]) <= end
@@ -2340,18 +2471,66 @@ def analyze_eternal_nightfall(fight, casts, enemy_buffs, interrupts, actor_map):
             and is_cast_complete(event)
             and timestamp <= int(event["timestamp"]) <= end
         )
+        target_id = (
+            (shield_apply or {}).get("targetID")
+            or (shield_remove or {}).get("targetID")
+            or shield_target_id
+            or cast.get("sourceID")
+        )
+        window_start = int(shield_apply["timestamp"]) if shield_apply else timestamp
+        window_end = int(shield_remove["timestamp"]) if shield_remove else end
+        window_hits = [
+            event for event in damage_rows
+            if event.get("targetID") == target_id
+            and window_start <= int(event.get("timestamp") or 0) <= window_end
+            and _resolve_player_source(event, players, pet_owners) is not None
+        ]
+        absorbed_total = sum(event_absorb_amount(event) for event in window_hits)
+        use_absorbed = absorbed_total > 0
+        grouped = defaultdict(lambda: {"damage": 0, "hitCount": 0})
+        for event in window_hits:
+            source_id = _resolve_player_source(event, players, pet_owners)
+            amount = event_absorb_amount(event) if use_absorbed else int(event.get("amount") or 0)
+            if amount <= 0:
+                continue
+            grouped[source_id]["damage"] += amount
+            grouped[source_id]["hitCount"] += 1
+        shield_total = sum(row["damage"] for row in grouped.values())
+        by_player = []
+        for source_id, stats in grouped.items():
+            pct = round(100.0 * stats["damage"] / shield_total, 1) if shield_total else 0.0
+            by_player.append({
+                **player_ref(players, actor_map, source_id),
+                "damage": stats["damage"],
+                "hitCount": stats["hitCount"],
+                "percent": pct,
+            })
+        by_player.sort(key=lambda row: (-row["damage"], row["player"]))
         rounds.append({
             "index": index,
+            "phase": phase_at(timestamp - int(fight["startTime"]), markers or []),
             "timeMs": timestamp - int(fight["startTime"]),
             "time": fmt_ms(timestamp - int(fight["startTime"])),
             "shieldRemoved": bool(shield_remove),
+            "shieldApplyTime": fmt_ms(int(shield_apply["timestamp"]) - int(fight["startTime"])) if shield_apply else None,
             "shieldRemoveTime": fmt_ms(int(shield_remove["timestamp"]) - int(fight["startTime"])) if shield_remove else None,
             "interrupted": bool(interrupt),
             "interruptSource": actor_name(actor_map, interrupt.get("sourceID")) if interrupt else None,
             "castCompleted": cast_success,
             "failed": cast_success or not shield_remove,
+            "shieldTargetID": target_id,
+            "shieldDamageTotal": shield_total,
+            "shieldDamageMethod": "absorbed" if use_absorbed else "amount",
+            "shieldDamageByPlayer": by_player,
         })
-    return {"rounds": rounds}
+    return {
+        "rounds": rounds,
+        "evidenceNote": (
+            "先以 1286912 removebuff 确认破盾，再匹配 1286918 打断。"
+            "护盾伤害优先取破盾窗口内友方对护盾目标 DamageDone 的 absorbed；"
+            "若该窗口没有 absorbed，则回退为 amount。"
+        ),
+    }
 
 
 def _dedupe_reclaim_events(events, merge_ms=250):
@@ -2596,6 +2775,10 @@ def build_field_audit(
             })
     for row in (gloombomb.get("rounds") or []):
         targets = [target for target in (row.get("targets") or []) if target.get("position")]
+        collateral = [
+            player for player in (row.get("collateralHits") or [])
+            if player.get("position")
+        ]
         if not targets:
             continue
         too_close = row.get("tooClosePairs") or []
@@ -2606,11 +2789,14 @@ def build_field_audit(
             "phase": row["phase"],
             "time": row["time"],
             "targets": targets,
+            "nearbyPlayers": collateral,
             "spreadRadiusYards": row.get("spreadRadiusYards", GLOOMBOMB_RADIUS_YARDS),
             "tooClosePairs": too_close,
             "annotation": (
                 f"点名 {row.get('targetCount', 0)} 人；"
-                f"过近组合 {len(too_close)}（分散半径 {row.get('spreadRadiusYards', GLOOMBOMB_RADIUS_YARDS)} 码）"
+                f"过近组合 {len(too_close)}；"
+                f"误伤墓缚 {row.get('collateralCount', len(collateral))}"
+                f"（分散半径 {row.get('spreadRadiusYards', GLOOMBOMB_RADIUS_YARDS)} 码）"
             ),
         })
     for row in (soul_sever.get("rounds") or []):
@@ -2747,7 +2933,14 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         fight, raw["debuffs"], deaths, actor_map, players,
         damage_events=list(raw.get("damage") or []),
     )
-    eternal = analyze_eternal_nightfall(fight, raw["casts"], raw["enemyBuffs"], raw.get("interrupts") or [], actor_map)
+    eternal = analyze_eternal_nightfall(
+        fight, raw["casts"], raw["enemyBuffs"], raw.get("interrupts") or [], actor_map,
+        players=players,
+        friendly_damage=raw.get("friendlyDamage") or [],
+        actor_rows=actor_rows,
+        shield_target_id=malacrass_id,
+        markers=markers,
+    )
     intermission = analyze_intermission(
         fight, raw["enemyBuffs"], raw["damage"], raw["debuffs"], actor_map, players, markers,
         heals=list(raw.get("enemyHeals") or []) + list(raw.get("heals") or []),
