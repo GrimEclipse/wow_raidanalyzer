@@ -335,15 +335,15 @@
                   "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
                 },
                 {
-                  "key": "essenceRendEdgeRatio",
+                  "key": "essenceRendMinDistanceYards",
                   "type": "number",
-                  "label": "精华撕裂靠边半径阈值",
-                  "description": "以估算场地半径为 1；落点半径低于该值时标为内场候选。",
-                  "unit": "场地半径",
-                  "min": 0.4,
-                  "max": 1.2,
-                  "step": 0.01,
-                  "default": 0.72,
+                  "label": "精华撕裂距中场下限",
+                  "description": "可靠落点距场地中心低于该距离时，标记为太靠近中场。",
+                  "unit": "码",
+                  "min": 5,
+                  "max": 40,
+                  "step": 1,
+                  "default": 20,
                   "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
                 },
                 {
@@ -482,7 +482,7 @@
               "key": "vashnik",
               "order": 4,
               "name": "万毒邪祟者瓦什尼克",
-              "encounterIds": [3455],
+              "encounterIds": [3455, 53455],
               "englishName": "Vashnik the Malignant",
               "externalKey": "wow.venomabyss,03.vashnik",
               "aliases": ["「恶性之毒」伐许尼克"],
@@ -503,7 +503,7 @@
               "key": "lostexplorers",
               "order": 3,
               "name": "迷失的探险者",
-              "encounterIds": [3497],
+              "encounterIds": [3497, 53497],
               "englishName": "The Lost Explorers",
               "externalKey": "wow.venomabyss,04.lostexplorers",
               "aliases": ["迷路的探险者"],
@@ -524,7 +524,7 @@
               "key": "sszorak",
               "order": 5,
               "name": "斯索拉克",
-              "encounterIds": [3420],
+              "encounterIds": [3420, 53420],
               "englishName": "Sszorak",
               "externalKey": "wow.venomabyss,05.sszorak",
               "aliases": ["司佐拉"],
@@ -545,7 +545,7 @@
               "key": "twinfangs",
               "order": 6,
               "name": "双子毒牙",
-              "encounterIds": [3421],
+              "encounterIds": [3421, 53421],
               "englishName": "The Twin Fangs",
               "externalKey": "wow.venomabyss,06.twinfangs",
               "aliases": ["双生毒牙"],
@@ -563,18 +563,18 @@
               ]
             },
             {
-              "key": "bargained",
+              "key": "coiledaltar",
               "order": 7,
-              "name": "The Coiled Altar（中文名待定）",
+              "name": "盘卷祭坛",
               "englishName": "The Coiled Altar",
-              "externalKey": "wow.venomabyss,07.bargained",
-              "aliases": [],
-              "plugin": "boss_plugins.venomous_abyss.bargained",
-              "supported": false,
-              "disabledReason": "12.1 中文名与机制数据待接入",
+              "externalKey": "wow.venomabyss,07.coiledaltar",
+              "aliases": ["盘卷祭坛"],
+              "plugin": "boss_plugins.venomous_abyss.coiledaltar",
+              "supported": true,
+              "disabledReason": "",
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/07-bargained.jpg", "width": 1997, "height": 1118 }
+                { "key": "default", "path": "assets/raids/venomous_abyss/07-coiledaltar.jpg", "width": 1997, "height": 1118 }
               ]
             },
             {
@@ -585,8 +585,9 @@
               "externalKey": "wow.venomabyss,08.ulatek",
               "aliases": [],
               "plugin": "boss_plugins.venomous_abyss.ulatek",
-              "supported": false,
-              "disabledReason": "12.1 机制数据待接入",
+              "encounterIds": [3492, 53492],
+              "supported": true,
+              "disabledReason": "",
               "configSchema": [],
               "arenaAssets": [
                 { "key": "arena", "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg", "width": 1997, "height": 1118 },

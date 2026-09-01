@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 from urllib3.exceptions import InsecureRequestWarning
 
 from analyzer_core.concurrency import MAX_REQUEST_RETRIES, REQUEST_RETRY_BASE_SECONDS, request_post
+from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_context import resolve_wcl_credentials
 
 
@@ -154,6 +155,7 @@ class WclClient:
         include_resources=False,
         source_id=None,
         target_id=None,
+        filter_expression=None,
     ) -> dict:
         optional_args = []
         optional_filters = []
@@ -184,6 +186,10 @@ class WclClient:
             optional_args.append("$targetID: Int")
             optional_filters.append("targetID: $targetID")
             variables["targetID"] = int(target_id)
+        if filter_expression:
+            optional_args.append("$filterExpression: String")
+            optional_filters.append("filterExpression: $filterExpression")
+            variables["filterExpression"] = str(filter_expression)
         args = ", " + ", ".join(optional_args) if optional_args else ""
         filters = ", " + ", ".join(optional_filters) if optional_filters else ""
         query = f"""
@@ -203,6 +209,19 @@ class WclClient:
         return {"data": [], "nextPageTimestamp": None}
 
     def events(self, report_id: str, data_type: str, fight: dict, **kwargs) -> list:
+        progress_labels = {
+            "Casts": (24, "读取施法记录"),
+            "DamageTaken": (38, "读取承伤与位置记录"),
+            "DamageDone": (44, "读取首领受伤与位置记录"),
+            "Debuffs": (54, "读取减益与叠层记录"),
+            "Buffs": (64, "读取增益记录"),
+            "Deaths": (74, "读取死亡记录"),
+            "CombatantInfo": (82, "读取本场阵容"),
+            "Resources": (88, "读取场地坐标样本"),
+            "All": (70, "读取机制实体记录"),
+        }
+        percent, message = progress_labels.get(data_type, (None, "读取战斗事件"))
+        emit_progress(message, percent=percent, stage="fetch", detail=True)
         rows = []
         current = kwargs.pop("start_time", None)
         current = fight["startTime"] if current is None else current

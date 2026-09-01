@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 import statistics
-from collections import defaultdict
+from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
 
@@ -246,6 +246,102 @@ def group_nearby(events, window_ms=1000):
             groups.append([])
         groups[-1].append(event)
     return groups
+
+
+def events_between(events, start, end, spell_ids=None, types=None):
+    """Return events in one half-open mechanic window."""
+    spell_ids = set(spell_ids or [])
+    types = set(types or [])
+    return [
+        event for event in events
+        if start <= int(event.get("timestamp") or 0) < end
+        and (not spell_ids or int(ability_id(event) or 0) in spell_ids)
+        and (not types or event_type(event) in types)
+    ]
+
+
+def completed_casts(casts, spell_id):
+    """Return completed enemy casts for a single spell."""
+    return [
+        event for event in casts
+        if int(ability_id(event) or 0) == spell_id and event_type(event) == "cast"
+    ]
+
+
+def avoidable_board(fight, actor_map, players, damage, deaths, labels):
+    """Build the common per-player avoidable-damage board shape."""
+    deaths_by = {
+        (event.get("targetID"), int(event.get("killingAbilityGameID") or 0))
+        for event in deaths
+    }
+    board = []
+    for spell_id, spell_label in labels.items():
+        grouped = defaultdict(list)
+        for event in damage:
+            if int(ability_id(event) or 0) == spell_id and event.get("targetID") in players:
+                grouped[event.get("targetID")].append(event)
+        for player_id, player_events in grouped.items():
+            board.append({
+                **player_ref(players, actor_map, player_id),
+                "spellID": spell_id,
+                "spellName": spell_label,
+                "hitCount": len(player_events),
+                "totalDamage": sum(event_amount(event) for event in player_events),
+                "maxHit": max((event_amount(event) for event in player_events), default=0),
+                "deathCount": int((player_id, spell_id) in deaths_by),
+                "events": [
+                    {
+                        "timeMs": int(event["timestamp"] - fight["startTime"]),
+                        "time": fmt_ms(event["timestamp"] - fight["startTime"]),
+                        "amount": event_amount(event),
+                    }
+                    for event in player_events
+                ],
+            })
+    return sorted(
+        board,
+        key=lambda row: (row["deathCount"], row["totalDamage"], row["hitCount"]),
+        reverse=True,
+    )
+
+
+def nightly_detail(pull, time_value, text, **extra):
+    """Create one generic clickable nightly-overview record."""
+    return {
+        "reportID": pull.get("reportID"),
+        "fightID": pull.get("fightID"),
+        "date": pull.get("date"),
+        "startClock": pull.get("startClock"),
+        "time": time_value,
+        "text": text,
+        **extra,
+    }
+
+
+def nightly_player_totals(events):
+    """Aggregate mechanic event attribution without owning Boss rules."""
+    totals = {}
+    for event in events:
+        player_name = event.get("player")
+        if not player_name:
+            continue
+        row = totals.setdefault(player_name, {
+            "player": player_name,
+            "count": 0,
+            "classColor": event.get("classColor") or "#e5e7eb",
+        })
+        row["count"] += int(event.get("count") or 1)
+    return sorted(totals.values(), key=lambda row: (-row["count"], row["player"]))
+
+
+def death_near(deaths, player_id, timestamp, window_ms=500):
+    """Return a player's nearest death event around a mechanic timestamp."""
+    candidates = [
+        event for event in deaths
+        if event.get("targetID") == player_id
+        and abs(int(event.get("timestamp") or 0) - timestamp) <= window_ms
+    ]
+    return min(candidates, key=lambda event: abs(int(event.get("timestamp") or 0) - timestamp), default=None)
 
 
 def event_point(event):

@@ -53,8 +53,13 @@ def raid_night_date_tag(dt: datetime) -> str:
 
 
 def parse_fight_datetime(fight: dict) -> Optional[datetime]:
-    raw = fight.get("startDateTime")
+    raw = fight.get("startDateTime") or fight.get("startTimeIso")
     if raw:
+        try:
+            parsed = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            return parsed.astimezone(CN_TZ) if parsed.tzinfo else parsed.replace(tzinfo=CN_TZ)
+        except ValueError:
+            pass
         for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
             try:
                 return datetime.strptime(str(raw), fmt).replace(tzinfo=CN_TZ)
@@ -63,13 +68,15 @@ def parse_fight_datetime(fight: dict) -> Optional[datetime]:
     date = fight.get("date")
     clock = fight.get("startClock") or "00:00"
     if date:
-        try:
-            return datetime.strptime(f"{date} {clock}", "%Y-%m-%d %H:%M").replace(tzinfo=CN_TZ)
-        except ValueError:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
             try:
-                return datetime.strptime(str(date), "%Y-%m-%d").replace(tzinfo=CN_TZ)
+                return datetime.strptime(f"{date} {clock}", fmt).replace(tzinfo=CN_TZ)
             except ValueError:
-                return None
+                continue
+        try:
+            return datetime.strptime(str(date), "%Y-%m-%d").replace(tzinfo=CN_TZ)
+        except ValueError:
+            return None
     return None
 
 

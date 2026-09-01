@@ -959,21 +959,21 @@
           {"phase": "kill", "label": "击杀（未进入碎场 / P3）", "timeMs": 302823, "source": "fightEnd", "confidence": "observed"}
         ],
         "eventSeries": [
-          {"spellID": 1298367, "label": "母神之怒", "kind": "tank", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [10011, 72000]},
+          {"spellID": 1298367, "label": "蛇母之怒", "kind": "tank", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [10011, 72000]},
           {"spellID": 1299010, "label": "幽魂盘卷", "kind": "soak", "phase": "p1", "sourceName": "Spectral Coil", "timesMs": [23378, 26610, 107593, 110429]},
-          {"spellID": 1296301, "label": "恶臭横扫", "kind": "raid", "phase": "p1", "sourceName": "Gore Rattle", "timesMs": [35017, 75998]},
+          {"spellID": 1296301, "label": "响尾猛击", "kind": "raid", "phase": "p1", "sourceName": "Gore Rattle", "timesMs": [35017, 75998]},
           {"spellID": 1292403, "label": "腐蚀浪潮", "kind": "direction", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [42015, 84031]},
           {"spellID": 1304012, "label": "毒蛇呼唤", "kind": "adds", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [62002]},
-          {"spellID": 1286860, "label": "束缚之怒", "kind": "raid", "phase": "transition", "sourceName": "Ula'tek", "timesMs": [130006, 279040]},
-          {"spellID": 1299526, "label": "剧毒之心", "kind": "phase", "phase": "transition", "sourceName": "Venomous Heart", "timesMs": [136510, 285540]},
-          {"spellID": 1306862, "label": "厄兆孵化", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Egg", "timesMs": [165127]},
+          {"spellID": 1286860, "label": "被缚之怒", "kind": "raid", "phase": "transition", "sourceName": "Ula'tek", "timesMs": [130006, 279040]},
+          {"spellID": 1299526, "label": "烈毒之心", "kind": "phase", "phase": "transition", "sourceName": "Venomous Heart", "timesMs": [136510, 285540]},
+          {"spellID": 1306862, "label": "孵化厄运", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Egg", "timesMs": [165127]},
           {"spellID": 1290779, "label": "恶意", "kind": "interrupt", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [173242, 176096, 202774]},
           {"spellID": 1301117, "label": "攫取毒牙", "kind": "spread", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [187806, 189421]},
           {"spellID": 1301213, "label": "暗影蜕皮", "kind": "movement", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [191453, 193068]},
-          {"spellID": 1302950, "label": "扭动孵化", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [196576]},
+          {"spellID": 1302950, "label": "蠕动孕育", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [196576]},
           {"spellID": 1303410, "label": "缺陷：虚弱", "kind": "phase", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [220694, 221717]},
-          {"spellID": 1305650, "label": "痛苦尖啸", "kind": "raid", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [228278, 229904, 244074, 245707, 259865]},
-          {"spellID": 1305709, "label": "绝望横扫", "kind": "tank", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [233144, 237186, 251384]}
+          {"spellID": 1305650, "label": "痛苦哀嚎", "kind": "raid", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [228278, 229904, 244074, 245707, 259865]},
+          {"spellID": 1305709, "label": "绝望鞭笞", "kind": "tank", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [233144, 237186, 251384]}
         ],
         "codingSignals": [
           {"label": "正式服 P2 起点", "spellID": 1306862, "eventType": "begincast", "timeMs": 165127, "rule": "WCL Stage Two transition 与两个 Doomscale Egg 的 Hatching Doom 同时出现。"},
@@ -984,6 +984,56 @@
           "正式服普通击杀样本的 P1 约 02:45；两轮幽魂盘卷分别在约 00:23/00:27 与 01:48/01:50 开始。",
           "两个厄鳞守卫在约 02:53 首次读恶意，约 03:40 两只虚弱厄鳞出现；样本未观察到恐怖咆哮，说明提前孵化处理成功。",
           "团队在第二次剧毒之心易伤窗口完成击杀，因此普通日志没有覆盖连续盘卷碎场与最终 P3；这些阶段只按手册建立草案，不伪造时间点。"
+        ]
+      },
+      "heroic": {
+        "zoneID": 53,
+        "reportID": "njJBp2Nmrdgk1AaH",
+        "fightID": 2,
+        "kill": true,
+        "durationMs": 591940,
+        "stats": [
+          {"label": "英雄击杀", "timeMs": 591940},
+          {"label": "被缚之怒", "value": "3 轮"},
+          {"label": "P3 盘绕猎物", "value": "3 次"}
+        ],
+        "phaseMarkers": [
+          {"phase": "p1", "label": "P1 毒蛇之母的怒火", "timeMs": 0, "source": "fightStart", "confidence": "observed"},
+          {"phase": "heart-1", "label": "第一次被缚之怒 / 烈毒之心", "timeMs": 128972, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p2", "label": "P2 厄鳞之子", "timeMs": 164105, "spellID": 1306862, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "heart-2", "label": "第二次被缚之怒 / 烈毒之心", "timeMs": 278002, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p2.5", "label": "P2.5 连续幽魂盘卷", "timeMs": 322340, "spellID": 1299010, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p3", "label": "P3 最终 Rush", "timeMs": 367206, "spellID": 1300751, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "heart-3", "label": "第三次被缚之怒 / 烈毒之心", "timeMs": 567222, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "kill", "label": "击杀", "timeMs": 591940, "source": "fightEnd", "confidence": "observed"}
+        ],
+        "eventSeries": [
+          {"spellID": 1304012, "label": "毒蛇呼唤", "kind": "adds", "phase": "p1/p2.5", "sourceName": "Ula'tek", "timesMs": [71950, 309010]},
+          {"spellID": 1300751, "label": "毒蛇呼唤", "kind": "adds", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [367206, 397207, 442195, 502223]},
+          {"spellID": 1298367, "label": "蛇母之怒", "kind": "tank", "phase": "p1/p3", "sourceName": "Ula'tek", "timesMs": [9965, 76967, 113968, 372234, 447218, 523220]},
+          {"spellID": 1309074, "label": "腐蚀浪潮", "kind": "direction", "phase": "p1", "sourceName": "Ula'tek", "timesMs": [41959, 93951]},
+          {"spellID": 1292211, "label": "腐蚀浪潮", "kind": "direction", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [412225, 467212, 517208, 561203]},
+          {"spellID": 1299010, "label": "幽魂盘卷", "kind": "soak", "phase": "p1/p2.5", "sourceName": "Spectral Coil", "timesMs": [23530, 26356, 118411, 121667, 322340, 325574, 330449, 332889, 337756, 341021]},
+          {"spellID": 1286860, "label": "被缚之怒", "kind": "raid", "phase": "transition", "sourceName": "Ula'tek", "timesMs": [128972, 278002, 567222]},
+          {"spellID": 1306862, "label": "孵化厄运", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Egg", "timesMs": [164105]},
+          {"spellID": 1311611, "label": "攫取毒牙", "kind": "spread", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [190212]},
+          {"spellID": 1302950, "label": "蠕动孕育", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [173744, 196559]},
+          {"spellID": 1296301, "label": "响尾猛击", "kind": "raid", "phase": "p1", "sourceName": "Gore Rattle", "timesMs": [34956, 86973]},
+          {"spellID": 1305709, "label": "绝望鞭笞", "kind": "tank", "phase": "p2", "sourceName": "Weakened Doomscale", "timesMs": [244143, 247411, 262373, 265609]},
+          {"spellID": 1301510, "label": "盘绕猎物（伤害生效）", "kind": "transition", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [430511, 481615, 542846]},
+          {"spellID": 1295905, "label": "毒蛇之咬", "kind": "spread", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [387210, 458202, 495205, 555217]},
+          {"spellID": 1305878, "label": "易爆清除（伤害生效）", "kind": "spread", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [406792, 477750, 514726, 574760]},
+          {"spellID": 1313531, "label": "酸液喷发", "kind": "raid", "phase": "p3", "sourceName": "Blightscale Shrieker", "timesMs": [454503, 513307, 514535]}
+        ],
+        "codingSignals": [
+          {"label": "攫取毒牙唯一六人点名", "spellID": 1311611, "eventType": "applydebuff", "timeMs": 190212, "rule": "两侧守卫在 1.205 秒内分别施加三人，共六名玩家；分析时合并为整场唯一一轮。"},
+          {"label": "P3 盘绕猎物伤害", "spellID": 1301510, "eventType": "damage", "timeMs": 430511, "rule": "时间轴使用伤害首次生效时间，不使用 1315341 的施法开始时间。"},
+          {"label": "P3 易爆清除伤害", "spellID": 1305878, "eventType": "damage", "timeMs": 406792, "rule": "时间轴使用每轮 1305878 首次伤害时间。"}
+        ],
+        "cycleNotes": [
+          "该英雄击杀持续 09:51.9，完整覆盖 P1、P2、P2.5 六次连续幽魂盘卷与 P3 三次盘绕猎物。",
+          "攫取毒牙的六人点名分别在 03:10.2 与 03:11.4 施加，但属于同一轮机制，时间轴按首次施加合并为 03:10.2。",
+          "P3 的盘绕猎物和易爆清除均按伤害首次生效时间标记；其他有稳定读条的技能按 begincast 标记。"
         ]
       }
     },

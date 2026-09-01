@@ -9,6 +9,7 @@ import re
 import threading
 import time
 import uuid
+import warnings
 import webbrowser
 from dataclasses import dataclass, field
 from http import HTTPStatus
@@ -19,9 +20,9 @@ from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from analyzer_core.auth_store import AuthError, default_auth_store, validate_password
 from analyzer_core.catalog import find_boss, to_frontend_catalog
-from analyzer_core.concurrency import MAX_JOB_THREADS
+from analyzer_core.concurrency import MAX_JOB_THREADS, requests_module
 from analyzer_core.runner import analyze_report
-from analyzer_core import loot_store
+from analyzer_core import raid_calendar_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 from analyzer_core.wcl_paths import iter_wcl_json_files, list_wcl_data_files, write_data_manifest
 
@@ -47,12 +48,11 @@ def environment_setting(key, default=""):
 
 JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
-VERDICT_DIR = ROOT / "verdicts"
-VERDICT_DIR.mkdir(exist_ok=True)
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
+EXPORT_DIR = DATA_DIR / "exports"
 _DESKTOP = Path.home() / "Desktop"
-DEFAULT_EXPORT_EXCEL_DIR = _DESKTOP if _DESKTOP.is_dir() else VERDICT_DIR
+DEFAULT_EXPORT_EXCEL_DIR = _DESKTOP if _DESKTOP.is_dir() else EXPORT_DIR
 AUTH = default_auth_store()
 SESSION_COOKIE = "wra_session"
 MAX_JSON_BODY = 10 * 1024 * 1024
@@ -62,9 +62,18 @@ REGISTRATION_ATTEMPTS: Dict[str, List[float]] = {}
 REGISTRATION_ATTEMPTS_LOCK = threading.Lock()
 INVITE_CODE = environment_setting("APP_INVITE_CODE")
 
-FIGHT_RE = re.compile(r"分析 Fight .*?\((\d+)/(\d+)\)")
+FIGHT_RE = re.compile(r"(读取|分析) Fight .*?[（(](\d+)/(\d+)[）)]")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
 MATCHED_FIGHTS_RE = re.compile(r"匹配到\s+(\d+)\s+场")
+WOWHEAD_TOOLTIP_BASE_URL = "https://nether.wowhead.com"
+WOWHEAD_TOOLTIP_CACHE_TTL_SECONDS = 24 * 60 * 60
+WOWHEAD_TOOLTIP_CACHE: Dict[tuple, tuple] = {}
+WOWHEAD_TOOLTIP_CACHE_LOCK = threading.Lock()
+
+
+def normalize_static_request_path(path):
+    """Keep application entry points compatible with optional trailing slashes."""
+    return path.rstrip("/") if path != "/" and path.endswith("/") else path
 
 
 @dataclass
@@ -146,9 +155,11 @@ def translate_plugin_progress(job: Job, raw_event: dict):
 
     fight = FIGHT_RE.search(message)
     if fight:
-        index = int(fight.group(1))
-        total = max(1, int(fight.group(2)))
-        percent = 20 + round(index / total * 68)
+        action = fight.group(1)
+        index = int(fight.group(2))
+        total = max(1, int(fight.group(3)))
+        completed_before = max(0, index - 1) if action == "读取" else index
+        percent = 20 + round(completed_before / total * 68)
         set_job_progress(job, percent=percent, message=f"分析战斗 {index}/{total}", stage="analyze")
         return
 
@@ -273,6 +284,119 @@ def json_bytes(data, status=HTTPStatus.OK):
     return status, "application/json; charset=utf-8", body
 
 
+def local_wowhead_data(path):
+    """Return the minimum data tables expected by the bundled Wowhead client."""
+    data_name_match = re.fullmatch(
+        r"/wowhead-tooltip/data/(spell-scaling|item-scaling|spec-spells)(?:&.*)?",
+        path,
+    )
+    if not data_name_match:
+        return None
+
+    data_name = data_name_match.group(1)
+    if data_name == "spell-scaling":
+        return {
+            "scalingValue": {},
+            "spellInformation": {},
+            "randPropPoints": {},
+        }
+    if data_name == "item-scaling":
+        return {
+            "staminaByIlvl": {},
+            "ratingsToPercentRM": {},
+            "ratingsToPercentLT": {},
+            "itemScalingValue": {},
+            "scalingFactors": {},
+            "curvePoints": {},
+            "scalingData": {},
+            "contentTuningLevels": {},
+            "reforgeStats": {},
+        }
+    return {"specMap": {}, "class": {}, "spec": {}}
+
+
+def wowhead_static_asset_url(path, query=""):
+    """Map the bundled tooltip client's /zamimg asset prefix to its trusted CDN."""
+    if not path.startswith("/zamimg/") or "\\" in path:
+        return None
+    relative_path = path[len("/zamimg/"):]
+    if not relative_path or any(part in {"", ".", ".."} for part in relative_path.split("/")):
+        return None
+    if any(ord(char) < 32 for char in path + query):
+        return None
+    suffix = f"?{query}" if query else ""
+    return f"https://wow.zamimg.com/{relative_path}{suffix}"
+
+
+def wowhead_spell_tooltip(spell_id, query=""):
+    """Fetch the real Chinese Wowhead tooltip, with a local-name fallback.
+
+    The bundled tooltip client deliberately calls this same-origin route.  The
+    public ``www.wowhead.com/tooltip`` path returns 404 for current raid spells;
+    Wowhead's tooltip client uses ``nether.wowhead.com`` instead.
+    """
+    from boss_plugins.venomous_abyss.shared import local_spell_tooltip
+
+    spell_id = int(spell_id)
+    incoming = parse_qs(query, keep_blank_values=False)
+    params = {}
+    for key in ("dd", "dataEnv", "locale"):
+        value = str((incoming.get(key) or [""])[0]).strip()
+        if value.isdigit():
+            params[key] = value
+    params.setdefault("dataEnv", "1")
+    params.setdefault("locale", "4")
+    cache_key = (spell_id, tuple(sorted(params.items())))
+    now = time.time()
+    with WOWHEAD_TOOLTIP_CACHE_LOCK:
+        cached = WOWHEAD_TOOLTIP_CACHE.get(cache_key)
+        if cached and now - cached[0] < WOWHEAD_TOOLTIP_CACHE_TTL_SECONDS:
+            return cached[1]
+
+    url = f"{WOWHEAD_TOOLTIP_BASE_URL}/tooltip/spell/{spell_id}?{urlencode(params)}"
+    proxy_url = environment_setting("WCL_PROXY", "http://127.0.0.1:7890")
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    loopback_proxy = bool(
+        proxy_url
+        and (urlparse(proxy_url).hostname or "").lower()
+        in {"127.0.0.1", "localhost", "::1"}
+    )
+    verify_tls = environment_setting(
+        "WOWHEAD_TLS_VERIFY", "0" if loopback_proxy else "1"
+    ).lower() not in {"0", "false", "no", "off"}
+    try:
+        requests = requests_module()
+        if loopback_proxy and not verify_tls:
+            from urllib3.exceptions import InsecureRequestWarning
+
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", InsecureRequestWarning)
+                response = requests.get(
+                    url,
+                    headers={"User-Agent": "MythicAnalyzer/0.2"},
+                    proxies=proxies,
+                    verify=False,
+                    timeout=12,
+                )
+        else:
+            response = requests.get(
+                url,
+                headers={"User-Agent": "MythicAnalyzer/0.2"},
+                proxies=proxies,
+                verify=verify_tls,
+                timeout=12,
+            )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict) or not payload.get("name") or not payload.get("tooltip"):
+            raise ValueError("Wowhead tooltip payload is incomplete")
+        with WOWHEAD_TOOLTIP_CACHE_LOCK:
+            WOWHEAD_TOOLTIP_CACHE[cache_key] = (now, payload)
+        return payload
+    except Exception:
+        return local_spell_tooltip(spell_id)
+
+
 def safe_redirect_target(value, default="/online"):
     target = str(value or "").strip()
     parsed = urlparse(target)
@@ -293,6 +417,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.request_path()
+        wowhead_asset = wowhead_static_asset_url(path, urlparse(self.path).query)
+        if wowhead_asset is not None:
+            return self.redirect_resource(wowhead_asset)
+        if path == "/favicon.ico":
+            return self.send_response_body(HTTPStatus.NO_CONTENT, "image/x-icon", b"")
         if path == "/login":
             if self.current_user():
                 return self.redirect("/online")
@@ -303,12 +432,17 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "registrationRequiresInvite": bool(INVITE_CODE),
             }))
 
+        wowhead_data = local_wowhead_data(path)
+        if wowhead_data is not None:
+            return self.send_response_body(*json_bytes(wowhead_data))
+
         tooltip_match = re.fullmatch(r"/wowhead-tooltip/tooltip/spell/(\d+)", path)
         if tooltip_match:
-            from boss_plugins.venomous_abyss.shared import local_spell_tooltip
-
             return self.send_response_body(*json_bytes(
-                local_spell_tooltip(int(tooltip_match.group(1)))
+                wowhead_spell_tooltip(
+                    int(tooltip_match.group(1)),
+                    urlparse(self.path).query,
+                )
             ))
 
         user = self.require_user(path)
@@ -375,12 +509,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.handle_job_status(path, user)
         if path.startswith("/api/jobs/") and path.endswith("/result"):
             return self.handle_result(path, user)
-        if path == "/api/loot":
+        if path in {"/api/raid-calendar", "/api/loot"}:
             query = parse_qs(urlparse(self.path).query)
             selected_date = (query.get("date") or [None])[0]
             difficulty = (query.get("difficulty") or ["heroic"])[0]
             try:
-                document = loot_store.load_document(selected_date, difficulty)
+                document = raid_calendar_store.load_document(selected_date, difficulty)
                 document["permissions"] = {"isAdmin": user["isAdmin"], "canModify": user["canModify"]}
                 return self.send_response_body(*json_bytes(document))
             except ValueError as error:
@@ -468,16 +602,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.handle_admin_delete(user, int(admin_delete_match.group(1)))
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
-        allocation_match = re.fullmatch(r"/api/loot/allocations/([A-Za-z0-9_-]+)", path)
+        allocation_match = re.fullmatch(r"/api/(?:raid-calendar|loot)/allocations/([A-Za-z0-9_-]+)", path)
         if allocation_match:
             try:
-                return self.send_response_body(*json_bytes(loot_store.delete_allocation(allocation_match.group(1))))
+                return self.send_response_body(*json_bytes(raid_calendar_store.delete_allocation(allocation_match.group(1))))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.NOT_FOUND)
-        blackmark_match = re.fullmatch(r"/api/loot/blackmarks/([A-Za-z0-9_-]+)", path)
+        blackmark_match = re.fullmatch(r"/api/(?:raid-calendar|loot)/blackmarks/([A-Za-z0-9_-]+)", path)
         if blackmark_match:
             try:
-                return self.send_response_body(*json_bytes(loot_store.delete_blackmark(blackmark_match.group(1))))
+                return self.send_response_body(*json_bytes(raid_calendar_store.delete_blackmark(blackmark_match.group(1))))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.NOT_FOUND)
         return self.json_error("not found", HTTPStatus.NOT_FOUND)
@@ -736,16 +870,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         try:
-            if path == "/api/loot/setup":
-                return self.send_response_body(*json_bytes(loot_store.save_setup(self.read_json_body())))
-            if path == "/api/loot/settings":
+            if path in {"/api/raid-calendar/setup", "/api/loot/setup"}:
+                return self.send_response_body(*json_bytes(raid_calendar_store.save_setup(self.read_json_body())))
+            if path in {"/api/raid-calendar/settings", "/api/loot/settings"}:
                 if not user["isAdmin"]:
                     return self.json_error("仅管理员可以修改史诗难度刷新设置。", HTTPStatus.FORBIDDEN)
-                return self.send_response_body(*json_bytes(loot_store.save_settings(self.read_json_body())))
-            if path == "/api/loot/allocations":
-                return self.send_response_body(*json_bytes(loot_store.add_allocation(self.read_json_body())))
-            if path == "/api/loot/blackmarks":
-                return self.send_response_body(*json_bytes(loot_store.add_blackmark(self.read_json_body())))
+                return self.send_response_body(*json_bytes(raid_calendar_store.save_settings(self.read_json_body())))
+            if path in {"/api/raid-calendar/allocations", "/api/loot/allocations"}:
+                return self.send_response_body(*json_bytes(raid_calendar_store.add_allocation(self.read_json_body())))
+            if path in {"/api/raid-calendar/blackmarks", "/api/loot/blackmarks"}:
+                return self.send_response_body(*json_bytes(raid_calendar_store.add_blackmark(self.read_json_body())))
             if path == "/api/export-verdict-excel":
                 return self.handle_export_verdict_excel()
             if path == "/api/raid-cooldowns/search":
@@ -811,7 +945,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "statusUrl": f"/api/jobs/{job.id}/status",
                 "resultUrl": f"/api/jobs/{job.id}/result",
             }, HTTPStatus.ACCEPTED))
-        except loot_store.LootConflictWarning as warning:
+        except raid_calendar_store.LootConflictWarning as warning:
             return self.send_response_body(*json_bytes({
                 "error": "该分配存在需求权提醒，请确认后继续。",
                 "requiresConfirmation": True,
@@ -919,6 +1053,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         return self.send_response_body(HTTPStatus.OK, "application/json; charset=utf-8", body)
 
     def handle_static(self, path, public=False):
+        path = normalize_static_request_path(path)
         route_map = {
             "/": "/index.html",
             "/login": "/frontend/auth/login.html",
@@ -927,10 +1062,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/single-fight": "/frontend/tools/single-fight/index.html",
             "/spec-compare": "/frontend/tools/spec-comparison/index.html",
             "/report": "/frontend/report/index.html",
-            "/loot": "/frontend/tools/raid-loot/index.html",
+            "/raid-calendar": "/frontend/tools/raid-calendar/index.html",
+            "/loot": "/frontend/tools/raid-calendar/index.html",
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",
+            "/frontend/tools/raid-guide": "/frontend/tools/raid-guide/index.html",
             "/audit": "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
             "/LuraJudgement.html": "/frontend/report/index.html",
         }
@@ -972,6 +1109,13 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.SEE_OTHER)
         self.send_header("Location", location)
         self.send_header("Cache-Control", "no-store")
+        self.send_security_headers()
+        self.end_headers()
+
+    def redirect_resource(self, location):
+        self.send_response(HTTPStatus.FOUND)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "public, max-age=3600")
         self.send_security_headers()
         self.end_headers()
 

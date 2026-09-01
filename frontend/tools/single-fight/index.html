@@ -7,8 +7,8 @@
   <style>
     :root{color-scheme:dark;--bg:#060a12;--panel:#101827;--line:#27364a;--ink:#edf3fa;--muted:#91a0b5;--cyan:#22d3ee;--green:#34d399;--amber:#fbbf24;--red:#fb7185}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(900px 520px at 12% -10%,#123255 0,transparent 62%),radial-gradient(700px 500px at 90% 10%,#17255455 0,transparent 65%),var(--bg);color:var(--ink);font:14px/1.55 system-ui,"Microsoft YaHei",sans-serif}
-    a{color:#7dd3fc;text-decoration:none}button,input{font:inherit}.shell{max-width:1260px;margin:auto;padding:30px 22px 60px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:22px;border-bottom:1px solid var(--line)}h1{margin:5px 0 0;font-size:30px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--cyan)}.muted{color:var(--muted)}.nav{display:flex;gap:8px;flex-wrap:wrap}.button,button{border:1px solid #3b4d66;border-radius:9px;padding:9px 13px;background:#0c1422;color:var(--ink);cursor:pointer}.button:hover,button:hover{border-color:#64748b}.primary{border-color:#0891b2;background:#0e7490;font-weight:800}.primary:hover{background:#0891b2}.primary:disabled{cursor:not-allowed;opacity:.45}.danger{border-color:#9f1239}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:14px;background:#0d1522e8;overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h2{margin:0;font-size:16px}.panel-body{padding:16px 18px}.controls{display:grid;grid-template-columns:1fr auto;gap:9px}input{min-width:0;border:1px solid #33445b;border-radius:9px;background:#070d17;color:var(--ink);padding:9px 11px}.stack{display:grid;gap:9px}.report,.fight{width:100%;text-align:left;border-color:#29394f;background:#09111d;padding:12px}.report.active,.fight.active{border-color:#22d3ee;background:#082b36}.report strong,.fight strong{display:block}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--muted)}.tag{padding:2px 6px;border:1px solid #334155;border-radius:999px}.tag.ok{border-color:#047857;color:#6ee7b7}.tag.no{border-color:#713f12;color:#fcd34d}.tag.kill{border-color:#166534;color:#86efac}.empty{padding:22px;border:1px dashed #334155;border-radius:10px;color:var(--muted);text-align:center}.fight-list{display:grid;gap:9px;max-height:520px;overflow:auto}.roster{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.player{padding:3px 7px;border-radius:7px;background:#111827;border:1px solid #334155;font-size:11px}.DeathKnight{color:#c41e3a}.DemonHunter{color:#a330c9}.Druid{color:#ff7c0a}.Evoker{color:#33937f}.Hunter{color:#aad372}.Mage{color:#3fc7eb}.Monk{color:#00ff98}.Paladin{color:#f48cba}.Priest{color:#fff}.Rogue{color:#fff468}.Shaman{color:#0070dd}.Warlock{color:#8788ee}.Warrior{color:#c69b6d}.progress{height:9px;border-radius:999px;overflow:hidden;background:#1e293b}.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0891b2,#22d3ee);transition:width .25s}.status{display:flex;justify-content:space-between;gap:12px;margin:10px 0;color:var(--muted)}.result{display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px}.result.show{display:block}.result-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stat{padding:10px;border:1px solid #29394f;border-radius:9px;background:#080f1a}.stat span{display:block;color:var(--muted);font-size:10px}.stat strong{font-size:16px}.timeline{display:grid;gap:6px;max-height:360px;overflow:auto;margin-top:12px}.event{display:grid;grid-template-columns:65px 1fr auto;gap:10px;align-items:center;padding:8px 9px;border-left:3px solid #334155;background:#08111d}.event b{font-size:12px}.event small{color:var(--muted)}.note{margin-top:12px;padding:10px 12px;border-left:3px solid #0891b2;background:#08212b;color:#b9e6f2}.error{color:#fda4af}.split{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none!important}
-    @media(max-width:860px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    a{color:#7dd3fc;text-decoration:none}button,input{font:inherit}.shell{max-width:1260px;margin:auto;padding:30px 22px 60px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:22px;border-bottom:1px solid var(--line)}h1{margin:5px 0 0;font-size:30px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--cyan)}.muted{color:var(--muted)}.nav{display:flex;gap:8px;flex-wrap:wrap}.button,button{border:1px solid #3b4d66;border-radius:9px;padding:9px 13px;background:#0c1422;color:var(--ink);cursor:pointer}.button:hover,button:hover{border-color:#64748b}.primary{border-color:#0891b2;background:#0e7490;font-weight:800}.primary:hover{background:#0891b2}.primary:disabled{cursor:not-allowed;opacity:.45}.danger{border-color:#9f1239}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:14px;background:#0d1522e8;overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h2{margin:0;font-size:16px}.panel-body{padding:16px 18px}.controls{display:grid;grid-template-columns:1fr auto;gap:9px}input{min-width:0;border:1px solid #33445b;border-radius:9px;background:#070d17;color:var(--ink);padding:9px 11px}.stack{display:grid;gap:9px}.report,.fight{width:100%;text-align:left;border-color:#29394f;background:#09111d;padding:12px}.report.active,.fight.active{border-color:#22d3ee;background:#082b36}.report strong,.fight strong{display:block}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--muted)}.tag{padding:2px 6px;border:1px solid #334155;border-radius:999px}.tag.ok{border-color:#047857;color:#6ee7b7}.tag.no{border-color:#713f12;color:#fcd34d}.tag.kill{border-color:#166534;color:#86efac}.empty{padding:22px;border:1px dashed #334155;border-radius:10px;color:var(--muted);text-align:center}.fight-list{display:grid;gap:9px;max-height:520px;overflow:auto}.roster{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.player{padding:3px 7px;border-radius:7px;background:#111827;border:1px solid #334155;font-size:11px}.DeathKnight{color:#c41e3a}.DemonHunter{color:#a330c9}.Druid{color:#ff7c0a}.Evoker{color:#33937f}.Hunter{color:#aad372}.Mage{color:#3fc7eb}.Monk{color:#00ff98}.Paladin{color:#f48cba}.Priest{color:#fff}.Rogue{color:#fff468}.Shaman{color:#0070dd}.Warlock{color:#8788ee}.Warrior{color:#c69b6d}.note{padding:12px 14px;border-left:3px solid #0891b2;background:#08212b;color:#b9e6f2}.error{color:#fda4af}.split{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none!important}.wait-screen{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:radial-gradient(800px 480px at 50% 10%,#123255,transparent 66%),rgba(3,7,15,.97)}.wait-card{width:min(720px,100%);padding:30px;border:1px solid #33506d;border-radius:20px;background:#09121f;box-shadow:0 30px 90px #000b}.wait-title{display:flex;align-items:center;gap:16px}.spinner{width:44px;height:44px;flex:0 0 auto;border:4px solid #19344c;border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite}.wait-title h2{margin:0;font-size:24px}.wait-title p{margin:3px 0 0}.wait-progress{height:10px;margin:24px 0 8px;border-radius:99px;overflow:hidden;background:#152338}.wait-progress i{display:block;height:100%;min-width:3%;background:linear-gradient(90deg,#0e7490,#22d3ee);transition:width .45s}.wait-status{display:flex;justify-content:space-between;gap:16px;color:#b8c7d9}.wait-log{display:grid;gap:7px;max-height:230px;margin-top:22px;overflow:auto}.wait-log div{padding:8px 10px;border-left:2px solid #27445f;background:#0c1827;color:#91a0b5}.wait-log div.current{border-color:var(--cyan);color:#e4f9ff}.wait-actions{display:flex;justify-content:flex-end;margin-top:20px}@keyframes spin{to{transform:rotate(360deg)}}
+    @media(max-width:860px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
 <body>
@@ -42,25 +42,27 @@
       <article class="panel">
         <div class="panel-head"><div class="split"><h2>3 · 生成当场结论</h2><button id="analyze" class="primary" disabled>分析所选 Fight</button></div></div>
         <div class="panel-body">
-          <div class="progress"><i id="progressBar"></i></div>
-          <div class="status"><span id="statusText">等待选择</span><span id="percentText">0%</span></div>
-          <div id="result" class="result">
-            <div id="resultStats" class="result-grid"></div>
-            <div class="split" style="margin-top:12px"><strong>玩家关键技能时间轴</strong><a id="detailLink" class="button" href="#">打开 Boss 专属完整报告</a></div>
-            <div id="timeline" class="timeline"></div>
-          </div>
+          <div id="statusText" class="note">等待选择一场可分析的 Pull。完成后会直接打开 Boss 专属单场报告。</div>
         </div>
       </article>
     </section>
   </section>
 </main>
+<section id="waitScreen" class="wait-screen hidden" aria-live="polite" aria-busy="true">
+  <div class="wait-card">
+    <div class="wait-title"><span class="spinner" aria-hidden="true"></span><div><h2 id="waitTitle">正在准备单场分析</h2><p id="waitFight" class="muted"></p></div></div>
+    <div class="wait-progress"><i id="progressBar"></i></div>
+    <div class="wait-status"><span id="waitStatus">正在创建任务</span><span><b id="percentText">1%</b> · <span id="elapsedText">0 秒</span></span></div>
+    <div id="waitLog" class="wait-log"></div>
+    <div class="wait-actions"><button id="closeWait" class="hidden">返回选择</button></div>
+  </div>
+</section>
 <script>
 (() => {
   const $=id=>document.getElementById(id);
   const state={reports:[],report:null,fight:null,resultUrl:""};
   const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const formatDuration=ms=>{const total=Math.max(0,Math.round(Number(ms||0)/1000));return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`};
-  const formatTime=ms=>{const value=Math.max(0,Number(ms||0));return `${String(Math.floor(value/60000)).padStart(2,"0")}:${String(Math.floor(value%60000/1000)).padStart(2,"0")}`};
   const errorMessage=async response=>{try{return (await response.json()).error||`HTTP ${response.status}`}catch(_){return `HTTP ${response.status}`}};
 
   function today(){const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`}
@@ -106,6 +108,7 @@
       const response=await fetch(`/api/single-fight/reports/${encodeURIComponent(code)}`,{cache:"no-store"});
       if(!response.ok)throw new Error(await errorMessage(response));
       state.report=await response.json();state.fight=null;
+      if(state.report.guild){$("guildInput").value=String(state.report.guild.id||$("guildInput").value);$("guildLabel").textContent=`${state.report.guild.name||"工会"} · ${state.report.guild.id||""}`}
       if(!(state.report.raidNightDates||[]).includes($("dateInput").value) && state.report.raidNightDates?.length){
         $("dateInput").value=state.report.raidNightDates[state.report.raidNightDates.length-1];
       }
@@ -113,14 +116,14 @@
       document.querySelectorAll("[data-report]").forEach(node=>node.classList.toggle("active",node.dataset.report===code));
       renderFights();
       const sameDay=(state.report.fights||[]).filter(row=>row.raidNightDate===$("dateInput").value);
-      const last=[...(sameDay.length?sameDay:state.report.fights||[])].pop();
+      const last=[...(sameDay.length?sameDay:state.report.fights||[])].sort((a,b)=>Number(a.absoluteStartTime||0)-Number(b.absoluteStartTime||0)).pop();
       if(last)selectFight(last.id);
     }catch(error){$("reportTitle").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`}
   }
 
   function renderFights(){
-    const rows=(state.report?.fights||[]).filter(row=>!$("dateInput").value||row.raidNightDate===$("dateInput").value).sort((a,b)=>b.id-a.id);
-    const lastId=rows.length?Math.max(...rows.map(row=>row.id)):-1;
+    const rows=(state.report?.fights||[]).filter(row=>!$("dateInput").value||row.raidNightDate===$("dateInput").value).sort((a,b)=>Number(b.absoluteStartTime||0)-Number(a.absoluteStartTime||0));
+    const lastId=rows.length?rows[0].id:-1;
     $("fightEmpty").classList.toggle("hidden",Boolean(rows.length));
     $("fightList").innerHTML=rows.map((fight,index)=>`<button class="fight" data-fight="${fight.id}">
       <div class="split"><strong>${escapeHtml(fight.analysisIdentity?.bossName||fight.name)} · Fight ${fight.id}</strong><span>${formatDuration(fight.durationMs)}</span></div>
@@ -135,45 +138,37 @@
     document.querySelectorAll("[data-fight]").forEach(node=>node.classList.toggle("active",Number(node.dataset.fight)===Number(id)));
     $("analyze").disabled=!state.fight?.supported;
     $("statusText").textContent=state.fight?.supported?`已选择 ${state.fight.analysisIdentity?.bossName||state.fight.name} · Fight ${id}`:(state.fight?.disabledReason||"该 Boss 尚未接入分析规则");
-    $("result").classList.remove("show");
   }
+
+  let waitStarted=0,elapsedTimer=null;
+  function openWait(){waitStarted=Date.now();$("waitTitle").textContent="正在准备单场分析";$("waitScreen").classList.remove("hidden");$("closeWait").classList.add("hidden");$("waitLog").innerHTML="";$("progressBar").style.width="1%";$("percentText").textContent="1%";$("waitStatus").textContent="正在创建单场任务";$("waitFight").textContent=`${state.fight.analysisIdentity?.bossName||state.fight.name} · Fight ${state.fight.id}`;clearInterval(elapsedTimer);elapsedTimer=setInterval(()=>{$("elapsedText").textContent=`${Math.floor((Date.now()-waitStarted)/1000)} 秒`},1000)}
+  function closeWait(){clearInterval(elapsedTimer);$("waitScreen").classList.add("hidden")}
+  function waitEvent(data){const percent=Number(data.percent||0),message=data.message||data.status||"处理中";$("progressBar").style.width=`${Math.max(1,percent)}%`;$("percentText").textContent=`${percent}%`;$("waitStatus").textContent=message;const previous=$("waitLog").querySelector(".current");if(previous)previous.classList.remove("current");if(!$("waitLog").lastElementChild||$("waitLog").lastElementChild.textContent!==message){const row=document.createElement("div");row.className="current";row.textContent=message;$("waitLog").appendChild(row);$("waitLog").scrollTop=$("waitLog").scrollHeight}else $("waitLog").lastElementChild.classList.add("current")}
 
   function monitor(job){
     const source=new EventSource(job.eventsUrl);
     source.onmessage=event=>{
-      const data=JSON.parse(event.data);const percent=Number(data.percent||0);
-      $("progressBar").style.width=`${percent}%`;$("percentText").textContent=`${percent}%`;$("statusText").textContent=data.message||data.status;
+      const data=JSON.parse(event.data);waitEvent(data);
       if(data.type==="done"||data.status==="done"){source.close();loadResult(job.resultUrl)}
-      if(data.type==="error"||data.status==="error"){source.close();$("statusText").innerHTML=`<span class="error">${escapeHtml(data.message)}</span>`;$("analyze").disabled=false}
+      if(data.type==="error"||data.status==="error"){source.close();clearInterval(elapsedTimer);$("waitTitle").textContent="分析失败";$("waitStatus").textContent=data.message;$("closeWait").classList.remove("hidden");$("analyze").disabled=false}
     };
     source.onerror=()=>{if(source.readyState===EventSource.CLOSED)$("analyze").disabled=false};
   }
 
   async function analyze(){
     if(!state.fight||!state.report)return;
-    $("analyze").disabled=true;$("progressBar").style.width="1%";$("statusText").textContent="正在创建单场任务";
+    $("analyze").disabled=true;openWait();
     try{
       const response=await fetch("/api/single-fight/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({reportCode:state.report.code,fightID:state.fight.id})});
       if(!response.ok)throw new Error(await errorMessage(response));monitor(await response.json());
-    }catch(error){$("statusText").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`;$("analyze").disabled=false}
+    }catch(error){clearInterval(elapsedTimer);$("waitTitle").textContent="分析失败";$("waitStatus").textContent=error.message;$("closeWait").classList.remove("hidden");$("analyze").disabled=false}
   }
 
   async function loadResult(url){
-    const response=await fetch(url,{cache:"no-store"});if(!response.ok)throw new Error(await errorMessage(response));
-    const result=await response.json();const meta=result.meta?.singleFight||{};const player=result.data?.singleFightPlayerTimeline||{};const performance=result.meta?.performance||{};
-    state.resultUrl=url;$("detailLink").href=`/report?json=${encodeURIComponent(url)}`;
-    $("resultStats").innerHTML=[
-      ["分析耗时",`${meta.elapsedSeconds??performance.elapsedSeconds??"?"} 秒`],
-      ["Boss 规则请求",performance.logicalGraphQLRequests??"未计量"],
-      ["玩家事件请求",player.requestMetrics?.logicalGraphQLRequests??0],
-      ["缓存",meta.cacheHit?"命中":"本次新建"]
-    ].map(([label,value])=>`<div class="stat"><span>${label}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
-    const categories={"major-burst":"大爆发","minor-burst":"中爆发","personal-defensive":"个人减伤","party-defensive":"团队减伤","external":"外部技能","utility":"功能","passive-survival":"被动保命","interrupt":"打断","control":"控制","bloodlust":"嗜血","consumable":"爆发药"};
-    $("timeline").innerHTML=(player.events||[]).length?(player.events||[]).map(row=>`<div class="event"><b>${formatTime(row.timeMs)}</b><span class="${escapeHtml(row.class)}"><strong>${escapeHtml(row.playerName)}</strong> · ${escapeHtml(row.abilityName)}<br><small>${escapeHtml(row.spec)} · Spell ${row.abilityId}</small></span><small>${escapeHtml(categories[row.category]||row.category)}</small></div>`).join(""):'<div class="empty">本场没有匹配到公共目录中的关键技能事件。</div>';
-    $("result").classList.add("show");$("analyze").disabled=false;
+    clearInterval(elapsedTimer);$("progressBar").style.width="100%";$("percentText").textContent="100%";$("waitStatus").textContent="分析完成，正在打开单场报告";location.href=`/report?json=${encodeURIComponent(url)}`;
   }
 
-  $("loadReports").addEventListener("click",loadReports);$("openReport").addEventListener("click",()=>openReport());$("analyze").addEventListener("click",analyze);
+  $("loadReports").addEventListener("click",loadReports);$("openReport").addEventListener("click",()=>openReport());$("analyze").addEventListener("click",analyze);$("closeWait").addEventListener("click",closeWait);
   loadConfig().catch(error=>$("reportMessage").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`);
 })();
 </script>

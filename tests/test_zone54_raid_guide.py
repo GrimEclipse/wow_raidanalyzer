@@ -29,7 +29,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
         )
         cls.document = build_document(discovery, authored, timelines)
 
-    def test_guide_contains_all_bosses_and_live_ulatek_normal_evidence(self):
+    def test_guide_contains_all_bosses_and_live_ulatek_normal_and_heroic_evidence(self):
         self.assertEqual(len(self.document["bosses"]), 9)
         ulatek = next(
             boss for boss in self.document["bosses"] if boss["key"] == "ulatek"
@@ -38,9 +38,17 @@ class Zone54RaidGuideTests(unittest.TestCase):
         self.assertEqual(ulatek["encounterID"], 3492)
         self.assertFalse(ulatek["expectedUntested"])
         self.assertTrue(ulatek["hasNormalEvidence"])
-        self.assertFalse(ulatek["hasHeroicEvidence"])
+        self.assertTrue(ulatek["hasHeroicEvidence"])
         self.assertFalse(ulatek["hasMythicEvidence"])
         self.assertIn("normal", ulatek["timelines"])
+        self.assertIn("heroic", ulatek["timelines"])
+        heroic = ulatek["timelines"]["heroic"]
+        self.assertEqual(heroic["reportID"], "njJBp2Nmrdgk1AaH")
+        self.assertEqual(heroic["fightID"], 2)
+        self.assertEqual(heroic["durationMs"], 591940)
+        self.assertTrue(any(
+            row["spellID"] == 1313531 for row in heroic["events"]
+        ))
         self.assertGreaterEqual(len(ulatek["mechanics"]), 6)
         self.assertTrue(any(
             mechanic.get("heroicNotes")
