@@ -89,6 +89,11 @@ SPELLS.update({
     1295132: "液态光泽",
     1297445: "恐惧行军",
     1297906: "墓缚",
+    1312424: "无能之辈",
+    1285017: "碎斧",
+    1283290: "剧毒之地",
+    1288635: "恐惧威仪",
+    1298795: "腐化毒素",
     1299266: "冷酷处斩",
     1299267: "冷酷处斩",
     1299396: "死亡之拥",
@@ -168,9 +173,9 @@ GLOOMBOMB_CAST_IDS = {1286895, 1310882}
 GLOOMBOMB_DEBUFF_IDS = {1310881}
 GRAVEBOUND_IDS = {1286837, 1308330}
 GRAVEBOUND_DEBUFF_IDS = {1286837}
-# 墓缚伤害致死（WCL 死亡归因 / DamageTaken）。killingAbility 缺失时用 overkill 回退。
+# 墓缚伤害（拉取 DamageTaken）；致死只认 1297906 的 killing blow。
 GRAVEBOUND_DAMAGE_IDS = {1308330, 1297906, 1286837}
-GRAVEBOUND_KILL_OVERKILL_WINDOW_MS = 250
+GRAVEBOUND_KILL_ID = 1297906
 # 炸弹爆炸后短窗口内的 1286837 施加，视为本次幽暗炸弹溅射。
 GLOOMBOMB_GRAVEBOUND_WINDOW_MS = 2_000
 ETERNAL_NIGHTFALL = 1286918
@@ -2520,41 +2525,23 @@ def analyze_gloombomb(
 
 
 def _gravebound_damage_kill_id(death_event, damage_events=None):
-    """只认墓缚伤害打死：killingAbility，或归因缺失时墓缚伤害 overkill。"""
+    """只认 1297906 直接致死（WCL killingAbility）。"""
     kill_id = int(death_event.get("killingAbilityGameID") or 0)
-    if kill_id in GRAVEBOUND_DAMAGE_IDS:
+    if kill_id == GRAVEBOUND_KILL_ID:
         return kill_id
-    if kill_id:
-        return None
-    death_ts = int(death_event.get("timestamp") or 0)
-    target_id = death_event.get("targetID")
-    for event in damage_events or []:
-        if event.get("targetID") != target_id:
-            continue
-        spell = int(ability_id(event) or 0)
-        if spell not in GRAVEBOUND_DAMAGE_IDS:
-            continue
-        if int(event.get("overkill") or 0) <= 0:
-            continue
-        ts = int(event.get("timestamp") or 0)
-        if abs(ts - death_ts) <= GRAVEBOUND_KILL_OVERKILL_WINDOW_MS:
-            return spell
     return None
 
 
 def _is_gravebound_damage_death(row):
     if row.get("killedByGraveboundDamage") is False:
         return False
-    spell = int(row.get("deathAbilityID") or 0)
-    if spell and spell not in GRAVEBOUND_DAMAGE_IDS:
-        return False
-    return True
+    return int(row.get("deathAbilityID") or 0) == GRAVEBOUND_KILL_ID
 
 
 def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, damage_events=None):
     """
-    墓缚致死：只统计被墓缚伤害打死的玩家。
-    带墓缚但死于其他技能不计入；死亡时是否仍带 1286837 仅作标注。
+    墓缚致死：只统计 1297906 作为 killing blow 直接打死的玩家。
+    1286837 / 1308330 致死、带墓缚但死于其他技能均不计入。
     """
     fight_start = int(fight["startTime"])
     fight_end = int(fight["endTime"])
@@ -2616,8 +2603,8 @@ def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, dama
     return {
         "failures": rows,
         "evidenceNote": (
-            "只统计墓缚伤害（1308330/1297906/1286837）打死的玩家；"
-            "带墓缚但死于其他技能不计入。死亡时是否仍带 1286837 仅作标注。"
+            "只统计 1297906 直接致死；1286837 / 1308330 以及其他技能致死不计入。"
+            "死亡时是否仍带墓缚 1286837 仅作标注。"
         ),
     }
 
@@ -3557,7 +3544,7 @@ def _mechanic_overview(rendered):
                 "value": len(gravebound_deaths),
                 "unit": "次",
                 "tone": "danger",
-                "description": "只统计被墓缚伤害（1308330 / 1297906 / 1286837）打死的玩家。带墓缚但死于其他技能不计入。",
+                "description": "只统计 1297906 直接致死。1286837 / 1308330 以及其他技能致死不计入。",
                 "players": nightly_player_totals(gravebound_deaths),
                 "events": gravebound_deaths,
             },

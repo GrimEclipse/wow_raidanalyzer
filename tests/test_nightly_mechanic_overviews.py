@@ -175,8 +175,7 @@ def test_coiledaltar_nightly_overview_counts_requested_four_metrics():
     assert rows["regularDreadmarch"]["players"] == [
         {"player": "乙", "count": 1, "classColor": "#3fc7eb"},
     ]
-    assert rows["graveboundDeaths"]["value"] == 2
+    assert rows["graveboundDeaths"]["value"] == 1
     assert rows["graveboundDeaths"]["players"] == [
-        {"player": "牧师", "count": 1, "classColor": "#fff"},
         {"player": "猎人", "count": 1, "classColor": "#abd473"},
     ]

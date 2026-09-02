@@ -201,19 +201,16 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
         ]
         deaths = [
             {"timestamp": 70_000, "type": "death", "targetID": 10, "killingAbilityGameID": 1308330},
-            {"timestamp": 95_000, "type": "death", "targetID": 11, "killingAbilityGameID": 1, "extraAbilityGameID": 1286837},
-        ]
-        damage = [
-            {"timestamp": 94_500, "type": "damage", "abilityGameID": 1297906, "targetID": 11, "amount": 1},
+            {"timestamp": 95_000, "type": "death", "targetID": 11, "killingAbilityGameID": 1297906},
         ]
         result = coiledaltar.analyze_gravebound_failures(
-            fight, debuffs, deaths, actor_map, players, damage_events=damage,
+            fight, debuffs, deaths, actor_map, players, damage_events=[],
         )
-        self.assertEqual([row["player"] for row in result["failures"]], ["Tank"])
-        self.assertEqual(result["failures"][0]["deathAbilityID"], 1308330)
+        self.assertEqual([row["player"] for row in result["failures"]], ["Dps"])
+        self.assertEqual(result["failures"][0]["deathAbilityID"], 1297906)
         self.assertTrue(result["failures"][0]["killedByGraveboundDamage"])
 
-        overkill = coiledaltar.analyze_gravebound_failures(
+        overkill_only = coiledaltar.analyze_gravebound_failures(
             fight, debuffs,
             [{"timestamp": 95_000, "type": "death", "targetID": 11}],
             actor_map, players,
@@ -222,14 +219,15 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
                 "targetID": 11, "amount": 1, "overkill": 800,
             }],
         )
-        self.assertEqual(len(overkill["failures"]), 1)
-        self.assertEqual(overkill["failures"][0]["player"], "Dps")
-        self.assertEqual(overkill["failures"][0]["deathAbilityID"], 1297906)
+        self.assertEqual(overkill_only["failures"], [])
 
         empty = coiledaltar.analyze_gravebound_failures(
             fight, debuffs,
-            [{"timestamp": 95_000, "type": "death", "targetID": 11, "killingAbilityGameID": 999}],
-            actor_map, players, damage_events=damage,
+            [
+                {"timestamp": 70_000, "type": "death", "targetID": 10, "killingAbilityGameID": 1286837},
+                {"timestamp": 95_000, "type": "death", "targetID": 11, "killingAbilityGameID": 1, "extraAbilityGameID": 1286837},
+            ],
+            actor_map, players, damage_events=[],
         )
         self.assertEqual(empty["failures"], [])
         fight = {"startTime": 0, "endTime": 300_000, "kill": False}
