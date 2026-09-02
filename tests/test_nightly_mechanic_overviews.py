@@ -61,7 +61,7 @@ def test_sentinels_nightly_overview_combines_requested_three_metrics():
         }]},
         "helicalToxins": {"rounds": [{"collisions": [
             {"time": "00:20.0", "firstWrongCollision": True,
-             "players": [{"player": "甲"}, {"player": "乙"}]},
+             "players": ["甲", "乙"]},
             {"time": "00:21.0", "firstWrongCollision": True,
              "players": [{"player": "丙"}, {"player": "丁"}]},
         ]}]},
@@ -71,6 +71,7 @@ def test_sentinels_nightly_overview_combines_requested_three_metrics():
     assert rows["deathOverThirty"]["value"] == 1
     assert rows["greenSpearHits"]["value"] == "2 / 1"
     assert rows["firstWrongCollisions"]["value"] == 1
+    assert rows["firstWrongCollisions"]["events"][0]["text"] == "本轮第一次错误碰撞：甲、乙"
 
 
 def test_vashnik_nightly_overview_separates_wave_and_floor_hits():

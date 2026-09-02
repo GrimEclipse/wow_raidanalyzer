@@ -1185,6 +1185,13 @@ def merge_living_venom(global_rows, fight):
         target["events"].extend({**event, "fightID": fight["fightID"]} for event in row["events"])
 
 
+def _collision_player_name(player):
+    """Return a display name for both current and legacy collision payloads."""
+    if isinstance(player, dict):
+        return player.get("player") or player.get("name") or "未知玩家"
+    return str(player) if player else "未知玩家"
+
+
 def _mechanic_overview(rendered):
     high_stack_deaths = []
     spear_hits = []
@@ -1210,7 +1217,7 @@ def _mechanic_overview(rendered):
             first = next((row for row in round_row.get("collisions") or [] if row.get("firstWrongCollision")), None)
             if not first:
                 continue
-            names = "、".join(row.get("player") or "未知玩家" for row in first.get("players") or [])
+            names = "、".join(_collision_player_name(player) for player in first.get("players") or [])
             first_wrong_collisions.append(nightly_detail(
                 pull, first.get("time"),
                 f"本轮第一次错误碰撞：{names or first.get('collisionCombination') or '未识别组合'}",
