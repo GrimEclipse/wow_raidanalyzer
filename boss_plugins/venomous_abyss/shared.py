@@ -190,12 +190,18 @@ def build_player_catalog(actor_map, actor_type, combatants):
 
 def player_ref(players, actor_map, actor_id):
     player = players.get(actor_id) or {}
+    localization = player.get("localization") or {}
+    spec_labels = localization.get("spec") or {}
+    class_labels = localization.get("class") or {}
     return {
         "playerID": actor_id,
         "player": player.get("name") or actor_name(actor_map, actor_id),
         "classColor": player.get("classColor") or "#e5e7eb",
         "icon": player.get("icon"),
         "role": player.get("role", "unknown"),
+        "specID": player.get("specID"),
+        "specName": spec_labels.get("zhCN") or player.get("specName"),
+        "className": class_labels.get("zhCN") or player.get("className"),
     }
 
 

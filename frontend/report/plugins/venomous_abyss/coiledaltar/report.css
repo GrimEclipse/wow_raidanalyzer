@@ -44,6 +44,37 @@
 }
 .marker.share { background: #fbbf24; }
 .marker.inside { background: #ff7380; }
+.field-mechanic-groups {
+  display: grid;
+  gap: 10px;
+}
+.field-mechanic-panel {
+  border: 1px solid #355156;
+  border-radius: 10px;
+  background: #0b1517;
+  padding: 0 10px 10px;
+}
+.field-mechanic-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  padding: 10px 2px;
+  user-select: none;
+}
+.field-mechanic-panel > summary::-webkit-details-marker,
+.field-mechanic-panel > summary::marker { display: none; }
+.field-mechanic-panel > summary::after {
+  content: "展开";
+  color: #9fb0b8;
+  font-size: 12px;
+}
+.field-mechanic-panel[open] > summary::after { content: "收起"; }
+.field-mechanic-title {
+  font-weight: 700;
+  flex: 1;
+}
 .field-diagram-list {
   display: grid;
   gap: 10px;
@@ -78,8 +109,91 @@
 .marker.venom-spawn { background: #2dd4bf; border-color: #99f6e4; }
 .marker.manifest { background: #c084fc; border-color: #e9d5ff; width: 14px; height: 14px; }
 .marker.manifest-target { background: #fb7185; border-color: #fecdd3; }
+.marker.spec-token {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color, #fff);
+  background: #071013;
+  overflow: visible;
+  z-index: 5;
+  box-shadow: 0 0 0 1px #000a;
+}
+.marker.spec-token .spec-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #071013;
+}
+.marker.spec-token .spec-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.marker.spec-token.manifest {
+  width: 24px;
+  height: 24px;
+  border-color: #e9d5ff;
+}
+.marker.spec-token.venom,
+.marker.spec-token.venom-spawn {
+  width: 20px;
+  height: 20px;
+  border-color: #99f6e4;
+}
+.player-tip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: 108px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #0c1418f2;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 18px #0008;
+  z-index: 8;
+}
+.player-tip b { display: block; font-size: 13px; }
+.player-tip span { display: block; color: #94a3b8; }
+.marker.spec-token:hover,
+.marker.manifest-target:hover { z-index: 9; }
+.marker.spec-token:hover .player-tip,
+.marker.manifest-target:hover .player-tip { display: block; }
 .marker.tank { background: #38bdf8; border-color: #e0f2fe; width: 14px; height: 14px; }
 .marker.bomb { background: #ff7380; }
+.marker.bomb-nearby { background: #fbbf24; border-color: #fde68a; }
+.marker.bomb-splash { background: #fb7185; border-color: #fecdd3; width: 14px; height: 14px; }
+.marker.spec-token.bomb,
+.marker.spec-token.bomb-splash,
+.marker.spec-token.bomb-nearby,
+.marker.spec-token.share,
+.marker.spec-token.inside,
+.marker.spec-token.manifest-target,
+.marker.spec-token.tank {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color, #fff);
+  background: #071013;
+}
+.marker.spec-token.bomb-splash,
+.marker.spec-token.bomb-nearby,
+.marker.spec-token.inside {
+  width: 20px;
+  height: 20px;
+}
+.actor.nearby { opacity: 0.85; font-size: 11px; }
 .link-map {
   position: absolute;
   inset: 0;

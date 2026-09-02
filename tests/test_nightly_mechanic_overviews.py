@@ -1,3 +1,4 @@
+from boss_plugins.venomous_abyss.coiledaltar import _mechanic_overview as coiledaltar_overview
 from boss_plugins.venomous_abyss.nakzali import _mechanic_overview as nakzali_overview
 from boss_plugins.venomous_abyss.sentinels import _mechanic_overview as sentinels_overview
 from boss_plugins.venomous_abyss.sszorak import _mechanic_overview as sszorak_overview
@@ -110,3 +111,72 @@ def test_sszorak_and_twinfangs_nightly_overviews_use_actual_events():
     assert sszorak_rows["badCystPlacements"]["value"] == 1
     assert sszorak_rows["stormHits"]["value"] == 1
     assert metrics(twin)["waveHits"]["value"] == 2
+
+
+def test_coiledaltar_nightly_overview_counts_requested_four_metrics():
+    overview = coiledaltar_overview([pull(coiledaltar={
+        "gloombomb": {"rounds": [{
+            "time": "03:40.0",
+            "targets": [{
+                "player": "术士", "classColor": "#8788ee",
+                "collateralGravebound": [
+                    {"player": "牧师", "receivedGravebound": True},
+                    {"player": "猎人", "receivedGravebound": True},
+                ],
+            }],
+            "collateralHits": [
+                {"player": "牧师", "classColor": "#fff", "fromPlayer": "术士"},
+                {"player": "猎人", "classColor": "#abd473", "fromPlayer": "术士"},
+            ],
+        }]},
+        "soulSever": {"rounds": [{
+            "time": "04:10.0",
+            "unclearedManifestations": [
+                {"player": "法师", "classColor": "#3fc7eb", "inCone": False},
+                {"player": "战士", "classColor": "#c69b6d", "inCone": True},
+            ],
+        }]},
+        "blightedSever": {"rounds": [{
+            "time": "08:20.0",
+            "unclearedManifestations": [
+                {"player": "德鲁伊", "classColor": "#ff7c0a", "inCone": False},
+            ],
+        }]},
+        "dreadmarch": {
+            "applications": [
+                {"player": "甲", "classColor": "#fff", "phase": "p2", "appliedTime": "03:00.0", "hitManifestation": False, "triggerKind": "boss-cast"},
+                {"player": "乙", "classColor": "#3fc7eb", "phase": "p2", "appliedTime": "03:12.0", "hitManifestation": True, "triggerKind": "manifest-collision"},
+                {"player": "丙", "classColor": "#fff", "phase": "intermission", "appliedTime": "06:00.0", "hitManifestation": False, "triggerKind": "boss-cast"},
+            ],
+            "rounds": [
+                {
+                    "index": 1, "time": "03:00.0", "phase": "p2",
+                    "targets": [
+                        {"player": "甲", "hitManifestation": False},
+                        {"player": "乙", "hitManifestation": True},
+                    ],
+                },
+            ],
+        },
+        "graveboundFailures": {"failures": [
+            {"time": "03:41.0", "player": "牧师", "classColor": "#fff", "deathAbilityID": 1308330, "deathAbility": "墓缚"},
+            {"time": "04:02.0", "player": "猎人", "classColor": "#abd473", "deathAbilityID": 1297906, "deathAbility": "墓缚"},
+            {"time": "04:10.0", "player": "战士", "classColor": "#c69b6d", "deathAbilityID": 1, "deathAbility": "自动攻击", "killedByGraveboundDamage": False},
+        ]},
+    })])
+
+    rows = metrics(overview)
+    assert rows["gloombombCollateralHits"]["value"] == 2
+    assert rows["gloombombCollateralHits"]["players"] == [
+        {"player": "术士", "count": 2, "classColor": "#8788ee"},
+    ]
+    assert rows["unclearedSouls"]["value"] == 2
+    assert {row["player"] for row in rows["unclearedSouls"]["players"]} == {"法师", "德鲁伊"}
+    assert rows["regularDreadmarch"]["value"] == 1
+    assert rows["regularDreadmarch"]["players"] == [
+        {"player": "乙", "count": 1, "classColor": "#3fc7eb"},
+    ]
+    assert rows["graveboundDeaths"]["value"] == 1
+    assert rows["graveboundDeaths"]["players"] == [
+        {"player": "猎人", "count": 1, "classColor": "#abd473"},
+    ]
