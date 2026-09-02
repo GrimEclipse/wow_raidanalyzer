@@ -10,7 +10,8 @@ from analyzer_core.analysis_scope import filter_fights
 from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
-from boss_plugins.common import write_json_result
+from boss_plugins.assets.icons import get_boss_icon_path
+from boss_plugins.common import COMBAT_RES_SPELLS, role_to_basic, write_json_result
 from boss_plugins.venomous_abyss.shared import (
     ability_id,
     actor_name,
@@ -24,6 +25,8 @@ from boss_plugins.venomous_abyss.shared import (
     fmt_ms,
     group_nearby,
     load_confirmed_spell_names,
+    nightly_detail,
+    nightly_player_totals,
     player_ref,
     position_actor_id,
     position_at,
@@ -61,6 +64,8 @@ ARENA_PLOT_SCALE_Y = round((ARENA_SQUARE_PX / 2) / ARENA_IMAGE_HEIGHT * 100, 4)
 SPELLS = load_confirmed_spell_names()
 SPELLS.update({
     1243002: "死亡进军",
+    1236616: "圣光潜力",
+    1236994: "鲁莽药水",
     1282403: "凝结毒液",
     1282408: "凝结毒液",
     1282419: "不稳定毒液",
@@ -77,9 +82,11 @@ SPELLS.update({
     1286895: "幽暗炸弹",
     1286912: "永恒夜幕护盾",
     1286918: "永恒夜幕",
+    1310752: "永恒夜幕",
     1287718: "收回精华",
     1287722: "灵魂抹除",
     1289798: "灵魂绑定",
+    1295132: "液态光泽",
     1297445: "恐惧行军",
     1297906: "墓缚",
     1299266: "冷酷处斩",
@@ -161,18 +168,38 @@ GLOOMBOMB_CAST_IDS = {1286895, 1310882}
 GLOOMBOMB_DEBUFF_IDS = {1310881}
 GRAVEBOUND_IDS = {1286837, 1308330}
 GRAVEBOUND_DEBUFF_IDS = {1286837}
-# 墓缚伤害致死（WCL 死亡归因 / DamageTaken）
+# 墓缚伤害致死（WCL 死亡归因 / DamageTaken）。killingAbility 缺失时用 overkill 回退。
 GRAVEBOUND_DAMAGE_IDS = {1308330, 1297906, 1286837}
+GRAVEBOUND_KILL_OVERKILL_WINDOW_MS = 250
 # 炸弹爆炸后短窗口内的 1286837 施加，视为本次幽暗炸弹溅射。
 GLOOMBOMB_GRAVEBOUND_WINDOW_MS = 2_000
 ETERNAL_NIGHTFALL = 1286918
+ETERNAL_NIGHTFALL_AURA = 1310752
 VEIL_SHIELD = 1286912
-NIGHTFALL_SHIELD_WINDOW_MS = 12_000
+# 被打断技能：读条 1286918，部分日志会把光环 1310752 记在 extraAbilityGameID。
+NIGHTFALL_INTERRUPTED_SPELLS = {ETERNAL_NIGHTFALL, ETERNAL_NIGHTFALL_AURA}
+# 轮次上界用下一发 begincast；没有下一发时再用这个上限，避免固定 12s 漏掉普通难度 ~14s 破盾。
+NIGHTFALL_ROUND_MAX_MS = 45_000
+NIGHTFALL_SHIELD_APPLY_LOOKBACK_MS = 2_000
 UNASSAILABLE = 1285847
 RECLAIM_ESSENCE = 1287718
 SPIRIT_ERASURE = 1287722
+# 踩片者易伤与伤害同 ID（1287722 applydebuff）；全团 AOE 按脉冲合并，不按承伤条数计次。
+SPIRIT_ERASURE_DEBUFF_IDS = {1287722}
+SPIRIT_ERASURE_WAVE_MS = 250
+SPIRIT_ERASURE_STEPPER_WINDOW_MS = 500
 INTERMISSION_BUFFS = {1304032, 1304033, 1304498}
 P3_SOULBOUND = 1289798
+POTION_LIGHTS_POTENTIAL = 1236616
+POTION_RECKLESSNESS = 1236994
+POTION_LIQUID_LUSTER = 1295132
+INTERMISSION_POTIONS = {
+    POTION_LIGHTS_POTENTIAL: "圣光潜力",
+    POTION_RECKLESSNESS: "鲁莽药水",
+    POTION_LIQUID_LUSTER: "液态光泽",
+}
+# 转阶段前预开药水也算本次爆发。
+INTERMISSION_POTION_LOOKBACK_MS = 2_000
 
 P2_SIGNAL_SPELL = 1307184
 INTERMISSION_MS = 35_000
@@ -180,6 +207,45 @@ CONE_RADIUS_YARDS = 35
 CONE_HALF_ANGLE_DEG = 30.0  # 总宽约 60° 的正面锥形
 GLOOMBOMB_RADIUS_YARDS = 15
 POSITION_RELIABLE_MS = 2_500
+
+# 拉取时只向 WCL 要机制相关技能，避免整场友伤/治疗/带坐标的团员施法。
+MECHANIC_CAST_IDS = (
+    {TOXIC_DELUGE, COALESCED_VENOM_CAST, ETERNAL_NIGHTFALL, ETERNAL_NIGHTFALL_AURA,
+     P2_SIGNAL_SPELL, MANIFEST_CAST, FIXATION, RECLAIM_ESSENCE}
+    | SEVER_IDS | BLIGHTED_SEVER_IDS | SOUL_SEVER_IDS
+    | GUILLOTINE_CAST_IDS | GRIM_GUILLOTINE_CAST_IDS
+    | DREADMARCH_CAST_IDS | GLOOMBOMB_CAST_IDS
+)
+MECHANIC_DAMAGE_IDS = (
+    {COALESCED_VENOM_DAMAGE, VOLATILE_VENOM, VENOM_RUPTURE, GUILLOTINE_DAMAGE_ID,
+     WIDOW_TOUCH_DAMAGE_ID, WIDOW_KISS_DAMAGE_ID, DEATH_WHISPER_DAMAGE_ID,
+     DEATH_EMBRACE_DAMAGE_ID, SPIRIT_ERASURE, RECLAIM_ESSENCE}
+    | GRIM_GUILLOTINE_DAMAGE_IDS | GRAVEBOUND_DAMAGE_IDS
+    | GLOOMBOMB_CAST_IDS | GLOOMBOMB_DEBUFF_IDS
+)
+MECHANIC_DEBUFF_IDS = (
+    {VOLATILE_VENOM, FIXATION, GUILLOTINE_MARK, VENOM_RUPTURE}
+    | GLOOMBOMB_DEBUFF_IDS | GRAVEBOUND_DEBUFF_IDS
+    | DREADMARCH_DEBUFF_IDS | MANIFEST_COLLISION_DEBUFF_IDS
+    | GRIM_GUILLOTINE_MARK_IDS
+    | SEVER_TANK_DEBUFF_IDS | BLIGHTED_SEVER_TANK_DEBUFF_IDS | SOUL_SEVER_TANK_DEBUFF_IDS
+    | SPIRIT_ERASURE_DEBUFF_IDS
+)
+MECHANIC_ENEMY_BUFF_IDS = set(INTERMISSION_BUFFS) | {VEIL_SHIELD, P3_SOULBOUND}
+FRIENDLY_CAST_IDS = set(COMBAT_RES_SPELLS) | set(INTERMISSION_POTIONS) | {SPIRIT_ERASURE}
+
+
+def _boss_icon_src(key):
+    path = get_boss_icon_path(key)
+    return path.relative_to(path.parents[2]).as_posix()
+
+
+FIELD_ICONS = {
+    "zuljan": _boss_icon_src("zuljan"),
+    "malacrass": _boss_icon_src("hex_lord_malacrass"),
+    "poisonOrb": _boss_icon_src("poison_orb"),
+    "manifestation": _boss_icon_src("manifestation_dread"),
+}
 
 TABS = [
     ("survival", "全场存活情况"),
@@ -565,6 +631,19 @@ def boss_cone_origin(origin_index, boss_actor_id, timestamp, cast_event=None):
     }
 
 
+def boss_field_position(origin_index, boss_actor_id, timestamp, cast_event=None):
+    """处斩/幽暗炸弹等非锥形图：Boss 标记用当时自身坐标，不用场地中心。"""
+    origin, state = boss_cone_origin(origin_index, boss_actor_id, timestamp, cast_event=cast_event)
+    if not origin:
+        return None
+    return point_dict(
+        origin,
+        timestamp=timestamp,
+        reliable=bool(state and state.get("reliable")),
+        offset_ms=(state or {}).get("sampleOffsetMs"),
+    )
+
+
 def actor_origin_at(index, actor_id, timestamp):
     row = position_at_interpolated(index, actor_id, timestamp, reliable_window_ms=POSITION_RELIABLE_MS)
     if not row:
@@ -786,6 +865,90 @@ def build_phase_markers(fight, casts, enemy_buffs, enemy_deaths=None, zuljan_id=
     return markers
 
 
+def _ability_filter(spell_ids):
+    ids = sorted({int(spell_id) for spell_id in spell_ids or [] if spell_id})
+    if not ids:
+        return None
+    if len(ids) == 1:
+        return f"ability.id = {ids[0]}"
+    return "ability.id in (" + ", ".join(str(i) for i in ids) + ")"
+
+
+def _actor_filter(actor_ids):
+    ids = sorted({int(actor_id) for actor_id in actor_ids or [] if actor_id is not None})
+    if not ids:
+        return None
+    if len(ids) == 1:
+        return f"source.id = {ids[0]} OR target.id = {ids[0]}"
+    joined = ", ".join(str(i) for i in ids)
+    return f"source.id in ({joined}) OR target.id in ({joined})"
+
+
+def _event_type_filter(types):
+    return "type in (" + ", ".join(f'"{name}"' for name in types) + ")"
+
+
+# 具象只点名上凝视，不打人。坐标来自其施法/debuff 的 sourceResources，以及被打到时的受击坐标。
+NPC_POSITION_TYPES = (
+    "cast", "begincast", "applybuff", "applydebuff", "removebuff", "removedebuff",
+    "refreshbuff", "refreshdebuff", "death",
+)
+
+
+def _npc_position_filter_expression(npc_ids):
+    actor_filter = _actor_filter(npc_ids)
+    if not actor_filter:
+        return None
+    return f"({actor_filter}) and {_event_type_filter(NPC_POSITION_TYPES)}"
+
+
+def _fetch_manifest_position_events(client, report_id, fight, manifest_ids):
+    """具象坐标：点名施法/凝视 debuff、敌方资源采样，以及被打到时的受击位置。"""
+    source_filter = _source_id_filter(manifest_ids)
+    target_filter = _target_id_filter(manifest_ids)
+    rows = []
+    if source_filter:
+        rows.extend(client.events(
+            report_id, "Casts", fight,
+            filter_expression=source_filter, hostility_type="Enemies", include_resources=True,
+        ))
+        rows.extend(client.events(
+            report_id, "Resources", fight,
+            filter_expression=source_filter, hostility_type="Enemies", include_resources=True,
+        ))
+    if target_filter:
+        rows.extend(client.events(
+            report_id, "DamageTaken", fight,
+            filter_expression=target_filter, hostility_type="Enemies", include_resources=True,
+        ))
+    return rows
+
+
+def _source_id_filter(actor_ids):
+    ids = sorted({int(actor_id) for actor_id in actor_ids or [] if actor_id is not None})
+    if not ids:
+        return None
+    if len(ids) == 1:
+        return f"source.id = {ids[0]}"
+    return "source.id in (" + ", ".join(str(i) for i in ids) + ")"
+
+
+def _target_id_filter(actor_ids):
+    ids = sorted({int(actor_id) for actor_id in actor_ids or [] if actor_id is not None})
+    if not ids:
+        return None
+    if len(ids) == 1:
+        return f"target.id = {ids[0]}"
+    return "target.id in (" + ", ".join(str(i) for i in ids) + ")"
+
+
+def _fetch_by_abilities(client, report_id, data_type, fight, spell_ids, **kwargs):
+    expression = _ability_filter(spell_ids)
+    if not expression:
+        return []
+    return client.events(report_id, data_type, fight, filter_expression=expression, **kwargs)
+
+
 def _events_between(events, start, end, spell_ids=None):
     spell_ids = set(spell_ids or [])
     return [
@@ -816,7 +979,7 @@ def _npc_position_events(raw, npc_actor_ids):
     if not npc_actor_ids:
         return []
     events = []
-    for bucket in ("casts", "enemyDamage", "damage", "resources", "enemyDeaths"):
+    for bucket in ("casts", "enemyDamage", "damage", "debuffs", "resources", "enemyDeaths", "npcPositionEvents"):
         for event in raw.get(bucket) or []:
             source_id = event.get("sourceID")
             target_id = event.get("targetID")
@@ -897,9 +1060,12 @@ def build_npc_position_index(events):
 def _npc_instance_rows(index, actor_id, source_instance):
     if actor_id is None:
         return []
+    actor_id = int(actor_id)
     if source_instance is not None:
-        return index.get((int(actor_id), int(source_instance))) or []
-    return index.get((int(actor_id), 0)) or []
+        exact = index.get((actor_id, int(source_instance))) or []
+        if exact:
+            return exact
+    return index.get((actor_id, 0)) or []
 
 
 def _position_sample_npc(index, actor_id, source_instance, timestamp):
@@ -996,6 +1162,34 @@ def _resolve_player_source(event, players, pet_owners):
     if owner_id in players:
         return owner_id
     return None
+
+
+def _player_is_healer(players, player_id):
+    return role_to_basic((players.get(player_id) or {}).get("role")) == "healer"
+
+
+def _alive_player_ids(players, deaths, friendly_casts, timestamp):
+    alive = set(players)
+    timeline = [
+        (int(event.get("timestamp") or 0), "death", event.get("targetID"))
+        for event in deaths or []
+        if event.get("targetID") in players
+    ]
+    timeline.extend(
+        (int(event.get("timestamp") or 0), "res", event.get("targetID"))
+        for event in friendly_casts or []
+        if event.get("targetID") in players
+        and int(ability_id(event) or 0) in COMBAT_RES_SPELLS
+        and event_type(event) in {"cast", "applybuff"}
+    )
+    for event_timestamp, kind, player_id in sorted(timeline):
+        if event_timestamp >= timestamp:
+            break
+        if kind == "death":
+            alive.discard(player_id)
+        else:
+            alive.add(player_id)
+    return alive
 
 
 def event_absorb_amount(event):
@@ -1549,6 +1743,8 @@ def analyze_guillotine(
     mark_ids=None,
     pulse_damage_id=None,
     in_range_damage_id=None,
+    origin_index=None,
+    boss_actor_id=None,
 ):
     """分摊后是否仍在 40 码内：用脉冲伤害后的范围内伤害证据，不用固定延迟估位置。
 
@@ -1674,6 +1870,8 @@ def analyze_guillotine(
             for event in _events_between(debuffs, timestamp - 1_000, timestamp + 30_000, mark_ids)
             if is_apply(event) and event.get("targetID") in players
         })
+        caster_id = cast.get("sourceID") if cast.get("sourceID") is not None else boss_actor_id
+        boss_position = boss_field_position(origin_index, caster_id, timestamp, cast_event=cast)
         rounds.append({
             "index": index,
             "label": label,
@@ -1684,6 +1882,7 @@ def analyze_guillotine(
             "participantCount": len(participants),
             "participants": participants,
             "shareCentroid": centroid,
+            "bossPosition": boss_position,
             "dangerRadiusYards": GUILLOTINE_RANGE_YARDS,
             "pulseDamageID": pulse_id,
             "inRangeDamageID": in_range_id,
@@ -1821,17 +2020,8 @@ def _annotate_dreadmarch_manifest_collisions(
             )
 
 
-def _friendly_damage_hits(friendly_damage, players, target_id, start, end):
-    return [
-        event for event in friendly_damage
-        if event.get("targetID") == target_id
-        and event.get("sourceID") in players
-        and start <= int(event.get("timestamp") or 0) <= end
-        and event_type(event) == "damage"
-    ]
-
-
 def analyze_dreadmarch(fight, casts, debuffs, damage, friendly_damage, deaths, actor_map, players, markers):
+    del damage, friendly_damage  # 救人只看 removedebuff，不再扫全场友伤
     cast_rows = sorted(
         [event for event in casts if int(ability_id(event) or 0) in DREADMARCH_CAST_IDS and is_cast_complete(event)],
         key=lambda row: int(row.get("timestamp") or 0),
@@ -1874,9 +2064,6 @@ def analyze_dreadmarch(fight, casts, debuffs, damage, friendly_damage, deaths, a
         )
         death_ts = int(death_event["timestamp"]) if death_event else None
         died_before_remove = bool(death_ts and (remove_ts is None or death_ts < remove_ts))
-        friendly_hits = _friendly_damage_hits(
-            friendly_damage, players, target_id, apply_ts, window_end,
-        )
         rescued = bool(remove_event) and not died_before_remove
         applications.append({
             **player_ref(players, actor_map, target_id),
@@ -1888,15 +2075,12 @@ def analyze_dreadmarch(fight, casts, debuffs, damage, friendly_damage, deaths, a
             "appliedTime": fmt_ms(apply_ts - fight_start),
             "removedTimeMs": remove_ts - fight_start if remove_ts else None,
             "removedTime": fmt_ms(remove_ts - fight_start) if remove_ts else None,
-            "shieldBroken": bool(friendly_hits),
-            "friendlyHitCount": len(friendly_hits),
-            "friendlyDamageTotal": sum(event_amount(hit) for hit in friendly_hits),
             "rescued": rescued,
             "diedWhileControlled": died_before_remove,
             "failed": died_before_remove or not rescued,
             "hitManifestation": False,
             "triggerKind": "unknown",
-            "evidenceNote": "救援成功以 1297445 removedebuff 为准；护盾击破参考友方对该目标的 DamageDone，不用 1285847。",
+            "evidenceNote": "救援成功以 1297445 removedebuff 为准，不再拉取对被控玩家的友伤命中。",
         })
 
     _annotate_dreadmarch_manifest_collisions(
@@ -2042,16 +2226,19 @@ def analyze_manifestations(
 
     manifestation_points = []
     for row in fixations:
-        if not row.get("manifestPosition"):
-            continue
         manifestation_points.append({
             "kind": "manifestation",
             "manifest": row["manifest"],
             "playerID": row.get("playerID"),
             "player": row["player"],
             "classColor": row.get("classColor"),
-            "position": row["manifestPosition"],
-            "manifestPosition": row["manifestPosition"],
+            "icon": row.get("icon"),
+            "role": row.get("role"),
+            "specID": row.get("specID"),
+            "specName": row.get("specName"),
+            "className": row.get("className"),
+            "position": row.get("manifestPosition"),
+            "manifestPosition": row.get("manifestPosition"),
             "playerPosition": row.get("playerPosition"),
             "lastSeenMs": int(fight["startTime"]) + int(row.get("despawnTimeMs") or row["applyTimeMs"]),
             "applyTimeMs": row["applyTimeMs"],
@@ -2204,7 +2391,10 @@ def analyze_soul_sever(
     return {"rounds": rounds}
 
 
-def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players, markers):
+def analyze_gloombomb(
+    fight, casts, debuffs, position_index, actor_map, players, markers,
+    origin_index=None, boss_actor_id=None,
+):
     completed = [event for event in casts if int(ability_id(event) or 0) in GLOOMBOMB_CAST_IDS and is_cast_complete(event)]
     debuff_rows = sorted(debuffs, key=lambda row: int(row.get("timestamp") or 0))
     fight_start = int(fight["startTime"])
@@ -2302,6 +2492,8 @@ def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players,
             target["nearbyUnnamed"] = nearby_rows
             target["collateralGravebound"] = collateral_rows
         too_close = [row for row in spacing if row["tooClose"]]
+        caster_id = cast.get("sourceID") if cast.get("sourceID") is not None else boss_actor_id
+        boss_position = boss_field_position(origin_index, caster_id, timestamp, cast_event=cast)
         rounds.append({
             "index": index,
             "phase": phase_at(timestamp - fight_start, markers),
@@ -2309,6 +2501,7 @@ def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players,
             "time": fmt_ms(timestamp - fight_start),
             "targetCount": len(targets),
             "targets": targets,
+            "bossPosition": boss_position,
             "spreadRadiusYards": GLOOMBOMB_RADIUS_YARDS,
             "pairSpacing": spacing,
             "tooClosePairs": too_close,
@@ -2326,10 +2519,42 @@ def analyze_gloombomb(fight, casts, debuffs, position_index, actor_map, players,
     }
 
 
+def _gravebound_damage_kill_id(death_event, damage_events=None):
+    """只认墓缚伤害打死：killingAbility，或归因缺失时墓缚伤害 overkill。"""
+    kill_id = int(death_event.get("killingAbilityGameID") or 0)
+    if kill_id in GRAVEBOUND_DAMAGE_IDS:
+        return kill_id
+    if kill_id:
+        return None
+    death_ts = int(death_event.get("timestamp") or 0)
+    target_id = death_event.get("targetID")
+    for event in damage_events or []:
+        if event.get("targetID") != target_id:
+            continue
+        spell = int(ability_id(event) or 0)
+        if spell not in GRAVEBOUND_DAMAGE_IDS:
+            continue
+        if int(event.get("overkill") or 0) <= 0:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if abs(ts - death_ts) <= GRAVEBOUND_KILL_OVERKILL_WINDOW_MS:
+            return spell
+    return None
+
+
+def _is_gravebound_damage_death(row):
+    if row.get("killedByGraveboundDamage") is False:
+        return False
+    spell = int(row.get("deathAbilityID") or 0)
+    if spell and spell not in GRAVEBOUND_DAMAGE_IDS:
+        return False
+    return True
+
+
 def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, damage_events=None):
     """
-    墓缚致死：以收到墓缚伤害致死为准（killingAbility / 临死前墓缚伤害）。
-    若死亡时仍带 1286837，一并标注。
+    墓缚致死：只统计被墓缚伤害打死的玩家。
+    带墓缚但死于其他技能不计入；死亡时是否仍带 1286837 仅作标注。
     """
     fight_start = int(fight["startTime"])
     fight_end = int(fight["endTime"])
@@ -2358,18 +2583,6 @@ def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, dama
     def had_gravebound_at(target_id, timestamp):
         return any(apply_ts <= timestamp <= remove_ts for apply_ts, remove_ts in intervals.get(target_id) or [])
 
-    def recent_gravebound_damage(target_id, death_ts, window_ms=2_500):
-        hits = []
-        for event in damage_events or []:
-            if event.get("targetID") != target_id:
-                continue
-            if int(ability_id(event) or 0) not in GRAVEBOUND_DAMAGE_IDS:
-                continue
-            ts = int(event.get("timestamp") or 0)
-            if death_ts - window_ms <= ts <= death_ts:
-                hits.append(event)
-        return hits
-
     rows = []
     seen = set()
     for event in sorted(deaths or [], key=lambda row: int(row.get("timestamp") or 0)):
@@ -2377,13 +2590,8 @@ def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, dama
         if target_id not in players:
             continue
         death_ts = int(event.get("timestamp") or 0)
-        kill_id = int(event.get("killingAbilityGameID") or ability_id(event) or 0)
-        killed_by_damage = kill_id in GRAVEBOUND_DAMAGE_IDS
-        damage_hits = [] if killed_by_damage else recent_gravebound_damage(target_id, death_ts)
-        if not killed_by_damage and damage_hits:
-            kill_id = int(ability_id(damage_hits[-1]) or kill_id)
-            killed_by_damage = True
-        if not killed_by_damage:
+        kill_id = _gravebound_damage_kill_id(event, damage_events)
+        if not kill_id:
             continue
         key = (target_id, death_ts // 500)
         if key in seen:
@@ -2408,10 +2616,47 @@ def analyze_gravebound_failures(fight, debuffs, deaths, actor_map, players, dama
     return {
         "failures": rows,
         "evidenceNote": (
-            "墓缚致死以死亡归因/临死前墓缚伤害（1308330/1297906/1286837）为准；"
-            "并标注死亡时是否仍带墓缚 debuff（1286837）。"
+            "只统计墓缚伤害（1308330/1297906/1286837）打死的玩家；"
+            "带墓缚但死于其他技能不计入。死亡时是否仍带 1286837 仅作标注。"
         ),
     }
+
+
+def _nightfall_round_end(fight, casts_rows, index, start_ts):
+    if index < len(casts_rows):
+        return int(casts_rows[index]["timestamp"]) - 1
+    return min(int(fight["endTime"]), start_ts + NIGHTFALL_ROUND_MAX_MS)
+
+
+def _veil_shield_span(buff_rows, start_ts, end_ts):
+    """配对本轮 1286912：只认完整 applybuff/removebuff，忽略层数跳动。"""
+    apply_event = next(
+        (
+            event for event in buff_rows
+            if int(ability_id(event) or 0) == VEIL_SHIELD
+            and event_type(event) == "applybuff"
+            and start_ts - NIGHTFALL_SHIELD_APPLY_LOOKBACK_MS <= int(event["timestamp"]) <= end_ts
+        ),
+        None,
+    )
+    remove_start = int(apply_event["timestamp"]) if apply_event else start_ts
+    remove_event = next(
+        (
+            event for event in buff_rows
+            if int(ability_id(event) or 0) == VEIL_SHIELD
+            and event_type(event) == "removebuff"
+            and remove_start <= int(event["timestamp"]) <= end_ts
+        ),
+        None,
+    )
+    return apply_event, remove_event
+
+
+def _is_nightfall_interrupt(event):
+    extra = int(event.get("extraAbilityGameID") or 0)
+    if extra not in NIGHTFALL_INTERRUPTED_SPELLS:
+        return False
+    return event_type(event) in {"", "interrupt"}
 
 
 def analyze_eternal_nightfall(
@@ -2425,112 +2670,120 @@ def analyze_eternal_nightfall(
     actor_rows=None,
     shield_target_id=None,
     markers=None,
+    friendly_casts=None,
 ):
+    del friendly_damage, shield_target_id  # 破盾只看 1286912 removebuff，不再统计打盾命中
     players = players or {}
     pet_owners = _pet_owner_map(actor_rows)
-    casts_rows = [event for event in casts if int(ability_id(event) or 0) == ETERNAL_NIGHTFALL and event_type(event) == "begincast"]
-    interrupt_rows = interrupts or []
-    buff_rows = sorted(enemy_buffs or [], key=lambda row: int(row.get("timestamp") or 0))
-    damage_rows = [
-        event for event in (friendly_damage or [])
-        if event_type(event) == "damage"
+    casts_rows = [
+        event for event in casts
+        if int(ability_id(event) or 0) == ETERNAL_NIGHTFALL and event_type(event) == "begincast"
     ]
+    interrupt_rows = [
+        event for event in list(interrupts or []) + list(friendly_casts or [])
+        if _is_nightfall_interrupt(event)
+    ]
+    buff_rows = sorted(enemy_buffs or [], key=lambda row: int(row.get("timestamp") or 0))
+    fight_start = int(fight["startTime"])
     rounds = []
     for index, cast in enumerate(casts_rows, start=1):
         timestamp = int(cast["timestamp"])
-        end = timestamp + NIGHTFALL_SHIELD_WINDOW_MS
-        shield_apply = next(
-            (
-                event for event in buff_rows
-                if int(ability_id(event) or 0) == VEIL_SHIELD
-                and is_apply(event)
-                and timestamp - 1_000 <= int(event["timestamp"]) <= end
-            ),
-            None,
-        )
-        shield_remove = next(
-            (
-                event for event in buff_rows
-                if int(ability_id(event) or 0) == VEIL_SHIELD
-                and is_remove(event)
-                and timestamp <= int(event["timestamp"]) <= end
-            ),
-            None,
-        )
-        interrupt = next(
-            (
-                event for event in interrupt_rows
-                if timestamp <= int(event.get("timestamp") or 0) <= end
-                and int(event.get("extraAbilityGameID") or ability_id(event) or 0) == ETERNAL_NIGHTFALL
-            ),
-            None,
-        )
+        end = _nightfall_round_end(fight, casts_rows, index, timestamp)
+        shield_apply, shield_remove = _veil_shield_span(buff_rows, timestamp, end)
+        window_interrupts = [
+            event for event in interrupt_rows
+            if timestamp <= int(event.get("timestamp") or 0) <= end
+        ]
+        interrupt = window_interrupts[-1] if window_interrupts else None
         cast_success = any(
             event for event in casts
             if int(ability_id(event) or 0) == ETERNAL_NIGHTFALL
             and is_cast_complete(event)
             and timestamp <= int(event["timestamp"]) <= end
         )
-        target_id = (
-            (shield_apply or {}).get("targetID")
-            or (shield_remove or {}).get("targetID")
-            or shield_target_id
-            or cast.get("sourceID")
-        )
-        window_start = int(shield_apply["timestamp"]) if shield_apply else timestamp
-        window_end = int(shield_remove["timestamp"]) if shield_remove else end
-        window_hits = [
-            event for event in damage_rows
-            if event.get("targetID") == target_id
-            and window_start <= int(event.get("timestamp") or 0) <= window_end
-            and _resolve_player_source(event, players, pet_owners) is not None
-        ]
-        absorbed_total = sum(event_absorb_amount(event) for event in window_hits)
-        use_absorbed = absorbed_total > 0
-        grouped = defaultdict(lambda: {"damage": 0, "hitCount": 0})
-        for event in window_hits:
-            source_id = _resolve_player_source(event, players, pet_owners)
-            amount = event_absorb_amount(event) if use_absorbed else int(event.get("amount") or 0)
-            if amount <= 0:
-                continue
-            grouped[source_id]["damage"] += amount
-            grouped[source_id]["hitCount"] += 1
-        shield_total = sum(row["damage"] for row in grouped.values())
-        by_player = []
-        for source_id, stats in grouped.items():
-            pct = round(100.0 * stats["damage"] / shield_total, 1) if shield_total else 0.0
-            by_player.append({
-                **player_ref(players, actor_map, source_id),
-                "damage": stats["damage"],
-                "hitCount": stats["hitCount"],
-                "percent": pct,
-            })
-        by_player.sort(key=lambda row: (-row["damage"], row["player"]))
+        interrupt_player = None
+        interrupt_spell_id = None
+        if interrupt:
+            interrupt_id = _resolve_player_source(interrupt, players, pet_owners) or interrupt.get("sourceID")
+            interrupt_player = player_ref(players, actor_map, interrupt_id)
+            interrupt_spell_id = int(interrupt.get("abilityGameID") or 0) or None
         rounds.append({
             "index": index,
-            "phase": phase_at(timestamp - int(fight["startTime"]), markers or []),
-            "timeMs": timestamp - int(fight["startTime"]),
-            "time": fmt_ms(timestamp - int(fight["startTime"])),
+            "phase": phase_at(timestamp - fight_start, markers or []),
+            "timeMs": timestamp - fight_start,
+            "time": fmt_ms(timestamp - fight_start),
             "shieldRemoved": bool(shield_remove),
-            "shieldApplyTime": fmt_ms(int(shield_apply["timestamp"]) - int(fight["startTime"])) if shield_apply else None,
-            "shieldRemoveTime": fmt_ms(int(shield_remove["timestamp"]) - int(fight["startTime"])) if shield_remove else None,
+            "shieldApplyTime": fmt_ms(int(shield_apply["timestamp"]) - fight_start) if shield_apply else None,
+            "shieldRemoveTime": fmt_ms(int(shield_remove["timestamp"]) - fight_start) if shield_remove else None,
             "interrupted": bool(interrupt),
-            "interruptSource": actor_name(actor_map, interrupt.get("sourceID")) if interrupt else None,
+            "interruptTime": fmt_ms(int(interrupt["timestamp"]) - fight_start) if interrupt else None,
+            "interruptSource": interrupt_player["player"] if interrupt_player else None,
+            "interruptPlayer": interrupt_player,
+            "interruptSpellID": interrupt_spell_id,
+            "interruptSpell": spell_name(interrupt_spell_id, SPELLS) if interrupt_spell_id else None,
             "castCompleted": cast_success,
             "failed": cast_success or not shield_remove,
-            "shieldTargetID": target_id,
-            "shieldDamageTotal": shield_total,
-            "shieldDamageMethod": "absorbed" if use_absorbed else "amount",
-            "shieldDamageByPlayer": by_player,
         })
     return {
         "rounds": rounds,
         "evidenceNote": (
-            "先以 1286912 removebuff 确认破盾，再匹配 1286918 打断。"
-            "护盾伤害优先取破盾窗口内友方对护盾目标 DamageDone 的 absorbed；"
-            "若该窗口没有 absorbed，则回退为 amount。"
+            "护盾以本轮 1286912 的完整 removebuff 为准（不含层数跳动），窗口到下一发永恒夜幕为止。"
+            "打断取友方 Interrupts 中 extraAbilityGameID 为 1286918/1310752 的最后一次，并标出打断玩家。"
+            "不再统计破盾窗口内各玩家打盾伤害与命中次数。"
         ),
     }
+
+
+def _cluster_events_by_time(events, merge_ms=250):
+    waves = []
+    for event in sorted(events or [], key=lambda row: int(row.get("timestamp") or 0)):
+        ts = int(event.get("timestamp") or 0)
+        if waves and ts - waves[-1]["timestamp"] <= merge_ms:
+            waves[-1]["events"].append(event)
+        else:
+            waves.append({"timestamp": ts, "events": [event]})
+    return waves
+
+
+def _spirit_erasure_stepper_ids(wave, players, debuffs, friendly_damage, friendly_casts):
+    """定位触发本次灵魂抹除的友方：伤害来源 / 易伤 debuff / 友方施法，不按承伤目标猜。"""
+    wave_ts = int(wave["timestamp"])
+    window_start = wave_ts - SPIRIT_ERASURE_STEPPER_WINDOW_MS
+    window_end = wave_ts + SPIRIT_ERASURE_STEPPER_WINDOW_MS
+    steppers = []
+    seen = set()
+
+    def add(player_id, evidence):
+        if player_id not in players or player_id in seen:
+            return
+        seen.add(player_id)
+        steppers.append((player_id, evidence))
+
+    for event in wave.get("events") or []:
+        add(event.get("sourceID"), "damage-source")
+    for event in friendly_damage or []:
+        if int(ability_id(event) or 0) != SPIRIT_ERASURE:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if window_start <= ts <= window_end:
+            add(event.get("sourceID"), "friendly-damage")
+    for event in friendly_casts or []:
+        if int(ability_id(event) or 0) != SPIRIT_ERASURE:
+            continue
+        if event_type(event) not in {"cast", "begincast"}:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if window_start <= ts <= window_end:
+            add(event.get("sourceID"), "friendly-cast")
+    for event in debuffs or []:
+        if int(ability_id(event) or 0) not in SPIRIT_ERASURE_DEBUFF_IDS:
+            continue
+        if not is_apply(event):
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if window_start <= ts <= window_end:
+            add(event.get("targetID"), "desecrator-debuff")
+    return steppers
 
 
 def _dedupe_reclaim_events(events, merge_ms=250):
@@ -2562,12 +2815,19 @@ def analyze_intermission(
     markers,
     heals=None,
     casts=None,
+    friendly_damage=None,
+    friendly_casts=None,
+    deaths=None,
+    zuljan_id=None,
+    actor_rows=None,
+    buffs=None,
 ):
     """
     转阶段漏片：残片未被踩到、抵达祖尔加时会施放收回精华（1287718）为其回血。
     以该技能的治疗/施法次数统计漏掉的灵魂数。
+    踩片：1287722 是全团 AOE，按脉冲合并后找触发的友方，不把每个承伤目标当成一次踩片。
     """
-    del debuffs, markers  # 接口保留，当前漏片判定不依赖
+    del markers  # 接口保留，当前转阶段窗口不依赖阶段标记
     start_event = next(
         (
             event for event in sorted(enemy_buffs, key=lambda row: int(row.get("timestamp") or 0))
@@ -2613,15 +2873,119 @@ def analyze_intermission(
             "eventType": event_type(event) or None,
         })
 
-    steps = [
-        {
-            **player_ref(players, actor_map, event.get("targetID")),
-            "timeMs": int(event["timestamp"]) - int(fight["startTime"]),
-            "time": fmt_ms(int(event["timestamp"]) - int(fight["startTime"])),
-        }
-        for event in _events_between(damage, start, end, {SPIRIT_ERASURE})
-        if event.get("targetID") in players
+    erasure_hits = [
+        event for event in _events_between(damage, start, end, {SPIRIT_ERASURE})
+        if event.get("targetID") in players and event_type(event) in {"", "damage"}
     ]
+    steps = []
+    for index, wave in enumerate(_cluster_events_by_time(erasure_hits, SPIRIT_ERASURE_WAVE_MS), start=1):
+        steppers = _spirit_erasure_stepper_ids(
+            wave, players, debuffs, friendly_damage or [], friendly_casts or [],
+        )
+        hit_ids = []
+        seen_hits = set()
+        for event in wave["events"]:
+            target_id = event.get("targetID")
+            if target_id in seen_hits:
+                continue
+            seen_hits.add(target_id)
+            hit_ids.append(target_id)
+        primary = steppers[0][0] if steppers else None
+        row = {
+            "index": index,
+            "timeMs": wave["timestamp"] - int(fight["startTime"]),
+            "time": fmt_ms(wave["timestamp"] - int(fight["startTime"])),
+            "hitCount": len(hit_ids),
+            "evidence": steppers[0][1] if steppers else "unknown",
+            "steppers": [
+                {**player_ref(players, actor_map, player_id), "evidence": evidence}
+                for player_id, evidence in steppers
+            ],
+        }
+        if primary is not None:
+            row.update(player_ref(players, actor_map, primary))
+        else:
+            row["player"] = None
+            row["playerID"] = None
+        steps.append(row)
+
+    potion_start = start - INTERMISSION_POTION_LOOKBACK_MS
+    potion_uses = {}
+    for event in list(friendly_casts or []) + list(buffs or []):
+        spell_id = int(ability_id(event) or 0)
+        if spell_id not in INTERMISSION_POTIONS:
+            continue
+        kind = event_type(event)
+        if kind == "cast":
+            player_id = event.get("sourceID")
+        elif kind in {"applybuff", "refreshbuff"}:
+            player_id = event.get("targetID") or event.get("sourceID")
+        else:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if player_id not in players or not (potion_start <= ts < end):
+            continue
+        prev = potion_uses.get(player_id)
+        if prev is not None and ts >= prev["timestamp"]:
+            continue
+        potion_uses[player_id] = {
+            "timestamp": ts,
+            "spellID": spell_id,
+            "spellName": INTERMISSION_POTIONS[spell_id],
+            "evidence": "cast" if kind == "cast" else "buff",
+        }
+
+    pet_owners = _pet_owner_map(actor_rows)
+    damage_by = defaultdict(lambda: {"damage": 0})
+    if zuljan_id is not None:
+        for event in friendly_damage or []:
+            if event_type(event) != "damage" or event.get("targetID") != zuljan_id:
+                continue
+            ts = int(event.get("timestamp") or 0)
+            if not (start <= ts <= end):
+                continue
+            source_id = _resolve_player_source(event, players, pet_owners)
+            if source_id is None or _player_is_healer(players, source_id):
+                continue
+            amount = int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
+            if amount <= 0:
+                continue
+            damage_by[source_id]["damage"] += amount
+
+    alive = _alive_player_ids(players, deaths, friendly_casts, start)
+    for event in friendly_casts or []:
+        if event.get("targetID") not in players:
+            continue
+        if int(ability_id(event) or 0) not in COMBAT_RES_SPELLS:
+            continue
+        if event_type(event) not in {"cast", "applybuff"}:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if start <= ts <= end:
+            alive.add(event.get("targetID"))
+
+    total_boss_damage = sum(row["damage"] for row in damage_by.values())
+    survivors = []
+    for player_id in alive:
+        if _player_is_healer(players, player_id):
+            continue
+        potion = potion_uses.get(player_id)
+        stats = damage_by.get(player_id) or {"damage": 0}
+        damage_total = stats["damage"]
+        pct = round(100.0 * damage_total / total_boss_damage, 1) if total_boss_damage else 0.0
+        survivors.append({
+            **player_ref(players, actor_map, player_id),
+            "potionUsed": bool(potion),
+            "potionSpellID": potion["spellID"] if potion else None,
+            "potionName": potion["spellName"] if potion else None,
+            "potionTimeMs": (potion["timestamp"] - int(fight["startTime"])) if potion else None,
+            "potionTime": fmt_ms(potion["timestamp"] - int(fight["startTime"])) if potion else None,
+            "potionEvidence": potion["evidence"] if potion else None,
+            "zuljanDamage": damage_total,
+            "zuljanPercent": pct,
+        })
+    survivors.sort(key=lambda row: (-row["zuljanDamage"], row["player"] or ""))
+    potion_used_count = sum(1 for row in survivors if row["potionUsed"])
     return {
         "enabled": True,
         "startTimeMs": start - int(fight["startTime"]),
@@ -2634,9 +2998,19 @@ def analyze_intermission(
         "reclaimHealTotal": total_heal or None,
         "reclaimEvidenceSource": evidence_source,
         "spiritErasureSteps": steps,
+        "spiritErasureStepCount": len(steps),
+        "survivors": survivors,
+        "survivorCount": len(survivors),
+        "potionUsedCount": potion_used_count,
+        "zuljanDamageTotal": total_boss_damage,
         "evidenceNote": (
             "漏掉的灵魂以收回精华（Reclaim Essence，1287718）为准："
-            "残片抵达祖尔加回血即记 1 次漏片；踩片以 1287722 灵魂抹除命中记录为准。"
+            "残片抵达祖尔加回血即记 1 次漏片。"
+            "灵魂抹除 1287722 是全团 AOE：同一脉冲合并为 1 次踩片，"
+            "踩片者以友方伤害来源、1287722 易伤施加或友方施法为准，不用承伤目标计数。"
+            "爆发药水与对祖尔加护盾伤害只统计非治疗玩家（转阶段开始时存活，含战复）："
+            "是否使用圣光潜力 1236616、鲁莽药水 1236994 或液态光泽 1295132；"
+            "对祖尔加伤害取该窗口对祖尔加的 DamageDone，不计命中次数，不含治疗。"
         ),
     }
 
@@ -2664,7 +3038,7 @@ def build_field_audit(
                 draw_link = uncleared if mechanic in {"灵魂撕裂", "凋零撕裂"} else True
                 if manifest_pos:
                     targets.append({
-                        **{k: point.get(k) for k in ("player", "classColor", "manifest", "playerID", "clearOutcome") if point.get(k) is not None},
+                        **{k: point.get(k) for k in ("player", "classColor", "manifest", "playerID", "clearOutcome", "icon", "role", "specID", "specName", "className") if point.get(k) is not None},
                         "kind": "manifestation",
                         "position": manifest_pos,
                         "manifestPosition": manifest_pos,
@@ -2675,10 +3049,8 @@ def build_field_audit(
                     })
                 if player_pos and (mechanic not in {"灵魂撕裂", "凋零撕裂"} or draw_link):
                     targets.append({
+                        **{k: point.get(k) for k in ("player", "classColor", "playerID", "icon", "role", "specID", "specName", "className") if point.get(k) is not None},
                         "kind": "manifest-target",
-                        "player": point.get("player"),
-                        "classColor": point.get("classColor"),
-                        "playerID": point.get("playerID"),
                         "position": player_pos,
                         "uncleared": uncleared,
                         "clearOutcome": point.get("clearOutcome"),
@@ -2736,9 +3108,7 @@ def build_field_audit(
             "annotation": annotation,
         })
 
-    for row in (sever.get("rounds") or []):
-        append_cone_diagram(row, row.get("label") or "撕裂", "targetsInCone")
-    for row in ((guillotine or {}).get("rounds") or []):
+    def append_runout_diagram(row, mechanic, annotation):
         targets = []
         for participant in row.get("participants") or []:
             if not participant.get("position"):
@@ -2760,19 +3130,29 @@ def build_field_audit(
         if row.get("shareCentroid") or targets:
             diagrams.append({
                 "kind": "runout",
-                "mechanic": row.get("label") or "处斩",
+                "mechanic": mechanic,
                 "roundIndex": row["index"],
                 "phase": row["phase"],
                 "time": row["time"],
                 "origin": row.get("shareCentroid"),
+                "bossPosition": row.get("bossPosition"),
                 "dangerRadiusYards": row.get("dangerRadiusYards", GUILLOTINE_RANGE_YARDS),
                 "targets": targets,
-                "annotation": (
-                    f"分摊 {row.get('participantCount', 0)} 人；"
-                    f"（{row.get('dangerRadiusYards', GUILLOTINE_RANGE_YARDS)} 码内）"
-                    f" {len(row.get('stillInsideRange') or [])} 人"
-                ),
+                "annotation": annotation,
             })
+
+    for row in (sever.get("rounds") or []):
+        append_cone_diagram(row, row.get("label") or "撕裂", "targetsInCone")
+    for row in ((guillotine or {}).get("rounds") or []):
+        append_runout_diagram(
+            row,
+            row.get("label") or "处斩",
+            (
+                f"分摊 {row.get('participantCount', 0)} 人；"
+                f"（{row.get('dangerRadiusYards', GUILLOTINE_RANGE_YARDS)} 码内）"
+                f" {len(row.get('stillInsideRange') or [])} 人"
+            ),
+        )
     for row in (gloombomb.get("rounds") or []):
         targets = [target for target in (row.get("targets") or []) if target.get("position")]
         collateral = [
@@ -2788,6 +3168,7 @@ def build_field_audit(
             "roundIndex": row["index"],
             "phase": row["phase"],
             "time": row["time"],
+            "bossPosition": row.get("bossPosition"),
             "targets": targets,
             "nearbyPlayers": collateral,
             "spreadRadiusYards": row.get("spreadRadiusYards", GLOOMBOMB_RADIUS_YARDS),
@@ -2803,46 +3184,22 @@ def build_field_audit(
         # 用释放前全部活跃具象；红线仅未消掉 debuff
         append_cone_diagram(row, "灵魂撕裂", "nearbyPoints")
     for row in ((grim_guillotine or {}).get("rounds") or []):
-        targets = []
-        for participant in row.get("participants") or []:
-            if not participant.get("position"):
-                continue
-            targets.append({
-                **{k: participant.get(k) for k in ("player", "classColor", "playerID", "role", "icon") if participant.get(k) is not None},
-                "kind": "guillotine-share",
-                "position": participant["position"],
-            })
-        for inside in row.get("stillInsideRange") or []:
-            if not inside.get("position"):
-                continue
-            targets.append({
-                **{k: inside.get(k) for k in ("player", "classColor", "playerID", "role", "icon") if inside.get(k) is not None},
-                "kind": "guillotine-inside",
-                "position": inside["position"],
-                "distanceFromShareYards": inside.get("distanceFromShareYards"),
-            })
-        if row.get("shareCentroid") or targets:
-            diagrams.append({
-                "kind": "runout",
-                "mechanic": row.get("label") or "冷酷处斩",
-                "roundIndex": row["index"],
-                "phase": row["phase"],
-                "time": row["time"],
-                "origin": row.get("shareCentroid"),
-                "dangerRadiusYards": row.get("dangerRadiusYards", GUILLOTINE_RANGE_YARDS),
-                "targets": targets,
-                "annotation": (
-                    f"分摊 {row.get('participantCount', 0)} 人；"
-                    f"死亡低语脉冲后仍吃死亡之拥（{row.get('dangerRadiusYards', GUILLOTINE_RANGE_YARDS)} 码内）"
-                    f" {len(row.get('stillInsideRange') or [])} 人"
-                ),
-            })
+        append_runout_diagram(
+            row,
+            row.get("label") or "冷酷处斩",
+            (
+                f"分摊 {row.get('participantCount', 0)} 人；"
+                f"死亡低语脉冲后仍吃死亡之拥（{row.get('dangerRadiusYards', GUILLOTINE_RANGE_YARDS)} 码内）"
+                f" {len(row.get('stillInsideRange') or [])} 人"
+            ),
+        )
     for row in (blighted_sever.get("rounds") or []):
         append_cone_diagram(row, row.get("label") or "凋零撕裂", "targetsInCone")
 
     return {
         "arena": arena,
         "arenaImage": ARENA_IMAGE,
+        "icons": dict(FIELD_ICONS),
         "diagrams": diagrams,
         "evidenceNote": (
             f"场地中心固定为坐标 ({ARENA_CENTER_X_UNITS:g}, {ARENA_CENTER_Y_UNITS:g})，"
@@ -2870,16 +3227,16 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     boss_position_events = _npc_position_events(raw, boss_ids)
     caster_index = build_caster_self_position_index(
         list(raw.get("casts") or [])
-        + list(raw.get("enemyDamage") or [])
-        + list(raw.get("friendlyDamage") or [])
         + list(raw.get("damage") or [])
-        + list(raw.get("resources") or []),
+        + list(raw.get("resources") or [])
+        + list(raw.get("npcPositionEvents") or []),
         boss_ids or None,
     )
     position_events = (
         list(raw.get("damage") or [])
+        + list(raw.get("debuffs") or [])
         + list(raw.get("resources") or [])
-        + list(raw.get("friendlyCasts") or [])
+        + list(raw.get("npcPositionEvents") or [])
         + boss_position_events
     )
     position_index = build_position_index(position_events)
@@ -2887,7 +3244,7 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
 
     toxic_deluge = analyze_toxic_deluge(
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
-        damage_events=list(raw.get("enemyDamage") or []) + list(raw.get("damage") or []),
+        damage_events=list(raw.get("damage") or []),
     )
     venom_points = build_active_venom_points(toxic_deluge)
     manifestations = analyze_manifestations(
@@ -2910,6 +3267,8 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         GUILLOTINE_CAST_IDS, "处斩",
         pulse_damage_id=WIDOW_TOUCH_DAMAGE_ID,
         in_range_damage_id=WIDOW_KISS_DAMAGE_ID,
+        origin_index=caster_index,
+        boss_actor_id=zuljan_id,
     )
     grim_guillotine = analyze_guillotine(
         fight, raw["casts"], raw["damage"], raw["debuffs"], position_index, actor_map, players, markers,
@@ -2918,9 +3277,11 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         mark_ids=GRIM_GUILLOTINE_MARK_IDS,
         pulse_damage_id=DEATH_WHISPER_DAMAGE_ID,
         in_range_damage_id=DEATH_EMBRACE_DAMAGE_ID,
+        origin_index=caster_index,
+        boss_actor_id=zuljan_id,
     )
     dreadmarch = analyze_dreadmarch(
-        fight, raw["casts"], raw["debuffs"], raw["damage"], raw.get("friendlyDamage") or [],
+        fight, raw["casts"], raw["debuffs"], raw["damage"], [],
         deaths, actor_map, players, markers,
     )
     soul_sever = analyze_soul_sever(
@@ -2928,7 +3289,10 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         boss_actor_id=malacrass_id, origin_index=caster_index, debuffs=raw["debuffs"],
         npc_position_index=npc_position_index,
     )
-    gloombomb = analyze_gloombomb(fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers)
+    gloombomb = analyze_gloombomb(
+        fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
+        origin_index=caster_index, boss_actor_id=malacrass_id,
+    )
     gravebound = analyze_gravebound_failures(
         fight, raw["debuffs"], deaths, actor_map, players,
         damage_events=list(raw.get("damage") or []),
@@ -2936,15 +3300,20 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     eternal = analyze_eternal_nightfall(
         fight, raw["casts"], raw["enemyBuffs"], raw.get("interrupts") or [], actor_map,
         players=players,
-        friendly_damage=raw.get("friendlyDamage") or [],
         actor_rows=actor_rows,
-        shield_target_id=malacrass_id,
         markers=markers,
+        friendly_casts=raw.get("friendlyCasts") or [],
     )
     intermission = analyze_intermission(
         fight, raw["enemyBuffs"], raw["damage"], raw["debuffs"], actor_map, players, markers,
-        heals=list(raw.get("enemyHeals") or []) + list(raw.get("heals") or []),
+        heals=list(raw.get("heals") or []),
         casts=raw.get("casts") or [],
+        friendly_damage=raw.get("bossDamage") or [],
+        friendly_casts=raw.get("friendlyCasts") or [],
+        deaths=deaths,
+        zuljan_id=zuljan_id,
+        actor_rows=actor_rows,
+        buffs=raw.get("buffs") or [],
     )
     field_audit = build_field_audit(
         arena, toxic_deluge, sever, soul_sever, gloombomb, blighted_sever, manifestations,
@@ -2977,23 +3346,54 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     }
 
 
-def fetch_payload(client, report_id, fight):
+def fetch_payload(client, report_id, fight, actor_rows=None):
+    actor_rows = actor_rows or []
+    zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
+    malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
+    manifest_ids = set(manifest_actor_ids(actor_rows))
+    boss_ids = {actor_id for actor_id in (zuljan_id, malacrass_id) if actor_id is not None}
+    npc_filter = _npc_position_filter_expression(manifest_ids | boss_ids)
+    npc_position_events = []
+    if npc_filter:
+        npc_position_events.extend(client.events(
+            report_id,
+            "All",
+            fight,
+            filter_expression=npc_filter,
+            include_resources=True,
+        ))
+    npc_position_events.extend(_fetch_manifest_position_events(client, report_id, fight, manifest_ids))
+    boss_damage = []
+    if zuljan_id is not None:
+        boss_damage = client.events(report_id, "DamageDone", fight, target_id=zuljan_id)
     return {
-        "casts": client.events(report_id, "Casts", fight, hostility_type="Enemies", include_resources=True),
-        "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies", include_resources=True),
-        "damage": client.events(report_id, "DamageTaken", fight, include_resources=True),
-        "enemyDamage": client.events(report_id, "DamageDone", fight, hostility_type="Enemies", include_resources=True),
-        "friendlyDamage": client.events(report_id, "DamageDone", fight, hostility_type="Friendlies", include_resources=True),
-        # 转阶段漏片回血：收回精华 1287718（WCL EventDataType 为 Healing）
-        "enemyHeals": client.events(report_id, "Healing", fight, hostility_type="Enemies", include_resources=True),
-        "heals": client.events(report_id, "Healing", fight, include_resources=True),
-        "debuffs": client.events(report_id, "Debuffs", fight, include_resources=True),
-        "enemyBuffs": client.events(report_id, "Buffs", fight, hostility_type="Enemies"),
+        "casts": _fetch_by_abilities(
+            client, report_id, "Casts", fight, MECHANIC_CAST_IDS,
+            hostility_type="Enemies", include_resources=True,
+        ),
+        "friendlyCasts": _fetch_by_abilities(
+            client, report_id, "Casts", fight, FRIENDLY_CAST_IDS, hostility_type="Friendlies",
+        ),
+        "damage": _fetch_by_abilities(
+            client, report_id, "DamageTaken", fight, MECHANIC_DAMAGE_IDS, include_resources=True,
+        ),
+        "heals": _fetch_by_abilities(client, report_id, "Healing", fight, {RECLAIM_ESSENCE}),
+        "debuffs": _fetch_by_abilities(
+            client, report_id, "Debuffs", fight, MECHANIC_DEBUFF_IDS, include_resources=True,
+        ),
+        "buffs": _fetch_by_abilities(
+            client, report_id, "Buffs", fight, set(INTERMISSION_POTIONS), hostility_type="Friendlies",
+        ),
+        "enemyBuffs": _fetch_by_abilities(
+            client, report_id, "Buffs", fight, MECHANIC_ENEMY_BUFF_IDS, hostility_type="Enemies",
+        ),
         "deaths": client.events(report_id, "Deaths", fight),
         "enemyDeaths": client.events(report_id, "Deaths", fight, hostility_type="Enemies"),
         "combatants": client.events(report_id, "CombatantInfo", fight),
         "resources": client.events(report_id, "Resources", fight, include_resources=True),
-        "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Enemies"),
+        "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Friendlies"),
+        "npcPositionEvents": npc_position_events,
+        "bossDamage": boss_damage,
     }
 
 
@@ -3029,6 +3429,142 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
     }
 
 
+REGULAR_PHASE_KEYS = {"p1", "p2", "p3"}
+
+
+def _regular_phase(row):
+    phase = str(row.get("phase") or "").lower()
+    if not phase:
+        return True
+    if phase in REGULAR_PHASE_KEYS:
+        return True
+    return phase != "intermission" and "转" not in phase
+
+
+def _mechanic_overview(rendered):
+    """整夜机制统计：幽暗炸弹误伤、灵魂未劈中、常规阶段撞具象恐惧行军、墓缚致死。"""
+    gloombomb_hits = []
+    uncleared_souls = []
+    dreadmarch_collisions = []
+    gravebound_deaths = []
+    for pull in rendered:
+        mechanics = pull.get("coiledaltar") or {}
+        for round_row in (mechanics.get("gloombomb") or {}).get("rounds") or []:
+            named_targets = round_row.get("targets") or []
+            has_named_breakdown = any("collateralGravebound" in (target or {}) for target in named_targets)
+            if has_named_breakdown:
+                for target in named_targets:
+                    for hit in target.get("collateralGravebound") or []:
+                        if hit.get("receivedGravebound") is False:
+                            continue
+                        gloombomb_hits.append(nightly_detail(
+                            pull,
+                            round_row.get("time") or hit.get("graveboundApplyTime"),
+                            f"{target.get('player') or '未知玩家'} 的幽暗炸弹误伤 {hit.get('player') or '未知队友'}",
+                            player=target.get("player"),
+                            classColor=target.get("classColor"),
+                            victim=hit.get("player"),
+                        ))
+            else:
+                for hit in round_row.get("collateralHits") or []:
+                    gloombomb_hits.append(nightly_detail(
+                        pull,
+                        round_row.get("time") or hit.get("graveboundApplyTime"),
+                        f"{hit.get('fromPlayer') or '点名者'} 的幽暗炸弹误伤 {hit.get('player') or '未知队友'}",
+                        player=hit.get("fromPlayer"),
+                        classColor=hit.get("fromClassColor"),
+                        victim=hit.get("player"),
+                    ))
+        for key, mechanic_name in (("soulSever", "灵魂撕裂"), ("blightedSever", "凋零撕裂")):
+            for round_row in (mechanics.get(key) or {}).get("rounds") or []:
+                for point in round_row.get("unclearedManifestations") or []:
+                    if point.get("inCone") is True:
+                        continue
+                    uncleared_souls.append(nightly_detail(
+                        pull,
+                        round_row.get("time"),
+                        f"{point.get('player') or '未知玩家'} 携带灵魂，未被{mechanic_name}劈中",
+                        player=point.get("player"),
+                        classColor=point.get("classColor"),
+                        mechanic=mechanic_name,
+                    ))
+        dreadmarch = mechanics.get("dreadmarch") or {}
+        applications = list(dreadmarch.get("applications") or [])
+        if not applications:
+            for round_row in dreadmarch.get("rounds") or []:
+                applications.extend(round_row.get("targets") or [])
+        for row in applications:
+            if not _regular_phase(row):
+                continue
+            if not (row.get("hitManifestation") or row.get("triggerKind") == "manifest-collision"):
+                continue
+            dreadmarch_collisions.append(nightly_detail(
+                pull,
+                row.get("appliedTime") or row.get("time"),
+                f"{row.get('player') or '未知玩家'} 常规阶段撞具象触发恐惧行军",
+                player=row.get("player"),
+                classColor=row.get("classColor"),
+            ))
+        for row in (mechanics.get("graveboundFailures") or {}).get("failures") or []:
+            if not _is_gravebound_damage_death(row):
+                continue
+            ability = row.get("deathAbility") or row.get("deathAbilityID") or "墓缚"
+            gravebound_deaths.append(nightly_detail(
+                pull,
+                row.get("time"),
+                f"{row.get('player') or '未知玩家'} 死于墓缚（{ability}）",
+                player=row.get("player"),
+                classColor=row.get("classColor"),
+                spellID=row.get("deathAbilityID"),
+            ))
+    return {
+        "title": "整夜机制统计",
+        "subtitle": "按所有 Pull 汇总可验证事件；单场阶段页明细保持原样。",
+        "metrics": [
+            {
+                "key": "gloombombCollateralHits",
+                "label": "幽暗炸弹误伤队友",
+                "value": len(gloombomb_hits),
+                "unit": "人次",
+                "tone": "danger",
+                "description": "按被点名炸弹的玩家计：爆炸 15 码内且 2 秒内给队友上墓缚 1286837 一次计一次。同一队友被两枚炸弹溅到会分别记到两名点名者。",
+                "players": nightly_player_totals(gloombomb_hits),
+                "events": gloombomb_hits,
+            },
+            {
+                "key": "unclearedSouls",
+                "label": "携带灵魂未被劈中",
+                "value": len(uncleared_souls),
+                "unit": "次",
+                "tone": "danger",
+                "description": "灵魂撕裂 / 凋零撕裂释放时场上仍有凝视，且该具象不在锥形内；锥内但没消掉的不算「未被劈中」。",
+                "players": nightly_player_totals(uncleared_souls),
+                "events": uncleared_souls,
+            },
+            {
+                "key": "regularDreadmarch",
+                "label": "常规阶段恐惧行军",
+                "value": len(dreadmarch_collisions),
+                "unit": "次",
+                "tone": "warning",
+                "description": "与单场撞具象同一套判定：常规阶段里首次救人后、下一轮 Boss 释放前再次获得 1297445 的玩家。Boss 正常点名不计入。",
+                "players": nightly_player_totals(dreadmarch_collisions),
+                "events": dreadmarch_collisions,
+            },
+            {
+                "key": "graveboundDeaths",
+                "label": "死于墓缚",
+                "value": len(gravebound_deaths),
+                "unit": "次",
+                "tone": "danger",
+                "description": "只统计被墓缚伤害（1308330 / 1297906 / 1286837）打死的玩家。带墓缚但死于其他技能不计入。",
+                "players": nightly_player_totals(gravebound_deaths),
+                "events": gravebound_deaths,
+            },
+        ],
+    }
+
+
 def build_aggregated_json(report_ids, options=None):
     report_id_list = [value for value in (item.strip() for item in report_ids.replace(" ", "").split(",")) if value]
     if not report_id_list:
@@ -3054,7 +3590,7 @@ def build_aggregated_json(report_ids, options=None):
         def fetch_one(item):
             index, fight = item
             progress(f"读取 Fight {fight['id']}（{index}/{len(fights)}）")
-            raw = fetch_payload(client, report_id, fight)
+            raw = fetch_payload(client, report_id, fight, actor_rows)
             return index, render_fight(report_id, report["startTime"], actor_map, actor_type, actor_rows, fight, raw)
 
         for _, row in run_parallel_indexed(list(enumerate(fights, start=1)), fetch_one):
@@ -3073,6 +3609,7 @@ def build_aggregated_json(report_ids, options=None):
             "mechanicVersion": "coiledaltar-heroic-2026-08-29",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS],
             "arenaImage": ARENA_IMAGE,
+            "fieldIcons": dict(FIELD_ICONS),
             "features": {"survival": True, "fieldReplay": True},
             "evidenceLimits": {
                 "positions": (
@@ -3090,7 +3627,10 @@ def build_aggregated_json(report_ids, options=None):
                 ),
             },
         },
-        "data": {"page1_wipeAnalysis": rendered},
+        "data": {
+            "page1_wipeAnalysis": rendered,
+            "mechanicOverview": _mechanic_overview(rendered),
+        },
     }
 
 

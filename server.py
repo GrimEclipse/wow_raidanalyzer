@@ -1000,6 +1000,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         allowed = (
             path in {"/index.html", "/boss_catalog.json", "/spec_catalog.json"}
             or path.startswith("/assets/")
+            or (
+                path.startswith("/boss_plugins/assets/")
+                and Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+            )
             or path.startswith("/frontend/")
             or path.startswith("/data/")
         )
