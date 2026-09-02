@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 
 from boss_plugins.venomous_abyss.lostexplorers import analyze_lost, analyze_throw_junk
 from boss_plugins.venomous_abyss.sszorak import (
@@ -19,8 +20,8 @@ from boss_plugins.venomous_abyss.shared import (
 )
 
 
-def player(player_id, name="测试玩家"):
-    return {"id": player_id, "name": name, "classColor": "#fff", "role": "dps", "icon": None}
+def player(player_id, name="测试玩家", icon=None):
+    return {"id": player_id, "name": name, "classColor": "#fff", "role": "dps", "icon": icon}
 
 
 def event(timestamp, spell_id, kind, **extra):
@@ -172,7 +173,11 @@ def test_twinfangs_tracks_stack_changes_and_explosion_nonparticipants():
 
 def test_sszorak_tracks_cyst_placement_consumption_and_crosswind_wave():
     fight = {"startTime": 0, "endTime": 200_000}
-    players = {1: player(1, "甲"), 2: player(2, "乙"), 3: player(3, "丙")}
+    players = {
+        1: player(1, "甲", "mage-fire"),
+        2: player(2, "乙", "deathknight-frost"),
+        3: player(3, "丙"),
+    }
     raw = {
         "casts": [
             event(20_000, 1286033, "cast"),
@@ -227,7 +232,17 @@ def test_sszorak_tracks_cyst_placement_consumption_and_crosswind_wave():
     assert wave["targets"][0]["resolution"] == "与反方向玩家对撞消除"
     assert wave["targets"][0]["mobilityUses"][0]["spellName"] == "死亡脚步"
     assert wave["targets"][0]["mobilityUses"][0]["offsetFromLaunchMs"] == 190
+    assert [row["icon"] for row in wave["targets"]] == ["mage-fire", "deathknight-frost"]
     assert result["fieldReplay"]["frameStepMs"] == 200
+    assert result["fieldReplay"]["rounds"][0]["frames"][0]["players"][0]["icon"] == "mage-fire"
+
+
+def test_sszorak_maps_player_spec_assets_in_replay_and_crosswinds():
+    root = Path(__file__).resolve().parents[1]
+    script = (root / "frontend/report/plugins/venomous_abyss/progression/report.js").read_text(encoding="utf-8")
+    assert "assets/specs/${name}.jpg" in script
+    assert 'class="crosswind-player"' in script
+    assert "mapPlayerFace(row,'场地推演位置')" in script
 
 
 def test_sszorak_stops_replay_positions_at_first_death():

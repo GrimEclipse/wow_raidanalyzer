@@ -240,11 +240,59 @@ th {
   background: #071013;
   box-shadow: 0 0 0 2px #0008;
 }
+.actor.has-spec {
+  width: 24px;
+  height: 24px;
+  background: #071013;
+  z-index: 5;
+}
+.actor .spec-face,
+.crosswind-player .spec-face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 50%;
+}
+.actor .spec-face img,
+.crosswind-player .spec-face img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.player-tip {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: 108px;
+  padding: 6px 8px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0c1418f2;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 18px #0008;
+  z-index: 9;
+}
+.player-tip b { display: block; position: static; transform: none; font-size: 13px; }
+.player-tip span { display: block; color: #94a3b8; }
+.actor:hover,
+.crosswind-player:hover { z-index: 10; }
+.actor:hover .player-tip,
+.crosswind-player:hover .player-tip { display: block; }
 .actor.stale {
   opacity: 0.35;
   border-style: dashed;
 }
-.actor b {
+.actor > .actor-name {
   position: absolute;
   top: 18px;
   left: 50%;
@@ -299,6 +347,19 @@ th {
   display: grid;
   place-items: center;
 }
+.crosswind-player {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--color, #fff);
+  border-radius: 50%;
+  background: #071013;
+  box-shadow: 0 0 0 2px #0008;
+  z-index: 3;
+}
 .crosswind-target.group-a {
   border-color: #65c7ff;
   background: #2386c433;
@@ -307,7 +368,7 @@ th {
   border-color: #ffb45f;
   background: #d5792333;
 }
-.crosswind-target b {
+.crosswind-target > .crosswind-name {
   position: absolute;
   top: 100%;
   left: 50%;
@@ -341,9 +402,10 @@ th {
   line-height: 1;
   color: #fff;
   text-shadow: 0 1px 3px #000;
-  z-index: 2;
+  z-index: 4;
+  pointer-events: none;
 }
-.crosswind-target b {
+.crosswind-target > .crosswind-name {
   position: absolute;
   left: 50%;
   top: 100%;
