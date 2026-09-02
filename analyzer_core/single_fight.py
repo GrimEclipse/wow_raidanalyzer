@@ -32,7 +32,10 @@ DIFFICULTIES = {1: "普通", 3: "普通", 4: "英雄", 5: "史诗", 10: "史诗�
 def load_single_fight_config() -> dict:
     document = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     guild = dict(document.get("guild") or {})
-    guild["id"] = int(os.getenv("WCL_GUILD_ID") or guild.get("id") or 774422)
+    configured_id = int(guild.get("id") or 774422)
+    guild["id"] = int(os.getenv("WCL_GUILD_ID") or configured_id)
+    if guild["id"] != configured_id:
+        guild["name"] = ""
     document["guild"] = guild
     return document
 
@@ -338,6 +341,11 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
         ROOT / "boss_catalog.json",
         ROOT / "analyzer_core" / "single_fight.py",
     ]
+    if entry.raid_key == "venomous_abyss":
+        implementation_paths.extend([
+            ROOT / "boss_plugins" / "venomous_abyss" / "shared.py",
+            ROOT / "skills" / "venomous-abyss-raid-development" / "references" / "source-data" / "raid-guide-source.json",
+        ])
     if entry.boss_key == "crown_of_the_cosmos":
         implementation_paths.append(ROOT / "tools" / "crown_single_fight_audit.py")
     implementation_hash = hashlib.sha256()

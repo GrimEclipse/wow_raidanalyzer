@@ -6,7 +6,7 @@ function current() { return state.pulls[state.pull] || null; }
 function boss() { return current()?.coiledaltar || {}; }
 function player(row) { return `<span class="player" style="color:${row?.classColor || "#fff"}">${esc(row?.player || row?.name || "—")}</span>`; }
 function players(rows) { return (rows || []).map(player).join("、") || "—"; }
-function spellLink(id, name) { return id ? `<a href="https://www.wowhead.com/cn/spell=${id}" data-wowhead="domain=cn&amp;spell=${id}" target="_blank" rel="noreferrer">${esc(name || "未知技能")}</a>` : esc(name || "—"); }
+function spellLink(id, name) { const spellID = Number(id || 0), label = name || (spellID ? `法术 ${spellID}` : "—"); return !spellID || [1, 3, 4, 5, 6, 7, 8].includes(spellID) ? esc(label) : `<a href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;spell=${spellID}" target="_blank" rel="noreferrer">${esc(label)}</a>`; }
 function refreshWowhead() { if (window.WH?.Tooltips?.refreshLinks) window.WH.Tooltips.refreshLinks(); else if (window.$WowheadPower) window.$WowheadPower.refreshLinks(); }
 function table(headers, rows) { if (!rows?.length) return '<div class="empty">没有对应记录。</div>'; return `<table><thead><tr>${headers.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell ?? "—"}</td>`).join("")}</tr>`).join("")}</tbody></table>`; }
 function pct(point, arena) { if (!point || !arena) return null; const radius = Number(arena.radius || 1), dx = Number(point.x) - Number(arena.centerX), dy = Number(point.y) - Number(arena.centerY); return { left: 50 + (dx / radius) * Number(arena.plotScaleX || 25.9389), top: 50 - (dy / radius) * Number(arena.plotScaleY || 46.3327) }; }

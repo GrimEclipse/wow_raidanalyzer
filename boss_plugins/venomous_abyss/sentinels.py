@@ -30,6 +30,7 @@ from boss_plugins.common import (
 from boss_plugins.venomous_abyss.shared import (
     build_survival_timeline,
     difficulty_fields,
+    load_confirmed_spell_names,
     nightly_detail,
     nightly_player_totals,
 )
@@ -1126,10 +1127,16 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         wipe_reason = f"剧毒水滴漏踩 {droplets['missedRoundCount']} 轮"
     else:
         wipe_reason = "击杀复盘" if fight.get("kill") else "死亡链待复核"
+    survival_spell_names = load_confirmed_spell_names()
+    survival_spell_names.update({
+        LIVING_VENOM_ID: "活体毒液",
+        TOXIC_DROPLETS_HIT_ID: "剧毒水滴",
+        NOXIOUS_BLAST_ID: "剧毒冲击",
+        CULTIVATED_BURST_DAMAGE_ID: "培育爆裂",
+    })
     survival = build_survival_timeline(
         fight, actor_map, player_catalog, player_deaths, payload.get("friendlyCasts") or [],
-        {LIVING_VENOM_ID: "活体毒液", TOXIC_DROPLETS_HIT_ID: "剧毒水滴", NOXIOUS_BLAST_ID: "有害爆炸",
-         CULTIVATED_BURST_DAMAGE_ID: "培养爆发"},
+        survival_spell_names,
     )
     return {
         "reportID": report_id,

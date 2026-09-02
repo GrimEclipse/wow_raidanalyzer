@@ -34,7 +34,7 @@ from boss_plugins.venomous_abyss.shared import (
 
 
 ENCOUNTER_ID = 3429
-ENCOUNTER_IDS = {ENCOUNTER_ID}
+ENCOUNTER_IDS = {ENCOUNTER_ID, 53429}
 CN_TZ = timezone(timedelta(hours=8))
 ARENA_IMAGE = "assets/raids/venomous_abyss/07-coiledaltar.jpg"
 # 07-coiledaltar.jpg 为 1997×1118；图中正方形石台边长约 1036px，对齐整场地正方形。

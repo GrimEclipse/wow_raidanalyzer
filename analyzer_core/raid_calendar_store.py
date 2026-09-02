@@ -289,7 +289,7 @@ def _normalise_blackmarks(rows: Iterable[Dict[str, Any]], player_ids: set[str]) 
             "notes": _text(raw.get("notes"), 300),
             "createdAt": _text(raw.get("createdAt"), 40) or datetime.now().astimezone().isoformat(timespec="seconds"),
         })
-    return sorted(result, key=lambda row: (row["date"], row["createdAt"]))
+    return sorted(result, key=lambda row: (row["date"], row["createdAt"]), reverse=True)
 
 
 def _normalise_state(raw: Dict[str, Any]) -> Dict[str, Any]:

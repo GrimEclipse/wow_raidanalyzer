@@ -34,6 +34,15 @@ TAUNT_SPELLS = {
 }
 HOLLOWING_STACK_IDS = {1284109, 1284110}
 FALL_DEATH_LABEL = "跌落"
+ENVIRONMENTAL_DAMAGE_NAMES = {
+    1: "近战攻击",
+    3: "跌落",
+    4: "溺水",
+    5: "疲劳",
+    6: "环境火焰",
+    7: "熔岩",
+    8: "淤泥",
+}
 GUIDE_SOURCE = Path(__file__).resolve().parents[2] / "skills/venomous-abyss-raid-development/references/source-data/raid-guide-source.json"
 EXTRA_SPELL_NAMES = {
     1: "近战攻击",
@@ -74,11 +83,27 @@ def spell_name(spell_id, local_names=None):
     if not spell_id:
         return FALL_DEATH_LABEL
     spell_id = int(spell_id)
-    if spell_id == 1:
-        return "近战攻击"
+    if spell_id in ENVIRONMENTAL_DAMAGE_NAMES:
+        return ENVIRONMENTAL_DAMAGE_NAMES[spell_id]
     if local_names and local_names.get(spell_id):
         return local_names[spell_id]
-    return load_confirmed_spell_names().get(spell_id, "未知技能")
+    return load_confirmed_spell_names().get(spell_id, f"法术 {spell_id}")
+
+
+def death_cause(spell_id):
+    """Normalize WCL's pseudo ability IDs used by environmental deaths."""
+    spell_id = int(spell_id or 0)
+    if spell_id in {0, 3}:
+        return "fall"
+    if spell_id == 1:
+        return "melee"
+    if spell_id == 4:
+        return "drowning"
+    if spell_id == 5:
+        return "fatigue"
+    if spell_id in {6, 7, 8}:
+        return "environment"
+    return "ability"
 
 
 def local_spell_tooltip(spell_id):
@@ -194,7 +219,7 @@ def build_survival_timeline(fight, actor_map, players, deaths, friendly_casts, s
             "abilityID": spell_id,
             "ability": spell_name(spell_id, spell_names),
             "abilityLabel": spell_name(spell_id, spell_names),
-            "deathCause": "fall" if not spell_id else "ability",
+            "deathCause": death_cause(spell_id),
         })
     seen = set()
     for event in sorted(friendly_casts, key=lambda item: int(item.get("timestamp") or 0)):

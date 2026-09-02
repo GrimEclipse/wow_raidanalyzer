@@ -87,7 +87,7 @@ RAIDS = {
             {"key": "lostexplorers", "name": "迷失的探险者", "encounterID": 3497},
             {"key": "sszorak", "name": "斯索拉克", "encounterID": 3420},
             {"key": "twinfangs", "name": "双子毒牙", "encounterID": 3421},
-            {"key": "bargained", "name": "盘卷祭坛", "encounterID": 3429},
+            {"key": "coiledaltar", "name": "盘卷祭坛", "encounterID": 3429},
             {"key": "ulatek", "name": "乌拉特克", "encounterID": 3492},
         ],
     },

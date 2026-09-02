@@ -9,7 +9,7 @@
   const boss = () => current()?.ulatek || {};
   const player = row => `<span class="player" style="color:${row?.classColor || "#fff"}">${esc(row?.player || row?.name || "—")}</span>`;
   const players = rows => (rows || []).map(player).join("、") || "—";
-  const spell = (id, name) => id ? `<a href="https://www.wowhead.com/cn/spell=${Number(id)}" data-wowhead="domain=cn&amp;spell=${Number(id)}" target="_blank" rel="noreferrer">${esc(name || "未知技能")}</a>` : esc(name || "—");
+  const spell = (id, name) => { const spellID = Number(id || 0), label = name || (spellID ? `法术 ${spellID}` : "—"); return !spellID || [1, 3, 4, 5, 6, 7, 8].includes(spellID) ? esc(label) : `<a href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;spell=${spellID}" target="_blank" rel="noreferrer">${esc(label)}</a>`; };
   const badge = (text, tone = "") => `<span class="badge ${tone}">${esc(text)}</span>`;
   const table = (headers, rows) => !rows?.length ? '<div class="empty">没有对应记录。</div>' : `<table><thead><tr>${headers.map(item => `<th>${esc(item)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${cell ?? "—"}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const metric = (label, value) => `<div class="summary-item"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`;

@@ -23,6 +23,13 @@ function coloredPlayers(names, playerIDs) {
   return (names || []).map((name, index) => coloredPlayer(name, (playerIDs || [])[index])).join(" + ");
 }
 
+function spellLink(id, name) {
+  const spellID = Number(id || 0);
+  const label = name || (spellID ? `法术 ${spellID}` : "—");
+  if (!spellID || [1, 3, 4, 5, 6, 7, 8].includes(spellID)) return esc(label);
+  return `<a href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;spell=${spellID}" target="_blank" rel="noreferrer">${esc(label)}</a>`;
+}
+
 function simpleTable(headers, rows) {
   if (!rows.length) return '<div class="empty">没有对应记录。</div>';
   return `<table><thead><tr>${headers.map(item => `<th>${esc(item)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(item => `<td>${item ?? "—"}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
@@ -44,11 +51,11 @@ function renderSummary() {
 
 function renderSurvival() {
   const survival = current()?.survival || {};
-  $("content").innerHTML = `<section class="panel"><h2>死亡 / 战复时间线</h2><p class="muted">阵亡 ${survival.deathCount || 0} 次 · 战复 ${survival.combatResCount || 0} 次 · 战斗结束存活 ${survival.survivorCount || 0}/${survival.rosterCount || 0}</p>${simpleTable(["时间", "类型", "玩家", "原因 / 技能"], (survival.timeline || []).map(event => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', coloredPlayer(event.player, event.playerID), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${esc(event.ability)}` : esc(event.ability)]))}</section>`;
+  $("content").innerHTML = `<section class="panel"><h2>死亡 / 战复时间线</h2><p class="muted">阵亡 ${survival.deathCount || 0} 次 · 战复 ${survival.combatResCount || 0} 次 · 战斗结束存活 ${survival.survivorCount || 0}/${survival.rosterCount || 0}</p>${simpleTable(["时间", "类型", "玩家", "原因 / 技能"], (survival.timeline || []).map(event => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', coloredPlayer(event.player, event.playerID), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${spellLink(event.abilityID, event.ability)}` : spellLink(event.abilityID, event.ability)]))}</section>`;
 }
 
 function spellHeading(spellID, label) {
-  return `<span class="spell-heading"><a class="spell-icon-link" href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small" target="_blank" rel="noreferrer"><span class="spell-icon-fallback">${spellID}</span></a><a href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;dd=15" target="_blank" rel="noreferrer">${esc(label)}</a></span>`;
+  return `<span class="spell-heading"><a class="spell-icon-link" href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small" target="_blank" rel="noreferrer" title="查看${esc(label)}"><span class="spell-icon-fallback">技能</span></a><a href="https://www.wowhead.com/cn/spell=${spellID}" data-wowhead="domain=cn&amp;dd=15" target="_blank" rel="noreferrer">${esc(label)}</a></span>`;
 }
 
 function refreshWowhead() {

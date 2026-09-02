@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime
@@ -8,7 +9,7 @@ from zoneinfo import ZoneInfo
 from analyzer_core.analysis_scope import filter_fights, single_fight_scope
 from analyzer_core.catalog import find_boss_by_encounter
 from analyzer_core.player_abilities import abilities_for_roster, catalog_summary, load_player_ability_catalog
-from analyzer_core.single_fight import raid_night_date, recent_guild_reports, report_overview
+from analyzer_core.single_fight import load_single_fight_config, raid_night_date, recent_guild_reports, report_overview
 
 
 class AnalysisScopeTests(unittest.TestCase):
@@ -56,6 +57,18 @@ class PlayerAbilityCatalogTests(unittest.TestCase):
 
 
 class SingleFightDiscoveryTests(unittest.TestCase):
+    def test_default_guild_name_waits_for_wcl_lookup_and_env_override_clears_stale_name(self):
+        self.assertEqual(load_single_fight_config()["guild"], {"id": 774422, "name": ""})
+        previous = os.environ.get("WCL_GUILD_ID")
+        os.environ["WCL_GUILD_ID"] = "824636"
+        try:
+            self.assertEqual(load_single_fight_config()["guild"], {"id": 824636, "name": ""})
+        finally:
+            if previous is None:
+                os.environ.pop("WCL_GUILD_ID", None)
+            else:
+                os.environ["WCL_GUILD_ID"] = previous
+
     def test_raid_night_rollover_keeps_after_midnight_pull_on_prior_day(self):
         zone = ZoneInfo("Asia/Shanghai")
         before = datetime(2026, 8, 13, 0, 30, tzinfo=zone).timestamp() * 1000
@@ -67,6 +80,9 @@ class SingleFightDiscoveryTests(unittest.TestCase):
         self.assertEqual(find_boss_by_encounter(3181).boss_key, "crown_of_the_cosmos")
         self.assertEqual(find_boss_by_encounter(3470).boss_key, "nakzali")
         self.assertEqual(find_boss_by_encounter(53470).boss_key, "nakzali")
+        self.assertEqual(find_boss_by_encounter(3429).boss_key, "coiledaltar")
+        self.assertEqual(find_boss_by_encounter(53429).boss_key, "coiledaltar")
+        self.assertEqual(find_boss_by_encounter(3492).boss_key, "ulatek")
         self.assertIsNone(find_boss_by_encounter(999999))
 
     def test_recent_reports_filters_short_and_non_encounter_fights(self):
@@ -131,6 +147,8 @@ class SingleFightFrontendTests(unittest.TestCase):
         self.assertIn('/api/single-fight/analyze', page)
         self.assertIn('id="guildInput"', page)
         self.assertIn('&guildID=${encodeURIComponent(guildID)}', page)
+        self.assertIn('const guildLabel=(id,name="")=>`${name||"待查询工会"}', page)
+        self.assertIn('$("guildInput").addEventListener("input"', page)
         self.assertIn('$("loadReports").addEventListener("click",loadReports)', page)
         self.assertNotIn("then(loadReports)", page)
         self.assertIn('id="waitScreen"', page)
@@ -139,17 +157,30 @@ class SingleFightFrontendTests(unittest.TestCase):
 
 
 class SingleFightProgressTests(unittest.TestCase):
-    def test_single_fight_starts_at_twenty_then_advances_by_wcl_stream(self):
+    def test_single_fight_maps_wcl_subprogress_into_the_current_pull(self):
         from server import Job, translate_plugin_progress
 
         job = Job(id="test", owner_user_id=1)
         translate_plugin_progress(job, {"message": "读取 Fight 33（1/1）", "stage": "analyze"})
-        self.assertEqual(job.percent, 20)
+        self.assertEqual(job.percent, 16)
         translate_plugin_progress(job, {
             "message": "读取减益与叠层记录", "percent": 54, "stage": "fetch", "detail": True,
         })
-        self.assertEqual(job.percent, 54)
-        self.assertEqual(job.message, "读取减益与叠层记录")
+        self.assertEqual(job.percent, 58)
+        self.assertEqual(job.message, "分析战斗 1/1 · 读取减益与叠层记录")
+
+    def test_multiple_reports_reserve_progress_for_later_reports(self):
+        from server import Job, translate_plugin_progress
+
+        job = Job(id="test", owner_user_id=1, report_total=2)
+        translate_plugin_progress(job, {"message": "匹配到 10 场开荒记录"})
+        translate_plugin_progress(job, {"message": "读取 Fight 5（5/10）"})
+        translate_plugin_progress(job, {
+            "message": "读取场地坐标样本", "percent": 88, "stage": "fetch", "detail": True,
+        })
+        self.assertLess(job.percent, 50)
+        translate_plugin_progress(job, {"message": "匹配到 8 场开荒记录"})
+        self.assertGreaterEqual(job.percent, 55)
 
 
 if __name__ == "__main__":

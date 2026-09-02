@@ -570,6 +570,7 @@
               "externalKey": "wow.venomabyss,07.coiledaltar",
               "aliases": ["盘卷祭坛"],
               "plugin": "boss_plugins.venomous_abyss.coiledaltar",
+              "encounterIds": [3429, 53429],
               "supported": true,
               "disabledReason": "",
               "configSchema": [],

@@ -153,6 +153,9 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .bm-form-grid .span-3 { grid-column: span 3; }
 .existing-blackmarks { display: grid; gap: 7px; margin: 12px 0 2px; }
 .existing-blackmark { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; overflow: hidden; border: 1px dashed #5d3745; border-radius: 9px; background: rgba(43,20,29,.55); padding: 7px 10px; font-size: 13px; }
+.existing-blackmark.black { border-color: #51404c; background: linear-gradient(100deg, rgba(24,19,25,.96), rgba(45,31,40,.78)); }
+.existing-blackmark.red { border-color: rgba(235,83,83,.55); background: linear-gradient(100deg, rgba(61,19,27,.9), rgba(35,15,22,.82)); }
+.existing-blackmark.neutral { border-color: #435467; background: linear-gradient(100deg, rgba(27,37,48,.92), rgba(17,24,33,.82)); }
 .existing-blackmark .bm-who { flex: none; max-width: 18%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .existing-blackmark .bm-tag { flex: none; border-radius: 99px; padding: 2px 8px; background: #1f2b20; color: #a9d9b8; font-size: 11.5px; }
 .existing-blackmark .bm-verdict { flex: none; }
@@ -184,12 +187,22 @@ input:focus, select:focus { border-color: #9b793d; box-shadow: 0 0 0 3px rgba(23
 .black-history-list { display: grid; gap: 9px; max-height: 58vh; overflow-y: auto; }
 .black-history-list.empty { color: var(--muted); text-align: center; padding: 22px 0; }
 .history-card { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; border: 1px solid #402e36; border-radius: 10px; background: linear-gradient(145deg, #170f14, #110b10); padding: 12px 14px; }
+.history-card.black { border-color: #51404c; background: linear-gradient(115deg, #181318, #2b1e27 72%, #171116); }
+.history-card.red { border-color: rgba(235,83,83,.58); background: linear-gradient(115deg, #3c141c, #271219 72%, #160e13); }
+.history-card.neutral { border-color: #435467; background: linear-gradient(115deg, #1d2935, #16212b 72%, #101820); }
+.history-card { animation: history-card-in .24s ease both; animation-delay: calc(var(--history-index, 0) * 24ms); transition: transform .18s ease, border-color .18s ease, filter .18s ease; }
+.history-card:hover { transform: translateY(-1px); filter: brightness(1.08); }
 .history-main { display: flex; align-items: baseline; gap: 10px; min-width: 180px; }
 .history-player { font-weight: 700; font-size: 15px; }
 .history-main small { color: var(--muted); font-size: 12px; }
 .history-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; flex: 1 1 260px; color: #b9c2cb; font-size: 12.5px; }
 .history-meta .bm-notes { flex: 0 1 auto; min-width: 0; }
 .history-card .button.danger { margin-left: auto; }
+.history-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 13px; color: #b9c2cb; font-size: 12px; }
+.history-pagination[hidden] { display: none; }
+.history-pagination .button:disabled { cursor: not-allowed; opacity: .42; }
+@keyframes history-card-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .history-card { animation: none; transition: none; } }
 .player-armor:disabled { opacity: .8; }
 
 @media (max-width: 900px) {

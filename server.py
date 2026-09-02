@@ -62,13 +62,14 @@ REGISTRATION_ATTEMPTS: Dict[str, List[float]] = {}
 REGISTRATION_ATTEMPTS_LOCK = threading.Lock()
 INVITE_CODE = environment_setting("APP_INVITE_CODE")
 
-FIGHT_RE = re.compile(r"(读取|分析) Fight .*?[（(](\d+)/(\d+)[）)]")
+FIGHT_RE = re.compile(r"(读取|分析) Fight\s+(\d+).*?[（(](\d+)/(\d+)[）)]")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
-MATCHED_FIGHTS_RE = re.compile(r"匹配到\s+(\d+)\s+场")
+MATCHED_FIGHTS_RE = re.compile(r"匹配(?:到)?[^0-9\n]*?(\d+)\s*场")
 WOWHEAD_TOOLTIP_BASE_URL = "https://nether.wowhead.com"
 WOWHEAD_TOOLTIP_CACHE_TTL_SECONDS = 24 * 60 * 60
 WOWHEAD_TOOLTIP_CACHE: Dict[tuple, tuple] = {}
 WOWHEAD_TOOLTIP_CACHE_LOCK = threading.Lock()
+JOB_ID_RE = re.compile(r"[a-f0-9]{12}")
 
 
 def normalize_static_request_path(path):
@@ -89,11 +90,35 @@ class Job:
     events: List[dict] = field(default_factory=list)
     subscribers: List[queue.Queue] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
+    fight_index: int = 0
+    fight_total: int = 0
+    report_index: int = 0
+    report_total: int = 1
 
 
 JOBS: Dict[str, Job] = {}
 JOBS_LOCK = threading.Lock()
 JOB_SEMAPHORE = threading.BoundedSemaphore(MAX_JOB_THREADS)
+
+
+def job_result_url(job_id: str, *, download=False) -> str:
+    suffix = "?download=1" if download else ""
+    return f"/api/jobs/{job_id}/result{suffix}"
+
+
+def stored_job_result(job_id: str, user: dict) -> Optional[Path]:
+    """Resolve a completed result without relying on the in-memory job table."""
+    if not JOB_ID_RE.fullmatch(str(job_id or "")):
+        return None
+    own_path = JOB_DIR / str(user["id"]) / f"{job_id}.json"
+    if own_path.is_file():
+        return own_path
+    if user.get("isAdmin"):
+        return next(
+            (candidate for candidate in JOB_DIR.glob(f"*/{job_id}.json") if candidate.is_file()),
+            None,
+        )
+    return None
 
 
 def publish(job: Job, event: dict):
@@ -138,7 +163,35 @@ def translate_plugin_progress(job: Job, raw_event: dict):
     stage = raw_event.get("stage")
 
     if percent is not None:
-        set_job_progress(job, percent=percent, message=message or job.message, stage=stage or job.stage)
+        raw_percent = max(0, min(100, int(percent)))
+        if stage == "fetch":
+            # WCL event readers report a *single fight* sub-progress (24..88).
+            # Treating it as the whole raid-night percentage made the first pull
+            # jump to 80% and the remaining pulls appear stalled.
+            if job.fight_total:
+                completed_before = max(0, job.fight_index - 1)
+                mapped = 16 + round(
+                    (
+                        (max(1, job.report_index) - 1)
+                        + (completed_before + raw_percent / 100) / job.fight_total
+                    )
+                    / max(1, job.report_total)
+                    * 78
+                )
+                mapped = min(94, mapped)
+            else:
+                mapped = 12 + round(raw_percent * 0.78)
+            set_job_progress(
+                job,
+                percent=mapped,
+                message=(
+                    f"分析战斗 {job.fight_index}/{job.fight_total} · {message}"
+                    if job.fight_total and message else message or job.message
+                ),
+                stage="fetch",
+            )
+            return
+        set_job_progress(job, percent=raw_percent, message=message or job.message, stage=stage or job.stage)
         return
 
     if "连接 WCL 鉴权端点" in message:
@@ -150,24 +203,33 @@ def translate_plugin_progress(job: Job, raw_event: dict):
 
     matched = MATCHED_FIGHTS_RE.search(message)
     if matched:
-        set_job_progress(job, percent=18, message=f"匹配到 {matched.group(1)} 场开荒记录", stage="match")
+        job.report_index = min(job.report_total, job.report_index + 1)
+        job.fight_index = 0
+        job.fight_total = max(1, int(matched.group(1)))
+        percent = 16 + round((job.report_index - 1) / max(1, job.report_total) * 78)
+        set_job_progress(job, percent=percent, message=f"匹配到 {matched.group(1)} 场开荒记录", stage="match")
         return
 
     fight = FIGHT_RE.search(message)
     if fight:
         action = fight.group(1)
-        index = int(fight.group(2))
-        total = max(1, int(fight.group(3)))
-        completed_before = max(0, index - 1) if action == "读取" else index
-        percent = 20 + round(completed_before / total * 68)
-        set_job_progress(job, percent=percent, message=f"分析战斗 {index}/{total}", stage="analyze")
+        index = int(fight.group(3))
+        total = max(1, int(fight.group(4)))
+        job.report_index = max(1, job.report_index)
+        job.fight_index = max(job.fight_index, index)
+        job.fight_total = total
+        completed_before = max(0, job.fight_index - 1) if action == "读取" else job.fight_index
+        overall = ((job.report_index - 1) + completed_before / total) / max(1, job.report_total)
+        percent = 16 + round(overall * 78)
+        set_job_progress(job, percent=percent, message=f"分析战斗 {job.fight_index}/{total}", stage="analyze")
         return
 
     completed = COMPLETED_FIGHTS_RE.search(message)
     if completed:
         count = int(completed.group(1))
         total = max(1, int(completed.group(2)))
-        percent = 20 + round(count / total * 68)
+        overall = ((max(1, job.report_index) - 1) + count / total) / max(1, job.report_total)
+        percent = 16 + round(overall * 78)
         set_job_progress(job, percent=percent, message=f"已完成战斗 {count}/{total}", stage="analyze")
         return
 
@@ -190,6 +252,10 @@ def run_job(job: Job, payload: dict, credentials: WclCredentials):
         raid = payload["raid"]
         boss = payload["boss"]
         report_ids = payload["reportIds"]
+        job.report_total = max(
+            1,
+            len([value for value in re.split(r"[\s,，;；]+", report_ids) if value]),
+        )
         options = payload.get("options") or {}
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -216,7 +282,8 @@ def run_job(job: Job, payload: dict, credentials: WclCredentials):
             "percent": 100,
             "message": "分析完成",
             "stage": "done",
-            "resultUrl": f"/api/jobs/{job.id}/result",
+            "resultUrl": job_result_url(job.id),
+            "downloadUrl": job_result_url(job.id, download=True),
         })
     except Exception as exc:
         job.status = "error"
@@ -264,7 +331,8 @@ def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
         publish(job, {
             "type": "done", "status": "done", "percent": 100,
             "message": job.message, "stage": "done",
-            "resultUrl": f"/api/jobs/{job.id}/result",
+            "resultUrl": job_result_url(job.id),
+            "downloadUrl": job_result_url(job.id, download=True),
             "cacheHit": bool(result.get("cacheHit")),
         })
     except Exception as exc:
@@ -915,7 +983,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                     "jobId": job.id,
                     "eventsUrl": f"/api/jobs/{job.id}/events",
                     "statusUrl": f"/api/jobs/{job.id}/status",
-                    "resultUrl": f"/api/jobs/{job.id}/result",
+                    "resultUrl": job_result_url(job.id),
+                    "downloadUrl": job_result_url(job.id, download=True),
                 }, HTTPStatus.ACCEPTED))
             if path != "/api/analyze":
                 return self.json_error("not found", HTTPStatus.NOT_FOUND)
@@ -943,7 +1012,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "jobId": job.id,
                 "eventsUrl": f"/api/jobs/{job.id}/events",
                 "statusUrl": f"/api/jobs/{job.id}/status",
-                "resultUrl": f"/api/jobs/{job.id}/result",
+                "resultUrl": job_result_url(job.id),
+                "downloadUrl": job_result_url(job.id, download=True),
             }, HTTPStatus.ACCEPTED))
         except raid_calendar_store.LootConflictWarning as warning:
             return self.send_response_body(*json_bytes({
@@ -1028,6 +1098,18 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
     def handle_job_status(self, path, user):
         job_id = path.split("/")[3]
         job = JOBS.get(job_id)
+        stored_result = stored_job_result(job_id, user)
+        if not job and stored_result:
+            return self.send_response_body(*json_bytes({
+                "type": "done",
+                "jobId": job_id,
+                "status": "done",
+                "percent": 100,
+                "message": "分析结果已从任务缓存恢复",
+                "stage": "done",
+                "resultUrl": job_result_url(job_id),
+                "downloadUrl": job_result_url(job_id, download=True),
+            }))
         if not job or (job.owner_user_id != user["id"] and not user["isAdmin"]):
             return self.json_error("not found", HTTPStatus.NOT_FOUND)
         payload = {
@@ -1039,18 +1121,37 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "stage": job.stage,
         }
         if job.status == "done":
-            payload["resultUrl"] = f"/api/jobs/{job.id}/result"
+            payload["resultUrl"] = job_result_url(job.id)
+            payload["downloadUrl"] = job_result_url(job.id, download=True)
         return self.send_response_body(*json_bytes(payload))
 
     def handle_result(self, path, user):
         job_id = path.split("/")[3]
         job = JOBS.get(job_id)
-        if not job or (job.owner_user_id != user["id"] and not user["isAdmin"]):
+        if job and job.owner_user_id != user["id"] and not user["isAdmin"]:
             return self.json_error("not found", HTTPStatus.NOT_FOUND)
-        if job.status != "done" or not job.result_path or not job.result_path.exists():
+        if job and job.status != "done":
             return self.send_response_body(*json_bytes({"error": "结果尚未生成"}, HTTPStatus.CONFLICT))
-        body = job.result_path.read_bytes()
-        return self.send_response_body(HTTPStatus.OK, "application/json; charset=utf-8", body)
+        result_path = stored_job_result(job_id, user)
+        if not result_path and job and job.status == "done" and job.result_path and job.result_path.exists():
+            result_path = job.result_path
+        if not result_path:
+            if not job:
+                return self.json_error("not found", HTTPStatus.NOT_FOUND)
+            return self.send_response_body(*json_bytes({"error": "结果尚未生成"}, HTTPStatus.CONFLICT))
+        body = result_path.read_bytes()
+        query = parse_qs(urlparse(self.path).query)
+        if (query.get("download") or [""])[0] not in {"1", "true", "yes"}:
+            return self.send_response_body(HTTPStatus.OK, "application/json; charset=utf-8", body)
+        filename = f"wcl-analysis-{job_id}.json"
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_security_headers()
+        self.end_headers()
+        self.wfile.write(body)
 
     def handle_static(self, path, public=False):
         path = normalize_static_request_path(path)

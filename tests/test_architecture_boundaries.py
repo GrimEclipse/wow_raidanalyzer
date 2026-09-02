@@ -11,7 +11,10 @@ def test_boss_logic_is_not_collected_in_cross_boss_modules():
 
 
 def test_each_supported_venomous_boss_has_its_own_backend_module():
-    for module in ("nakzali", "sentinels", "lostexplorers", "vashnik", "sszorak", "twinfangs"):
+    for module in (
+        "nakzali", "sentinels", "lostexplorers", "vashnik",
+        "sszorak", "twinfangs", "coiledaltar", "ulatek",
+    ):
         assert (VENOMOUS / f"{module}.py").is_file()
 
 

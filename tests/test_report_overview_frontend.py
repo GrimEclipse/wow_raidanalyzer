@@ -46,6 +46,8 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('战斗列表', self.overview)
         self.assertIn('机制统计', self.overview)
         self.assertIn('按阶段分组', self.overview)
+        self.assertIn('id="downloadJson"', self.overview)
+        self.assertIn('id="importJson"', self.overview)
         self.assertIn('id="difficultyFilter"', self.overview)
         self.assertIn('difficultyName(pull)', self.overview_js)
         self.assertIn('全部难度（分组展示）', self.overview_js)
@@ -54,6 +56,8 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('metric.events', self.overview_js)
         self.assertIn('metric.players', self.overview_js)
         self.assertIn('玩家汇总', self.overview_js)
+        self.assertIn('function downloadJson()', self.overview_js)
+        self.assertIn('function importJson(event)', self.overview_js)
         self.assertNotIn('NIGHTLY REVIEW', self.overview_js)
         self.assertNotRegex(self.overview_js, r"\breturn\d")
 
@@ -70,11 +74,15 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('安全消除', self.sentinels_js)
         self.assertIn('碰撞前 ${Number(movement.windowMs || 1000) / 1000} 秒位移', self.sentinels_js)
         self.assertIn('两人间距 ${movement.pairDistanceBeforeYards}→${movement.pairDistanceAtCollisionYards}码', self.sentinels_js)
+        self.assertNotIn('<span class="spell-icon-fallback">${spellID}</span>', self.sentinels_js)
+        self.assertIn('<span class="spell-icon-fallback">技能</span>', self.sentinels_js)
+        self.assertIn('spellLink(event.abilityID, event.ability)', self.sentinels_js)
 
     def test_collision_cards_wrap_as_cards_not_player_names(self):
         self.assertIn("minmax(390px,1fr)", self.sentinels_css)
         self.assertIn("flex-wrap:nowrap", self.sentinels_css)
         self.assertIn("word-break:keep-all", self.sentinels_css)
+        self.assertIn(":has(.iconsmall) .spell-icon-fallback", self.sentinels_css)
         self.assertIn(".timeout-burst .effect-line{grid-column:2 / -1}", self.sentinels_css)
 
     def test_project_report_samples_are_merged_with_local_analysis_files(self):

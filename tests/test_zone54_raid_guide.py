@@ -306,7 +306,7 @@ class Zone54RaidGuideTests(unittest.TestCase):
         eruption = next(
             spell for spell in sentinels["spells"] if spell["spellID"] == 1296962
         )
-        self.assertEqual(eruption["nameZh"], "原毒喷发")
+        self.assertEqual(eruption["nameZh"], "原型毒液爆发")
         self.assertEqual(sentinels["energy"]["title"], "循环与转阶段")
         self.assertNotIn("腐毒停滞", json.dumps(sentinels, ensure_ascii=False))
         split_phase = next(row for row in sentinels["phases"] if row["key"] == "split-cycle")

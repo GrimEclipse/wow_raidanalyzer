@@ -64,6 +64,7 @@
   const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const formatDuration=ms=>{const total=Math.max(0,Math.round(Number(ms||0)/1000));return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`};
   const errorMessage=async response=>{try{return (await response.json()).error||`HTTP ${response.status}`}catch(_){return `HTTP ${response.status}`}};
+  const guildLabel=(id,name="")=>`${name||"待查询工会"} · ${id||"—"}`;
 
   function today(){const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`}
   $("dateInput").value=today();
@@ -73,7 +74,7 @@
     if(!response.ok)throw new Error(await errorMessage(response));
     const data=await response.json();
     $("guildInput").value=String(data.guild.id||774422);
-    $("guildLabel").textContent=`${data.guild.name||"工会"} · ${data.guild.id}`;
+    $("guildLabel").textContent=guildLabel(data.guild.id,data.guild.name);
   }
 
   async function loadReports(){
@@ -82,10 +83,11 @@
       const date=$("dateInput").value;
       const guildID=Number($("guildInput").value);
       if(!Number.isInteger(guildID)||guildID<=0)throw new Error("请输入有效的 WCL 工会 ID。");
+      $("guildLabel").textContent=guildLabel(guildID);
       const response=await fetch(`/api/single-fight/reports?date=${encodeURIComponent(date)}&limit=20&guildID=${encodeURIComponent(guildID)}`,{cache:"no-store"});
       if(!response.ok)throw new Error(await errorMessage(response));
       const data=await response.json();state.reports=data.reports||[];
-      $("guildLabel").textContent=`${data.guild?.name||"工会"} · ${data.guild?.id||guildID}`;
+      $("guildLabel").textContent=guildLabel(data.guild?.id||guildID,data.guild?.name);
       const rate=data.rateLimit||{};
       $("reportMessage").textContent=`找到 ${state.reports.length} 份 report；WCL 本小时 ${rate.pointsSpentThisHour??"?"}/${rate.limitPerHour??"?"} 点。`;
       renderReports();
@@ -108,7 +110,7 @@
       const response=await fetch(`/api/single-fight/reports/${encodeURIComponent(code)}`,{cache:"no-store"});
       if(!response.ok)throw new Error(await errorMessage(response));
       state.report=await response.json();state.fight=null;
-      if(state.report.guild){$("guildInput").value=String(state.report.guild.id||$("guildInput").value);$("guildLabel").textContent=`${state.report.guild.name||"工会"} · ${state.report.guild.id||""}`}
+      if(state.report.guild){$("guildInput").value=String(state.report.guild.id||$("guildInput").value);$("guildLabel").textContent=guildLabel(state.report.guild.id,state.report.guild.name)}
       if(!(state.report.raidNightDates||[]).includes($("dateInput").value) && state.report.raidNightDates?.length){
         $("dateInput").value=state.report.raidNightDates[state.report.raidNightDates.length-1];
       }
@@ -168,6 +170,7 @@
     clearInterval(elapsedTimer);$("progressBar").style.width="100%";$("percentText").textContent="100%";$("waitStatus").textContent="分析完成，正在打开单场报告";location.href=`/report?json=${encodeURIComponent(url)}`;
   }
 
+  $("guildInput").addEventListener("input",event=>{$("guildLabel").textContent=guildLabel(event.target.value)});
   $("loadReports").addEventListener("click",loadReports);$("openReport").addEventListener("click",()=>openReport());$("analyze").addEventListener("click",analyze);$("closeWait").addEventListener("click",closeWait);
   loadConfig().catch(error=>$("reportMessage").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`);
 })();

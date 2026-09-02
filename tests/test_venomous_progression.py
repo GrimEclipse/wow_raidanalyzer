@@ -53,6 +53,25 @@ def test_survival_timeline_merges_death_and_combat_res_in_time_order():
     assert result["survivorCount"] == 2
 
 
+def test_survival_timeline_normalizes_wcl_environmental_pseudo_spells():
+    fight = {"startTime": 1000, "endTime": 20_000}
+    players = {spell_id: player(spell_id, f"玩家{spell_id}") for spell_id in (1, 3, 4, 5)}
+    deaths = [
+        {"timestamp": 2000 + spell_id, "targetID": spell_id, "killingAbilityGameID": spell_id}
+        for spell_id in players
+    ]
+    result = build_survival_timeline(fight, {}, players, deaths, [])
+    rows = {row["abilityID"]: row for row in result["timeline"]}
+    assert rows[1]["ability"] == "近战攻击"
+    assert rows[1]["deathCause"] == "melee"
+    assert rows[3]["ability"] == "跌落"
+    assert rows[3]["deathCause"] == "fall"
+    assert rows[4]["ability"] == "溺水"
+    assert rows[4]["deathCause"] == "drowning"
+    assert rows[5]["ability"] == "疲劳"
+    assert rows[5]["deathCause"] == "fatigue"
+
+
 def test_vashnik_infection_groups_by_cast_windows():
     fight = {"startTime": 0, "endTime": 60_000}
     players = {1: player(1, "甲"), 2: player(2, "乙")}
@@ -911,7 +930,10 @@ def test_twinfangs_inserts_death_when_feast_clears_multiple_stacks():
 
 def test_spell_name_maps_melee_attack():
     assert spell_name(1) == "近战攻击"
-    assert spell_name(999999999) == "未知技能"
+    assert spell_name(1284258) == "污染"
+    assert spell_name(1286737) == "幽影喷射"
+    assert spell_name(1305901) == "燃烧领域"
+    assert spell_name(999999999) == "法术 999999999"
 
 
 def test_infer_dig_winds_prefers_movement_and_never_uses_cyst_activation_as_direction():

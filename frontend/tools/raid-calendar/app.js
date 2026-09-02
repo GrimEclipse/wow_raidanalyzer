@@ -22,6 +22,8 @@ const now = new Date();
 let selectedDate = localDate(now);
 let displayedMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 let documentState = null;
+const BLACK_HISTORY_PAGE_SIZE = 8;
+let blackHistoryPage = 1;
 
 function localDate(value) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
@@ -532,6 +534,7 @@ function openBlackHistory(playerId = "") {
   const currentRaid = raidFilter.value;
   raidFilter.innerHTML = `<option value="">全部副本</option>` + raids().map(raid => `<option value="${escapeHtml(raid.key)}">${escapeHtml(raid.name)}</option>`).join("");
   raidFilter.value = raids().some(raid => raid.key === currentRaid) ? currentRaid : "";
+  blackHistoryPage = 1;
   renderBlackHistory();
   $("#blackHistoryBackdrop").hidden = false;
 }
@@ -547,11 +550,16 @@ function filteredBlackmarks() {
     .filter(row => (!playerFilter || row.playerId === playerFilter)
       && (!raidFilter || row.raidKey === raidFilter)
       && (!difficultyFilter || row.difficulty === difficultyFilter)
-      && (!verdictFilter || markVerdict(row) === verdictFilter));
+      && (!verdictFilter || markVerdict(row) === verdictFilter))
+    .sort((left, right) => `${right.date}|${right.createdAt || ""}`.localeCompare(`${left.date}|${left.createdAt || ""}`));
 }
 
 function renderBlackHistory() {
   const rows = filteredBlackmarks();
+  const pageCount = Math.max(1, Math.ceil(rows.length / BLACK_HISTORY_PAGE_SIZE));
+  blackHistoryPage = Math.min(Math.max(1, blackHistoryPage), pageCount);
+  const pageStart = (blackHistoryPage - 1) * BLACK_HISTORY_PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + BLACK_HISTORY_PAGE_SIZE);
   const list = $("#blackHistoryList");
   list.classList.toggle("empty", !rows.length);
   // 汇总统计：各判定次数
@@ -560,10 +568,10 @@ function renderBlackHistory() {
   const redCount = rows.filter(row => markVerdict(row) === "red").length;
   const neutralCount = rows.filter(row => markVerdict(row) === "neutral").length;
   statsBox.innerHTML = `<span>共 <strong>${rows.length}</strong> 条</span><span class="stat-black">⚫ 拉了 <strong>${blackCount}</strong> 次</span><span class="stat-red">🔴 神了 <strong>${redCount}</strong> 次</span><span class="stat-neutral">⚪ 行吧 <strong>${neutralCount}</strong> 次</span>`;
-  list.innerHTML = rows.length ? rows.map(row => {
+  list.innerHTML = rows.length ? pageRows.map((row, index) => {
     const p = player(row.playerId);
     const verdict = markVerdict(row);
-    return `<article class="history-card ${verdict}">
+    return `<article class="history-card ${verdict}" style="--history-index:${index}">
       <div class="history-main">
         <span class="class-colored history-player" style="${classStyle(row.playerId)}">${escapeHtml(playerNick(row.playerId))}</span>
         <small>${escapeHtml(p?.className || "")}</small>
@@ -577,6 +585,11 @@ function renderBlackHistory() {
       <button class="button danger bm-delete" data-id="${escapeHtml(row.id)}">删除</button>
     </article>`;
   }).join("") : "还没有任何黑本记录";
+  const pagination = $("#blackHistoryPagination");
+  pagination.hidden = rows.length <= BLACK_HISTORY_PAGE_SIZE;
+  $("#blackHistoryPageInfo").textContent = `第 ${blackHistoryPage} / ${pageCount} 页 · ${rows.length} 条`;
+  $("#blackHistoryPrev").disabled = blackHistoryPage <= 1;
+  $("#blackHistoryNext").disabled = blackHistoryPage >= pageCount;
   list.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", async () => {
     if (!(await confirmDialog({ title: "删除黑本标记", message: "确定删除这条黑本标记吗？该操作不可恢复。", confirmText: "删除", danger: true }))) return;
     try {
@@ -598,7 +611,7 @@ async function confirmContinueIfBlack(playerId, dateValue, difficultyValue = "",
     && (!raidKey || row.raidKey === raidKey)
     && markVerdict(row) === "black");
   if (!sameDifficultyMarks.length) return true;
-  const lines = sameDifficultyMarks.slice(-3).map(row => `• 该玩家于 ${row.date} 黑本【${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}】且判定为「拉了」${row.notes ? `，备注：${row.notes}` : ""}`);
+  const lines = sameDifficultyMarks.slice(0, 3).map(row => `• 该玩家于 ${row.date} 黑本【${escapeHtml(raidName(row.raidKey))}·${DIFFICULTY_NAMES[row.difficulty]}】且判定为「拉了」${row.notes ? `，备注：${row.notes}` : ""}`);
   return confirmDialog({
     title: "⚠ 该玩家此前黑本掉落「拉了」",
     message: `${raidKey ? raidName(raidKey) : "相同副本"}·${difficultyValue ? DIFFICULTY_NAMES[difficultyValue] : "相同难度"}\n${lines.join("\n")}\n你确定还要让该玩家继续当这次的黑本（第一个进本）吗？`,
@@ -812,10 +825,13 @@ $("#mythicToggle").addEventListener("click", toggleMythicSchedule);
 $("#blackHistoryButton").addEventListener("click", () => openBlackHistory());
 $("#closeBlackHistory").addEventListener("click", closeBlackHistory);
 $("#blackHistoryBackdrop").addEventListener("click", event => { if (event.target === $("#blackHistoryBackdrop")) closeBlackHistory(); });
-$("#blackHistoryFilter").addEventListener("change", renderBlackHistory);
-$("#blackHistoryRaid")?.addEventListener("change", renderBlackHistory);
-$("#blackHistoryDifficulty")?.addEventListener("change", renderBlackHistory);
-$("#blackHistoryVerdict")?.addEventListener("change", renderBlackHistory);
+const resetBlackHistoryPage = () => { blackHistoryPage = 1; renderBlackHistory(); };
+$("#blackHistoryFilter").addEventListener("change", resetBlackHistoryPage);
+$("#blackHistoryRaid")?.addEventListener("change", resetBlackHistoryPage);
+$("#blackHistoryDifficulty")?.addEventListener("change", resetBlackHistoryPage);
+$("#blackHistoryVerdict")?.addEventListener("change", resetBlackHistoryPage);
+$("#blackHistoryPrev").addEventListener("click", () => { blackHistoryPage -= 1; renderBlackHistory(); });
+$("#blackHistoryNext").addEventListener("click", () => { blackHistoryPage += 1; renderBlackHistory(); });
 // 黑本编辑对话框：＋添加 = 干净表单；编辑 = 带出该条数据
 $("#addBlackmark").addEventListener("click", () => openBlackmarkEditor(null));
 $("#closeBlackmarkEditor").addEventListener("click", closeBlackmarkEditor);
