@@ -362,6 +362,25 @@
                   "visibleWhen": { "field": "possessionBarrageReviewEnabled", "equals": true }
                 },
                 {
+                  "key": "innerRealmReviewEnabled",
+                  "type": "boolean",
+                  "label": "分析史诗内场组",
+                  "description": "读取实际进出内场、灵魂疲惫、盘魂者诅咒打断与盘旋精魂伤害。",
+                  "default": true
+                },
+                {
+                  "key": "innerRealmTeams",
+                  "type": "interruptGroups",
+                  "label": "史诗内场小队名单",
+                  "description": "WCL 不含游戏内小队编号；在此填写 3 队和 4 队的玩家名单后，按 3 → 4 交替核对。",
+                  "default": {"3": [], "4": []},
+                  "groups": [
+                    {"key": "3", "label": "3 队"},
+                    {"key": "4", "label": "4 队"}
+                  ],
+                  "visibleWhen": { "field": "innerRealmReviewEnabled", "equals": true }
+                },
+                {
                   "key": "invokeInterruptReviewEnabled",
                   "type": "boolean",
                   "label": "统计祈求打断施法",

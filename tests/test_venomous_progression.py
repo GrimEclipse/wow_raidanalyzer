@@ -240,9 +240,10 @@ def test_sszorak_tracks_cyst_placement_consumption_and_crosswind_wave():
 def test_sszorak_maps_player_spec_assets_in_replay_and_crosswinds():
     root = Path(__file__).resolve().parents[1]
     script = (root / "frontend/report/plugins/venomous_abyss/progression/report.js").read_text(encoding="utf-8")
-    assert "assets/specs/${name}.jpg" in script
-    assert 'class="crosswind-player"' in script
-    assert "mapPlayerFace(row,'场地推演位置')" in script
+    assert "/assets/specs/${slug}.jpg" in script
+    assert 'class="actor-icon"' in script
+    assert "${specIcon(row)}<i class=\"target-arrow\"" in script
+    assert 'data-report-tooltip=' in script
 
 
 def test_sszorak_stops_replay_positions_at_first_death():

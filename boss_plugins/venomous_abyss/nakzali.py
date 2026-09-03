@@ -42,6 +42,7 @@ CN_TZ = timezone(timedelta(hours=8))
 SPELLS = load_confirmed_spell_names()
 SOURCE_NAMES = load_confirmed_source_names()
 SPELLS.update({
+    1288772: "盘魂仪式",
     1284034: "解缚之怒",
     1284103: "附身弹幕",
     1292034: "附身弹幕",
@@ -52,29 +53,34 @@ SPELLS.update({
     1287533: "墓缚推进",
     1289683: "苏醒仪式",
     1290003: "解缚",
-    1289855: "葬火",
+    1289855: "噬灭烈焰",
+    1289875: "焚烧",
+    1290361: "盘魂",
     1292248: "灵魂转移",
     1293214: "攫取深渊",
     1294729: "尸体枯萎",
-    1294933: "追踪火焰",
+    1294933: "蛇形烈焰",
     1295085: "灵魂转移",
     1295124: "苏醒仪式",
     1297624: "仪式灼烧",
     1299673: "祈求",
     1299722: "祈求打断",
-    1300239: "盘旋灵魂",
-    1306666: "葬火点名",
+    1297631: "觉醒宿主",
+    1299988: "不朽盘卷",
+    1300235: "灵魂疲惫",
+    1300238: "盘魂者诅咒",
+    1300239: "盘旋精魂",
+    1306666: "噬灭烈焰点名",
     1307939: "残骸凋零",
     1308227: "不朽盘卷",
 })
 
 PHASE_CASTS = {1293664, 1295124, 1292248, 1289855, 1299673, 1284034}
-MECHANIC_CASTS = PHASE_CASTS | {1284103, 1287533, 1297624}
+MECHANIC_CASTS = PHASE_CASTS | {1284103, 1287533, 1297624, 1300238}
 AVOIDABLE_DAMAGE = {
     1288554: spell_name(1288554),
     1295085: spell_name(1295085),
-    1300239: spell_name(1300239),
-    1308227: spell_name(1308227),
+    1300239: "盘旋精魂",
 }
 POSITION_DAMAGE_IDS = set(AVOIDABLE_DAMAGE) | {1287434, 1292034, 1293214}
 
@@ -90,6 +96,12 @@ DEFAULT_OPTIONS = {
     "possessionBarrageCountEnabled": False,
     "hungeringPyreReviewEnabled": True,
     "hungeringPyreSoakRadiusYards": 10,
+    "corpseBurnRadiusYards": 5,
+    "corpseAttemptRadiusYards": 10,
+    "innerRealmReviewEnabled": True,
+    "innerRealmTeams": {},
+    "innerRealmRotation": ["3", "4"],
+    "raidCollapseDeathThreshold": 8,
     "invokeInterruptReviewEnabled": True,
     "avoidableDamageReviewEnabled": True,
 }
@@ -376,12 +388,18 @@ def phase_at(elapsed_ms, markers):
     return phase
 
 
-def fetch_payload(client, report_id, fight, options, boss_id=None):
+def fetch_payload(client, report_id, fight, options, boss_id=None, amani_ids=None):
     casts = [
         event for event in client.events(report_id, "Casts", fight, hostility_type="Enemies")
         if ability_id(event) in MECHANIC_CASTS
     ]
     buffs = client.events(report_id, "Buffs", fight, ability_id=1290003, hostility_type="Enemies")
+    inner_buffs = []
+    amani_buffs = []
+    if options.get("innerRealmReviewEnabled"):
+        inner_buffs = client.events(report_id, "Buffs", fight, ability_id=1300514, hostility_type="Enemies")
+    if options.get("hungeringPyreReviewEnabled"):
+        amani_buffs = client.events(report_id, "Buffs", fight, ability_id=1297631, hostility_type="Enemies")
     deaths = client.events(report_id, "Deaths", fight)
     combatants = client.events(report_id, "CombatantInfo", fight)
     debuffs = []
@@ -392,6 +410,9 @@ def fetch_payload(client, report_id, fight, options, boss_id=None):
     if options["hungeringPyreReviewEnabled"]:
         debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1306666))
         debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1294933))
+    if options.get("innerRealmReviewEnabled"):
+        for spell_id in (1290361, 1299988, 1300235):
+            debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=spell_id))
     debuffs.extend(client.events(report_id, "Debuffs", fight, ability_id=1284109))
     damage = []
     wanted_damage = set()
@@ -401,7 +422,10 @@ def fetch_payload(client, report_id, fight, options, boss_id=None):
         wanted_damage.add(1292034)
     if options["hungeringPyreReviewEnabled"]:
         wanted_damage.add(1289855)
+        wanted_damage.add(1289875)
         wanted_damage.add(1294933)
+    if options.get("innerRealmReviewEnabled"):
+        wanted_damage.add(1300239)
     wanted_damage.update({1284109, 1295085})
     if options["avoidableDamageReviewEnabled"]:
         wanted_damage.update(AVOIDABLE_DAMAGE)
@@ -421,16 +445,40 @@ def fetch_payload(client, report_id, fight, options, boss_id=None):
             include_resources=True,
         )
         boss_position_events = compact_actor_position_events(boss_damage, boss_id)
+    amani_damage = []
+    if options.get("hungeringPyreReviewEnabled"):
+        pyre_completions = [
+            int(event.get("timestamp") or 0) for event in casts
+            if ability_id(event) == 1289855 and event_type(event) == "cast"
+        ]
+        amani_end = min(
+            int(fight["endTime"]),
+            (max(pyre_completions) + 30_000) if pyre_completions else int(fight["endTime"]),
+        )
+        for amani_id in sorted(set(amani_ids or [])):
+            amani_damage.extend(client.events(
+                report_id,
+                "DamageDone",
+                fight,
+                start_time=fight["startTime"],
+                end_time=amani_end,
+                target_id=amani_id,
+                include_resources=True,
+            ))
     return {
         "casts": casts,
         "buffs": buffs,
+        "innerBuffs": inner_buffs,
+        "amaniBuffs": amani_buffs,
         "deaths": deaths,
         "combatants": combatants,
         "debuffs": debuffs,
         "damage": damage,
         "positionEvents": position_events,
         "bossPositionEvents": boss_position_events,
+        "amaniDamage": amani_damage,
         "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies"),
+        "interrupts": client.events(report_id, "Interrupts", fight),
     }
 
 
@@ -841,6 +889,410 @@ def analyze_transition_assignments(fight, actor_map, player_catalog, pyre_rounds
     return pyre_rounds
 
 
+def aura_intervals(events, spell_id, fight_end):
+    active = {}
+    intervals = []
+    for event in sorted(events, key=lambda row: int(row.get("timestamp") or 0)):
+        if int(ability_id(event) or 0) != int(spell_id):
+            continue
+        target_id = event.get("targetID")
+        if is_apply(event):
+            active.setdefault(target_id, event)
+        elif is_remove(event) and target_id in active:
+            applied = active.pop(target_id)
+            intervals.append({
+                "targetID": target_id,
+                "start": int(applied.get("timestamp") or 0),
+                "end": int(event.get("timestamp") or 0),
+                "removeType": event_type(event),
+            })
+    for target_id, applied in active.items():
+        intervals.append({
+            "targetID": target_id,
+            "start": int(applied.get("timestamp") or 0),
+            "end": int(fight_end),
+            "removeType": "fight-end",
+        })
+    return sorted(intervals, key=lambda row: (row["start"], row["targetID"] or 0))
+
+
+def _trajectory_points(position_index, actor_id, start, end):
+    points = []
+    for timestamp in (start, end):
+        state = actor_state_at(position_index, actor_id, timestamp, reliable_window_ms=2_000)
+        if state and state.get("reliable"):
+            points.append((timestamp, float(state["x"]), float(state["y"])))
+    points.extend(
+        (int(row["timestamp"]), float(row["x"]), float(row["y"]))
+        for row in position_index.get(actor_id) or []
+        if start <= int(row["timestamp"]) <= end
+    )
+    return sorted(set(points))
+
+
+def _nearest_path_distance(points, point):
+    if not points:
+        return None
+    px, py = point
+    best = (math.inf, points[0][0])
+    for timestamp, x, y in points:
+        best = min(best, (math.dist((x, y), (px, py)), timestamp))
+    for left, right in zip(points, points[1:]):
+        lt, lx, ly = left
+        rt, rx, ry = right
+        if rt - lt > 3_000:
+            continue
+        dx, dy = rx - lx, ry - ly
+        length_sq = dx * dx + dy * dy
+        ratio = 0 if length_sq <= 0 else max(0.0, min(1.0, ((px - lx) * dx + (py - ly) * dy) / length_sq))
+        x, y = lx + ratio * dx, ly + ratio * dy
+        best = min(best, (math.dist((x, y), (px, py)), int(lt + ratio * (rt - lt))))
+    return {"distanceYards": round(best[0] / 100, 1), "timestamp": best[1]}
+
+
+def reconstruct_amani_corpses(fight, amani_damage, amani_buffs):
+    corpses = []
+    last_death = {}
+    for event in sorted(amani_damage, key=lambda row: int(row.get("timestamp") or 0)):
+        if event.get("hitPoints") != 0 or event.get("x") is None or event.get("y") is None:
+            continue
+        identity = (event.get("targetID"), event.get("targetInstance"))
+        timestamp = int(event.get("timestamp") or 0)
+        if timestamp - last_death.get(identity, -10_000) < 1_000:
+            continue
+        last_death[identity] = timestamp
+        corpses.append({
+            "uid": f"{identity[0]}:{identity[1]}:{timestamp}",
+            "actorID": identity[0],
+            "instance": identity[1],
+            "deathTimestamp": timestamp,
+            "deathTimeMs": timestamp - fight["startTime"],
+            "deathTime": fmt_ms(timestamp - fight["startTime"]),
+            "x": float(event["x"]),
+            "y": float(event["y"]),
+            "awakenedTimestamp": None,
+        })
+    wake_events = []
+    seen_wakes = set()
+    for event in sorted(amani_buffs, key=lambda row: int(row.get("timestamp") or 0)):
+        if int(ability_id(event) or 0) != 1297631 or not is_apply(event):
+            continue
+        identity = (event.get("targetID"), event.get("targetInstance"))
+        timestamp = int(event.get("timestamp") or 0)
+        key = (*identity, timestamp)
+        if key in seen_wakes:
+            continue
+        seen_wakes.add(key)
+        candidates = [
+            corpse for corpse in corpses
+            if (corpse["actorID"], corpse["instance"]) == identity
+            and corpse["deathTimestamp"] < timestamp
+            and corpse["awakenedTimestamp"] is None
+        ]
+        corpse = max(candidates, key=lambda row: row["deathTimestamp"]) if candidates else None
+        if corpse:
+            corpse["awakenedTimestamp"] = timestamp
+        wake_events.append({
+            "timestamp": timestamp,
+            "timeMs": timestamp - fight["startTime"],
+            "time": fmt_ms(timestamp - fight["startTime"]),
+            "actorID": identity[0],
+            "instance": identity[1],
+            "corpseUID": corpse["uid"] if corpse else None,
+        })
+    return corpses, wake_events
+
+
+def analyze_corpse_cremation(
+    fight, actor_map, players, pyre_rounds, debuffs, position_index,
+    amani_damage, amani_buffs, options,
+):
+    corpses, wake_events = reconstruct_amani_corpses(fight, amani_damage, amani_buffs)
+    snake_intervals = aura_intervals(debuffs, 1294933, fight["endTime"])
+    consumed = set()
+    burn_radius = float(options.get("corpseBurnRadiusYards") or 5)
+    attempt_radius = float(options.get("corpseAttemptRadiusYards") or 10)
+    for index, round_row in enumerate(pyre_rounds):
+        timestamp = int(fight["startTime"] + round_row["timeMs"])
+        next_timestamp = (
+            int(fight["startTime"] + pyre_rounds[index + 1]["timeMs"])
+            if index + 1 < len(pyre_rounds) else min(int(fight["endTime"]), timestamp + 30_000)
+        )
+        intervals = [row for row in snake_intervals if -1_500 <= row["start"] - timestamp <= 3_500]
+        round_wakes = [row for row in wake_events if timestamp <= row["timestamp"] < next_timestamp]
+        wake_uids = {row["corpseUID"] for row in round_wakes if row.get("corpseUID")}
+        available_at_round_start = [
+            corpse for corpse in corpses
+            if corpse["deathTimestamp"] < timestamp
+            and corpse["uid"] not in consumed
+            and not (corpse.get("awakenedTimestamp") and corpse["awakenedTimestamp"] < timestamp)
+        ]
+        player_rows = []
+        crossing_candidates = []
+        for interval in intervals:
+            player_id = interval["targetID"]
+            interaction_start = interval["start"]
+            interaction_end = interval["end"]
+            marked_state = actor_state_at(position_index, player_id, interval["start"], reliable_window_ms=2_000)
+            corpses_at_mark = [
+                corpse for corpse in corpses
+                if corpse["deathTimestamp"] <= interval["start"]
+                and corpse["uid"] not in consumed
+                and not (
+                    corpse.get("awakenedTimestamp")
+                    and corpse["awakenedTimestamp"] <= interval["start"]
+                )
+            ]
+            nearest_at_mark = None
+            if marked_state and marked_state.get("reliable") and corpses_at_mark:
+                nearest_corpse = min(
+                    corpses_at_mark,
+                    key=lambda corpse: math.dist(
+                        (float(marked_state["x"]), float(marked_state["y"])),
+                        (corpse["x"], corpse["y"]),
+                    ),
+                )
+                nearest_at_mark = {
+                    "corpseUID": nearest_corpse["uid"],
+                    "instance": nearest_corpse["instance"],
+                    "x": round(nearest_corpse["x"], 1),
+                    "y": round(nearest_corpse["y"], 1),
+                    "distanceYards": round(
+                        math.dist(
+                            (float(marked_state["x"]), float(marked_state["y"])),
+                            (nearest_corpse["x"], nearest_corpse["y"]),
+                        ) / 100,
+                        1,
+                    ),
+                }
+            distances = []
+            relevant_corpses = [
+                corpse for corpse in corpses
+                if corpse["deathTimestamp"] <= interaction_end
+                and corpse["uid"] not in consumed
+                and not (
+                    corpse.get("awakenedTimestamp")
+                    and corpse["awakenedTimestamp"] <= interaction_start
+                )
+            ]
+            position_available = bool(
+                _trajectory_points(position_index, player_id, interaction_start, interaction_end)
+            )
+            for corpse in relevant_corpses:
+                corpse_window_start = max(interaction_start, corpse["deathTimestamp"])
+                corpse_window_end = interaction_end
+                if corpse.get("awakenedTimestamp"):
+                    corpse_window_end = min(corpse_window_end, corpse["awakenedTimestamp"])
+                if corpse_window_end < corpse_window_start:
+                    continue
+                points = _trajectory_points(
+                    position_index, player_id, corpse_window_start, corpse_window_end,
+                )
+                position_available = position_available or bool(points)
+                nearest = _nearest_path_distance(points, (corpse["x"], corpse["y"]))
+                if nearest:
+                    distances.append((nearest["distanceYards"], nearest["timestamp"], corpse))
+            distances.sort(key=lambda row: (row[0], row[1]))
+            nearest = distances[0] if distances else None
+            ref = player_ref(players, actor_map, player_id)
+            player_row = {
+                **ref,
+                "markedAtMs": interval["start"] - fight["startTime"],
+                "markedAt": fmt_ms(interval["start"] - fight["startTime"]),
+                "auraStartMs": interaction_start - fight["startTime"],
+                "auraEndMs": interaction_end - fight["startTime"],
+                "auraStart": fmt_ms(interaction_start - fight["startTime"]),
+                "auraEnd": fmt_ms(interaction_end - fight["startTime"]),
+                "positionAvailable": position_available,
+                "markedPositionAvailable": bool(marked_state and marked_state.get("reliable")),
+                "nearestCorpseAtMark": nearest_at_mark,
+                "nearestCorpseYards": nearest[0] if nearest else None,
+                "attempted": bool(nearest and nearest[0] <= attempt_radius),
+                "burnedCorpses": [],
+                "status": "未取得可靠移动坐标" if not position_available else "持续期间未接近任何尸体",
+            }
+            if player_row["attempted"]:
+                player_row["status"] = "已尝试接近尸体"
+            for distance, crossing_time, corpse in distances:
+                if distance <= burn_radius and corpse["uid"] not in wake_uids:
+                    crossing_candidates.append((crossing_time, distance, corpse, player_row))
+            player_rows.append(player_row)
+        for crossing_time, distance, corpse, player_row in sorted(crossing_candidates, key=lambda row: (row[0], row[1])):
+            if corpse["uid"] in consumed:
+                continue
+            consumed.add(corpse["uid"])
+            player_row["burnedCorpses"].append({
+                "corpseUID": corpse["uid"],
+                "instance": corpse["instance"],
+                "timeMs": crossing_time - fight["startTime"],
+                "time": fmt_ms(crossing_time - fight["startTime"]),
+                "distanceYards": distance,
+            })
+            player_row["status"] = "已焚烧尸体"
+        consumed.update(wake_uids)
+        no_attempt = [
+            row for row in player_rows
+            if round_wakes and row["positionAvailable"] and not row["attempted"]
+        ]
+        round_row["corpseCremation"] = {
+            "burnRadiusYards": burn_radius,
+            "attemptRadiusYards": attempt_radius,
+            "availableCorpseCount": len(available_at_round_start),
+            "inferredBurnedCount": sum(len(row["burnedCorpses"]) for row in player_rows),
+            "awakenedHostCount": len(round_wakes),
+            "awakenedHosts": round_wakes,
+            "players": player_rows,
+            "noAttemptRefs": no_attempt,
+            "rule": "蛇形烈焰（1294933）的约 8 秒持续时间是尸体交互窗口；轨迹进入尸体 5 码视为焚烧、进入 10 码视为尝试。随后约 20 秒的焚化（1289875）仅为 DOT，不用于判断尸体交互。觉醒宿主是失败的直接证据。",
+        }
+    return {"corpses": corpses, "awakenedHosts": wake_events}
+
+
+def _configured_inner_teams(options, players):
+    by_name = {row.get("name", "").split("-", 1)[0]: player_id for player_id, row in players.items()}
+    configured = {}
+    for team, members in (options.get("innerRealmTeams") or {}).items():
+        resolved = set()
+        for member in members or []:
+            if isinstance(member, int) or str(member).isdigit():
+                player_id = int(member)
+            else:
+                player_id = by_name.get(str(member).split("-", 1)[0])
+            if player_id in players:
+                resolved.add(player_id)
+        configured[str(team)] = resolved
+    return configured
+
+
+def analyze_inner_realm(fight, actor_map, players, payload, options):
+    if not options.get("innerRealmReviewEnabled") or int(fight.get("difficulty") or 0) != 5:
+        return {"enabled": False, "rounds": [], "groupEvidenceAvailable": False}
+    well_intervals = aura_intervals(payload.get("innerBuffs") or [], 1300514, fight["endTime"])
+    inside = aura_intervals(payload.get("debuffs") or [], 1299988, fight["endTime"])
+    fatigue = aura_intervals(payload.get("debuffs") or [], 1300235, fight["endTime"])
+    mind_controls = [
+        event for event in payload.get("debuffs") or []
+        if int(ability_id(event) or 0) == 1290361 and is_apply(event)
+    ]
+    curse_casts = [
+        event for event in payload.get("casts") or []
+        if int(ability_id(event) or 0) == 1300238
+    ]
+    curse_interrupts = [
+        event for event in payload.get("interrupts") or []
+        if int(event.get("extraAbilityGameID") or 0) == 1300238
+    ]
+    swirl_damage = [
+        event for event in payload.get("damage") or []
+        if int(ability_id(event) or 0) == 1300239 and event_amount(event) > 0
+    ]
+    configured_teams = _configured_inner_teams(options, players)
+    owner_map = payload.get("actorOwnerMap") or {}
+    rotation = [str(value) for value in (options.get("innerRealmRotation") or [])]
+    death_time = {}
+    for event in payload.get("deaths") or []:
+        target_id = event.get("targetID")
+        death_time[target_id] = min(death_time.get(target_id, int(event["timestamp"])), int(event["timestamp"]))
+    rounds = []
+    row_index = 0
+    for well_index, well in enumerate(well_intervals, start=1):
+        well_start, well_end = well["start"], well["end"]
+        well_entries = sorted(
+            [row for row in inside if well_start - 1_500 <= row["start"] <= well_end + 1_500],
+            key=lambda row: row["start"],
+        )
+        clusters = []
+        for entrant in well_entries:
+            if not clusters or entrant["start"] - clusters[-1][-1]["start"] > 10_000:
+                clusters.append([])
+            clusters[-1].append(entrant)
+        if not clusters:
+            clusters = [[]]
+        for attempt_index, entrants in enumerate(clusters, start=1):
+            row_index += 1
+            cluster_start = min((row["start"] for row in entrants), default=well_start)
+            next_start = (
+                min(row["start"] for row in clusters[attempt_index])
+                if attempt_index < len(clusters) else well_end
+            )
+            start = well_start if attempt_index == 1 else cluster_start
+            end = max(start, min(well_end, next_start))
+            entrant_ids = {row["targetID"] for row in entrants if row["targetID"] in players}
+            expected_team = rotation[(well_index - 1) % len(rotation)] if rotation else None
+            expected_ids = set(configured_teams.get(expected_team) or []) if expected_team else set()
+            expected_alive = {player_id for player_id in expected_ids if death_time.get(player_id, math.inf) > start}
+            missing = expected_alive - entrant_ids
+            unexpected = entrant_ids - expected_alive if expected_ids else set()
+            fatigued = {
+                entrant["targetID"] for entrant in entrants
+                if any(row["targetID"] == entrant["targetID"] and row["start"] <= entrant["start"] < row["end"] for row in fatigue)
+            }
+            attempts = [row for row in curse_casts if start <= int(row.get("timestamp") or 0) < end]
+            successes = [row for row in attempts if event_type(row) == "cast"]
+            interrupts = [row for row in curse_interrupts if start <= int(row.get("timestamp") or 0) < end]
+            controlled_ids = {
+                row.get("targetID") for row in mind_controls
+                if start <= int(row.get("timestamp") or 0) < end and row.get("targetID") in players
+            }
+            hit_by_player = defaultdict(list)
+            for event in swirl_damage:
+                if start <= int(event.get("timestamp") or 0) < end:
+                    hit_by_player[event.get("targetID")].append(event)
+            hit_rows = []
+            for player_id, events in hit_by_player.items():
+                hit_rows.append({
+                    **player_ref(players, actor_map, player_id),
+                    "hitCount": len(events),
+                    "totalDamage": sum(event_amount(event) for event in events),
+                })
+            assignment_configured = bool(expected_ids)
+            assignment_ok = assignment_configured and not missing and not unexpected and not fatigued
+            rounds.append({
+                "index": row_index,
+                "wellIndex": well_index,
+                "attemptIndex": attempt_index,
+                "timeMs": start - fight["startTime"],
+                "time": fmt_ms(start - fight["startTime"]),
+                "endTimeMs": end - fight["startTime"],
+                "endTime": fmt_ms(end - fight["startTime"]),
+                "expectedTeam": expected_team,
+                "assignmentConfigured": assignment_configured,
+                "assignmentStatus": "正常" if assignment_ok else ("异常" if assignment_configured else "未配置小队名单"),
+                "entrantRefs": [player_ref(players, actor_map, player_id) for player_id in sorted(entrant_ids)],
+                "missingRefs": [player_ref(players, actor_map, player_id) for player_id in sorted(missing)],
+                "unexpectedRefs": [player_ref(players, actor_map, player_id) for player_id in sorted(unexpected)],
+                "fatiguedRefs": [player_ref(players, actor_map, player_id) for player_id in sorted(fatigued)],
+                "curseCastCount": len(interrupts) + len(successes),
+                "curseInterruptCount": len(interrupts),
+                "curseSuccessCount": len(successes),
+                "interrupts": [{
+                    "timeMs": int(row["timestamp"]) - fight["startTime"],
+                    "time": fmt_ms(int(row["timestamp"]) - fight["startTime"]),
+                    **player_ref(players, actor_map, owner_map.get(row.get("sourceID")) or row.get("sourceID")),
+                    "spellID": row.get("abilityGameID"),
+                    "spell": SPELLS.get(row.get("abilityGameID"), spell_name(row.get("abilityGameID"))),
+                } for row in interrupts],
+                "mindControlledRefs": [player_ref(players, actor_map, player_id) for player_id in sorted(controlled_ids)],
+                "swirlingSpirit": sorted(hit_rows, key=lambda row: (row["hitCount"], row["totalDamage"]), reverse=True),
+            })
+    return {
+        "enabled": True,
+        "spellIDs": [1299988, 1300235, 1300238, 1300239, 1290361],
+        "groupEvidenceAvailable": False,
+        "groupEvidenceNote": "WCL 不提供游戏内小队编号；名单配置后才进行 3/4 队轮换判定。",
+        "configuredTeams": sorted(configured_teams),
+        "rotation": rotation,
+        "rounds": rounds,
+        "totals": {
+            "roundCount": len(rounds),
+            "curseInterruptCount": sum(row["curseInterruptCount"] for row in rounds),
+            "curseSuccessCount": sum(row["curseSuccessCount"] for row in rounds),
+            "mindControlledCount": sum(len(row["mindControlledRefs"]) for row in rounds),
+            "swirlingSpiritHitCount": sum(sum(player["hitCount"] for player in row["swirlingSpirit"]) for row in rounds),
+        },
+    }
+
+
 def analyze_tank_swap(fight, actor_map, players, debuffs, friendly_casts, barrage, survival):
     tank_ids = {player_id for player_id, player in players.items() if player.get("role") == "tank"}
     stack_rows = []
@@ -1009,7 +1461,7 @@ def build_field_replay_events(fight, markers, player_catalog, boss_ids, actor_ma
             "timeMs": pyre["timeMs"],
             "time": pyre["time"],
             "phase": phase_at(pyre["timeMs"], markers),
-            "title": f"葬火分散 #{pyre['index']} · {pyre['target']}",
+            "title": f"噬灭烈焰分散 #{pyre['index']} · {pyre['target']}",
             "targetID": pyre.get("targetID"),
             "target": pyre.get("target"),
             "pyre": pyre,
@@ -1028,6 +1480,10 @@ def analyze_avoidable(fight, actor_map, actor_type, damage, deaths, players=None
             continue
         target_id = event.get("targetID")
         if actor_type.get(target_id) != "Player":
+            continue
+        if event_amount(event) <= 0 and (target_id, spell_id) not in death_keys:
+            # Immune / reflect / dodge / deflect rows can still be emitted by WCL;
+            # they are evidence of avoiding the mechanic, not a landed hit.
             continue
         row = board[spell_id][target_id]
         row["hitCount"] += 1
@@ -1115,12 +1571,39 @@ def merge_avoidable(global_board, local_board):
             target["events"].extend(row["events"])
 
 
-def _mechanic_overview(rendered):
-    barrage_rounds = []
+def _death_count_before(pull, time_ms):
+    return len({
+        row.get("playerID") for row in (pull.get("deathTimeline") or [])
+        if row.get("kind") == "death" and int(row.get("timeMs") or 0) <= int(time_ms or 0)
+    })
+
+
+def _mechanic_overview(rendered, options=None):
+    threshold = int((options or {}).get("raidCollapseDeathThreshold") or 8)
+    corpse_failures = []
     close_essence = []
-    missing_inner = []
+    barrage_rounds = []
+    inner_failures = []
+    avoidable_deaths = []
     for pull in rendered:
         mechanics = pull.get("nakzali") or {}
+        for round_row in (mechanics.get("hungeringPyre") or {}).get("rounds") or []:
+            cremation = round_row.get("corpseCremation") or {}
+            if not cremation.get("awakenedHostCount"):
+                continue
+            evidence_time = (cremation.get("awakenedHosts") or [{}])[0].get("timeMs", round_row.get("timeMs"))
+            death_count = _death_count_before(pull, evidence_time)
+            if death_count > threshold:
+                continue
+            for ref in cremation.get("noAttemptRefs") or []:
+                corpse_failures.append(nightly_detail(
+                    pull,
+                    round_row.get("time"),
+                    f"噬灭烈焰 #{round_row.get('index')} 后触发觉醒宿主；{ref.get('player')} 的蛇形烈焰轨迹未进入任意尸体 10 码范围",
+                    player=ref.get("player"),
+                    classColor=ref.get("classColor"),
+                    raidDeathCountBefore=death_count,
+                ))
         for round_row in (mechanics.get("possessionBarrage") or {}).get("rounds") or []:
             abnormal = [
                 wave for wave in round_row.get("waves") or []
@@ -1132,52 +1615,88 @@ def _mechanic_overview(rendered):
                 wave.get("interceptorCandidate") for wave in abnormal
                 if wave.get("interceptorCandidate")
             ), None)
-            candidate_text = (
-                f"；坐标候选拦截者：{candidate.get('player')}（距弹道 {candidate.get('distanceToLaneYards')} 码）"
-                if candidate else "；未取得可闭环的个人坐标"
-            )
+            if not candidate:
+                continue
+            evidence_time = abnormal[0].get("timeMs", round_row.get("timeMs"))
+            death_count = _death_count_before(pull, evidence_time)
+            if death_count > threshold:
+                continue
             barrage_rounds.append(nightly_detail(
                 pull, round_row.get("time"),
-                f"附身弹幕 #{round_row.get('index')} 疑似被提前拦截并造成过高全团伤害；弹幕目标：{round_row.get('target') or '未知'}{candidate_text}",
-                player=candidate.get("player") if candidate else None,
-                classColor=candidate.get("classColor") if candidate else None,
+                f"附身弹幕 #{round_row.get('index')} 被提前拦截；{candidate.get('player')} 位于 Boss 与坦克目标之间，距弹道 {candidate.get('distanceToLaneYards')} 码",
+                player=candidate.get("player"),
+                classColor=candidate.get("classColor"),
+                raidDeathCountBefore=death_count,
             ))
         for placement in (mechanics.get("essenceRend") or {}).get("placements") or []:
             if placement.get("placementEstimate") != "太靠近中场":
                 continue
+            death_count = _death_count_before(pull, placement.get("timeMs"))
+            if death_count > threshold:
+                continue
             close_essence.append(nightly_detail(
                 pull, placement.get("time"),
                 f"{placement.get('player') or '未知玩家'} 的精华撕裂距中场 {placement.get('distanceFromCenterYards')} 码（要求至少 20 码）",
-                player=placement.get("player"), classColor=placement.get("classColor"),
+                player=placement.get("player"), classColor=placement.get("classColor"), raidDeathCountBefore=death_count,
             ))
-        if int(pull.get("difficulty") or 0) == 5:
-            for player_row in (mechanics.get("avoidableBoard") or {}).get("1308227") or []:
-                events = player_row.get("events") or []
-                if not events:
-                    continue
-                missing_inner.append(nightly_detail(
-                    pull, events[0].get("time"),
-                    f"{player_row.get('player') or '未知玩家'} 进入中央井口并受到不朽盘卷伤害（{len(events)} 跳）",
-                    player=player_row.get("player"), classColor=player_row.get("classColor"),
-                ))
+        for round_row in (mechanics.get("innerRealm") or {}).get("rounds") or []:
+            if not round_row.get("assignmentConfigured") or round_row.get("assignmentStatus") == "正常":
+                continue
+            death_count = _death_count_before(pull, round_row.get("timeMs"))
+            if death_count > threshold:
+                continue
+            missing_names = "、".join(ref.get("player") for ref in round_row.get("missingRefs") or []) or "无"
+            unexpected_names = "、".join(ref.get("player") for ref in round_row.get("unexpectedRefs") or []) or "无"
+            fatigued_names = "、".join(ref.get("player") for ref in round_row.get("fatiguedRefs") or []) or "无"
+            inner_failures.append(nightly_detail(
+                pull,
+                round_row.get("time"),
+                f"内场 #{round_row.get('index')}（预期 {round_row.get('expectedTeam')} 队）异常：缺席 {missing_names}；替入 {unexpected_names}；带灵魂疲惫进入 {fatigued_names}",
+                raidDeathCountBefore=death_count,
+            ))
+        for death in pull.get("deathTimeline") or []:
+            if death.get("kind") != "death" or int(death.get("abilityID") or 0) not in {1288554, 1295085, 1300239}:
+                continue
+            death_count = _death_count_before(pull, death.get("timeMs"))
+            if death_count > threshold:
+                continue
+            avoidable_deaths.append(nightly_detail(
+                pull,
+                death.get("time"),
+                f"{death.get('player')} 死于 {death.get('ability')}",
+                player=death.get("player"),
+                classColor=death.get("classColor"),
+                spellID=death.get("abilityID"),
+                raidDeathCountBefore=death_count,
+            ))
     return {
         "title": "整夜机制统计",
-        "subtitle": "每轮附身弹幕最多计一次；精华撕裂使用固定 20 码阈值；错误进入内场仅统计史诗。",
+        "subtitle": f"所有项目只统计机制发生时累计减员不超过 {threshold} 人的记录；超过阈值后的崩盘阶段不继续归责。",
         "metrics": [
             {
-                "key": "barrageIntercepts", "label": "附身弹幕过早拦截", "value": len(barrage_rounds), "unit": "次",
-                "tone": "danger", "description": "同一轮即使多发弹幕均异常也只计一次；只有可靠坐标显示某名玩家最先穿过 Boss 到点名目标的弹道线段时才归到个人，缺坐标的轮次仍保留但不强行归人。",
-                "players": nightly_player_totals(barrage_rounds), "events": barrage_rounds,
+                "key": "awakenedHostNoAttempt", "label": "觉醒宿主时未尝试焚尸", "value": len(corpse_failures), "unit": "人次",
+                "tone": "danger", "description": "仅在该轮确实触发觉醒宿主时，蛇形烈焰全程未进入任意可用尸体 10 码范围的玩家才计数。",
+                "players": nightly_player_totals(corpse_failures), "events": corpse_failures,
             },
             {
-                "key": "closeEssenceRends", "label": "精华撕裂太靠近中场", "value": len(close_essence), "unit": "次",
-                "tone": "warning", "description": "可靠落点距估算场地中心小于 20 码时计数。",
+                "key": "closeEssenceRends", "label": "精华撕裂未远离中场", "value": len(close_essence), "unit": "次",
+                "tone": "warning", "description": "可靠解除位置距估算场地中心小于 20 码时计数。",
                 "players": nightly_player_totals(close_essence), "events": close_essence,
             },
             {
-                "key": "missingInnerRealm", "label": "未按要求进入内场", "value": len(missing_inner), "unit": "人次",
-                "tone": "danger", "description": "仅史诗难度；玩家进入中央盘魂之井并实际受到不朽盘卷 1308227 伤害时计数，每场 Pull 每名玩家最多计一次。",
-                "players": nightly_player_totals(missing_inner), "events": missing_inner,
+                "key": "barrageIntercepts", "label": "错误挡住附身弹幕", "value": len(barrage_rounds), "unit": "次",
+                "tone": "danger", "description": "同一轮最多计一次；必须同时存在异常团伤与可靠坐标，证明该玩家位于 Boss 和坦克目标之间。",
+                "players": nightly_player_totals(barrage_rounds), "events": barrage_rounds,
+            },
+            {
+                "key": "incorrectInnerRealm", "label": "未按分组进入内场", "value": len(inner_failures), "unit": "轮",
+                "tone": "danger", "description": "WCL 不记录小队编号；只有配置 3/4 队名单后才比较实际不朽盘卷进入记录，未配置时不计数。",
+                "players": nightly_player_totals(inner_failures), "events": inner_failures,
+            },
+            {
+                "key": "avoidableDeaths", "label": "死于可躲避技能", "value": len(avoidable_deaths), "unit": "次",
+                "tone": "danger", "description": "仅统计灵魂转移、潜藏的教徒与盘旋精魂的直接致死记录。",
+                "players": nightly_player_totals(avoidable_deaths), "events": avoidable_deaths,
             },
         ],
     }
@@ -1191,6 +1710,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
     markers = phase_markers(fight, payload["casts"], payload["buffs"])
     player_catalog = build_player_catalog(actor_map, actor_type, payload["combatants"])
     actor_game_id = {row["id"]: row.get("gameID") for row in actor_rows}
+    payload["actorOwnerMap"] = {row["id"]: row.get("petOwner") for row in actor_rows if row.get("petOwner")}
     boss_ids = [actor_id for actor_id, game_id in actor_game_id.items() if game_id == 259927]
     position_events = payload.get("positionEvents") or []
     boss_position_events = payload.get("bossPositionEvents") or []
@@ -1211,6 +1731,18 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
     )
     hungering_pyre = analyze_hungering_pyre(fight, actor_map, payload["debuffs"], payload["damage"], options, payload["casts"])
     analyze_transition_assignments(fight, actor_map, player_catalog, hungering_pyre["rounds"], payload["debuffs"], payload["damage"])
+    corpse_lifecycle = analyze_corpse_cremation(
+        fight,
+        actor_map,
+        player_catalog,
+        hungering_pyre["rounds"],
+        payload["debuffs"],
+        position_index,
+        payload.get("amaniDamage") or [],
+        payload.get("amaniBuffs") or [],
+        options,
+    )
+    inner_realm = analyze_inner_realm(fight, actor_map, player_catalog, payload, options)
     raw = {
         "reportID": report_id,
         "reportStart": report_start,
@@ -1223,6 +1755,8 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, actor_r
         "leaks": analyze_leaks(fight, payload["casts"], markers, options),
         "barrage": barrage,
         "hungeringPyre": hungering_pyre,
+        "corpseLifecycle": corpse_lifecycle,
+        "innerRealm": inner_realm,
         "invoke": analyze_invoke(fight, actor_map, payload["debuffs"], markers),
         "avoidable": analyze_avoidable(fight, actor_map, actor_type, payload["damage"], payload["deaths"], player_catalog),
     }
@@ -1293,6 +1827,7 @@ def render_fight(raw, baseline, options):
             "essenceRend": raw["essenceRend"],
             "possessionBarrage": {"baseline": baseline, "rounds": raw["barrage"]},
             "hungeringPyre": raw["hungeringPyre"],
+            "innerRealm": raw["innerRealm"],
             "invokeInterrupts": {"count": len(raw["invoke"]), "events": raw["invoke"],
                                  "mostInterruptedAbility": most_interrupted,
                                  "abilityCounts": [{"ability": name, "count": count} for name, count in sorted(interrupted_counts.items(), key=lambda item: item[1], reverse=True)]},
@@ -1323,12 +1858,20 @@ def build_aggregated_json(report_ids, options=None):
         actor_map = {row["id"]: row["name"] for row in actor_rows}
         actor_type = {row["id"]: row.get("type") for row in actor_rows}
         primary_boss_id = next((row["id"] for row in actor_rows if row.get("gameID") == 259927), None)
+        amani_ids = [row["id"] for row in actor_rows if row.get("gameID") == 261509]
         progress(f"{report_id}：匹配 {len(fights)} 场", 12)
 
         def fetch_one(index_and_fight):
             index, fight = index_and_fight
             progress(f"读取 Fight {fight['id']}（{index}/{len(fights)}）")
-            payload = fetch_payload(client, report_id, fight, options, boss_id=primary_boss_id)
+            payload = fetch_payload(
+                client,
+                report_id,
+                fight,
+                options,
+                boss_id=primary_boss_id,
+                amani_ids=amani_ids,
+            )
             raw = analyze_report_fight(report_id, report["startTime"], actor_map, actor_type, actor_rows, fight, payload, options)
             return index, raw
 
@@ -1374,7 +1917,7 @@ def build_aggregated_json(report_ids, options=None):
             "page1_wipeAnalysis": rendered,
             "page2_avoidableBoard": global_rows,
             "barrageBaseline": baseline,
-            "mechanicOverview": _mechanic_overview(rendered),
+            "mechanicOverview": _mechanic_overview(rendered, options),
         },
     }
 

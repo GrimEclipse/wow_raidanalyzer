@@ -31,6 +31,12 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         cls.ulatek_plugin = (
             ROOT / "frontend/report/plugins/venomous_abyss/ulatek/plugin.js"
         ).read_text(encoding="utf-8")
+        cls.progression_js = (
+            ROOT / "frontend/report/plugins/venomous_abyss/progression/report.js"
+        ).read_text(encoding="utf-8")
+        cls.progression_css = (
+            ROOT / "frontend/report/plugins/venomous_abyss/progression/report.css"
+        ).read_text(encoding="utf-8")
 
     def test_all_reports_route_through_shared_pull_overview(self):
         self.assertIn('function overviewUrl(sourcePath)', self.runtime)
@@ -99,6 +105,23 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('function renderHeart()', self.ulatek_js)
         self.assertIn('第 2 → 第 3 平台高压流程', self.ulatek_js)
         self.assertIn('new URLSearchParams(location.search).get("fight")', self.ulatek_js)
+
+    def test_single_fight_tooltips_use_a_top_level_overlay(self):
+        self.assertIn('const TOOLTIP_LAYER = 2147483647', self.runtime)
+        self.assertIn('.wowhead-tooltip-powered', self.runtime)
+        self.assertIn('position: fixed', self.runtime)
+        self.assertIn('[data-report-tooltip]', self.runtime)
+
+    def test_crosswind_arrows_leave_the_player_center_clear(self):
+        self.assertIn('data-report-tooltip=', self.progression_js)
+        self.assertIn('function specIcon(row)', self.progression_js)
+        self.assertIn('/assets/specs/${slug}.jpg', self.progression_js)
+        self.assertIn('${specIcon(row)}<i class="target-arrow"', self.progression_js)
+        self.assertIn('.actor-icon', self.progression_css)
+        self.assertIn('--arrow-angle:', self.progression_js)
+        self.assertNotIn('aria-hidden="true"></i><b>', self.progression_js)
+        self.assertIn('left: 54%', self.progression_css)
+        self.assertIn('height: 3px', self.progression_css)
 
     def test_published_guild_kill_report_has_complete_safe_collision_evidence(self):
         manifest = json.loads((ROOT / "assets/samples/report_manifest.json").read_text(encoding="utf-8"))

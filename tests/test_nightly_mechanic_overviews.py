@@ -29,14 +29,20 @@ def test_nakzali_nightly_overview_counts_each_bad_barrage_round_once():
             ],
         }]},
         "essenceRend": {"placements": [{
-            "time": "00:30.0", "player": "法师", "classColor": "#3fc7eb",
+            "time": "00:30.0", "timeMs": 30_000, "player": "法师", "classColor": "#3fc7eb",
             "distanceFromCenterYards": 19.9, "placementEstimate": "太靠近中场", "counted": False,
         }]},
-        "avoidableBoard": {"1308227": [{
-            "player": "战士", "classColor": "#c69b6d",
-            "events": [{"time": "01:00.0"}],
+        "innerRealm": {"rounds": [{
+            "index": 1, "time": "00:40.0", "timeMs": 40_000,
+            "expectedTeam": "3", "assignmentConfigured": True, "assignmentStatus": "异常",
+            "missingRefs": [{"player": "战士", "classColor": "#c69b6d"}],
+            "unexpectedRefs": [], "fatiguedRefs": [],
         }]},
-    }, difficulty=5)])
+    }, difficulty=5, deathTimeline=[{
+        "kind": "death", "time": "01:00.0", "timeMs": 60_000,
+        "playerID": 9, "player": "战士", "classColor": "#c69b6d",
+        "abilityID": 1300239, "ability": "盘旋精魂",
+    }])])
 
     rows = metrics(overview)
     assert rows["barrageIntercepts"]["value"] == 1
@@ -47,7 +53,37 @@ def test_nakzali_nightly_overview_counts_each_bad_barrage_round_once():
     assert rows["closeEssenceRends"]["players"] == [
         {"player": "法师", "count": 1, "classColor": "#3fc7eb"},
     ]
-    assert rows["missingInnerRealm"]["value"] == 1
+    assert rows["incorrectInnerRealm"]["value"] == 1
+    assert rows["avoidableDeaths"]["value"] == 1
+
+
+def test_nakzali_nightly_overview_stops_counting_after_ninth_distinct_death():
+    deaths = [
+        {"kind": "death", "timeMs": index * 100, "playerID": index}
+        for index in range(1, 10)
+    ]
+    overview = nakzali_overview([pull(
+        deathTimeline=deaths,
+        nakzali={
+            "hungeringPyre": {"rounds": [{
+                "index": 1, "time": "00:20.0", "timeMs": 20_000,
+                "corpseCremation": {
+                    "awakenedHostCount": 1,
+                    "awakenedHosts": [{"timeMs": 20_000}],
+                    "noAttemptRefs": [{"player": "法师", "classColor": "#3fc7eb"}],
+                },
+            }]},
+            "essenceRend": {"placements": [{
+                "time": "00:21.0", "timeMs": 21_000, "player": "法师",
+                "classColor": "#3fc7eb", "distanceFromCenterYards": 10,
+                "placementEstimate": "太靠近中场",
+            }]},
+        },
+    )])
+
+    rows = metrics(overview)
+    assert rows["awakenedHostNoAttempt"]["value"] == 0
+    assert rows["closeEssenceRends"]["value"] == 0
 
 
 def test_sentinels_nightly_overview_combines_requested_three_metrics():

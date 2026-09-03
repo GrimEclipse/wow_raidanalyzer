@@ -3,6 +3,75 @@
 
   const SAFE_KEY = /^[a-z0-9_]+$/;
   const ROOT_PREFIX = "frontend/report/plugins";
+  const TOOLTIP_LAYER = 2147483647;
+
+  function installTooltipLayer() {
+    if (!global.document || global.document.getElementById("report-tooltip-layer-style")) return;
+
+    const style = global.document.createElement("style");
+    style.id = "report-tooltip-layer-style";
+    style.textContent = `
+      .wowhead-tooltip,
+      .wowhead-tooltip-powered,
+      .wowhead-tooltip-screen {
+        z-index: ${TOOLTIP_LAYER} !important;
+      }
+      .report-hover-tooltip {
+        position: fixed;
+        z-index: ${TOOLTIP_LAYER} !important;
+        display: none;
+        max-width: min(360px, calc(100vw - 24px));
+        padding: 8px 10px;
+        border: 1px solid #5f7c82;
+        border-radius: 6px;
+        background: #050a0df5;
+        box-shadow: 0 10px 30px #000c;
+        color: #edf3f1;
+        font: 12px/1.45 system-ui, "Microsoft YaHei", sans-serif;
+        pointer-events: none;
+        white-space: normal;
+      }
+      .report-hover-tooltip.visible { display: block; }
+    `;
+    global.document.head.appendChild(style);
+
+    const tooltip = global.document.createElement("div");
+    tooltip.id = "reportHoverTooltip";
+    tooltip.className = "report-hover-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    global.document.body.appendChild(tooltip);
+
+    let trigger = null;
+    const move = event => {
+      if (!trigger) return;
+      const gap = 14;
+      const bounds = tooltip.getBoundingClientRect();
+      const left = Math.min(event.clientX + gap, global.innerWidth - bounds.width - 8);
+      const top = Math.min(event.clientY + gap, global.innerHeight - bounds.height - 8);
+      tooltip.style.left = `${Math.max(8, left)}px`;
+      tooltip.style.top = `${Math.max(8, top)}px`;
+    };
+    global.document.addEventListener("pointerover", event => {
+      const candidate = event.target instanceof Element
+        ? event.target.closest("[data-report-tooltip]")
+        : null;
+      if (!candidate) return;
+      trigger = candidate;
+      tooltip.textContent = candidate.dataset.reportTooltip || "";
+      tooltip.classList.add("visible");
+      move(event);
+    });
+    global.document.addEventListener("pointermove", move);
+    global.document.addEventListener("pointerout", event => {
+      if (!trigger || (event.relatedTarget instanceof Node && trigger.contains(event.relatedTarget))) return;
+      if (event.target instanceof Node && trigger.contains(event.target)) {
+        trigger = null;
+        tooltip.classList.remove("visible");
+      }
+    });
+    global.addEventListener("blur", () => tooltip.classList.remove("visible"));
+    global.addEventListener("scroll", () => tooltip.classList.remove("visible"), true);
+  }
 
   function identityOf(payload) {
     const meta = payload && payload.meta ? payload.meta : {};
@@ -102,4 +171,5 @@
     storePayload,
     loadPayload
   };
+  installTooltipLayer();
 })(window);

@@ -233,66 +233,28 @@ th {
 .actor {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border: 2px solid var(--color);
   border-radius: 50%;
   background: #071013;
   box-shadow: 0 0 0 2px #0008;
-}
-.actor.has-spec {
-  width: 24px;
-  height: 24px;
-  background: #071013;
+  overflow: hidden;
   z-index: 5;
 }
-.actor .spec-face,
-.crosswind-player .spec-face {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border-radius: 50%;
-}
-.actor .spec-face img,
-.crosswind-player .spec-face img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-  pointer-events: none;
-}
-.player-tip {
-  display: none;
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  min-width: 108px;
-  padding: 6px 8px;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  background: #0c1418f2;
-  color: #e2e8f0;
-  font-size: 12px;
-  line-height: 1.35;
-  white-space: nowrap;
-  pointer-events: none;
-  box-shadow: 0 8px 18px #0008;
-  z-index: 9;
-}
-.player-tip b { display: block; position: static; transform: none; font-size: 13px; }
-.player-tip span { display: block; color: #94a3b8; }
-.actor:hover,
-.crosswind-player:hover { z-index: 10; }
-.actor:hover .player-tip,
-.crosswind-player:hover .player-tip { display: block; }
 .actor.stale {
   opacity: 0.35;
   border-style: dashed;
 }
-.actor > .actor-name {
+.actor-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.actor b {
   position: absolute;
   top: 18px;
   left: 50%;
@@ -346,19 +308,18 @@ th {
   background: #7ed7ed22;
   display: grid;
   place-items: center;
+  z-index: 3;
 }
-.crosswind-player {
+.crosswind-target > .actor-icon {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   transform: translate(-50%, -50%);
   border: 2px solid var(--color, #fff);
-  border-radius: 50%;
-  background: #071013;
   box-shadow: 0 0 0 2px #0008;
-  z-index: 3;
+  z-index: 1;
 }
 .crosswind-target.group-a {
   border-color: #65c7ff;
@@ -367,16 +328,6 @@ th {
 .crosswind-target.group-b {
   border-color: #ffb45f;
   background: #d5792333;
-}
-.crosswind-target > .crosswind-name {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 8px;
-  color: #eafcff;
-  white-space: nowrap;
-  text-shadow: 0 1px 3px #000;
 }
 .map-wind {
   position: absolute;
@@ -395,24 +346,35 @@ th {
 }
 .crosswind-target .target-arrow {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  inset: 0;
   font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  color: #fff;
-  text-shadow: 0 1px 3px #000;
-  z-index: 4;
+  transform: rotate(var(--arrow-angle, 0deg));
+  z-index: 2;
   pointer-events: none;
 }
-.crosswind-target > .crosswind-name {
+.crosswind-target .target-arrow::before {
+  content: "";
   position: absolute;
-  left: 50%;
-  top: 100%;
-  transform: translate(-50%, 3px);
-  white-space: nowrap;
-  font-size: 11px;
-  text-shadow: 0 1px 3px #000;
+  left: 54%;
+  top: 50%;
+  width: 22%;
+  height: 3px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px #000, 0 0 4px #000;
+}
+.crosswind-target .target-arrow::after {
+  content: "";
+  position: absolute;
+  left: 76%;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-100%, -50%) rotate(45deg);
+  border-top: 3px solid #fff;
+  border-right: 3px solid #fff;
+  filter: drop-shadow(0 1px 2px #000);
 }
 .crosswind-card .replay-map {
   margin: 10px 0;

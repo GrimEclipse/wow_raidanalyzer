@@ -1,5 +1,8 @@
 from boss_plugins.venomous_abyss.nakzali import (
     DEFAULT_OPTIONS,
+    SPELLS,
+    analyze_corpse_cremation,
+    analyze_inner_realm,
     analyze_avoidable,
     analyze_essence_rend,
     analyze_leaks,
@@ -118,6 +121,16 @@ def test_corpse_wither_is_not_classified_as_avoidable_damage():
     assert result["1288554"][0]["spellName"] == "潜藏的教徒"
 
 
+def test_immortal_coil_is_not_classified_as_avoidable_damage():
+    fight = {"startTime": 0, "endTime": 30_000}
+    damage = [event(5_000, 1308227, "damage", targetID=7, amount=100_000)]
+    assert analyze_avoidable(fight, {7: "测试玩家"}, {7: "Player"}, damage, []) == {}
+
+
+def test_soulcoil_rite_uses_confirmed_chinese_alias():
+    assert SPELLS[1288772] == "盘魂仪式"
+
+
 def test_player_catalog_only_contains_current_fight_combatants():
     actors = {1: "本场玩家", 2: "报告中的其他玩家"}
     actor_types = {1: "Player", 2: "Player"}
@@ -139,3 +152,113 @@ def test_snapshot_does_not_fake_boss_centre_when_wcl_has_no_boss_position():
     assert boss["position"] is None
     assert boss["positionRule"] == "missing"
     assert boss["positionReliable"] is False
+
+
+def test_corpse_cremation_marks_no_attempt_only_when_awakened_host_is_observed():
+    fight = {"startTime": 0, "endTime": 40_000, "difficulty": 5}
+    players = {1: {"id": 1, "name": "远离尸体", "classColor": "#f00"}}
+    rounds = [{"index": 1, "timeMs": 20_000, "time": "00:20.0"}]
+    debuffs = [
+        event(20_000, 1294933, "applydebuff", targetID=1),
+        event(28_000, 1294933, "removedebuff", targetID=1),
+    ]
+    positions = build_position_index([
+        event(20_000, 0, "resource", sourceID=1, x=2_000, y=0),
+        event(28_000, 0, "resource", sourceID=1, x=2_000, y=0),
+    ])
+    amani_damage = [event(
+        10_000, 1, "damage", targetID=50, targetInstance=3,
+        hitPoints=0, x=0, y=0,
+    )]
+    amani_buffs = [event(
+        30_000, 1297631, "applybuff", targetID=50, targetInstance=3,
+    )]
+
+    analyze_corpse_cremation(
+        fight, {1: "远离尸体"}, players, rounds, debuffs, positions,
+        amani_damage, amani_buffs, DEFAULT_OPTIONS,
+    )
+
+    result = rounds[0]["corpseCremation"]
+    assert result["awakenedHostCount"] == 1
+    assert result["noAttemptRefs"][0]["player"] == "远离尸体"
+    assert result["players"][0]["nearestCorpseYards"] == 20.0
+    assert result["players"][0]["nearestCorpseAtMark"] == {
+        "corpseUID": "50:3:10000",
+        "instance": 3,
+        "x": 0.0,
+        "y": 0.0,
+        "distanceYards": 20.0,
+    }
+
+
+def test_corpse_cremation_checks_the_full_slithering_flame_window():
+    fight = {"startTime": 0, "endTime": 40_000, "difficulty": 5}
+    players = {1: {"id": 1, "name": "后程接近", "classColor": "#f00"}}
+    rounds = [{"index": 1, "timeMs": 20_000, "time": "00:20.0"}]
+    debuffs = [
+        event(20_000, 1294933, "applydebuff", targetID=1),
+        event(28_000, 1294933, "removedebuff", targetID=1),
+    ]
+    positions = build_position_index([
+        event(20_000, 0, "resource", sourceID=1, x=2_000, y=0),
+        event(23_000, 0, "resource", sourceID=1, x=1_500, y=0),
+        event(26_000, 0, "resource", sourceID=1, x=800, y=0),
+        event(28_000, 0, "resource", sourceID=1, x=800, y=0),
+    ])
+    amani_damage = [event(
+        10_000, 1, "damage", targetID=50, targetInstance=3,
+        hitPoints=0, x=0, y=0,
+    )]
+    amani_buffs = [event(
+        29_000, 1297631, "applybuff", targetID=50, targetInstance=3,
+    )]
+
+    analyze_corpse_cremation(
+        fight, {1: "后程接近"}, players, rounds, debuffs, positions,
+        amani_damage, amani_buffs, DEFAULT_OPTIONS,
+    )
+
+    player = rounds[0]["corpseCremation"]["players"][0]
+    assert player["nearestCorpseAtMark"]["distanceYards"] == 20.0
+    assert player["nearestCorpseYards"] == 8.0
+    assert player["attempted"] is True
+    assert rounds[0]["corpseCremation"]["noAttemptRefs"] == []
+
+
+def test_inner_realm_splits_recovery_entry_in_same_well():
+    fight = {"startTime": 0, "endTime": 60_000, "difficulty": 5}
+    players = {
+        1: {"id": 1, "name": "三队甲", "classColor": "#f00"},
+        2: {"id": 2, "name": "补位乙", "classColor": "#0f0"},
+    }
+    payload = {
+        "innerBuffs": [
+            event(1_000, 1300514, "applybuff", targetID=60),
+            event(50_000, 1300514, "removebuff", targetID=60),
+        ],
+        "debuffs": [
+            event(5_000, 1299988, "applydebuff", targetID=1),
+            event(25_000, 1299988, "removedebuff", targetID=1),
+            event(21_000, 1290361, "applydebuff", targetID=1),
+            event(35_000, 1299988, "applydebuff", targetID=2),
+            event(48_000, 1299988, "removedebuff", targetID=2),
+        ],
+        "casts": [event(20_000, 1300238, "cast", sourceID=61)],
+        "interrupts": [],
+        "damage": [],
+        "deaths": [],
+    }
+    options = {
+        **DEFAULT_OPTIONS,
+        "innerRealmTeams": {"3": ["三队甲"], "4": ["补位乙"]},
+        "innerRealmRotation": ["3", "4"],
+    }
+
+    result = analyze_inner_realm(fight, {1: "三队甲", 2: "补位乙"}, players, payload, options)
+
+    assert len(result["rounds"]) == 2
+    assert result["rounds"][0]["wellIndex"] == result["rounds"][1]["wellIndex"] == 1
+    assert result["rounds"][0]["curseSuccessCount"] == 1
+    assert result["rounds"][0]["mindControlledRefs"][0]["player"] == "三队甲"
+    assert result["rounds"][1]["entrantRefs"][0]["player"] == "补位乙"
