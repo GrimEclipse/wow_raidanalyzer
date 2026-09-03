@@ -246,7 +246,7 @@ def _sszorak_arena(position_index, boss_id=None):
         "bossCenter": True,
         "bossStart": boss_start,
         "coordinateOffsetYards": SSZORAK_WCL_MAP_Y_OFFSET / 100,
-        # 用户提供的 RaidPlan 原图为 986 x 554；场地半径在图中约为 270px。
+        # RaidPlan 原图为 986 x 554；场地半径在图中约为 270px。
         "plotScaleX": 27.4,
         "plotScaleY": 48.7,
         "rotationDegrees": ASSET_MAP_ROTATION_DEG,
