@@ -66,6 +66,8 @@ CYST_TRIGGER_DEBUFF_ID = 1287205
 
 CYST_VOLLEY_CAST_ID = 1305959
 
+CYST_ASSIGNMENT_AFTER_VOLLEY_MS = 8_000
+
 
 DIG_DURATION_MS = 25_000
 
@@ -499,7 +501,56 @@ def _sszorak_cysts(fight, actor_map, players, raw, position_index, arena):
                 "active": True,
             }
             rows.append(row)
+    volley_casts = _completed_casts(raw["casts"], CYST_VOLLEY_CAST_ID)
+    for row in rows:
+        assignment_ts = row["assignmentTimestamp"]
+        volley = next((
+            cast for cast in reversed(volley_casts)
+            if 0 <= assignment_ts - int(cast["timestamp"]) <= CYST_ASSIGNMENT_AFTER_VOLLEY_MS
+        ), None)
+        if volley is None:
+            continue
+        volley_ts = int(volley["timestamp"])
+        row["volleyTimestamp"] = volley_ts
+        row["volleyTimeMs"] = volley_ts - fight["startTime"]
+        row["volleyTime"] = fmt_ms(volley_ts - fight["startTime"])
     return rows
+
+
+def _cyst_placements_for_dig(all_cysts, previous_dig_ts, dig_ts):
+    """Select two Cyst Volley batches for one Burrow phase.
+
+    A 1305959 cast assigns two players a few seconds apart. Those two players
+    are one placement batch even though their aura removals are staggered.
+    """
+    volley_timestamps = sorted({
+        row["volleyTimestamp"]
+        for row in all_cysts
+        if row.get("volleyTimestamp") is not None
+        and previous_dig_ts <= row["volleyTimestamp"] <= dig_ts
+    })[-2:]
+    if volley_timestamps:
+        selected = [
+            dict(row) for row in all_cysts
+            if row.get("volleyTimestamp") in volley_timestamps
+        ]
+        selected.sort(key=lambda row: (row["volleyTimestamp"], row["assignmentTimestamp"]))
+        for wave, volley_ts in enumerate(volley_timestamps, start=1):
+            wave_rows = [row for row in selected if row["volleyTimestamp"] == volley_ts]
+            for target_order, row in enumerate(wave_rows, start=1):
+                row["placementWave"] = wave
+                row["volleyTargetOrder"] = target_order
+        return selected
+
+    # Compatibility for older/synthetic payloads that predate volley evidence.
+    selected = [
+        dict(row) for row in all_cysts
+        if previous_dig_ts <= row["applyTimestamp"] <= dig_ts
+    ][-4:]
+    for index, row in enumerate(selected):
+        row["placementWave"] = min(index // 2 + 1, 2)
+        row["volleyTargetOrder"] = index % 2 + 1
+    return selected
 
 def _forced_movement_evidence(position_index, actor_map, players, timestamp, death_times):
     rows = []
@@ -1049,7 +1100,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
     for index, dig in enumerate(digs, start=1):
         timestamp = int(dig["timestamp"])
         previous = int(digs[index - 2]["timestamp"]) if index > 1 else int(fight["startTime"])
-        placements = [dict(row) for row in all_cysts if previous <= row["applyTimestamp"] <= timestamp][-4:]
+        placements = _cyst_placements_for_dig(all_cysts, previous, timestamp)
         for slot, row in enumerate(placements, start=1):
             row["slot"] = slot
 

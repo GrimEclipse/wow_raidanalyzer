@@ -4,6 +4,7 @@ from pathlib import Path
 from boss_plugins.venomous_abyss.lostexplorers import analyze_lost, analyze_throw_junk
 from boss_plugins.venomous_abyss.sszorak import (
     DIG_WIND_DIRECTIONS,
+    _cyst_placements_for_dig,
     _infer_dig_winds,
     _infer_wind_from_frames,
     _placement_slot_validation,
@@ -336,6 +337,19 @@ def test_sszorak_cyst_validation_marks_incomplete_winds_as_unverified():
     assert result[0]["placementStatus"] == "unverified"
     assert result[0]["placementOk"] is None
     assert result[1]["placementOk"] is True
+
+
+def test_sszorak_groups_two_targets_from_one_volley_as_one_placement_wave():
+    placements = [
+        {"player": "甲", "assignmentTimestamp": 10_100, "applyTimestamp": 20_100, "volleyTimestamp": 10_000},
+        {"player": "Toccata", "assignmentTimestamp": 12_100, "applyTimestamp": 22_100, "volleyTimestamp": 10_000},
+        {"player": "乙", "assignmentTimestamp": 60_100, "applyTimestamp": 70_100, "volleyTimestamp": 60_000},
+        {"player": "丙", "assignmentTimestamp": 62_100, "applyTimestamp": 72_100, "volleyTimestamp": 60_000},
+    ]
+    result = _cyst_placements_for_dig(placements, 0, 80_000)
+    assert [(row["player"], row["placementWave"], row["volleyTargetOrder"]) for row in result] == [
+        ("甲", 1, 1), ("Toccata", 1, 2), ("乙", 2, 1), ("丙", 2, 2),
+    ]
 
 
 def test_lost_tracks_united_defense_total_duration():
