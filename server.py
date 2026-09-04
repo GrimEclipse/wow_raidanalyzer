@@ -48,6 +48,7 @@ def environment_setting(key, default=""):
 
 JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
+SINGLE_FIGHT_CACHE_DIR = ROOT / ".single_fight_cache"
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 EXPORT_DIR = DATA_DIR / "exports"
@@ -61,6 +62,10 @@ LOGIN_ATTEMPTS_LOCK = threading.Lock()
 REGISTRATION_ATTEMPTS: Dict[str, List[float]] = {}
 REGISTRATION_ATTEMPTS_LOCK = threading.Lock()
 INVITE_CODE = environment_setting("APP_INVITE_CODE")
+JOB_RESULT_TTL_SECONDS = max(1, int(environment_setting("APP_JOB_RESULT_TTL_HOURS", "24"))) * 3600
+JOB_RESULT_MAX_BYTES = max(64, int(environment_setting("APP_JOB_RESULT_MAX_MB", "512"))) * 1024 * 1024
+SINGLE_CACHE_TTL_SECONDS = max(1, int(environment_setting("APP_SINGLE_CACHE_TTL_DAYS", "30"))) * 86400
+SINGLE_CACHE_MAX_BYTES = max(128, int(environment_setting("APP_SINGLE_CACHE_MAX_MB", "2048"))) * 1024 * 1024
 
 FIGHT_RE = re.compile(r"(读取|分析) Fight\s+(\d+).*?[（(](\d+)/(\d+)[）)]")
 COMPLETED_FIGHTS_RE = re.compile(r"已完成\s+(\d+)/(\d+)\s+场")
@@ -119,6 +124,88 @@ def stored_job_result(job_id: str, user: dict) -> Optional[Path]:
             None,
         )
     return None
+
+
+def prune_json_storage(root: Path, *, max_age_seconds: int, max_bytes: int, now: Optional[float] = None) -> dict:
+    """Bound temporary JSON storage by age first and then least-recently-used size."""
+    root = Path(root)
+    if not root.is_dir():
+        return {"removed": 0, "bytes": 0}
+    cutoff = float(now if now is not None else time.time()) - max(1, int(max_age_seconds))
+    removed = 0
+    rows = []
+    for path in root.rglob("*.json"):
+        if not path.is_file():
+            continue
+        try:
+            stat = path.stat()
+            if stat.st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+            else:
+                rows.append((stat.st_mtime, stat.st_size, path))
+        except OSError:
+            continue
+    total = sum(size for _, size, _ in rows)
+    for _, size, path in sorted(rows):
+        if total <= max(0, int(max_bytes)):
+            break
+        try:
+            path.unlink()
+            total -= size
+            removed += 1
+        except OSError:
+            continue
+    return {"removed": removed, "bytes": total}
+
+
+def prune_analysis_storage():
+    prune_json_storage(
+        JOB_DIR,
+        max_age_seconds=JOB_RESULT_TTL_SECONDS,
+        max_bytes=JOB_RESULT_MAX_BYTES,
+    )
+    prune_json_storage(
+        SINGLE_FIGHT_CACHE_DIR,
+        max_age_seconds=SINGLE_CACHE_TTL_SECONDS,
+        max_bytes=SINGLE_CACHE_MAX_BYTES,
+    )
+
+
+def user_guilds(user_id: int) -> list[dict]:
+    guilds = AUTH.list_guilds(user_id)
+    if guilds:
+        return guilds
+    from analyzer_core.single_fight import load_single_fight_config
+
+    fallback = load_single_fight_config()["guild"]
+    if int(fallback.get("id") or 0) > 0:
+        AUTH.upsert_guild(
+            user_id,
+            int(fallback["id"]),
+            str(fallback.get("name") or f"工会 {fallback['id']}"),
+            is_default=True,
+        )
+    return AUTH.list_guilds(user_id)
+
+
+def selected_user_guild(user_id: int, requested_id=None) -> dict:
+    guilds = user_guilds(user_id)
+    if not guilds:
+        raise AuthError("请先在账号设置中添加一个 WCL 工会。")
+    if requested_id not in (None, ""):
+        try:
+            selected_id = int(requested_id)
+        except (TypeError, ValueError) as error:
+            raise AuthError("WCL 工会 ID 必须是正整数。") from error
+        selected = next((guild for guild in guilds if guild["id"] == selected_id), None)
+        if not selected:
+            raise AuthError("所选工会不在当前账号的工会列表中。")
+        return selected
+    return next((guild for guild in guilds if guild["isDefault"]), guilds[0])
+
+
+prune_analysis_storage()
 
 
 def publish(job: Job, event: dict):
@@ -347,6 +434,76 @@ def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
             JOB_SEMAPHORE.release()
 
 
+def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
+    acquired = False
+    try:
+        from analyzer_core.single_fight import analyze_single_fight, latest_guild_fight
+        from analyzer_core.progress import progress_scope
+        from analyzer_core.wcl_api import WclClient
+
+        set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
+        JOB_SEMAPHORE.acquire()
+        acquired = True
+        set_job_progress(job, status="running", percent=3, message="查找工会最新 Boss 战", stage="discovery", force=True)
+        output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with use_wcl_credentials(credentials):
+            latest = latest_guild_fight(
+                WclClient(), guild_id=int(payload["guildID"]), report_limit=5
+            )
+            fight = latest["fight"]
+            report = latest["report"]
+            boss_name = (fight.get("analysisIdentity") or {}).get("bossName") or fight.get("name") or "Boss"
+            if not fight.get("supported"):
+                reason = fight.get("disabledReason") or "该 Boss 尚未接入分析规则"
+                raise ValueError(
+                    f"最新一场是 {boss_name} · Fight {fight['id']}，暂不能分析：{reason}"
+                )
+            set_job_progress(
+                job,
+                percent=8,
+                message=f"已定位 {boss_name} · Fight {fight['id']}，开始分析",
+                stage="discovery",
+                force=True,
+            )
+            callback = lambda event: translate_plugin_progress(job, event)
+            with progress_scope(callback):
+                result = analyze_single_fight(
+                    report_code=report["code"],
+                    fight_id=int(fight["id"]),
+                    output_path=output_path,
+                    options=payload.get("options") or {},
+                    force=bool(payload.get("force")),
+                    progress_callback=callback,
+                )
+        job.result_path = Path(result["path"])
+        job.status = "done"
+        job.percent = 100
+        job.stage = "done"
+        job.message = "已从缓存读取最新一场" if result.get("cacheHit") else "最新一场分析完成"
+        publish(job, {
+            "type": "done", "status": "done", "percent": 100,
+            "message": job.message, "stage": "done",
+            "resultUrl": job_result_url(job.id),
+            "downloadUrl": job_result_url(job.id, download=True),
+            "cacheHit": bool(result.get("cacheHit")),
+            "selection": {
+                "guild": latest["guild"], "report": report,
+                "fightID": fight["id"], "bossName": boss_name,
+            },
+        })
+    except Exception as exc:
+        job.status = "error"
+        job.error = str(exc)
+        publish(job, {
+            "type": "error", "status": "error", "percent": job.percent,
+            "message": str(exc), "stage": "error",
+        })
+    finally:
+        if acquired:
+            JOB_SEMAPHORE.release()
+
+
 def json_bytes(data, status=HTTPStatus.OK):
     body = json.dumps(data, ensure_ascii=False).encode("utf-8")
     return status, "application/json; charset=utf-8", body
@@ -481,7 +638,7 @@ def safe_redirect_target(value, default="/online"):
 
 
 class AnalyzerHandler(BaseHTTPRequestHandler):
-    server_version = "MythicAnalyzer/0.2"
+    server_version = "MythicAnalyzer/1.3"
 
     def do_GET(self):
         path = self.request_path()
@@ -520,7 +677,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes({
                 "user": user,
                 "wcl": AUTH.wcl_summary(user["id"]),
+                "guilds": user_guilds(user["id"]),
             }))
+        if path == "/api/auth/guilds":
+            return self.send_response_body(*json_bytes({"guilds": user_guilds(user["id"])}))
         if path == "/api/admin/users":
             if not user["isAdmin"]:
                 return self.json_error("仅管理员可以管理账号。", HTTPStatus.FORBIDDEN)
@@ -532,9 +692,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             from analyzer_core.single_fight import load_single_fight_config
 
             config = load_single_fight_config()
+            guilds = user_guilds(user["id"])
+            selected_guild = next((guild for guild in guilds if guild["isDefault"]), guilds[0])
             return self.send_response_body(*json_bytes({
                 "schemaVersion": config["schemaVersion"],
-                "guild": config["guild"],
+                "guild": selected_guild,
+                "guilds": guilds,
                 "raidNight": config["raidNight"],
                 "abilityCatalog": catalog_summary(),
             }))
@@ -547,16 +710,15 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             query = parse_qs(urlparse(self.path).query)
             selected_date = str((query.get("date") or [""])[0]).strip()
             limit = int((query.get("limit") or ["20"])[0])
-            guild_value = str((query.get("guildID") or [""])[0]).strip()
             try:
-                guild_id = int(guild_value) if guild_value else None
-                if guild_id is not None and guild_id <= 0:
-                    raise ValueError
-            except ValueError:
-                return self.json_error("WCL 工会 ID 必须是正整数。", HTTPStatus.BAD_REQUEST)
+                selected_guild = selected_user_guild(
+                    user["id"], str((query.get("guildID") or [""])[0]).strip()
+                )
+            except AuthError as error:
+                return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
             with use_wcl_credentials(credentials):
                 return self.send_response_body(*json_bytes(recent_guild_reports(
-                    selected_date=selected_date, limit=limit, guild_id=guild_id,
+                    selected_date=selected_date, limit=limit, guild_id=selected_guild["id"],
                 )))
         single_report = re.fullmatch(r"/api/single-fight/reports/([A-Za-z0-9]+)", path)
         if single_report:
@@ -647,6 +809,15 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.handle_change_password(user)
         if path == "/api/auth/wcl-credentials":
             return self.handle_wcl_credentials(user)
+        if path == "/api/auth/guilds":
+            return self.handle_guild_upsert(user)
+        default_guild_match = re.fullmatch(r"/api/auth/guilds/(\d+)/default", path)
+        if default_guild_match:
+            try:
+                guild = AUTH.set_default_guild(user["id"], int(default_guild_match.group(1)))
+                return self.send_response_body(*json_bytes({"ok": True, "guild": guild, "guilds": user_guilds(user["id"])}))
+            except AuthError as error:
+                return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         admin_match = re.fullmatch(r"/api/admin/users/(\d+)", path)
         if admin_match:
             return self.handle_admin_update(user, int(admin_match.group(1)))
@@ -665,6 +836,13 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/wcl-credentials":
             AUTH.delete_wcl_credentials(user["id"])
             return self.send_response_body(*json_bytes({"ok": True}))
+        guild_match = re.fullmatch(r"/api/auth/guilds/(\d+)", path)
+        if guild_match:
+            try:
+                AUTH.delete_guild(user["id"], int(guild_match.group(1)))
+                return self.send_response_body(*json_bytes({"ok": True, "guilds": user_guilds(user["id"])}))
+            except AuthError as error:
+                return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         admin_delete_match = re.fullmatch(r"/api/admin/users/(\d+)", path)
         if admin_delete_match:
             return self.handle_admin_delete(user, int(admin_delete_match.group(1)))
@@ -854,17 +1032,52 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         except (AuthError, ValueError, json.JSONDecodeError) as error:
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
+    def handle_guild_upsert(self, user):
+        try:
+            payload = self.read_json_body()
+            guild_id = int(payload.get("guildId") or payload.get("id") or 0)
+            if guild_id <= 0:
+                raise AuthError("WCL 工会 ID 必须是正整数。")
+            credentials = AUTH.get_wcl_credentials(user["id"])
+            if not credentials:
+                return self.json_error(
+                    "请先保存 WCL Client ID 与 Client Secret，再添加工会。",
+                    HTTPStatus.BAD_REQUEST,
+                )
+            from analyzer_core.wcl_api import WclClient
+
+            with use_wcl_credentials(credentials):
+                data = WclClient().graphql_data(
+                    "query($guildID: Int!) { guildData { guild(id: $guildID) { id name } } }",
+                    {"guildID": guild_id},
+                )
+            resolved = (data.get("guildData") or {}).get("guild") or {}
+            if not resolved:
+                raise AuthError("WCL 未找到该工会，请检查工会 ID。")
+            guild = AUTH.upsert_guild(
+                user["id"],
+                int(resolved.get("id") or guild_id),
+                str(resolved.get("name") or f"工会 {guild_id}"),
+                is_default=bool(payload.get("isDefault")),
+            )
+            return self.send_response_body(*json_bytes({
+                "ok": True, "guild": guild, "guilds": user_guilds(user["id"]),
+            }))
+        except (AuthError, ValueError, json.JSONDecodeError) as error:
+            return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
+        except Exception as error:
+            return self.json_error(f"无法验证工会：{error}", HTTPStatus.BAD_REQUEST)
+
     def handle_wcl_credentials_test(self, user):
         try:
             credentials = AUTH.get_wcl_credentials(user["id"])
             if not credentials:
                 return self.json_error("尚未配置 WCL 凭据，请先保存再测试。", HTTPStatus.BAD_REQUEST)
-            from analyzer_core.single_fight import load_single_fight_config
             from analyzer_core.wcl_api import WclClient
             client = WclClient()
             with use_wcl_credentials(credentials):
                 client.token()
-                guild_id = int(load_single_fight_config()["guild"]["id"])
+                guild_id = int(selected_user_guild(user["id"])["id"])
                 data = client.graphql_data(
                     """
                     query($guildID: Int!) {
@@ -938,6 +1151,31 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if not user["canModify"]:
             return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
         try:
+            if path == "/api/single-fight/latest":
+                credentials = self.require_wcl_credentials(user)
+                if not credentials:
+                    return None
+                payload = self.read_json_body()
+                guild = selected_user_guild(user["id"], payload.get("guildID"))
+                payload["guildID"] = guild["id"]
+                prune_analysis_storage()
+                job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user["id"])
+                with JOBS_LOCK:
+                    JOBS[job.id] = job
+                thread = threading.Thread(
+                    target=run_latest_single_fight_job,
+                    args=(job, payload, credentials),
+                    daemon=True,
+                )
+                thread.start()
+                return self.send_response_body(*json_bytes({
+                    "jobId": job.id,
+                    "eventsUrl": f"/api/jobs/{job.id}/events",
+                    "statusUrl": f"/api/jobs/{job.id}/status",
+                    "resultUrl": job_result_url(job.id),
+                    "downloadUrl": job_result_url(job.id, download=True),
+                    "guild": guild,
+                }, HTTPStatus.ACCEPTED))
             if path in {"/api/raid-calendar/setup", "/api/loot/setup"}:
                 return self.send_response_body(*json_bytes(raid_calendar_store.save_setup(self.read_json_body())))
             if path in {"/api/raid-calendar/settings", "/api/loot/settings"}:
@@ -970,6 +1208,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                     raise ValueError("请选择有效的 report 与 Fight。")
                 payload["reportCode"] = report_code
                 payload["fightID"] = fight_id
+                prune_analysis_storage()
                 job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user["id"])
                 with JOBS_LOCK:
                     JOBS[job.id] = job

@@ -88,7 +88,7 @@ class UlatekAnalyzerTests(unittest.TestCase):
         self.assertFalse(result["rounds"][0]["breaks"][0]["wrong"])
         self.assertTrue(result["rounds"][0]["breaks"][1]["wrong"])
 
-    def test_critical_counts_actual_non_tank_melee_and_wrath_once(self):
+    def test_critical_does_not_treat_single_target_wrath_ticks_as_raidwide(self):
         raw = self.raw(
             casts=[
                 {"timestamp": 20_000, "type": "cast", "abilityGameID": 1298367, "sourceID": 90, "targetID": 2},
@@ -106,10 +106,51 @@ class UlatekAnalyzerTests(unittest.TestCase):
 
         result = analyze_ulatek(self.fight, self.actor_map, self.players, raw)["critical"]
 
-        self.assertEqual(result["nonTankMotherWrath"]["castCount"], 1)
+        self.assertEqual(result["motherWrath"]["castCount"], 1)
+        self.assertEqual(result["motherWrath"]["raidWideFailureCount"], 0)
         self.assertEqual(result["nonTankMelee"]["hitCount"], 1)
         self.assertEqual(result["nonTankMelee"]["totalDamage"], 500)
         self.assertEqual(result["malice"]["completedCount"], 1)
+
+    def test_critical_reports_cast_target_when_wrath_hits_the_raid(self):
+        raw = self.raw(
+            casts=[
+                {"timestamp": 20_000, "type": "cast", "abilityGameID": 1298367, "sourceID": 90, "targetID": 1},
+            ],
+            damage=[
+                {"timestamp": 20_100, "type": "damage", "abilityGameID": 1298369, "sourceID": 90, "targetID": 1, "amount": 100},
+                {"timestamp": 20_100, "type": "damage", "abilityGameID": 1298369, "sourceID": 90, "targetID": 2, "amount": 200},
+                {"timestamp": 20_100, "type": "damage", "abilityGameID": 1298369, "sourceID": 90, "targetID": 3, "amount": 300},
+            ],
+        )
+
+        result = analyze_ulatek(self.fight, self.actor_map, self.players, raw)["critical"]["motherWrath"]
+
+        self.assertEqual(result["raidWideFailureCount"], 1)
+        self.assertEqual(result["failures"][0]["receiver"]["player"], "坦克")
+        self.assertEqual(result["failures"][0]["receiverEvidence"], "蛇母之怒施法目标")
+        self.assertEqual(result["failures"][0]["affectedCount"], 3)
+        self.assertEqual(result["failures"][0]["totalDamage"], 600)
+
+    def test_critical_falls_back_to_recent_boss_melee_target(self):
+        raw = self.raw(
+            casts=[
+                {"timestamp": 20_000, "type": "cast", "abilityGameID": 1298367, "sourceID": 90},
+            ],
+            damage=[
+                {"timestamp": 18_500, "type": "damage", "abilityGameID": 1, "sourceID": 90, "targetID": 1, "amount": 500},
+                {"timestamp": 20_100, "type": "damage", "abilityGameID": 1301122, "sourceID": 90, "targetID": 1, "amount": 100},
+                {"timestamp": 20_100, "type": "damage", "abilityGameID": 1301122, "sourceID": 90, "targetID": 2, "amount": 200},
+                {"timestamp": 20_100, "type": "damage", "abilityGameID": 1301122, "sourceID": 90, "targetID": 3, "amount": 300},
+            ],
+        )
+
+        result = analyze_ulatek(self.fight, self.actor_map, self.players, raw)["critical"]["motherWrath"]
+
+        self.assertEqual(result["raidWideFailureCount"], 1)
+        self.assertEqual(result["failures"][0]["receiver"]["player"], "坦克")
+        self.assertEqual(result["failures"][0]["receiverEvidence"], "施法前 Boss 最近一次近战目标")
+        self.assertEqual(result["failures"][0]["evidenceDeltaMs"], 1500)
 
     def test_rage_window_sums_heart_damage_rocks_and_deaths(self):
         raw = self.raw(

@@ -105,7 +105,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-progression-2026-09-01-v2",
+    "mechanicVersion": "ulatek-progression-2026-09-04-v3",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -142,11 +142,11 @@ COURT_PROFILE = {
             "severityUnits": 1,
         },
         {
-            "key": "non_tank_mother_wrath",
-            "label": "蛇母之怒命中非坦克目标",
+            "key": "mother_wrath_raidwide",
+            "label": "蛇母之怒无人承接并触发全团伤害",
             "mode": "direct",
             "spellIDs": [1298367, 1298369, 1301122],
-            "requiredEvidence": ["蛇母之怒完成施法目标", "本场职责"],
+            "requiredEvidence": ["蛇母之怒完成施法", "同轮至少 3 名玩家受到蛇母之怒伤害", "施法目标或施法前 Boss 最近一次近战目标"],
             "defaultCountEnabled": True,
             "severityUnits": 2,
         },
@@ -612,16 +612,64 @@ def _analyze_critical(fight, actor_map, players, raw):
         })
     melee_players.sort(key=lambda row: (row["totalDamage"], row["hitCount"]), reverse=True)
 
-    mother_wrath = []
-    for event in completed_casts(raw["casts"], 1298367):
-        target_id = event.get("targetID")
-        if target_id not in players or players[target_id].get("role") == "tank":
-            continue
+    wrath_casts = sorted(completed_casts(raw["casts"], 1298367), key=lambda row: int(row["timestamp"]))
+    wrath_damage = [
+        event for event in raw["damage"]
+        if int(ability_id(event) or 0) in {1298369, 1301122}
+        and event.get("targetID") in players
+        and _amount(event) > 0
+    ]
+    mother_wrath_failures = []
+    for index, event in enumerate(wrath_casts, start=1):
         timestamp = int(event["timestamp"])
-        mother_wrath.append({
-            **player_ref(players, actor_map, target_id),
+        next_timestamp = int(wrath_casts[index]["timestamp"]) if index < len(wrath_casts) else fight["endTime"]
+        window_end = min(timestamp + 12_000, next_timestamp)
+        damage_events = [
+            row for row in wrath_damage
+            if timestamp - 250 <= int(row.get("timestamp") or 0) < window_end
+        ]
+        affected_ids = sorted({row.get("targetID") for row in damage_events if row.get("targetID") in players})
+
+        # 正常处理是同一名坦克连续承受多跳；圈内无人时才会扩散至全团。
+        # 使用“至少 3 名不同玩家”作为扩散证据，避免把坦克的 9 连击误判为 A 团。
+        if len(affected_ids) < 3:
+            continue
+
+        receiver_id = event.get("targetID") if event.get("targetID") in players else None
+        receiver_evidence = "蛇母之怒施法目标" if receiver_id is not None else None
+        evidence_delta_ms = 0 if receiver_id is not None else None
+        if receiver_id is None:
+            source_id = event.get("sourceID")
+            recent_melee = max(
+                (
+                    row for row in raw["damage"]
+                    if int(ability_id(row) or 0) == 1
+                    and row.get("targetID") in players
+                    and row.get("sourceID") == source_id
+                    and timestamp - 8_000 <= int(row.get("timestamp") or 0) <= timestamp
+                ),
+                key=lambda row: int(row.get("timestamp") or 0),
+                default=None,
+            )
+            if recent_melee is not None:
+                receiver_id = recent_melee.get("targetID")
+                receiver_evidence = "施法前 Boss 最近一次近战目标"
+                evidence_delta_ms = timestamp - int(recent_melee.get("timestamp") or 0)
+
+        first_damage_time = min(int(row.get("timestamp") or timestamp) for row in damage_events)
+        mother_wrath_failures.append({
+            "index": index,
             "time": fmt_ms(timestamp - fight["startTime"]),
+            "damageTime": fmt_ms(first_damage_time - fight["startTime"]),
             "spellID": 1298367,
+            "receiver": player_ref(players, actor_map, receiver_id) if receiver_id is not None else None,
+            "receiverEvidence": receiver_evidence or "未取得施法目标或近期近战目标",
+            "evidenceDeltaMs": evidence_delta_ms,
+            "affectedCount": len(affected_ids),
+            "affectedPlayers": [player_ref(players, actor_map, player_id) for player_id in affected_ids],
+            "hitCount": len(damage_events),
+            "totalDamage": sum(_amount(row) for row in damage_events),
+            "damageSpellIDs": sorted({int(ability_id(row) or 0) for row in damage_events}),
         })
 
     shatters = completed_casts(raw["casts"], 1315341)
@@ -663,9 +711,11 @@ def _analyze_critical(fight, actor_map, players, raw):
             "totalDamage": sum(row["totalDamage"] for row in melee_players),
             "players": melee_players,
         },
-        "nonTankMotherWrath": {
-            "castCount": len(mother_wrath),
-            "casts": mother_wrath,
+        "motherWrath": {
+            "castCount": len(wrath_casts),
+            "raidWideFailureCount": len(mother_wrath_failures),
+            "raidWideTargetThreshold": 3,
+            "failures": mother_wrath_failures,
         },
         "platformTransitions": transitions,
         "platform2To3": focus,
@@ -692,6 +742,7 @@ def _mechanic_overview(rendered):
     focus_deaths = []
     melee_events = []
     melee_damage = 0
+    mother_wrath_failures = []
     for pull in rendered:
         mechanics = pull.get(BOSS_CONFIG["key"]) or {}
         for row in (mechanics.get("wavesAndEggs") or {}).get("hits") or []:
@@ -745,9 +796,24 @@ def _mechanic_overview(rendered):
                     spellID=1,
                     amount=event.get("amount"),
                 ))
+        wrath = (mechanics.get("critical") or {}).get("motherWrath") or {}
+        for row in wrath.get("failures") or []:
+            receiver = row.get("receiver") or {}
+            receiver_name = receiver.get("player") or "未解析目标"
+            mother_wrath_failures.append(nightly_detail(
+                pull,
+                row.get("time"),
+                f"蛇母之怒触发全团伤害；当轮承接目标：{receiver_name}",
+                player=receiver.get("player"),
+                classColor=receiver.get("classColor"),
+                spellID=1298367,
+                affectedCount=row.get("affectedCount"),
+                totalDamage=row.get("totalDamage"),
+                receiverEvidence=row.get("receiverEvidence"),
+            ))
     return {
         "title": "整夜机制统计",
-        "subtitle": "按全部乌拉特克 Pull 汇总腐蚀浪潮、带蛋、拉断、平台减伤与非坦克近战证据。",
+        "subtitle": "按全部乌拉特克 Pull 汇总腐蚀浪潮、带蛋、拉断、蛇母之怒 A 团、平台减伤与非坦克近战证据。",
         "metrics": [
             {
                 "key": "waveHits",
@@ -794,6 +860,15 @@ def _mechanic_overview(rendered):
                 "totalDamage": melee_damage,
                 "players": nightly_player_totals(melee_events),
                 "events": melee_events,
+            },
+            {
+                "key": "motherWrathRaidwide",
+                "label": "蛇母之怒 A 团",
+                "value": len(mother_wrath_failures),
+                "unit": "次",
+                "tone": "danger",
+                "players": nightly_player_totals(mother_wrath_failures),
+                "events": mother_wrath_failures,
             },
         ],
     }

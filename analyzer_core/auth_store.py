@@ -151,6 +151,18 @@ class AuthStore:
                         updated_at INTEGER NOT NULL,
                         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
                     );
+                    CREATE TABLE IF NOT EXISTS user_guilds (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        guild_id INTEGER NOT NULL,
+                        name TEXT NOT NULL DEFAULT '',
+                        is_default INTEGER NOT NULL DEFAULT 0,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        UNIQUE(user_id, guild_id),
+                        FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+                    );
+                    CREATE INDEX IF NOT EXISTS user_guilds_user_id ON user_guilds(user_id);
                     """
                 )
                 columns = {
@@ -478,6 +490,115 @@ class AuthStore:
     def delete_wcl_credentials(self, user_id: int):
         with self._connect() as connection:
             connection.execute("DELETE FROM wcl_credentials WHERE user_id = ?", (int(user_id),))
+            connection.commit()
+
+    @staticmethod
+    def _public_guild(row: sqlite3.Row) -> dict:
+        return {
+            "id": int(row["guild_id"]),
+            "name": str(row["name"] or ""),
+            "isDefault": bool(row["is_default"]),
+        }
+
+    def list_guilds(self, user_id: int) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id, name, is_default
+                FROM user_guilds
+                WHERE user_id = ?
+                ORDER BY is_default DESC, name COLLATE NOCASE, guild_id
+                """,
+                (int(user_id),),
+            ).fetchall()
+        return [self._public_guild(row) for row in rows]
+
+    def upsert_guild(
+        self, user_id: int, guild_id: int, name: str, *, is_default: bool = False
+    ) -> dict:
+        user_id = int(user_id)
+        guild_id = int(guild_id)
+        if guild_id <= 0:
+            raise AuthError("WCL 工会 ID 必须是正整数。")
+        name = str(name or "").strip() or f"工会 {guild_id}"
+        now = int(time.time())
+        with self._connect() as connection:
+            existing_count = int(connection.execute(
+                "SELECT COUNT(*) FROM user_guilds WHERE user_id = ?", (user_id,)
+            ).fetchone()[0])
+            make_default = bool(is_default or existing_count == 0)
+            if make_default:
+                connection.execute(
+                    "UPDATE user_guilds SET is_default = 0, updated_at = ? WHERE user_id = ?",
+                    (now, user_id),
+                )
+            connection.execute(
+                """
+                INSERT INTO user_guilds(user_id, guild_id, name, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, guild_id) DO UPDATE SET
+                    name = excluded.name,
+                    is_default = CASE
+                        WHEN excluded.is_default = 1 THEN 1
+                        ELSE user_guilds.is_default
+                    END,
+                    updated_at = excluded.updated_at
+                """,
+                (user_id, guild_id, name, int(make_default), now, now),
+            )
+            connection.commit()
+            row = connection.execute(
+                "SELECT guild_id, name, is_default FROM user_guilds WHERE user_id = ? AND guild_id = ?",
+                (user_id, guild_id),
+            ).fetchone()
+        return self._public_guild(row)
+
+    def set_default_guild(self, user_id: int, guild_id: int) -> dict:
+        user_id = int(user_id)
+        guild_id = int(guild_id)
+        now = int(time.time())
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT guild_id FROM user_guilds WHERE user_id = ? AND guild_id = ?",
+                (user_id, guild_id),
+            ).fetchone()
+            if not row:
+                raise AuthError("该工会不在当前账号的工会列表中。")
+            connection.execute(
+                "UPDATE user_guilds SET is_default = CASE WHEN guild_id = ? THEN 1 ELSE 0 END, updated_at = ? WHERE user_id = ?",
+                (guild_id, now, user_id),
+            )
+            connection.commit()
+            selected = connection.execute(
+                "SELECT guild_id, name, is_default FROM user_guilds WHERE user_id = ? AND guild_id = ?",
+                (user_id, guild_id),
+            ).fetchone()
+        return self._public_guild(selected)
+
+    def delete_guild(self, user_id: int, guild_id: int):
+        user_id = int(user_id)
+        guild_id = int(guild_id)
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT is_default FROM user_guilds WHERE user_id = ? AND guild_id = ?",
+                (user_id, guild_id),
+            ).fetchone()
+            if not row:
+                raise AuthError("该工会不在当前账号的工会列表中。")
+            connection.execute(
+                "DELETE FROM user_guilds WHERE user_id = ? AND guild_id = ?",
+                (user_id, guild_id),
+            )
+            if row["is_default"]:
+                replacement = connection.execute(
+                    "SELECT guild_id FROM user_guilds WHERE user_id = ? ORDER BY name COLLATE NOCASE, guild_id LIMIT 1",
+                    (user_id,),
+                ).fetchone()
+                if replacement:
+                    connection.execute(
+                        "UPDATE user_guilds SET is_default = 1, updated_at = ? WHERE user_id = ? AND guild_id = ?",
+                        (int(time.time()), user_id, int(replacement["guild_id"])),
+                    )
             connection.commit()
 
 

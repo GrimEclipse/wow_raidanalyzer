@@ -630,8 +630,18 @@
               "externalKey": "wow.tidebound,01.nymrissa",
               "aliases": ["妮莉莎·唤浪者"],
               "plugin": "boss_plugins.tidebound_grotto.nymrissa_wavecaller",
-              "supported": false,
-              "disabledReason": "12.1 战斗分析插件待接入",
+              "encounterIds": [3379],
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "generic-wipe" },
+                "avoidable": { "enabled": true, "renderer": "generic-avoidable" },
+                "interrupts": { "enabled": false, "renderer": "generic-interrupts" },
+                "dispels": { "enabled": false, "renderer": "generic-dispels" },
+                "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
+                "verdict": { "enabled": false, "renderer": "mistake-verdict" },
+                "replay": { "enabled": false, "renderer": "field-audit" }
+              },
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/tidebound_grotto/01-nymrissa.jpg", "width": 1997, "height": 1118 }

@@ -38,7 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.2.0 更新公告">v1.2.0</button></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.0 更新公告">v1.3.0</button></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -68,11 +68,22 @@
 <div id="releaseNotice" class="notice-layer" hidden>
   <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
     <header class="notice-head">
-      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.2.0</span></div>
+      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.3.0</span></div>
       <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
     </header>
     <div class="notice-content">
       <ol>
+        <li>
+          <p><strong>v1.3.0  快速分析与本地报告工作流更新</strong></p>
+          <ul>
+            <li>首页新增“一键分析最新一场 Boss”，自动使用账号默认工会定位最新 Report 的最后一场战斗。</li>
+            <li>工会信息改为账号级配置，支持多个工会、默认工会和下拉选择。</li>
+            <li>本地 JSON 成为正式报告入口，文件留在浏览器本地数据库；服务器结果与单场缓存加入容量和过期清理。</li>
+            <li>首页与账号设置改用深空视觉，并保留低动态模式。</li>
+            <li>首页趣味台词每次进入时随机抽取一次，实验入口仅管理员可见，高级单场选择移到快速开始区域。</li>
+            <li>尼姆瑞莎·唤潮者已接入基础战斗复盘，不再因缺少分析插件中止最新战斗流程。</li>
+          </ul>
+        </li>
         <li>
           <p><strong>v1.2.0  烈毒之渊团本分析更新</strong></p>
           <ul>
@@ -116,7 +127,7 @@
 </div>
 <script>
 (() => {
-  const RELEASE_VERSION = 'v1.2.0';
+  const RELEASE_VERSION = 'v1.3.0';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

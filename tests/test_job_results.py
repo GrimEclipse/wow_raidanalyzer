@@ -1,4 +1,5 @@
 import tempfile
+import os
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -37,6 +38,19 @@ class PersistedJobResultTests(unittest.TestCase):
             self.assertIsNone(
                 server.stored_job_result("../escape", {"id": 1, "isAdmin": True})
             )
+
+    def test_json_storage_prunes_expired_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            old = root / "old.json"
+            fresh = root / "fresh.json"
+            old.write_text("{}", encoding="utf-8")
+            fresh.write_text("{}", encoding="utf-8")
+            os.utime(old, (100, 100))
+            result = server.prune_json_storage(root, max_age_seconds=60, max_bytes=1000, now=200)
+            self.assertFalse(old.exists())
+            self.assertTrue(fresh.exists())
+            self.assertEqual(result["removed"], 1)
 
 
 if __name__ == "__main__":

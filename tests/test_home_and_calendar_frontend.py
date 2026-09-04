@@ -21,13 +21,28 @@ class HomeAndCalendarFrontendTests(unittest.TestCase):
         cls.online = (
             ROOT / "frontend/tools/analysis-runner/index.html"
         ).read_text(encoding="utf-8")
+        cls.account = (
+            ROOT / "frontend/auth/account.html"
+        ).read_text(encoding="utf-8")
 
     def test_recent_pull_and_wcl_analysis_are_primary_features(self):
-        primary, experimental = self.home.split('<section class="mt-10">', 1)
-        self.assertIn("当日最近 Pull 分析", primary)
-        self.assertIn("WCL 日志分析", primary)
+        primary, experimental = self.home.split('<footer id="adminLab" class="lab" hidden>', 1)
+        self.assertIn("分析最新一场 Boss", primary)
+        self.assertIn("高级选择 · 指定 Report / Fight", primary)
+        self.assertIn("整晚日志分析", primary)
+        self.assertIn("打开本地分析 JSON", primary)
+        self.assertIn("Avalon 工会运营", primary)
         self.assertIn("单专精战斗复盘", experimental)
         self.assertIn("大秘境抄轴", experimental)
+
+    def test_home_uses_one_random_chinese_line_and_admin_only_labs(self):
+        self.assertNotIn("Raid intelligence, without the detour", self.home)
+        self.assertNotIn("刚灭的这一把", self.home)
+        self.assertIn("刚刚是谁把蛋踩出来的？", self.home)
+        self.assertIn("让我贪完这个棱彩飞弹……", self.home)
+        self.assertIn("让我们看看是谁干了……", self.home)
+        self.assertIn("$('heroLine').textContent=lines[randomIndex()]", self.home)
+        self.assertIn("$('adminLab').hidden=!me.isAdmin", self.home)
 
     def test_blackmark_history_is_descending_paginated_and_color_coded(self):
         self.assertIn('id="blackHistoryPagination"', self.calendar)
@@ -44,6 +59,13 @@ class HomeAndCalendarFrontendTests(unittest.TestCase):
         self.assertIn('id="downloadLink"', self.online)
         self.assertIn("progress-scan", self.online)
         self.assertIn("data.downloadUrl || downloadUrl", self.online)
+
+    def test_account_embeds_the_complete_wcl_client_guide(self):
+        self.assertIn("WCL V2 Client 完整图文指引（5 步）", self.account)
+        self.assertIn("不要勾选 Public Client", self.account)
+        self.assertIn("Client Secret 只显示这一次", self.account)
+        for index in range(1, 7):
+            self.assertIn(f"/frontend/assets/guides/wcl-v2/0{index}-", self.account)
 
 
 if __name__ == "__main__":

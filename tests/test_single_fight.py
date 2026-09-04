@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from analyzer_core.analysis_scope import filter_fights, single_fight_scope
 from analyzer_core.catalog import find_boss_by_encounter
 from analyzer_core.player_abilities import abilities_for_roster, catalog_summary, load_player_ability_catalog
-from analyzer_core.single_fight import load_single_fight_config, raid_night_date, recent_guild_reports, report_overview
+from analyzer_core.single_fight import latest_guild_fight, load_single_fight_config, raid_night_date, recent_guild_reports, report_overview
 
 
 class AnalysisScopeTests(unittest.TestCase):
@@ -83,6 +83,7 @@ class SingleFightDiscoveryTests(unittest.TestCase):
         self.assertEqual(find_boss_by_encounter(3429).boss_key, "coiledaltar")
         self.assertEqual(find_boss_by_encounter(53429).boss_key, "coiledaltar")
         self.assertEqual(find_boss_by_encounter(3492).boss_key, "ulatek")
+        self.assertEqual(find_boss_by_encounter(3379).boss_key, "nymrissa_wavecaller")
         self.assertIsNone(find_boss_by_encounter(999999))
 
     def test_recent_reports_filters_short_and_non_encounter_fights(self):
@@ -137,6 +138,24 @@ class SingleFightDiscoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "正整数"):
             recent_guild_reports(object(), guild_id=0)
 
+    def test_latest_fight_is_selected_across_recent_reports(self):
+        class FakeClient:
+            def graphql_data(self, query, variables):
+                return {
+                    "guildData": {"guild": {"id": 123456, "name": "测试工会"}},
+                    "reportData": {"reports": {"data": [
+                        {"code": "OLD", "title": "old", "startTime": 100000, "endTime": 200000,
+                         "fights": [{"id": 7, "name": "old", "encounterID": 3181, "difficulty": 5, "kill": False, "startTime": 1000, "endTime": 61000}]},
+                        {"code": "NEW", "title": "new", "startTime": 300000, "endTime": 400000,
+                         "fights": [{"id": 9, "name": "new", "encounterID": 3181, "difficulty": 5, "kill": False, "startTime": 2000, "endTime": 72000}]},
+                    ]}},
+                    "rateLimitData": {},
+                }
+
+        selected = latest_guild_fight(FakeClient(), guild_id=123456)
+        self.assertEqual(selected["report"]["code"], "NEW")
+        self.assertEqual(selected["fight"]["id"], 9)
+
 
 class SingleFightFrontendTests(unittest.TestCase):
     def test_route_and_manual_fetch_are_wired(self):
@@ -145,10 +164,10 @@ class SingleFightFrontendTests(unittest.TestCase):
         page = (root / "frontend" / "tools" / "single-fight" / "index.html").read_text(encoding="utf-8")
         self.assertIn('"/single-fight": "/frontend/tools/single-fight/index.html"', server)
         self.assertIn('/api/single-fight/analyze', page)
-        self.assertIn('id="guildInput"', page)
+        self.assertIn('id="guildSelect"', page)
         self.assertIn('&guildID=${encodeURIComponent(guildID)}', page)
-        self.assertIn('const guildLabel=(id,name="")=>`${name||"待查询工会"}', page)
-        self.assertIn('$("guildInput").addEventListener("input"', page)
+        self.assertIn('const guildLabel=(id,name="")=>guildName(id,name)', page)
+        self.assertIn('$("guildSelect").addEventListener("change"', page)
         self.assertIn('$("loadReports").addEventListener("click",loadReports)', page)
         self.assertNotIn("then(loadReports)", page)
         self.assertIn('id="waitScreen"', page)

@@ -42,9 +42,11 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('function overviewUrl(sourcePath)', self.runtime)
         self.assertIn('frontend/report/overview.html', self.runtime)
         self.assertIn('function detailUrl(descriptor, sourcePath, fightID)', self.runtime)
-        self.assertIn('function storePayload(payload)', self.runtime)
+        self.assertIn('function storePayload(payload, options = {})', self.runtime)
         self.assertIn('function loadPayload(sourcePath)', self.runtime)
         self.assertIn('sessionStorage.setItem', self.runtime)
+        self.assertIn('indexedDB.open', self.runtime)
+        self.assertIn('listLocalPayloads', self.runtime)
         self.assertIn('id="pullBoard"', self.overview)
         self.assertIn('id="mechanicOverview"', self.overview)
         self.assertIn('id="pullsTab"', self.overview)
@@ -104,6 +106,8 @@ class SharedReportOverviewFrontendTests(unittest.TestCase):
         self.assertIn('function renderWaves()', self.ulatek_js)
         self.assertIn('function renderHeart()', self.ulatek_js)
         self.assertIn('第 2 → 第 3 平台高压流程', self.ulatek_js)
+        self.assertIn('蛇母之怒 A 团', self.ulatek_js)
+        self.assertIn('当轮承接目标', self.ulatek_js)
         self.assertIn('new URLSearchParams(location.search).get("fight")', self.ulatek_js)
 
     def test_single_fight_tooltips_use_a_top_level_overlay(self):

@@ -3,26 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>单场日志分析</title>
+  <title>高级单场选择 · V1.3.0</title>
   <style>
     :root{color-scheme:dark;--bg:#060a12;--panel:#101827;--line:#27364a;--ink:#edf3fa;--muted:#91a0b5;--cyan:#22d3ee;--green:#34d399;--amber:#fbbf24;--red:#fb7185}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(900px 520px at 12% -10%,#123255 0,transparent 62%),radial-gradient(700px 500px at 90% 10%,#17255455 0,transparent 65%),var(--bg);color:var(--ink);font:14px/1.55 system-ui,"Microsoft YaHei",sans-serif}
-    a{color:#7dd3fc;text-decoration:none}button,input{font:inherit}.shell{max-width:1260px;margin:auto;padding:30px 22px 60px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:22px;border-bottom:1px solid var(--line)}h1{margin:5px 0 0;font-size:30px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--cyan)}.muted{color:var(--muted)}.nav{display:flex;gap:8px;flex-wrap:wrap}.button,button{border:1px solid #3b4d66;border-radius:9px;padding:9px 13px;background:#0c1422;color:var(--ink);cursor:pointer}.button:hover,button:hover{border-color:#64748b}.primary{border-color:#0891b2;background:#0e7490;font-weight:800}.primary:hover{background:#0891b2}.primary:disabled{cursor:not-allowed;opacity:.45}.danger{border-color:#9f1239}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:14px;background:#0d1522e8;overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h2{margin:0;font-size:16px}.panel-body{padding:16px 18px}.controls{display:grid;grid-template-columns:1fr auto;gap:9px}input{min-width:0;border:1px solid #33445b;border-radius:9px;background:#070d17;color:var(--ink);padding:9px 11px}.stack{display:grid;gap:9px}.report,.fight{width:100%;text-align:left;border-color:#29394f;background:#09111d;padding:12px}.report.active,.fight.active{border-color:#22d3ee;background:#082b36}.report strong,.fight strong{display:block}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--muted)}.tag{padding:2px 6px;border:1px solid #334155;border-radius:999px}.tag.ok{border-color:#047857;color:#6ee7b7}.tag.no{border-color:#713f12;color:#fcd34d}.tag.kill{border-color:#166534;color:#86efac}.empty{padding:22px;border:1px dashed #334155;border-radius:10px;color:var(--muted);text-align:center}.fight-list{display:grid;gap:9px;max-height:520px;overflow:auto}.roster{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.player{padding:3px 7px;border-radius:7px;background:#111827;border:1px solid #334155;font-size:11px}.DeathKnight{color:#c41e3a}.DemonHunter{color:#a330c9}.Druid{color:#ff7c0a}.Evoker{color:#33937f}.Hunter{color:#aad372}.Mage{color:#3fc7eb}.Monk{color:#00ff98}.Paladin{color:#f48cba}.Priest{color:#fff}.Rogue{color:#fff468}.Shaman{color:#0070dd}.Warlock{color:#8788ee}.Warrior{color:#c69b6d}.note{padding:12px 14px;border-left:3px solid #0891b2;background:#08212b;color:#b9e6f2}.error{color:#fda4af}.split{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none!important}.wait-screen{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:radial-gradient(800px 480px at 50% 10%,#123255,transparent 66%),rgba(3,7,15,.97)}.wait-card{width:min(720px,100%);padding:30px;border:1px solid #33506d;border-radius:20px;background:#09121f;box-shadow:0 30px 90px #000b}.wait-title{display:flex;align-items:center;gap:16px}.spinner{width:44px;height:44px;flex:0 0 auto;border:4px solid #19344c;border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite}.wait-title h2{margin:0;font-size:24px}.wait-title p{margin:3px 0 0}.wait-progress{height:10px;margin:24px 0 8px;border-radius:99px;overflow:hidden;background:#152338}.wait-progress i{display:block;height:100%;min-width:3%;background:linear-gradient(90deg,#0e7490,#22d3ee);transition:width .45s}.wait-status{display:flex;justify-content:space-between;gap:16px;color:#b8c7d9}.wait-log{display:grid;gap:7px;max-height:230px;margin-top:22px;overflow:auto}.wait-log div{padding:8px 10px;border-left:2px solid #27445f;background:#0c1827;color:#91a0b5}.wait-log div.current{border-color:var(--cyan);color:#e4f9ff}.wait-actions{display:flex;justify-content:flex-end;margin-top:20px}@keyframes spin{to{transform:rotate(360deg)}}
+    a{color:#7dd3fc;text-decoration:none}button,input,select{font:inherit}.shell{max-width:1260px;margin:auto;padding:30px 22px 60px}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:22px;border-bottom:1px solid var(--line)}h1{margin:5px 0 0;font-size:30px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--cyan)}.muted{color:var(--muted)}.nav{display:flex;gap:8px;flex-wrap:wrap}.button,button{border:1px solid #3b4d66;border-radius:9px;padding:9px 13px;background:#0c1422;color:var(--ink);cursor:pointer}.button:hover,button:hover{border-color:#64748b}.primary{border-color:#7c76dc;background:linear-gradient(115deg,#38bddd,#8b7ee8);color:#06101c;font-weight:800}.primary:hover{filter:brightness(1.08)}.primary:disabled{cursor:not-allowed;opacity:.45}.danger{border-color:#9f1239}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:18px;margin-top:20px}.panel{border:1px solid var(--line);border-radius:14px;background:#0d1522e8;overflow:hidden}.panel-head{padding:16px 18px;border-bottom:1px solid var(--line)}.panel-head h2{margin:0;font-size:16px}.panel-body{padding:16px 18px}.controls{display:grid;grid-template-columns:1fr auto;gap:9px}input,select{min-width:0;border:1px solid #33445b;border-radius:9px;background:#070d17;color:var(--ink);padding:9px 11px}.stack{display:grid;gap:9px}.report,.fight{width:100%;text-align:left;border-color:#29394f;background:#09111d;padding:12px}.report.active,.fight.active{border-color:#22d3ee;background:#082b36}.report strong,.fight strong{display:block}.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--muted)}.tag{padding:2px 6px;border:1px solid #334155;border-radius:999px}.tag.ok{border-color:#047857;color:#6ee7b7}.tag.no{border-color:#713f12;color:#fcd34d}.tag.kill{border-color:#166534;color:#86efac}.empty{padding:22px;border:1px dashed #334155;border-radius:10px;color:var(--muted);text-align:center}.fight-list{display:grid;gap:9px;max-height:520px;overflow:auto}.roster{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.player{padding:3px 7px;border-radius:7px;background:#111827;border:1px solid #334155;font-size:11px}.DeathKnight{color:#c41e3a}.DemonHunter{color:#a330c9}.Druid{color:#ff7c0a}.Evoker{color:#33937f}.Hunter{color:#aad372}.Mage{color:#3fc7eb}.Monk{color:#00ff98}.Paladin{color:#f48cba}.Priest{color:#fff}.Rogue{color:#fff468}.Shaman{color:#0070dd}.Warlock{color:#8788ee}.Warrior{color:#c69b6d}.note{padding:12px 14px;border-left:3px solid #0891b2;background:#08212b;color:#b9e6f2}.error{color:#fda4af}.split{display:flex;justify-content:space-between;gap:12px;align-items:center}.hidden{display:none!important}.wait-screen{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:radial-gradient(800px 480px at 50% 10%,#123255,transparent 66%),rgba(3,7,15,.97)}.wait-card{width:min(720px,100%);padding:30px;border:1px solid #33506d;border-radius:20px;background:#09121f;box-shadow:0 30px 90px #000b}.wait-title{display:flex;align-items:center;gap:16px}.spinner{width:44px;height:44px;flex:0 0 auto;border:4px solid #19344c;border-top-color:var(--cyan);border-radius:50%;animation:spin 1s linear infinite}.wait-title h2{margin:0;font-size:24px}.wait-title p{margin:3px 0 0}.wait-progress{height:10px;margin:24px 0 8px;border-radius:99px;overflow:hidden;background:#152338}.wait-progress i{display:block;height:100%;min-width:3%;background:linear-gradient(90deg,#0e7490,#8b7ee8);transition:width .45s}.wait-status{display:flex;justify-content:space-between;gap:16px;color:#b8c7d9}.wait-log{display:grid;gap:7px;max-height:230px;margin-top:22px;overflow:auto}.wait-log div{padding:8px 10px;border-left:2px solid #27445f;background:#0c1827;color:#91a0b5}.wait-log div.current{border-color:var(--cyan);color:#e4f9ff}.wait-actions{display:flex;justify-content:flex-end;margin-top:20px}@keyframes spin{to{transform:rotate(360deg)}}
     @media(max-width:860px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
 <body>
 <main class="shell">
   <header class="top">
-    <div><div class="eyebrow">MANUAL SINGLE-FIGHT ANALYZER</div><h1>单场日志分析</h1><p class="muted">手动获取工会 report，定位开荒日，再选择当日最后一场 Pull。Boss 结论复用原逐场规则，相同 Fight 优先读取缓存。</p></div>
-    <nav class="nav"><a class="button" href="/">首页</a><a class="button" href="/online">整份 Report</a><a class="button" href="/account">WCL 凭据</a></nav>
+    <div><div class="eyebrow">ADVANCED SINGLE-FIGHT PICKER</div><h1>高级单场选择</h1><p class="muted">只有需要回看指定日期、Report 或 Fight 时才使用这里；最新一场请从首页一键分析。</p></div>
+    <nav class="nav"><a class="button" href="/">首页快速分析</a><a class="button" href="/online">整份 Report</a><a class="button" href="/account">账号与工会</a></nav>
   </header>
 
   <section class="grid">
     <aside class="panel">
       <div class="panel-head"><div class="split"><h2>1 · 获取开荒日</h2><span id="guildLabel" class="muted">工会…</span></div></div>
       <div class="panel-body stack">
-        <label class="stack"><span class="muted">WCL 工会 ID</span><input id="guildInput" type="number" min="1" step="1" inputmode="numeric" value="774422" aria-label="WCL 工会 ID"></label>
+        <label class="stack"><span class="muted">我的工会</span><select id="guildSelect" aria-label="选择工会"><option value="">正在读取工会…</option></select></label>
         <div class="controls"><input id="dateInput" type="date"><button id="loadReports" class="primary">获取数据</button></div>
         <div class="controls"><input id="reportInput" placeholder="或输入 WCL Report ID"><button id="openReport">读取</button></div>
         <div id="reportMessage" class="muted">尚未请求 WCL。</div>
@@ -64,7 +64,8 @@
   const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const formatDuration=ms=>{const total=Math.max(0,Math.round(Number(ms||0)/1000));return `${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`};
   const errorMessage=async response=>{try{return (await response.json()).error||`HTTP ${response.status}`}catch(_){return `HTTP ${response.status}`}};
-  const guildLabel=(id,name="")=>`${name||"待查询工会"} · ${id||"—"}`;
+    const guildName=(id,name="")=>{const value=String(name||"").trim();return value&&!new RegExp(`^工会\\s*${id}$`).test(value)?value:`Guild ID ${id||"—"}`};
+    const guildLabel=(id,name="")=>guildName(id,name);
 
   function today(){const now=new Date();return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`}
   $("dateInput").value=today();
@@ -73,7 +74,8 @@
     const response=await fetch("/api/single-fight/config",{cache:"no-store"});
     if(!response.ok)throw new Error(await errorMessage(response));
     const data=await response.json();
-    $("guildInput").value=String(data.guild.id||774422);
+    $("guildSelect").innerHTML=(data.guilds||[]).map(guild=>`<option value="${guild.id}" ${guild.isDefault?'selected':''}>${escapeHtml(guildName(guild.id,guild.name))}${guild.isDefault?'（默认）':''}</option>`).join("");
+    $("guildSelect").value=String(data.guild.id||"");
     $("guildLabel").textContent=guildLabel(data.guild.id,data.guild.name);
   }
 
@@ -81,8 +83,8 @@
     $("loadReports").disabled=true;$("reportMessage").textContent="正在读取工会 report…";
     try{
       const date=$("dateInput").value;
-      const guildID=Number($("guildInput").value);
-      if(!Number.isInteger(guildID)||guildID<=0)throw new Error("请输入有效的 WCL 工会 ID。");
+      const guildID=Number($("guildSelect").value);
+      if(!Number.isInteger(guildID)||guildID<=0)throw new Error("请先在账号设置中添加工会。");
       $("guildLabel").textContent=guildLabel(guildID);
       const response=await fetch(`/api/single-fight/reports?date=${encodeURIComponent(date)}&limit=20&guildID=${encodeURIComponent(guildID)}`,{cache:"no-store"});
       if(!response.ok)throw new Error(await errorMessage(response));
@@ -110,7 +112,7 @@
       const response=await fetch(`/api/single-fight/reports/${encodeURIComponent(code)}`,{cache:"no-store"});
       if(!response.ok)throw new Error(await errorMessage(response));
       state.report=await response.json();state.fight=null;
-      if(state.report.guild){$("guildInput").value=String(state.report.guild.id||$("guildInput").value);$("guildLabel").textContent=guildLabel(state.report.guild.id,state.report.guild.name)}
+      if(state.report.guild){$("guildLabel").textContent=guildLabel(state.report.guild.id,state.report.guild.name)}
       if(!(state.report.raidNightDates||[]).includes($("dateInput").value) && state.report.raidNightDates?.length){
         $("dateInput").value=state.report.raidNightDates[state.report.raidNightDates.length-1];
       }
@@ -170,7 +172,7 @@
     clearInterval(elapsedTimer);$("progressBar").style.width="100%";$("percentText").textContent="100%";$("waitStatus").textContent="分析完成，正在打开单场报告";location.href=`/report?json=${encodeURIComponent(url)}`;
   }
 
-  $("guildInput").addEventListener("input",event=>{$("guildLabel").textContent=guildLabel(event.target.value)});
+  $("guildSelect").addEventListener("change",event=>{const option=event.target.selectedOptions[0];$("guildLabel").textContent=option?option.textContent:guildLabel(event.target.value)});
   $("loadReports").addEventListener("click",loadReports);$("openReport").addEventListener("click",()=>openReport());$("analyze").addEventListener("click",analyze);$("closeWait").addEventListener("click",closeWait);
   loadConfig().catch(error=>$("reportMessage").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`);
 })();

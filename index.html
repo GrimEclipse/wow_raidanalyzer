@@ -1,95 +1,43 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WCL 开荒复盘入口</title>
-    <script src="assets/vendor/tailwindcss.js"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#030711">
+  <title>开荒工具包 · V1.3.0</title>
+  <link rel="stylesheet" href="/frontend/core/design-system.css?v=1.3.0">
+  <style>
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:72px}.brand{display:flex;align-items:center;gap:11px;font-weight:850;letter-spacing:-.02em}.brand-mark{width:34px;height:34px;border:1px solid rgba(103,232,249,.38);border-radius:50%;background:radial-gradient(circle at 42% 38%,#fff 0 3%,#7dd3fc 4% 10%,transparent 28%),linear-gradient(145deg,rgba(103,232,249,.2),rgba(139,92,246,.2));box-shadow:0 0 30px rgba(103,232,249,.15)}.version{color:#8996b2;font-size:12px}.top-links{display:flex;gap:8px}
+    .hero{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(380px,.92fr);gap:54px;align-items:center}.hero h1{max-width:760px;min-height:2.06em;margin:10px 0 20px;font-size:clamp(42px,6vw,72px);line-height:1.03;letter-spacing:-.055em;white-space:pre-line}.hero-copy{max-width:650px;margin-bottom:7px;color:#a2adc3;font-size:17px;line-height:1.8}.hero-copy strong{color:#eaf7ff}.hero-aside{margin:0;color:#707d98;font-size:12px}.hero-aside em{color:#aab5ca;font-style:normal}.quick-card{padding:25px}.quick-card h2{margin:0;font-size:22px}.quick-card p{margin:7px 0 22px}.quick-actions{display:grid;gap:12px}.quick-actions .primary{width:100%;min-height:54px;font-size:16px}.advanced-button{width:100%;border-color:rgba(125,211,252,.26);background:rgba(8,18,38,.7);color:#cbefff}.divider{display:flex;align-items:center;gap:12px;margin:5px 0;color:#65718c;font-size:11px}.divider:before,.divider:after{content:"";height:1px;flex:1;background:var(--space-line)}.file-button{position:relative;overflow:hidden}.file-button input{position:absolute;inset:0;opacity:0;cursor:pointer}.quick-note{min-height:22px;margin-top:14px;font-size:12px}.quick-note a{color:var(--space-cyan)}
+    .section{margin-top:86px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:20px}.section h2{margin:5px 0 0;font-size:28px}.section-head p{max-width:560px;margin:0;text-align:right}.tool-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.tool{position:relative;min-height:190px;padding:21px;overflow:hidden;color:inherit;text-decoration:none;transition:transform .22s,border-color .22s}.tool:hover{transform:translateY(-4px);border-color:var(--space-line-hover)}.tool:after{content:"↗";position:absolute;right:18px;top:16px;color:#66738e;font-size:18px}.tool .tone{display:inline-flex;width:32px;height:4px;border-radius:99px;background:var(--tone,#67e8f9);box-shadow:0 0 18px var(--tone,#67e8f9)}.tool h3{margin:22px 0 8px;font-size:18px}.tool p{margin:0;color:var(--space-muted);font-size:13px;line-height:1.7}.tool.custom{--tone:#f8c96b}.tool.raid{--tone:#a78bfa}.tool.cooldown{--tone:#67e8f9}.tool.full{--tone:#7dd3fc}.secondary{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}.lab{margin-top:48px;padding-top:25px;border-top:1px solid var(--space-line)}.lab[hidden]{display:none}.lab-links{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}.lab a{color:#7b87a1;text-decoration:none;font-size:13px}.lab a:hover{color:#c4cee3}
+    .wait{position:fixed;z-index:30;inset:0;display:grid;place-items:center;padding:20px;background:rgba(2,5,14,.82);backdrop-filter:blur(15px)}.wait[hidden]{display:none}.wait-card{width:min(620px,100%);padding:30px}.wait-title{display:flex;align-items:center;gap:15px}.orb{width:48px;height:48px;border:1px solid rgba(103,232,249,.36);border-radius:50%;background:radial-gradient(circle,#fff 0 4%,#67e8f9 7%,rgba(139,92,246,.45) 28%,transparent 62%);box-shadow:0 0 30px rgba(103,232,249,.22);animation:pulse 1.8s ease-in-out infinite}.wait h2{margin:0}.track{height:8px;margin:25px 0 10px;overflow:hidden;border-radius:99px;background:#121b31}.track i{display:block;height:100%;width:2%;background:linear-gradient(90deg,#67d6f5,#9b8cf1);transition:width .45s}.wait-meta{display:flex;justify-content:space-between;gap:20px;color:#a6b0c6;font-size:13px}.wait-log{margin-top:19px;min-height:44px;padding:12px;border-left:2px solid var(--space-cyan);background:rgba(4,10,24,.62);color:#cbd8ea}.wait-close{margin-top:18px}@keyframes pulse{50%{transform:scale(1.08);filter:brightness(1.2)}}
+    @media(max-width:980px){.hero{grid-template-columns:1fr}.topbar{margin-bottom:46px}.tool-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.top-links .cosmic-button:first-child{display:none}.hero h1{font-size:44px}.quick-card{padding:20px}.tool-grid{grid-template-columns:1fr}.section{margin-top:62px}.section-head{align-items:flex-start;flex-direction:column}.section-head p{text-align:left}.tool{min-height:150px}}
+  </style>
 </head>
-<body class="min-h-screen bg-gray-950 text-gray-100">
-<main class="mx-auto max-w-5xl px-6 py-10">
-    <header class="mb-8 border-b border-gray-800 pb-5">
-        <div class="flex items-center justify-between gap-4">
-            <div class="text-xs font-semibold uppercase tracking-wide text-amber-300">Mythic Analyzer</div>
-            <a class="rounded border border-gray-700 px-3 py-2 text-sm text-gray-200 hover:border-emerald-400 hover:text-emerald-300" href="/account">账号与权限</a>
-        </div>
-        <h1 class="mt-2 text-3xl font-bold text-white">WCL 开荒复盘入口</h1>
-        <p class="mt-2 text-sm text-gray-400">把分析结果放入 <code class="text-amber-200">data/</code>，在报告中查看灭团复盘、机制明细与团队执行情况。</p>
-    </header>
-
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-amber-500 hover:bg-gray-900/80"
-           href="/raid-guide">
-            <div class="text-xs font-semibold uppercase tracking-wide text-amber-300">12.1 团本手册</div>
-            <h2 class="mt-2 text-xl font-bold">12.1 · 团长战斗手册</h2>
-            <p class="mt-3 text-sm leading-6 text-gray-400">覆盖烈毒之渊与潮缚石窟；按 Boss 切换综述、粗略流程、技能分析、详细时间轴与开发 ID 明细。</p>
-        </a>
-
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-blue-500 hover:bg-gray-900/80"
-           href="/report">
-            <div class="text-xs font-semibold uppercase tracking-wide text-blue-300">分析</div>
-            <h2 class="mt-2 text-xl font-bold">场面复盘 / 开庭</h2>
-            <p class="mt-3 text-sm leading-6 text-gray-400">读取分析 JSON，查看灭团复盘、转阶段与开庭明细。不负责跨日计分留痕。</p>
-        </a>
-
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-cyan-500 hover:bg-gray-900/80"
-           href="/single-fight">
-            <div class="text-xs font-semibold uppercase tracking-wide text-cyan-300">最近日志分析</div>
-            <h2 class="mt-2 text-xl font-bold">当日最近 Pull 分析</h2>
-            <p class="mt-3 text-sm leading-6 text-gray-400">按开荒日筛选当日日志，进入最近一场 Pull 的爆发、减伤与控制时间轴。</p>
-        </a>
-
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-emerald-500 hover:bg-gray-900/80"
-           href="/online">
-            <div class="text-xs font-semibold uppercase tracking-wide text-emerald-300">在线分析</div>
-            <h2 class="mt-2 text-xl font-bold">WCL 日志分析</h2>
-            <p class="mt-3 text-sm leading-6 text-gray-400">使用当前账号绑定的 WCL 凭据拉取整晚 Pull，生成可下载、可重新导入的分析 JSON。</p>
-        </a>
-
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-cyan-500 hover:bg-gray-900/80"
-           href="/cooldowns">
-            <div class="text-xs font-semibold uppercase tracking-wide text-cyan-300">团长排轴</div>
-            <h2 class="mt-2 text-xl font-bold">治疗构成 / 团队技能时间线</h2>
-            <p class="mt-3 text-sm leading-6 text-gray-400">按副本、Boss、难度和指定治疗构成寻找公开过本记录，提取治疗大技能、团队减伤、位移与增辉团队功能，并导出 MRT/NSRT 时间戳。</p>
-        </a>
-
-        <a class="block rounded border border-gray-800 bg-gray-900 p-6 hover:border-yellow-500 hover:bg-gray-900/80"
-           href="/raid-calendar">
-            <div class="text-xs font-semibold uppercase tracking-wide text-yellow-300">开荒运营</div>
-            <h2 class="mt-2 text-xl font-bold">Loot 与出勤日历</h2>
-            <p class="mt-3 text-sm leading-6 text-gray-400">记录活动出勤、需求资格、玩家需求详情和装备分配；按 Boss、难度、护甲及职业快速筛选 PTR 掉落。</p>
-        </a>
-    </section>
-
-    <section class="mt-10">
-        <div class="mb-4 flex items-end justify-between gap-4">
-            <div>
-                <div class="text-xs font-semibold uppercase tracking-wide text-zinc-400">开发中</div>
-                <h2 class="mt-1 text-xl font-bold text-zinc-200">实验功能</h2>
-            </div>
-            <p class="text-sm text-zinc-500">以下模块可用性仍在迭代，入口保留但不作为主推流程。</p>
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
-            <a class="block rounded border border-dashed border-zinc-700 bg-zinc-950/40 p-5 hover:border-zinc-500 hover:bg-zinc-950/70"
-               href="/spec-compare">
-                <div class="text-xs font-semibold tracking-wide text-lime-400/80">单专精战斗复盘</div>
-                <h3 class="mt-2 text-lg font-bold text-zinc-100">Buff、溢出与爆发序列</h3>
-                <p class="mt-2 text-sm leading-6 text-zinc-400">把一名玩家的单场战斗与 WCL 前列样本放在同一页核对。</p>
-            </a>
-
-            <a class="block rounded border border-dashed border-zinc-700 bg-zinc-950/40 p-5 hover:border-zinc-500 hover:bg-zinc-950/70"
-               href="/mythic-dungeon">
-                <div class="text-xs font-semibold uppercase tracking-wide text-orange-400/80">大秘境抄轴</div>
-                <h3 class="mt-2 text-lg font-bold text-zinc-100">国家队极限层路线样板</h3>
-                <p class="mt-2 text-sm leading-6 text-zinc-400">按 WCL 原生 Pull 展示真实拉怪构成、开怪归属与玩家成功施法。</p>
-            </a>
-        </div>
-    </section>
+<body class="cosmic-page" data-cosmic-density="390">
+<main class="cosmic-content cosmic-shell">
+  <header class="topbar"><div class="brand"><span class="brand-mark"></span><span>Mythic Analyzer</span><span class="version">V1.3.0</span></div><nav class="top-links"><a class="cosmic-button" href="/account">账号与工会</a><a class="cosmic-button" href="/single-fight">高级选择</a></nav></header>
+  <section class="hero">
+    <div><div class="cosmic-eyebrow">快速团本复盘</div><h1 id="heroLine">让我看看这个按钮是干什么用的……</h1><p class="hero-copy">从默认工会自动找到<strong>最新 Report 的最后一场 Boss 战</strong>，直接进入分析；已有 JSON 则完全在浏览器本地打开，不占用服务器长期空间。</p><p class="hero-aside">让我们看看是谁干了……<em>原来是我？</em></p></div>
+    <article class="glass-panel quick-card"><h2>快速开始</h2><p class="cosmic-muted">不再选择日期、Report 和 Fight。</p><div class="quick-actions"><label class="cosmic-field"><span>分析工会</span><select id="quickGuild" aria-label="分析工会"><option value="">正在读取工会…</option></select></label><button id="analyzeLatest" class="cosmic-button primary" type="button">分析最新一场 Boss</button><a class="cosmic-button advanced-button" href="/single-fight">高级选择 · 指定 Report / Fight</a><div class="divider">或者</div><label class="cosmic-button file-button">打开本地分析 JSON<input id="localJson" type="file" accept=".json,application/json"></label></div><div id="quickMessage" class="quick-note cosmic-muted" role="status">文件只在当前浏览器处理，不会上传服务器。</div></article>
+  </section>
+  <section class="section"><header class="section-head"><div><div class="cosmic-eyebrow">Raid tools</div><h2>团长工具</h2></div><p class="cosmic-muted">高频工作保持直接；赛后复盘和定制运营进入各自模块。</p></header><div class="tool-grid"><a class="glass-panel tool full" href="/online"><span class="tone"></span><h3>整晚日志分析</h3><p>指定 Report 和 Boss，生成整晚 Pull 概览与专项机制报告。</p></a><a class="glass-panel tool raid" href="/raid-guide"><span class="tone"></span><h3>12.1 团本手册</h3><p>当前赛季 Boss 技能、流程、时间轴与开荒证据。</p></a><a class="glass-panel tool cooldown" href="/cooldowns"><span class="tone"></span><h3>团队技能排轴</h3><p>按治疗构成参考公开记录，导出 MRT / NSRT 时间戳。</p></a><a class="glass-panel tool custom" href="/raid-calendar"><span class="tone"></span><h3>Avalon 工会运营</h3><p>保留定制化 Loot、出勤日历和装备分配流程。</p></a></div><div class="secondary"><a class="cosmic-button" href="/report">本地报告库</a><a class="cosmic-button" href="/single-fight">手动选择 Report / Fight</a></div></section>
+  <footer id="adminLab" class="lab" hidden><div class="cosmic-eyebrow">管理员实验区</div><div class="lab-links"><a href="/spec-compare">单专精战斗复盘</a><a href="/mythic-dungeon">大秘境抄轴（极限层）</a></div></footer>
 </main>
+<section id="waitScreen" class="wait" hidden aria-live="polite" aria-busy="true"><article class="glass-panel wait-card"><div class="wait-title"><span class="orb"></span><div><h2 id="waitTitle">正在查找最新一场</h2><div id="waitGuild" class="cosmic-muted"></div></div></div><div class="track"><i id="waitProgress"></i></div><div class="wait-meta"><span id="waitStatus">正在创建任务</span><b id="waitPercent">1%</b></div><div id="waitLog" class="wait-log">WCL 查询将在后台完成。</div><button id="waitClose" class="cosmic-button wait-close" type="button" hidden>返回首页</button></article></section>
+<script src="/frontend/core/report-plugin-runtime.js?v=1.3.0"></script><script src="/frontend/core/cosmic-background.js?v=1.3.0"></script>
 <script>
-fetch('/api/auth/me').then(response => response.ok ? response.json() : null).then(payload => {
-    if (!payload?.user?.isAdmin) document.querySelectorAll('[data-admin-only]').forEach(node => node.remove());
-}).catch(() => document.querySelectorAll('[data-admin-only]').forEach(node => node.remove()));
+(()=>{const $=id=>document.getElementById(id);let me=null;const lines=[
+'让我看看这个按钮是干什么用的……',
+'刚刚是谁把蛋踩出来的？',
+'是不是有人选错目标了？',
+'为什么Boss还有 30% 的血……',
+'谁在做踩蘑菇的小姑娘？',
+'让我贪完这个棱彩飞弹……',
+'叠满君王再转火应该不会被发现吧...?',
+'这分摊伤害是不是不太对...',
+'大副纳玛为何频频团结?'];const randomIndex=()=>{if(globalThis.crypto?.getRandomValues){const value=new Uint32Array(1);crypto.getRandomValues(value);return value[0]%lines.length}return Math.floor(Math.random()*lines.length)};$('heroLine').textContent=lines[randomIndex()];const errorText=async response=>{try{return(await response.json()).error||`HTTP ${response.status}`}catch(_){return`HTTP ${response.status}`}};function escapeHtml(value){const span=document.createElement('span');span.textContent=String(value??'');return span.innerHTML}function guildName(guild){const name=String(guild.name||'').trim();return name&&!new RegExp(`^工会\\s*${guild.id}$`).test(name)?name:`Guild ID ${guild.id}`}async function loadAccount(){const response=await fetch('/api/auth/me',{cache:'no-store'});if(!response.ok)throw new Error(await errorText(response));const data=await response.json();me=data.user;const guilds=data.guilds||[];$('quickGuild').innerHTML=guilds.length?guilds.map(g=>`<option value="${g.id}" ${g.isDefault?'selected':''}>${escapeHtml(guildName(g))}${g.isDefault?'（默认）':''}</option>`).join(''):'<option value="">尚未配置工会</option>';$('adminLab').hidden=!me.isAdmin;if(!data.wcl?.configured)$('quickMessage').innerHTML='尚未配置 WCL 凭据，请先前往 <a href="/account">账号与工会</a>。';if(!me.canModify){$('analyzeLatest').disabled=true;$('quickMessage').textContent='当前账号为只读权限，仍可打开本地分析 JSON。'}}function showWait(guild){$('waitGuild').textContent=guild;$('waitScreen').hidden=false;$('waitClose').hidden=true;$('waitTitle').textContent='正在查找最新一场';$('waitStatus').textContent='正在创建任务';$('waitPercent').textContent='1%';$('waitProgress').style.width='1%';$('waitLog').textContent='WCL 查询将在后台完成。'}function monitor(job){const source=new EventSource(job.eventsUrl);source.onmessage=event=>{const data=JSON.parse(event.data),percent=Math.max(1,Number(data.percent||0));$('waitProgress').style.width=`${percent}%`;$('waitPercent').textContent=`${percent}%`;$('waitStatus').textContent=data.message||data.status;$('waitLog').textContent=data.selection?`${data.selection.bossName} · Fight ${data.selection.fightID}`:(data.message||'处理中');if(data.type==='done'||data.status==='done'){source.close();location.href=`/report?json=${encodeURIComponent(data.resultUrl||job.resultUrl)}`}if(data.type==='error'||data.status==='error'){source.close();$('waitTitle').textContent='暂时无法分析';$('waitClose').hidden=false}};source.onerror=()=>{if(source.readyState===EventSource.CLOSED)$('waitClose').hidden=false}}$('analyzeLatest').onclick=async()=>{const guildID=Number($('quickGuild').value);if(!guildID){$('quickMessage').textContent='请先在账号设置中添加工会。';return}showWait($('quickGuild').selectedOptions[0].textContent);try{const response=await fetch('/api/single-fight/latest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({guildID})});if(!response.ok)throw new Error(await errorText(response));monitor(await response.json())}catch(error){$('waitTitle').textContent='暂时无法分析';$('waitStatus').textContent=error.message;$('waitLog').textContent='可以进入高级选择手动指定 Report 和 Fight。';$('waitClose').hidden=false}};$('waitClose').onclick=()=>{$('waitScreen').hidden=true};$('localJson').onchange=async event=>{const file=event.target.files?.[0];if(!file)return;$('quickMessage').textContent='正在识别本地文件…';try{const payload=JSON.parse(await file.text());const descriptor=await window.MythicReportRuntime.loadDescriptor(payload);const source=await window.MythicReportRuntime.storePayload(payload,{label:file.name});location.href=window.MythicReportRuntime.reportUrl(descriptor,source)}catch(error){$('quickMessage').textContent=`无法打开：${error.message}`}finally{event.target.value=''}};loadAccount().catch(error=>$('quickMessage').textContent=error.message)})();
+
+
+
+
 </script>
-</body>
-</html>
+</body></html>

@@ -201,6 +201,49 @@ def recent_guild_reports(
     }
 
 
+def latest_guild_fight(
+    client: WclClient | None = None,
+    *,
+    guild_id: int | None = None,
+    report_limit: int = 5,
+) -> dict:
+    """Resolve the chronologically latest completed Boss pull for a guild.
+
+    Selection is intentionally strict: an unsupported latest Boss is returned so
+    the caller can explain that limitation instead of silently analyzing an older
+    encounter.
+    """
+    discovery = recent_guild_reports(
+        client,
+        guild_id=guild_id,
+        limit=max(1, min(10, int(report_limit or 5))),
+    )
+    candidates = [
+        {"report": report, "fight": fight}
+        for report in discovery["reports"]
+        for fight in report.get("fights") or []
+    ]
+    if not candidates:
+        raise ValueError("最近的 WCL 报告中没有已结束且时长达到 20 秒的 Boss 战。")
+    selected = max(
+        candidates,
+        key=lambda row: (
+            int(row["fight"].get("absoluteStartTime") or 0),
+            int(row["fight"].get("id") or 0),
+        ),
+    )
+    return {
+        "schemaVersion": 1,
+        "guild": discovery["guild"],
+        "report": {
+            "code": selected["report"]["code"],
+            "title": selected["report"]["title"],
+        },
+        "fight": selected["fight"],
+        "rateLimit": discovery["rateLimit"],
+    }
+
+
 def report_overview(report_code: str, client: WclClient | None = None) -> dict:
     config = load_single_fight_config()
     code = str(report_code or "").strip()

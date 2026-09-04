@@ -12,7 +12,7 @@ class LoginFrontendTests(unittest.TestCase):
         cls.page = LOGIN_PAGE.read_text(encoding="utf-8")
 
     def test_login_page_shows_version_and_removes_old_slogan(self):
-        self.assertIn("v1.2.0", self.page)
+        self.assertIn("v1.3.0", self.page)
         self.assertIn('id="versionButton"', self.page)
         self.assertNotIn("旨在快速帮团长完成团本开荒中问题的定位", self.page)
 
@@ -26,6 +26,7 @@ class LoginFrontendTests(unittest.TestCase):
         self.assertIn("https://github.com/GrimEclipse/wow_raidanalyzer", self.page)
         self.assertIn("所有 Boss 共用的整场 Pull 概览", self.page)
         self.assertIn("同帧多条安全移除的两两归组", self.page)
+        self.assertIn("一键分析最新一场 Boss", self.page)
 
     def test_canvas_has_drifting_constellations_and_comets(self):
         self.assertIn("const linked = stars.filter", self.page)

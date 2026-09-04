@@ -54,6 +54,18 @@ class AuthStoreTests(unittest.TestCase):
         with self.assertRaises(AuthError):
             self.store.set_role(admin["id"], "viewer", actor_user_id=admin["id"])
 
+    def test_user_guilds_have_one_default_and_follow_the_user(self):
+        user = self.store.create_user("raider", "password", role="editor")
+        first = self.store.upsert_guild(user["id"], 1001, "First Guild")
+        self.assertTrue(first["isDefault"])
+        self.store.upsert_guild(user["id"], 1002, "Second Guild")
+        self.store.set_default_guild(user["id"], 1002)
+        guilds = self.store.list_guilds(user["id"])
+        self.assertEqual(guilds[0]["id"], 1002)
+        self.assertEqual(sum(1 for guild in guilds if guild["isDefault"]), 1)
+        self.store.delete_guild(user["id"], 1002)
+        self.assertTrue(self.store.list_guilds(user["id"])[0]["isDefault"])
+
 
 if __name__ == "__main__":
     unittest.main()

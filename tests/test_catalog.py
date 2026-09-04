@@ -63,8 +63,12 @@ class BossCatalogTests(unittest.TestCase):
         boss = find_boss("12.1", "tidebound_grotto", "nymrissa_wavecaller")
         self.assertEqual(boss.english_name, "Nymrissa Wavecaller")
         self.assertEqual(boss.external_key, "wow.tidebound,01.nymrissa")
+        self.assertEqual(boss.encounter_ids, [3379])
+        self.assertTrue(boss.supported)
         self.assertEqual(len(boss.arena_assets), 1)
         self.assertTrue((CATALOG_PATH.parent / boss.arena_assets[0]["path"]).is_file())
+        self.assertTrue((CATALOG_PATH.parent / "boss_plugins/tidebound_grotto/nymrissa_wavecaller.py").is_file())
+        self.assertTrue((CATALOG_PATH.parent / "frontend/report/plugins/tidebound_grotto/nymrissa_wavecaller/plugin.js").is_file())
 
     def test_duplicate_boss_identity_is_rejected(self):
         duplicate = {
