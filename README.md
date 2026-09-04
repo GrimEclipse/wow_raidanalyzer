@@ -39,9 +39,7 @@ py analyze.py --version 12.0 --raid void_spire --boss crown_of_the_cosmos --repo
 - `boss_plugins/`：后端 Boss 插件
 - `frontend/report/`：报告入口、通用报告和 Boss 前端插件
 - `frontend/tools/`：团本手册、团队时间轴、在线执行器与团队运营工具
-- `skills/`：项目维护规范与 Boss 研究资料
 - `config/player_abilities.json`：按职业/专精维护的 WCL 已验证爆发、减伤、功能、打断与控制技能公共目录
-- `tools/debug/`：手工调试入口
 - `data/raid_calendar.db`：团本日历、出勤和拾取分配的本地持久化数据（不纳入 Git）
 
 新增 Boss 时注册后端插件，并创建

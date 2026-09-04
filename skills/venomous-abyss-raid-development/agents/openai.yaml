@@ -1,5 +1,0 @@
-interface:
-  display_name: "烈毒之渊团本研发"
-  short_description: "维护 12.1 Boss 流程、法术证据与团长手册资料"
-  brand_color: "#A855F7"
-  default_prompt: "Use $venomous-abyss-raid-development to add or revise a 12.1 Boss mechanic and its evidence IDs."

@@ -1,5 +1,0 @@
-interface:
-  display_name: "WCL Boss 断案插件"
-  short_description: "维护 Boss 取证逻辑、逐场复盘与专用前端报告插件"
-  brand_color: "#F59E0B"
-  default_prompt: "Use $wcl-boss-analysis to implement or review evidence logic for one Boss without changing unrelated plugins."

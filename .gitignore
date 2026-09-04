@@ -3,6 +3,12 @@ __pycache__/
 *.log
 tools/tmp/
 
+# Local-only development suites and work-in-progress plugins.
+/tests/
+/spec_plugins/
+/skills/
+/tools/
+
 .env
 .env.*
 !.env.example
