@@ -28,6 +28,7 @@ from analyzer_core.wcl_paths import iter_wcl_json_files, list_wcl_data_files, wr
 
 
 ROOT = Path(__file__).resolve().parent
+FAVICON_PATH = ROOT / "assets" / "branding" / "mythic-analyzer.gif"
 
 
 def environment_setting(key, default=""):
@@ -646,7 +647,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if wowhead_asset is not None:
             return self.redirect_resource(wowhead_asset)
         if path == "/favicon.ico":
-            return self.send_response_body(HTTPStatus.NO_CONTENT, "image/x-icon", b"")
+            return self.send_response_body(HTTPStatus.OK, "image/gif", FAVICON_PATH.read_bytes())
         if path == "/login":
             if self.current_user():
                 return self.redirect("/online")

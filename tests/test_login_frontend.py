@@ -24,6 +24,8 @@ class LoginFrontendTests(unittest.TestCase):
         self.assertIn("versionButton.addEventListener('click'", self.page)
         self.assertIn("noticeModal.scrollTop = 0", self.page)
         self.assertIn("https://github.com/GrimEclipse/wow_raidanalyzer", self.page)
+        self.assertIn("https://github.com/GrimEclipse/wow_raidanalyzer/issues/new", self.page)
+        self.assertIn("反馈 Issue", self.page)
         self.assertIn("所有 Boss 共用的整场 Pull 概览", self.page)
         self.assertIn("同帧多条安全移除的两两归组", self.page)
         self.assertIn("一键分析最新一场 Boss", self.page)

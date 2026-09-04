@@ -18,7 +18,7 @@
     .shell{position:relative;z-index:1;min-height:100vh;width:min(980px,100%);margin:auto;padding:40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(350px,420px);align-items:center;gap:72px;animation:arrive .55s ease-out both;transition:opacity .35s ease,transform .35s ease,filter .35s ease}
     .brand{padding:18px 0}.brand::before{content:"";display:block;width:36px;height:3px;margin-bottom:24px;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--violet))}
     h1{margin:0;font-size:clamp(42px,6vw,68px);line-height:1.08;letter-spacing:-.045em;font-weight:790}
-    .brand-meta{display:flex;align-items:center;gap:10px;margin-top:26px;color:#69738f;font-size:12px;letter-spacing:.03em}.version{display:inline-flex;align-items:center;min-height:24px;padding:2px 9px;border:1px solid rgba(103,232,249,.2);border-radius:99px;background:rgba(8,47,73,.26);color:#9eeaf7;cursor:pointer;font:inherit;font-weight:750;letter-spacing:.06em}.version:hover{border-color:rgba(103,232,249,.48);background:rgba(8,47,73,.44)}
+    .brand-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:26px;color:#69738f;font-size:12px;letter-spacing:.03em}.version{display:inline-flex;align-items:center;min-height:24px;padding:2px 9px;border:1px solid rgba(103,232,249,.2);border-radius:99px;background:rgba(8,47,73,.26);color:#9eeaf7;cursor:pointer;font:inherit;font-weight:750;letter-spacing:.06em;text-decoration:none}.version:hover{border-color:rgba(103,232,249,.48);background:rgba(8,47,73,.44)}
     .card{position:relative;padding:32px;border:1px solid var(--line);border-radius:22px;background:rgba(10,14,32,.78);box-shadow:0 28px 80px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.04);backdrop-filter:blur(22px)}.card-head{margin-bottom:24px}.card-head strong{display:block;font-size:20px}.card-head span{display:block;margin-top:6px;color:#737d99;font-size:12px}
     .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin-bottom:25px;border:1px solid rgba(148,163,184,.12);border-radius:14px;background:rgba(2,6,23,.55)}button,input{font:inherit}.tabs button{height:40px;border:0;border-radius:10px;background:transparent;color:#747e9e;cursor:pointer;font-weight:700;transition:.2s}.tabs button.active{background:linear-gradient(135deg,rgba(30,41,83,.95),rgba(38,30,78,.95));color:#eef2ff;box-shadow:0 5px 18px rgba(0,0,0,.2)}
     form{display:grid;gap:17px}.field{display:grid;gap:8px}.label-row{display:flex;justify-content:space-between;align-items:center;color:#b8c0da;font-size:12px;font-weight:650}.field-wrap{position:relative}.field input{width:100%;height:49px;padding:0 44px 0 15px;border:1px solid rgba(148,163,184,.18);border-radius:13px;outline:0;background:rgba(2,6,23,.58);color:#f7f8ff;transition:border-color .2s,box-shadow .2s,background .2s}.field input::placeholder{color:#4e5878}.field input:hover{border-color:rgba(165,180,252,.3)}.field input:focus{border-color:rgba(103,232,249,.62);background:rgba(3,7,24,.78);box-shadow:0 0 0 4px rgba(34,211,238,.08),0 0 25px rgba(34,211,238,.05)}.reveal{position:absolute;right:8px;top:7px;width:35px;height:35px;border:0;border-radius:9px;background:transparent;color:#74809f;cursor:pointer}.reveal:hover{background:rgba(148,163,184,.08);color:#dce5ff}
@@ -38,7 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.0 更新公告">v1.3.0</button></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.0 更新公告">v1.3.0</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈 Issue ↗</a></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -82,6 +82,7 @@
             <li>首页与账号设置改用深空视觉，并保留低动态模式。</li>
             <li>首页趣味台词每次进入时随机抽取一次，实验入口仅管理员可见，高级单场选择移到快速开始区域。</li>
             <li>尼姆瑞莎·唤潮者已接入基础战斗复盘，不再因缺少分析插件中止最新战斗流程。</li>
+            <li>账号页加入 WCL V2 Client 完整图文指引；乌拉特克蛇母之怒 A 团会显示当轮承接目标。</li>
           </ul>
         </li>
         <li>
@@ -110,7 +111,7 @@
         </li>
         <li>
           <p>目前系统已经维护的内容基本都可以使用，并且基本都外接了 Wowhead、lorrgs.io 等工具的附件。只要你能访问到这个网站，你基本都可以无痛访问到 Wowhead 上的相关资源。</p>
-          <p>有相关需求的可以直接反馈给我，或者反馈到 <a href="https://github.com/GrimEclipse/wow_raidanalyzer" target="_blank" rel="noreferrer">GrimEclipse/wow_raidanalyzer</a>。我会在能力范围之内快速处理这些需求。</p>
+          <p>有相关需求的可以直接反馈给我，或者<a href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">提交 GitHub Issue</a>。我会在能力范围之内快速处理这些需求。</p>
         </li>
         <li>
           <p>计划之内的需求包括：</p>

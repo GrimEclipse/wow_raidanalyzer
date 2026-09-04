@@ -44,6 +44,13 @@ class HomeAndCalendarFrontendTests(unittest.TestCase):
         self.assertIn("$('heroLine').textContent=lines[randomIndex()]", self.home)
         self.assertIn("$('adminLab').hidden=!me.isAdmin", self.home)
 
+    def test_home_can_reopen_release_notes_and_submit_feedback(self):
+        self.assertIn('id="releaseNotesButton"', self.home)
+        self.assertIn('id="releaseNotes"', self.home)
+        self.assertIn("$('releaseNotesButton').onclick=openReleaseNotes", self.home)
+        self.assertIn("$('dismissReleaseNotes').onclick=closeReleaseNotes", self.home)
+        self.assertIn("https://github.com/GrimEclipse/wow_raidanalyzer/issues/new", self.home)
+
     def test_blackmark_history_is_descending_paginated_and_color_coded(self):
         self.assertIn('id="blackHistoryPagination"', self.calendar)
         self.assertIn("BLACK_HISTORY_PAGE_SIZE = 8", self.calendar_js)
@@ -66,6 +73,7 @@ class HomeAndCalendarFrontendTests(unittest.TestCase):
         self.assertIn("Client Secret 只显示这一次", self.account)
         for index in range(1, 7):
             self.assertIn(f"/frontend/assets/guides/wcl-v2/0{index}-", self.account)
+        self.assertIn("https://github.com/GrimEclipse/wow_raidanalyzer/issues/new", self.account)
 
 
 if __name__ == "__main__":

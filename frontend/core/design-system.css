@@ -58,5 +58,33 @@ body.cosmic-page {
 .cosmic-field input:focus, .cosmic-field select:focus { border-color: rgba(103, 232, 249, .65); box-shadow: 0 0 0 4px rgba(34, 211, 238, .08); }
 .cosmic-status { min-height: 24px; color: var(--space-green); }
 .cosmic-status.error { color: var(--space-red); }
+.release-open { overflow: hidden; }
+.release-layer {
+  position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 24px;
+  background: rgba(2, 5, 14, .8); backdrop-filter: blur(12px);
+}
+.release-layer[hidden] { display: none; }
+.release-modal {
+  width: min(800px, 100%); max-height: min(84vh, 860px); overflow: auto;
+  border: 1px solid rgba(165, 180, 252, .24); border-radius: 24px;
+  background: linear-gradient(145deg, rgba(13, 18, 40, .99), rgba(7, 11, 27, .99));
+  box-shadow: 0 36px 110px rgba(0, 0, 0, .6), inset 0 1px rgba(255, 255, 255, .05);
+}
+.release-head {
+  position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 24px 28px 18px; border-bottom: 1px solid var(--space-line); background: rgba(10, 14, 32, .95); backdrop-filter: blur(18px);
+}
+.release-head h2 { margin: 4px 0 0; font-size: 24px; }
+.release-close {
+  flex: none; width: 38px; height: 38px; border: 1px solid var(--space-line); border-radius: 50%;
+  background: rgba(15, 23, 42, .7); color: #cbd5e1; cursor: pointer; font: 22px/1 system-ui;
+}
+.release-content { padding: 22px 28px 28px; color: #c4cbe0; font-size: 14px; line-height: 1.8; }
+.release-content h3 { margin: 0 0 9px; color: var(--space-text); }
+.release-content section + section { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--space-line); }
+.release-content ul { display: grid; gap: 6px; margin: 0; padding-left: 21px; }
+.release-content a { color: var(--space-cyan); }
+.release-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
 @media (max-width: 720px) { .cosmic-shell { width: min(100% - 22px, 1180px); padding-top: 20px; } }
+@media (max-width: 560px) { .release-layer { padding: 10px; } .release-head { padding: 19px; } .release-content { padding: 18px 19px 22px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

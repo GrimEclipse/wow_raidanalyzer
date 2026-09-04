@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from server import (
     AnalyzerHandler,
+    FAVICON_PATH,
     local_wowhead_data,
     normalize_static_request_path,
     safe_redirect_target,
@@ -12,6 +13,10 @@ from server import (
 
 
 class ServerAuthRouteTests(unittest.TestCase):
+    def test_animated_favicon_is_a_bundled_gif(self):
+        self.assertTrue(FAVICON_PATH.is_file())
+        self.assertTrue(FAVICON_PATH.read_bytes().startswith(b"GIF8"))
+
     def test_static_app_routes_accept_trailing_slashes(self):
         self.assertEqual(normalize_static_request_path("/raid-guide/"), "/raid-guide")
         self.assertEqual(
