@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from analyzer_core.analysis_scope import filter_fights
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
+from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.common import (
     CLASS_COLORS,
     COMBAT_RES_SPELLS,
@@ -369,7 +370,7 @@ def render_fight(report_id, report_start, actors, fight, raw):
 
 def build_aggregated_json(report_ids, options=None, client=None):
     del options
-    report_id_list = [value for value in (item.strip() for item in str(report_ids or "").replace(" ", "").split(",")) if value]
+    report_id_list = parse_wcl_report_ids(report_ids)
     if not report_id_list:
         raise RuntimeError("请传入至少一个 WCL report ID。")
     client = client or WclClient()

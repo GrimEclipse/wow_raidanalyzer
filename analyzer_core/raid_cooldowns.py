@@ -8,7 +8,6 @@ all ability filtering and export formatting happens locally.
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time
 from collections import Counter
@@ -18,6 +17,7 @@ from pathlib import Path
 from typing import Iterable
 
 from analyzer_core.concurrency import request_post
+from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.combat_config import TEAM_COOLDOWNS
 from boss_plugins.common import CLASS_NAMES, SPEC_ICON_SLUGS, SPEC_NAMES
 from boss_plugins.void_spire.crown_of_the_cosmos import (
@@ -340,16 +340,7 @@ def _zone_report_codes(token: str, zone_id: int) -> dict:
 
 def parse_report_codes(value) -> list[str]:
     """Extract up to ten WCL report codes from codes, URLs or mixed text."""
-    values = value if isinstance(value, list) else [value]
-    codes = []
-    for raw in values:
-        text = str(raw or "")
-        codes.extend(re.findall(r"(?:warcraftlogs\.com/)?reports/([A-Za-z0-9]{16})", text, re.IGNORECASE))
-        for token in re.split(r"[\s,;]+", text):
-            token = token.strip()
-            if re.fullmatch(r"[A-Za-z0-9]{16}", token):
-                codes.append(token)
-    return list(dict.fromkeys(codes))[:MAX_PROVIDED_REPORTS]
+    return parse_wcl_report_ids(value, max_count=MAX_PROVIDED_REPORTS)
 
 
 def _discovery_report_codes(

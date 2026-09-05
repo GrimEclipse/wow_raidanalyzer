@@ -11,6 +11,7 @@ from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.court_rules import validate_court_profile
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
+from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.common import (
     build_player_mechanic_roles,
     combatant_spec_id,
@@ -1841,7 +1842,7 @@ def render_fight(raw, baseline, options):
 def build_aggregated_json(report_ids, options=None):
     from analyzer_core.analysis_scope import filter_fights
     options = {**DEFAULT_OPTIONS, **(options or {})}
-    report_id_list = [value for value in (item.strip() for item in report_ids.replace(" ", "").split(",")) if value]
+    report_id_list = parse_wcl_report_ids(report_ids)
     if not report_id_list:
         raise RuntimeError("请传入至少一个 WCL report ID。")
     client = WclClient()

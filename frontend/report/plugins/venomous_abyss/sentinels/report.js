@@ -39,11 +39,12 @@ function renderSummary() {
   const pull = current(), sentinels = pull?.sentinels || {};
   const helical = sentinels.helicalToxins || {}, water = sentinels.clingingMurk || {};
   const living = sentinels.livingVenom || {}, droplets = sentinels.toxicDroplets || {};
+  const protovenom = sentinels.shiftingProtovenom || {};
   const stats = [
     ["战斗", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`],
     ["时长", pull?.duration || "—"], ["静滞轮数", helical.roundCount || 0],
     ["错误碰撞", helical.wrongCollisionCount || 0], ["活体毒液", `${living.totalHits || 0} 次`],
-    ["漏绿球 / 分摊", `${droplets.missedRoundCount || 0} / ${water.roundCount || 0}`]
+    ["已归因原型毒液 / 击飞", `${protovenom.attributedErrorCount || 0} / ${protovenom.teammateKnockbackCount || 0}`]
   ];
   $("summary").innerHTML = stats.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join("");
   $("wclLink").href = pull?.wclDeepLink || "#";
@@ -146,7 +147,18 @@ function playerList(rows, formatter) { return rows.length ? rows.map(formatter).
 
 function renderField() {
   const water = current()?.sentinels?.clingingMurk || {};
-  $("content").innerHTML = `<section class="panel"><h2>分摊参与与附着幽暗离散</h2>${simpleTable(["轮次", "分摊时间", "附着幽暗人数", "鲜血>酸液但未参与分摊", "放水过于离散"], (water.rounds || []).map(round => [`#${round.index}`, esc(round.soakTime), round.carrierCount, playerList(round.missingBloodSidePlayers || [], row => coloredPlayer(row.player, row.playerID)), playerList(round.dispersedPlayers || [], row => `${coloredPlayer(row.player, row.playerID)}（距本轮中位中心${row.distanceFromGroupYards}码）`)]))}</section>`;
+  const mythic = water.placementMode === "linear-row";
+  const placementHeader = mythic ? "未排进横排" : "放水过于离散";
+  const placementCell = round => mythic
+    ? playerList(round.offRowPlayers || [], row => `${coloredPlayer(row.player, row.playerID)}（偏离横排 ${row.rowDeviationYards} 码）`)
+    : playerList(round.dispersedPlayers || [], row => `${coloredPlayer(row.player, row.playerID)}（距本轮中位中心 ${row.distanceFromGroupYards} 码）`);
+  const geometryCell = round => {
+    if (!mythic) return "集中放置";
+    const geometry = round.rowAlignment || {};
+    if (geometry.aligned == null) return '<span class="badge warn">坐标不足</span>';
+    return `${geometry.aligned ? '<span class="badge good">已成排</span>' : '<span class="badge bad">存在偏离</span>'} · 方向 ${geometry.angleDegrees}° · 跨度 ${geometry.spanYards} 码`;
+  };
+  $("content").innerHTML = `<section class="panel notice"><p>${esc(water.explanation || "")}</p></section><section class="panel"><h2>${mythic ? "史诗横排放水" : "分摊参与与附着幽暗离散"}</h2>${simpleTable(["轮次", "分摊时间", "附着幽暗人数", "鲜血>酸液但未参与分摊", "队形", placementHeader], (water.rounds || []).map(round => [`#${round.index}`, esc(round.soakTime), round.carrierCount, playerList(round.missingBloodSidePlayers || [], row => coloredPlayer(row.player, row.playerID)), geometryCell(round), placementCell(round)]))}</section>`;
 }
 
 function noHitText(players) {
@@ -163,11 +175,34 @@ function renderAvoidable() {
   refreshWowhead();
 }
 
+function renderProtovenom() {
+  const data = current()?.sentinels?.shiftingProtovenom || {};
+  if (!data.enabled && data.mythicOnly) {
+    $("content").innerHTML = `<section class="panel"><h2>${spellHeading(1296880, "变幻的原型毒液")}</h2><div class="empty">${esc(data.explanation || "该机制只在史诗难度出现。")}</div></section>`;
+    return;
+  }
+  const collisions = data.collisions || [];
+  const knockbackCell = row => row.instigator
+    ? `<span class="badge bad">${row.teammateKnockbackCount || 0} 人次</span>`
+    : `<span class="badge warn">${row.unattributedKnockbackCount || row.affectedCount || 0} 名受击者，无法排除本人</span>`;
+  const collisionRows = collisions.map(row => [
+    esc(row.time),
+    row.instigator ? coloredPlayer(row.instigator.player, row.instigator.playerID) : '<span class="badge warn">未解析</span>',
+    row.collisionTarget ? coloredPlayer(row.collisionTarget.player, row.collisionTarget.playerID) : "—",
+    row.delayFromApplySec == null ? "—" : `${Number(row.delayFromApplySec).toFixed(2)} 秒`,
+    knockbackCell(row),
+    playerList(row.affectedPlayers || [], player => coloredPlayer(player.player, player.playerID)),
+    row.attributionConfidence === "high" ? '<span class="badge good">高</span>' : row.attributionConfidence === "medium" ? '<span class="badge warn">中</span>' : '<span class="badge warn">未解析</span>',
+  ]);
+  $("content").innerHTML = `<section class="panel notice"><h2>${spellHeading(data.spellID || 1296880, "变幻的原型毒液")}</h2><p>${esc(data.explanation || "")}</p><div class="legend"><span class="chip">爆炸 ${data.errorCount || 0} 次</span><span class="chip">已归因 ${data.attributedErrorCount || 0} 次</span><span class="chip">未解析 ${data.unresolvedErrorCount || 0} 次</span><span class="chip">确认击飞队友 ${data.teammateKnockbackCount || 0} 人次</span><span class="chip">爆炸范围 ${data.eruptionRadiusYards || 10} 码</span></div></section><section class="panel"><h2>${spellHeading(data.eruptionSpellID || 1296962, "未及时分散 / 原型毒液爆炸")}</h2>${simpleTable(["时间", "归因玩家", "碰到的未中毒玩家", "施加后触发", "击飞队友", "受影响玩家", "坐标置信度"], collisionRows)}</section><section class="panel"><h2>按归因玩家汇总</h2>${simpleTable(["玩家", "错误接触", "击飞队友", "时间"], (data.players || []).map(row => [coloredPlayer(row.player, row.playerID), row.errorCount || 0, row.teammateKnockbackCount || 0, esc((row.events || []).map(event => event.time).join("、"))]))}</section>`;
+  refreshWowhead();
+}
+
 function render() {
   renderSummary();
   $("pageTitle").textContent = `陵寝哨兵${current()?.difficultyName ? `（${current().difficultyName}）` : ""} · Fight ${current()?.fightID || "-"} 技能分析`;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === state.tab));
-  ({ survival: renderSurvival, helical: renderHelical, marks: renderMarks, field: renderField, avoidable: renderAvoidable }[state.tab] || renderHelical)();
+  ({ survival: renderSurvival, helical: renderHelical, marks: renderMarks, field: renderField, protovenom: renderProtovenom, avoidable: renderAvoidable }[state.tab] || renderHelical)();
 }
 
 function load(payload) {

@@ -88,6 +88,7 @@ HEART_ID = 1299526
 FANG_AURA_ID = 1311611
 BLIGHT_VEIN_ID = 1311609
 SAFE_BLIGHT_STACK = 2
+HEROIC_SAFE_BLIGHT_STACK = 3
 HEALTHSTONE_IDS = {6262, 452930, 387636}
 HEALING_POTION_IDS = {1234768, 1295247}
 
@@ -402,6 +403,7 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
 
 
 def _analyze_fangs(fight, actor_map, players, raw):
+    safe_stack = HEROIC_SAFE_BLIGHT_STACK if int(fight.get("difficulty") or 0) == 4 else SAFE_BLIGHT_STACK
     applies = [
         event for event in raw["debuffs"]
         if int(ability_id(event) or 0) == FANG_AURA_ID
@@ -415,7 +417,7 @@ def _analyze_fangs(fight, actor_map, players, raw):
         and event_type(event) == "removedebuff"
     ]
     if not applies:
-        return {"safeStack": SAFE_BLIGHT_STACK, "rounds": [], "wrongBreakCount": 0, "maxBlightStack": 0}
+        return {"safeStack": safe_stack, "rounds": [], "wrongBreakCount": 0, "maxBlightStack": 0}
 
     # This mechanic is one assignment per fight.  The two Wardens can apply the
     # six debuffs about 1.2 s apart, so grouping by transport timestamp would
@@ -460,7 +462,7 @@ def _analyze_fangs(fight, actor_map, players, raw):
                 "toStack": row_to,
                 "blightStack": row_to,
                 "stackEvidenceTime": fmt_ms(change["timestamp"] - fight["startTime"]),
-                "wrong": row_to > SAFE_BLIGHT_STACK,
+                "wrong": row_to > safe_stack,
             })
     for event in unresolved_events:
         timestamp = int(event["timestamp"])
@@ -494,7 +496,7 @@ def _analyze_fangs(fight, actor_map, players, raw):
         "wrongBreakCount": len(wrong_players),
     }]
     return {
-        "safeStack": SAFE_BLIGHT_STACK,
+        "safeStack": safe_stack,
         "rounds": rounds,
         "wrongBreakCount": sum(row["wrongBreakCount"] for row in rounds),
         "maxBlightStack": max((row["maxBlightStack"] for row in rounds), default=0),

@@ -13,6 +13,7 @@ import urllib3
 from analyzer_core.concurrency import MAX_REQUEST_THREADS, request_post, run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_context import resolve_wcl_credentials
+from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.common import COMBAT_RES_SPELLS, HEALER_DISPEL_SPELLS, HEALER_SPEC_IDS, write_json_result
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -1747,7 +1748,7 @@ def build_aggregated_json(report_ids):
     progress(f"WCL 代理：{PROXY_URL or '未启用'}", 1)
     progress("启动光盲先锋军复盘分析")
     token = get_token()
-    report_id_list = [report_id.strip() for report_id in report_ids.replace(" ", "").split(",") if report_id.strip()]
+    report_id_list = parse_wcl_report_ids(report_ids)
     if not report_id_list:
         raise RuntimeError("请传入至少一个 WCL 日志 ID。")
 

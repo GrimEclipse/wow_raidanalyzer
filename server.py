@@ -25,6 +25,7 @@ from analyzer_core.runner import analyze_report
 from analyzer_core import raid_calendar_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 from analyzer_core.wcl_paths import iter_wcl_json_files, list_wcl_data_files, write_data_manifest
+from analyzer_core.wcl_report_ids import normalize_wcl_report_ids
 
 
 ROOT = Path(__file__).resolve().parent
@@ -639,7 +640,7 @@ def safe_redirect_target(value, default="/online"):
 
 
 class AnalyzerHandler(BaseHTTPRequestHandler):
-    server_version = "MythicAnalyzer/1.3"
+    server_version = "MythicAnalyzer/1.3.1"
 
     def do_GET(self):
         path = self.request_path()
@@ -1239,6 +1240,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             report_ids = str(payload.get("reportIds") or "").strip()
             if not all([version, raid, boss, report_ids]):
                 raise ValueError("请选择版本、副本、Boss，并填写 WCL report id。")
+            report_ids = normalize_wcl_report_ids(report_ids)
+            if not report_ids:
+                raise ValueError("没有识别到有效的 WCL 报告编号；可直接粘贴 report ID 或完整报告链接。")
+            payload["reportIds"] = report_ids
             entry = find_boss(version, raid, boss)
             if not entry.supported:
                 raise ValueError(f"{entry.boss_name} {entry.disabled_reason or '暂未接入在线分析'}")

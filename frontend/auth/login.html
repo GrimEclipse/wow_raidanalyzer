@@ -38,7 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.0 更新公告">v1.3.0</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈 Issue ↗</a></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.1 更新公告">v1.3.1</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈 Issue ↗</a></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -68,11 +68,19 @@
 <div id="releaseNotice" class="notice-layer" hidden>
   <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
     <header class="notice-head">
-      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.3.0</span></div>
+      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.3.1</span></div>
       <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
     </header>
     <div class="notice-content">
       <ol>
+        <li>
+          <p><strong>v1.3.1  陵寝哨兵史诗复盘与输入优化</strong></p>
+          <ul>
+            <li>陵寝哨兵史诗难度新增变幻的原型毒液碰撞与队友击飞归因。</li>
+            <li>史诗放水改按横排直线检查，并修复“团队内第一个撞错”的玩家汇总。</li>
+            <li>乌拉特克英雄难度攫取毒牙允许三层拉断，报告输入支持完整 WCL 链接。</li>
+          </ul>
+        </li>
         <li>
           <p><strong>v1.3.0  快速分析与本地报告工作流更新</strong></p>
           <ul>
@@ -128,7 +136,7 @@
 </div>
 <script>
 (() => {
-  const RELEASE_VERSION = 'v1.3.0';
+  const RELEASE_VERSION = 'v1.3.1';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -12,6 +12,7 @@ from analyzer_core.analysis_scope import filter_fights
 from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
+from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.common import write_json_result
 from boss_plugins.venomous_abyss.shared import (
     build_player_catalog,
@@ -152,11 +153,7 @@ def render_fight(config, analyzer, report_id, report_start, actor_map, actor_typ
 
 def build_aggregated_json(config, analyzer, report_ids, options=None):
     boss_key = config["key"]
-    report_id_list = [
-        value
-        for value in (item.strip() for item in report_ids.replace(" ", "").split(","))
-        if value
-    ]
+    report_id_list = parse_wcl_report_ids(report_ids)
     if not report_id_list:
         raise RuntimeError("请传入至少一个 WCL report ID。")
     client = WclClient()

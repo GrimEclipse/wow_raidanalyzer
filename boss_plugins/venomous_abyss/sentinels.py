@@ -18,6 +18,7 @@ from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.court_rules import validate_court_profile
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
+from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.combat_config import PERSONAL_DEFENSIVES
 from boss_plugins.common import (
     build_player_mechanic_roles,
@@ -53,6 +54,11 @@ NOXIOUS_BLAST_ID = 1284452
 UNSTABLE_MIASMA_ID = 1288260
 SOAK_DAMAGE_ID = 1288282
 CLINGING_MURK_ID = 1288297
+SHIFTING_PROTOVENOM_CAST_ID = 1296878
+SHIFTING_PROTOVENOM_DEBUFF_ID = 1296880
+SHIFTING_PROTOVENOM_DAMAGE_ID = 1296882
+PROTOVENOM_ERUPTION_ID = 1296962
+PROTOVENOM_ERUPTION_RADIUS_YARDS = 10.0
 
 DEFAULT_OPTIONS = {
     "helicalToxinReviewEnabled": True,
@@ -61,9 +67,11 @@ DEFAULT_OPTIONS = {
     "markReviewEnabled": True,
     "waterPlacementReviewEnabled": True,
     "waterOutlierDistanceYards": 8.0,
+    "mythicWaterLineToleranceYards": 5.0,
     "waterMaxSampleOffsetMs": 1500,
     "livingVenomReviewEnabled": True,
     "toxicDropletReviewEnabled": True,
+    "shiftingProtovenomReviewEnabled": True,
 }
 
 COURT_PROFILE = {
@@ -657,6 +665,218 @@ def position_at(index, actor_id, timestamp, max_gap_ms=1500):
     return nearest
 
 
+def _prototype_player(player_catalog, actor_map, player_id):
+    return {
+        **(player_catalog.get(player_id) or {}),
+        "playerID": player_id,
+        "player": actor_name(actor_map, player_id),
+    }
+
+
+def _active_protovenom_players(events, timestamp):
+    active = set()
+    for event in events:
+        if int(event.get("timestamp") or 0) > timestamp:
+            break
+        target_id = event.get("targetID")
+        kind = event_type(event)
+        if kind in {"applydebuff", "applydebuffstack", "refreshdebuff"}:
+            active.add(target_id)
+        elif kind in {"removedebuff", "removedebuffstack"}:
+            active.discard(target_id)
+    return active
+
+
+def analyze_shifting_protovenom(
+    fight,
+    actor_map,
+    player_catalog,
+    debuffs,
+    damage,
+    position_index,
+):
+    """Attribute confirmed Protovenom Eruptions to the nearest active carrier."""
+    if int(fight.get("difficulty") or 0) != 5:
+        return {
+            "enabled": False,
+            "mythicOnly": True,
+            "rounds": [],
+            "errorCount": 0,
+            "teammateKnockbackCount": 0,
+            "players": [],
+            "explanation": "变幻的原型毒液只在史诗难度出现。",
+        }
+
+    aura_events = sorted(
+        (
+            event for event in debuffs
+            if int(ability_id(event) or 0) == SHIFTING_PROTOVENOM_DEBUFF_ID
+            and event.get("targetID") in player_catalog
+        ),
+        key=lambda event: int(event.get("timestamp") or 0),
+    )
+    applications = [event for event in aura_events if event_type(event) == "applydebuff"]
+    application_groups = cluster_events(applications, tolerance_ms=1500)
+    eruption_groups = cluster_events(
+        [
+            event for event in damage
+            if int(ability_id(event) or 0) == PROTOVENOM_ERUPTION_ID
+            and event.get("targetID") in player_catalog
+        ],
+        tolerance_ms=50,
+    )
+
+    collisions = []
+    radius_units = PROTOVENOM_ERUPTION_RADIUS_YARDS * 100
+    for group in eruption_groups:
+        timestamp = min(int(event.get("timestamp") or 0) for event in group)
+        active_ids = _active_protovenom_players(aura_events, timestamp)
+        victim_ids = list(dict.fromkeys(event.get("targetID") for event in group))
+        victim_positions = {}
+        for event in group:
+            target_id = event.get("targetID")
+            if event.get("x") is not None and event.get("y") is not None:
+                victim_positions[target_id] = (float(event["x"]), float(event["y"]))
+        for target_id in victim_ids:
+            if target_id in victim_positions:
+                continue
+            sample = position_at(position_index, target_id, timestamp)
+            if sample:
+                victim_positions[target_id] = (sample["x"], sample["y"])
+
+        unmarked_victims = [target_id for target_id in victim_ids if target_id not in active_ids]
+        candidates = []
+        for player_id in active_ids:
+            sample = position_at(position_index, player_id, timestamp)
+            if not sample:
+                continue
+            point = (sample["x"], sample["y"])
+            distances = {
+                target_id: math.dist(point, victim_positions[target_id]) / 100
+                for target_id in victim_ids
+                if target_id in victim_positions
+            }
+            unmarked_distances = [distances[target_id] for target_id in unmarked_victims if target_id in distances]
+            candidates.append({
+                "playerID": player_id,
+                "point": point,
+                "distances": distances,
+                "nearestUnmarkedYards": min(unmarked_distances, default=None),
+                "victimsWithinRadius": sum(distance * 100 <= radius_units for distance in distances.values()),
+                "totalVictimDistanceYards": sum(distances.values()),
+            })
+        candidates.sort(key=lambda row: (
+            row["nearestUnmarkedYards"] is None,
+            row["nearestUnmarkedYards"] if row["nearestUnmarkedYards"] is not None else float("inf"),
+            -row["victimsWithinRadius"],
+            row["totalVictimDistanceYards"],
+        ))
+        attributed = candidates[0] if candidates else None
+        instigator_id = attributed["playerID"] if attributed else None
+        collision_target_id = None
+        if attributed and unmarked_victims:
+            collision_target_id = min(
+                (target_id for target_id in unmarked_victims if target_id in attributed["distances"]),
+                key=lambda target_id: attributed["distances"][target_id],
+                default=None,
+            )
+        apply_timestamp = max(
+            (
+                int(event.get("timestamp") or 0) for event in applications
+                if event.get("targetID") == instigator_id and int(event.get("timestamp") or 0) <= timestamp
+            ),
+            default=None,
+        )
+        teammate_ids = (
+            [target_id for target_id in victim_ids if target_id != instigator_id]
+            if instigator_id is not None else []
+        )
+        confidence = "unresolved"
+        if attributed:
+            confidence = "high" if (
+                attributed["nearestUnmarkedYards"] is not None
+                and attributed["nearestUnmarkedYards"] <= PROTOVENOM_ERUPTION_RADIUS_YARDS
+            ) else "medium"
+        collisions.append({
+            "timeMs": timestamp - int(fight["startTime"]),
+            "time": fmt_ms(timestamp - int(fight["startTime"])),
+            "spellID": PROTOVENOM_ERUPTION_ID,
+            "instigator": _prototype_player(player_catalog, actor_map, instigator_id) if instigator_id is not None else None,
+            "collisionTarget": _prototype_player(player_catalog, actor_map, collision_target_id) if collision_target_id is not None else None,
+            "delayFromApplyMs": timestamp - apply_timestamp if apply_timestamp is not None else None,
+            "delayFromApplySec": round((timestamp - apply_timestamp) / 1000, 2) if apply_timestamp is not None else None,
+            "affectedCount": len(victim_ids),
+            "affectedPlayers": [_prototype_player(player_catalog, actor_map, player_id) for player_id in victim_ids],
+            "teammateKnockbackCount": len(teammate_ids),
+            "unattributedKnockbackCount": len(victim_ids) if instigator_id is None else 0,
+            "teammates": [_prototype_player(player_catalog, actor_map, player_id) for player_id in teammate_ids],
+            "totalDamage": sum(event_amount(event) for event in group),
+            "attributionConfidence": confidence,
+            "nearestUnmarkedYards": round(attributed["nearestUnmarkedYards"], 1) if attributed and attributed["nearestUnmarkedYards"] is not None else None,
+        })
+
+    rounds = []
+    for index, group in enumerate(application_groups, start=1):
+        start = min(int(event.get("timestamp") or 0) for event in group)
+        next_start = (
+            min(int(event.get("timestamp") or 0) for event in application_groups[index])
+            if index < len(application_groups) else int(fight["endTime"]) + 1
+        )
+        round_collisions = [row for row in collisions if start <= row["timeMs"] + int(fight["startTime"]) < next_start]
+        target_ids = list(dict.fromkeys(event.get("targetID") for event in group))
+        rounds.append({
+            "index": index,
+            "applyTimeMs": start - int(fight["startTime"]),
+            "applyTime": fmt_ms(start - int(fight["startTime"])),
+            "targets": [_prototype_player(player_catalog, actor_map, player_id) for player_id in target_ids],
+            "targetCount": len(target_ids),
+            "collisions": round_collisions,
+            "errorCount": len(round_collisions),
+            "teammateKnockbackCount": sum(row["teammateKnockbackCount"] for row in round_collisions),
+        })
+
+    by_instigator = {}
+    for row in collisions:
+        instigator = row.get("instigator") or {}
+        player_id = instigator.get("playerID")
+        if player_id is None:
+            continue
+        player = by_instigator.setdefault(player_id, {
+            **instigator,
+            "errorCount": 0,
+            "teammateKnockbackCount": 0,
+            "events": [],
+        })
+        player["errorCount"] += 1
+        player["teammateKnockbackCount"] += row["teammateKnockbackCount"]
+        player["events"].append({
+            "time": row["time"],
+            "timeMs": row["timeMs"],
+            "teammateKnockbackCount": row["teammateKnockbackCount"],
+        })
+    players = sorted(
+        by_instigator.values(),
+        key=lambda row: (row["errorCount"], row["teammateKnockbackCount"]),
+        reverse=True,
+    )
+    return {
+        "enabled": True,
+        "mythicOnly": True,
+        "spellID": SHIFTING_PROTOVENOM_DEBUFF_ID,
+        "eruptionSpellID": PROTOVENOM_ERUPTION_ID,
+        "eruptionRadiusYards": PROTOVENOM_ERUPTION_RADIUS_YARDS,
+        "rounds": rounds,
+        "collisions": collisions,
+        "errorCount": len(collisions),
+        "attributedErrorCount": sum(row.get("instigator") is not None for row in collisions),
+        "unresolvedErrorCount": sum(row.get("instigator") is None for row in collisions),
+        "teammateKnockbackCount": sum(row["teammateKnockbackCount"] for row in collisions),
+        "unattributedKnockbackCount": sum(row["unattributedKnockbackCount"] for row in collisions),
+        "players": players,
+        "explanation": "WCL 的原型毒液爆炸事件只记录 Boss 为来源，不直接写出碰撞者。这里以爆炸时仍持有 1296880 的玩家为候选，并结合 1296962 受击坐标和 10 码范围，归因到最靠近未中毒受击者的携带者；只统计已实际触发爆炸的确认事件。",
+    }
+
+
 def movement_before_collision(actor_map, player_ids, timestamp, position_index, threshold_yards):
     evidence = collision_movement_evidence(actor_map, player_ids, timestamp, position_index)
     if not evidence:
@@ -772,6 +992,79 @@ def placement_metrics(positions, cluster_radius_yards):
     }
 
 
+def linear_row_metrics(placements, tolerance_yards):
+    """Fit a robust line through Mythic water drops and flag only off-row points."""
+    reliable = [row for row in placements if row.get("positionReliable")]
+    if len(reliable) < 2:
+        return {
+            "reliableCount": len(reliable),
+            "aligned": None,
+            "angleDegrees": None,
+            "spanYards": None,
+            "offRowPlayers": [],
+        }
+
+    tolerance_units = float(tolerance_yards) * 100
+    candidates = []
+    for left_index, left in enumerate(reliable):
+        for right in reliable[left_index + 1:]:
+            dx = right["_x"] - left["_x"]
+            dy = right["_y"] - left["_y"]
+            length = math.hypot(dx, dy)
+            if length < 100:
+                continue
+            distances = []
+            projections = []
+            for row in reliable:
+                relative_x = row["_x"] - left["_x"]
+                relative_y = row["_y"] - left["_y"]
+                distances.append(abs(relative_x * dy - relative_y * dx) / length)
+                projections.append((relative_x * dx + relative_y * dy) / length)
+            inlier_distances = [distance for distance in distances if distance <= tolerance_units]
+            candidates.append({
+                "left": left,
+                "dx": dx,
+                "dy": dy,
+                "length": length,
+                "distances": distances,
+                "inlierCount": len(inlier_distances),
+                "medianInlierDistance": statistics.median(inlier_distances) if inlier_distances else float("inf"),
+                "span": max(projections) - min(projections),
+            })
+    if not candidates:
+        return {
+            "reliableCount": len(reliable),
+            "aligned": None,
+            "angleDegrees": None,
+            "spanYards": None,
+            "offRowPlayers": [],
+        }
+    best = max(
+        candidates,
+        key=lambda row: (row["inlierCount"], -row["medianInlierDistance"], row["span"]),
+    )
+    angle = math.degrees(math.atan2(best["dy"], best["dx"])) % 180
+    off_row = []
+    for row, distance in zip(reliable, best["distances"]):
+        row["rowDeviationYards"] = round(distance / 100, 1)
+        if distance > tolerance_units:
+            off_row.append({
+                "playerID": row["playerID"],
+                "player": row["player"],
+                "time": row["time"],
+                "rowDeviationYards": row["rowDeviationYards"],
+                "sampleOffsetMs": row["sampleOffsetMs"],
+            })
+    return {
+        "reliableCount": len(reliable),
+        "aligned": not off_row,
+        "angleDegrees": round(angle, 1),
+        "spanYards": round(best["span"] / 100, 1),
+        "lineToleranceYards": float(tolerance_yards),
+        "offRowPlayers": off_row,
+    }
+
+
 def _alive_at(player_id, timestamp, deaths, position_index):
     prior_deaths = [
         int(event.get("timestamp") or 0)
@@ -794,6 +1087,7 @@ def analyze_clinging_murk(
     mark_events=None,
     deaths=None,
 ):
+    mythic = int(fight.get("difficulty") or 0) == 5
     mark_events = mark_events or []
     deaths = deaths or []
     marks_by_player = defaultdict(list)
@@ -860,7 +1154,11 @@ def analyze_clinging_murk(
             for row in reliable:
                 row["distanceFromGroupYards"] = round(math.dist((row["_x"], row["_y"]), center) / 100, 1)
         outlier_threshold = float(options["waterOutlierDistanceYards"])
-        dispersed = [
+        row_metrics = linear_row_metrics(
+            placements,
+            float(options["mythicWaterLineToleranceYards"]),
+        ) if mythic else None
+        dispersed = [] if mythic else [
             {
                 "playerID": row["playerID"],
                 "player": row["player"],
@@ -900,13 +1198,23 @@ def analyze_clinging_murk(
             "bloodSideCandidateCount": len(blood_side),
             "missingBloodSidePlayers": missing_blood_side,
             "dispersedPlayers": dispersed,
+            "offRowPlayers": (row_metrics or {}).get("offRowPlayers", []),
+            "rowAlignment": row_metrics,
+            "placementMode": "linear-row" if mythic else "cluster",
             "reliableRemovalPositionCount": len(reliable),
             "placements": public_placements,
         })
     return {
         "rounds": rounds,
         "roundCount": len(rounds),
+        "placementMode": "linear-row" if mythic else "cluster",
         "outlierDistanceYards": float(options["waterOutlierDistanceYards"]),
+        "lineToleranceYards": float(options["mythicWaterLineToleranceYards"]) if mythic else None,
+        "explanation": (
+            "史诗难度按横向成排放置检查：只看落点到最佳拟合直线的垂直偏差，排在直线两端不会被视为离群。"
+            if mythic else
+            "非史诗难度继续按本轮中位中心检查离群放置。"
+        ),
     }
 
 
@@ -1069,6 +1377,18 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
     # table for some players. Combining both avoids silently losing the final
     # approach immediately before a collision.
     position_index = build_position_index(payload["resources"] + payload["damage"])
+    protovenom = analyze_shifting_protovenom(
+        fight,
+        actor_map,
+        player_catalog,
+        payload["debuffs"],
+        payload["damage"],
+        position_index,
+    ) if options["shiftingProtovenomReviewEnabled"] else {
+        "enabled": False, "mythicOnly": True, "rounds": [], "collisions": [],
+        "errorCount": 0, "teammateKnockbackCount": 0, "players": [],
+        "explanation": "变幻的原型毒液分析已在配置中关闭。",
+    }
     helical = analyze_helical_toxins(
         fight,
         actor_map,
@@ -1133,6 +1453,8 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         TOXIC_DROPLETS_HIT_ID: "剧毒水滴",
         NOXIOUS_BLAST_ID: "剧毒冲击",
         CULTIVATED_BURST_DAMAGE_ID: "培育爆裂",
+        SHIFTING_PROTOVENOM_DAMAGE_ID: "变幻的原型毒液",
+        PROTOVENOM_ERUPTION_ID: "原型毒液爆炸",
     })
     survival = build_survival_timeline(
         fight, actor_map, player_catalog, player_deaths, payload.get("friendlyCasts") or [],
@@ -1153,7 +1475,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         "duration": fmt_ms(duration_ms),
         "wipePhase": "击杀" if fight.get("kill") else "分场/静滞循环",
         "wipeReason": wipe_reason,
-        "summary": f"{helical['roundCount']} 次强酸静滞，{helical['wrongCollisionCount']} 次错误碰撞，{helical['failedRoundCount']} 轮超时；活体毒液 {living['totalHits']} 次命中。",
+        "summary": f"{helical['roundCount']} 次强酸静滞，{helical['wrongCollisionCount']} 次错误碰撞，{helical['failedRoundCount']} 轮超时；原型毒液错误接触 {protovenom['errorCount']} 次，击飞队友 {protovenom['teammateKnockbackCount']} 人次；活体毒液 {living['totalHits']} 次命中。",
         "phaseTimeline": phase_timeline(fight, stasis_events),
         "wclDeepLink": f"https://www.warcraftlogs.com/reports/{report_id}#fight={fight['id']}&type=summary",
         "players": list(player_catalog.values()),
@@ -1166,6 +1488,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
             "clingingMurk": water,
             "toxicDroplets": droplets,
             "livingVenom": living,
+            "shiftingProtovenom": protovenom,
         },
         "avoidableSummary": {"1284209": living["players"]},
     }
@@ -1197,6 +1520,9 @@ def _mechanic_overview(rendered):
     spear_hits = []
     spear_death_count = 0
     first_wrong_collisions = []
+    first_wrong_players = []
+    protovenom_errors = []
+    protovenom_teammate_knockbacks = 0
     for pull in rendered:
         mechanics = pull.get("sentinels") or {}
         for row in (mechanics.get("marks") or {}).get("deathOverThirty") or []:
@@ -1222,9 +1548,43 @@ def _mechanic_overview(rendered):
                 pull, first.get("time"),
                 f"本轮第一次错误碰撞：{names or first.get('collisionCombination') or '未识别组合'}",
             ))
+            roster = {
+                str(player.get("id") or player.get("playerID")): player
+                for player in pull.get("players") or []
+            }
+            player_ids = first.get("playerIDs") or []
+            for player_index, player in enumerate(first.get("players") or []):
+                name = _collision_player_name(player)
+                player_id = player_ids[player_index] if player_index < len(player_ids) else None
+                roster_player = roster.get(str(player_id)) or {}
+                first_wrong_players.append(nightly_detail(
+                    pull,
+                    first.get("time"),
+                    f"{name} 参与本轮第一次错误碰撞",
+                    player=name,
+                    classColor=roster_player.get("classColor"),
+                ))
+        for row in (mechanics.get("shiftingProtovenom") or {}).get("collisions") or []:
+            instigator = row.get("instigator") or {}
+            if instigator.get("playerID") is None:
+                continue
+            target = row.get("collisionTarget") or {}
+            knockbacks = int(row.get("teammateKnockbackCount") or 0)
+            protovenom_teammate_knockbacks += knockbacks
+            target_text = f"，碰到未中毒玩家 {target.get('player')}" if target.get("player") else ""
+            protovenom_errors.append(nightly_detail(
+                pull,
+                row.get("time"),
+                f"{instigator.get('player') or '未解析携带者'} 未及时分散并触发原型毒液爆炸{target_text}，击飞队友 {knockbacks} 人次",
+                player=instigator.get("player"),
+                classColor=instigator.get("classColor"),
+                spellID=PROTOVENOM_ERUPTION_ID,
+                teammateKnockbackCount=knockbacks,
+                attributionConfidence=row.get("attributionConfidence"),
+            ))
     return {
         "title": "整夜机制统计",
-        "subtitle": "按所有 Pull 汇总死亡层数、绿色长矛与每轮第一次错误碰撞。",
+        "subtitle": "按所有 Pull 汇总死亡层数、绿色长矛、每轮第一次错误碰撞与史诗原型毒液。",
         "metrics": [
             {
                 "key": "deathOverThirty", "label": "死亡时红绿总层数超过 30", "value": len(high_stack_deaths), "unit": "次",
@@ -1238,8 +1598,13 @@ def _mechanic_overview(rendered):
             },
             {
                 "key": "firstWrongCollisions", "label": "团队内第一个撞错", "value": len(first_wrong_collisions), "unit": "次",
-                "tone": "danger", "description": "每一轮螺旋毒素最多计一次，只取该轮第一次明确的错误碰撞。",
-                "players": [], "events": first_wrong_collisions,
+                "tone": "danger", "description": "每一轮螺旋毒素最多计一次；玩家汇总分别给该次碰撞涉及的两名玩家各记 1 次。",
+                "players": nightly_player_totals(first_wrong_players), "events": first_wrong_collisions,
+            },
+            {
+                "key": "shiftingProtovenomErrors", "label": "已归因原型毒液错误 / 击飞队友", "value": f"{len(protovenom_errors)} / {protovenom_teammate_knockbacks}", "unit": "次 / 人次",
+                "tone": "danger", "description": "仅汇总能够由有效光环和坐标归因到具体携带者的 1296962；后一个数字排除携带者本人。无法归因的爆炸仍保留在单场明细，不计入玩家归责。",
+                "players": nightly_player_totals(protovenom_errors), "events": protovenom_errors,
             },
         ],
     }
@@ -1249,7 +1614,7 @@ def build_aggregated_json(report_ids, options=None):
     from analyzer_core.analysis_scope import filter_fights
 
     options = {**DEFAULT_OPTIONS, **(options or {})}
-    report_id_list = [value for value in (item.strip() for item in report_ids.replace(" ", "").split(",")) if value]
+    report_id_list = parse_wcl_report_ids(report_ids)
     if not report_id_list:
         raise RuntimeError("请传入至少一个 WCL report ID。")
     client = WclClient()
@@ -1297,7 +1662,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "sentinels",
             "bossName": "陵寝哨兵",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "sentinels-helical-collision-movement-v4-2026-08-25",
+            "mechanicVersion": "sentinels-mythic-protovenom-water-row-v5-2026-09-06",
             "features": {"interrupts": False, "dispels": False, "fieldReplay": False, "mistakes": False},
             "capabilities": {
                 "wipe": {"enabled": True, "renderer": "sentinels-pulls"},
