@@ -6,8 +6,13 @@ tools/tmp/
 # Local-only development suites and work-in-progress plugins.
 /tests/
 /spec_plugins/
-/skills/
-/tools/
+/skills/*
+!/skills/venomous-abyss-raid-development/
+!/skills/venomous-abyss-raid-development/**
+/tools/*
+!/tools/__init__.py
+!/tools/crown_pam_probe.py
+!/tools/crown_single_fight_audit.py
 
 .env
 .env.*
