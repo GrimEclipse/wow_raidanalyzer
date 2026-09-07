@@ -384,13 +384,25 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
         ROOT / "boss_catalog.json",
         ROOT / "analyzer_core" / "single_fight.py",
     ]
+    optional_implementation_paths = []
     if entry.raid_key == "venomous_abyss":
-        implementation_paths.extend([
-            ROOT / "boss_plugins" / "venomous_abyss" / "shared.py",
-            ROOT / "skills" / "venomous-abyss-raid-development" / "references" / "source-data" / "raid-guide-source.json",
-        ])
+        implementation_paths.append(
+            ROOT / "boss_plugins" / "venomous_abyss" / "shared.py"
+        )
+        optional_implementation_paths.append(
+            ROOT / "skills" / "venomous-abyss-raid-development"
+            / "references" / "source-data" / "raid-guide-source.json"
+        )
     if entry.boss_key == "crown_of_the_cosmos":
-        implementation_paths.append(ROOT / "tools" / "crown_single_fight_audit.py")
+        optional_implementation_paths.append(
+            ROOT / "tools" / "crown_single_fight_audit.py"
+        )
+    # Local development attachments are deliberately excluded from release
+    # builds. Hash them when present, but never make production analysis depend
+    # on files that are not part of the runtime package.
+    implementation_paths.extend(
+        path for path in optional_implementation_paths if path.is_file()
+    )
     implementation_hash = hashlib.sha256()
     for path in implementation_paths:
         implementation_hash.update(path.read_bytes())
