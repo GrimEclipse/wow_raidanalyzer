@@ -8,12 +8,15 @@ import json
 import os
 import shutil
 import time
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from analyzer_core.analysis_scope import single_fight_scope
 from analyzer_core.catalog import CATALOG, BossEntry, find_boss_by_encounter
+from analyzer_core.config import resolve_analysis_options
+from analyzer_core.wcl_context import resolve_wcl_credentials
 from analyzer_core.player_abilities import abilities_for_roster, catalog_summary
 from analyzer_core.progress import emit_progress
 from analyzer_core.raid_cooldowns import RAIDS
@@ -24,7 +27,7 @@ from analyzer_core.wcl_api import WclClient
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "single_fight.json"
 CACHE_DIR = ROOT / ".single_fight_cache"
-ANALYSIS_SCHEMA = "single-fight-v2"
+ANALYSIS_SCHEMA = "single-fight-v3"
 
 DIFFICULTIES = {1: "普通", 3: "普通", 4: "英雄", 5: "史诗", 10: "史诗钥石"}
 
@@ -110,6 +113,7 @@ def _fight_document(report: dict, fight: dict, config: dict) -> dict:
         ),
         "wclUrl": f"https://www.warcraftlogs.com/reports/{report.get('code', '')}#fight={int(fight.get('id') or 0)}",
         "supported": bool(entry and entry.supported),
+        "configSchema": entry.config_schema if entry and entry.supported else [],
         "disabledReason": entry.disabled_reason if entry and not entry.supported else "",
     }
     identity = entry and {
@@ -383,10 +387,13 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
         Path(plugin.__file__).resolve(),
         ROOT / "boss_catalog.json",
         ROOT / "analyzer_core" / "single_fight.py",
+        ROOT / "analyzer_core" / "config.py",
+        ROOT / "analyzer_core" / "runner.py",
     ]
     if entry.raid_key == "venomous_abyss":
         implementation_paths.extend([
             ROOT / "boss_plugins" / "venomous_abyss" / "shared.py",
+            ROOT / "boss_plugins" / "venomous_abyss" / "runtime.py",
             ROOT / "skills" / "venomous-abyss-raid-development"
             / "references" / "source-data" / "raid-guide-source.json",
         ])
@@ -398,12 +405,14 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
     implementation_hash = hashlib.sha256()
     for path in implementation_paths:
         implementation_hash.update(path.read_bytes())
+    credentials = resolve_wcl_credentials(os.getenv("WCL_CLIENT_ID", ""), "")
     source = {
         "schema": ANALYSIS_SCHEMA,
         "report": report_code,
         "fight": int(fight_id),
         "identity": [entry.version, entry.raid_key, entry.boss_key],
         "options": options,
+        "credentialScope": hashlib.sha256((os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com") + "\0" + credentials.client_id).encode()).hexdigest(),
         "abilityCatalog": catalog_summary()["digest"],
         "implementation": implementation_hash.hexdigest()[:16],
     }
@@ -430,6 +439,7 @@ def analyze_single_fight(
         reason = entry.disabled_reason if entry else "未在 Boss 目录中登记"
         raise ValueError(f"{fight['name']} 暂不能生成单场结论：{reason}。")
 
+    options = resolve_analysis_options(entry.config_schema, options)
     cache_key = _cache_key(code, int(fight_id), entry, options)
     cache_path = CACHE_DIR / entry.version / entry.raid_key / entry.boss_key / f"{cache_key}.json"
     output_path = Path(output_path)
@@ -471,10 +481,20 @@ def analyze_single_fight(
         "cacheHit": False,
         "elapsedSeconds": elapsed,
         "abilitySelection": fight["abilitySelection"],
+        "analysisConfig": options,
     }
     result = apply_analysis_contract(result)
     output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(output_path, cache_path)
+    # Readers must see either the previous complete JSON or the new complete JSON.
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=cache_path.parent, suffix=".tmp", delete=False) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(output_path.read_bytes())
+        os.replace(temporary_path, cache_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
     emit_progress("单场结论已写入缓存", percent=99, stage="write")
     return {"path": output_path, "cacheHit": False, "cacheKey": cache_key}

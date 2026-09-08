@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from copy import deepcopy
+from analyzer_core.config import resolve_analysis_options
 from collections import Counter, defaultdict
 
 from boss_plugins.common import write_json_result
@@ -28,6 +30,16 @@ from boss_plugins.venomous_abyss.shared import (
 )
 
 GUIDE_SPELLS = load_confirmed_spell_names()
+
+CONFIG_SCHEMA = [
+    {"key": "predatorReviewEnabled", "type": "boolean", "label": "顶级掠食者技能处理", "default": True},
+    {"key": "tempestReviewEnabled", "type": "boolean", "label": "风暴承伤", "default": True},
+    {"key": "cystsReviewEnabled", "type": "boolean", "label": "囊肿放置与激活", "default": True,
+     "description": "需要坐标与风向采样；关闭场地推演后仍可单独分析。"},
+    {"key": "crosswindsReviewEnabled", "type": "boolean", "label": "狂怒侧风位置归因", "default": True},
+    {"key": "fieldReplayEnabled", "type": "boolean", "label": "场地推演", "default": True, "expensive": True,
+     "description": "生成逐帧回放。关闭后跳过回放帧；囊肿、侧风也关闭时，不再读取场地坐标。"},
+]
 
 BOSS_CONFIG = {
     "key": "sszorak",
@@ -1039,16 +1051,13 @@ def _predator_cycles(casts):
 
 def analyze_sszorak(fight, actor_map, players, raw):
     casts, damage, debuffs = raw["casts"], raw["damage"], raw["debuffs"]
-    boss_id = raw.get("bossID")
-    combat_position_index = build_position_index(raw.get("bossPositionEvents", []) + raw["resources"] + damage + debuffs)
-    position_index = _sszorak_map_position_index(combat_position_index)
-    arena = _sszorak_arena(position_index, boss_id=boss_id)
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     deaths = raw["deaths"]
     death_times = _first_death_times(deaths, players)
     tank_ids = {player_id for player_id, player in players.items() if player.get("role") == "tank"}
 
     sequence = []
-    for cycle_index, cycle in enumerate(_predator_cycles(casts), start=1):
+    for cycle_index, cycle in enumerate(_predator_cycles(casts) if options["predatorReviewEnabled"] else [], start=1):
         for step_index, cast in enumerate(cycle, start=1):
             spell_id, timestamp = int(ability_id(cast)), int(cast["timestamp"])
             hits = _events_between(damage, timestamp - 300, timestamp + 2500, PREDATOR_DAMAGE[spell_id])
@@ -1089,12 +1098,21 @@ def analyze_sszorak(fight, actor_map, players, raw):
                 "deaths": [player_ref(players, actor_map, player_id) for player_id in death_players],
             })
 
-    tempest = _avoidable_board(fight, actor_map, players, damage, deaths, {1287083: spell_name(1287083)})
-    all_cysts = _sszorak_cysts(fight, actor_map, players, raw, position_index, arena)
+    tempest = _avoidable_board(fight, actor_map, players, damage, deaths, {1287083: spell_name(1287083)}) if options["tempestReviewEnabled"] else []
+    if not any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled")):
+        return {"apexPredator": {"cycles": len(_predator_cycles(casts)), "sequence": sequence, "tempestDamage": tempest},
+                "cysts": {"enabled": False}, "crosswinds": {"enabled": False},
+                "fieldReplay": {"enabled": False}, "fallDeaths": []}
+    boss_id = raw.get("bossID")
+    combat_position_index = build_position_index(raw.get("bossPositionEvents", []) + raw["resources"] + damage + debuffs)
+    position_index = _sszorak_map_position_index(combat_position_index)
+    arena = _sszorak_arena(position_index, boss_id=boss_id)
+
+    all_cysts = _sszorak_cysts(fight, actor_map, players, raw, position_index, arena) if options["cystsReviewEnabled"] or options["fieldReplayEnabled"] else []
     cyst_activations, unmatched_activations = _attribute_cyst_activations(
         fight, actor_map, players, raw, position_index, all_cysts, death_times,
-    )
-    digs = _completed_casts(casts, 1286033)
+    ) if all_cysts else ([], [])
+    digs = _completed_casts(casts, 1286033) if options["cystsReviewEnabled"] or options["fieldReplayEnabled"] else []
     cyst_rounds = []
     replay_rounds = []
     for index, dig in enumerate(digs, start=1):
@@ -1133,7 +1151,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
             replay_end,
             step_ms=REPLAY_STEP_MS,
             death_times=death_times,
-        )
+        ) if options["fieldReplayEnabled"] else []
         activation_rows = [
             {
                 **row,
@@ -1153,23 +1171,24 @@ def analyze_sszorak(fight, actor_map, players, raw):
             "placements": validated,
             "windsComplete": len([wind for wind in winds if wind]) >= 3,
         })
-        replay_rounds.append({
-            "index": index,
-            "timeMs": timestamp - fight["startTime"],
-            "time": fmt_ms(timestamp - fight["startTime"]),
-            "durationSec": DIG_DURATION_MS / 1000,
-            "windowSec": round((replay_end - timestamp) / 1000, 1),
-            "placements": validated,
-            "winds": winds,
-            "windsComplete": len([wind for wind in winds if wind]) >= 3,
-            "wind": winds[0] if winds else None,
-            "frames": [{
-                "timeMs": frame["timeMs"] - fight["startTime"],
-                "time": fmt_ms(frame["timeMs"] - fight["startTime"]),
-                "players": [{**player_ref(players, actor_map, player_id), **frame_player}
-                             for player_id, frame_player in zip(players, frame["players"])],
-            } for frame in frames],
-        })
+        if options["fieldReplayEnabled"]:
+            replay_rounds.append({
+                "index": index,
+                "timeMs": timestamp - fight["startTime"],
+                "time": fmt_ms(timestamp - fight["startTime"]),
+                "durationSec": DIG_DURATION_MS / 1000,
+                "windowSec": round((replay_end - timestamp) / 1000, 1),
+                "placements": validated,
+                "winds": winds,
+                "windsComplete": len([wind for wind in winds if wind]) >= 3,
+                "wind": winds[0] if winds else None,
+                "frames": [{
+                    "timeMs": frame["timeMs"] - fight["startTime"],
+                    "time": fmt_ms(frame["timeMs"] - fight["startTime"]),
+                    "players": [{**player_ref(players, actor_map, player_id), **frame_player}
+                                 for player_id, frame_player in zip(players, frame["players"])],
+                } for frame in frames],
+            })
 
     crosswind_waves = _sszorak_crosswind_waves(
         fight,
@@ -1181,7 +1200,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
         deaths,
         position_index,
         arena,
-    )
+    ) if options["crosswindsReviewEnabled"] or options["fieldReplayEnabled"] else []
     crosswind_rows = [{
         "timeMs": wave["timeMs"], "time": wave["time"],
         "applyTimeMs": wave["applyTimeMs"], "applyTime": wave["applyTime"],
@@ -1212,9 +1231,10 @@ def analyze_sszorak(fight, actor_map, players, raw):
             "placements": all_cysts,
             "activations": cyst_activations,
             "unmatchedActivations": unmatched_activations,
-        },
-        "crosswinds": {"waves": crosswind_waves, "players": crosswind_rows},
+        } if options["cystsReviewEnabled"] else {"enabled": False},
+        "crosswinds": {"waves": crosswind_waves, "players": crosswind_rows} if options["crosswindsReviewEnabled"] else {"enabled": False},
         "fieldReplay": {
+            "enabled": options["fieldReplayEnabled"],
             "arena": arena,
             "arenaImage": BOSS_CONFIG["arena"],
             "bossIcon": BOSS_CONFIG["bossIcon"],
@@ -1271,10 +1291,30 @@ def _mechanic_overview(rendered):
 
 
 def build_aggregated_json(report_ids, options=None):
-    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    config = deepcopy(BOSS_CONFIG)
+    spatial = any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled"))
+    config["fetchPositionResources"] = spatial
+    config["fetchEventResources"] = spatial
+    config["features"]["fieldReplay"] = options["fieldReplayEnabled"]
+    tab_enabled = {"survival": True, "predator": options["predatorReviewEnabled"] or options["tempestReviewEnabled"],
+                   "replay": options["fieldReplayEnabled"], "cysts": options["cystsReviewEnabled"],
+                   "crosswinds": options["crosswindsReviewEnabled"]}
+    config["tabs"] = [row for row in config["tabs"] if tab_enabled.get(row[0], False)]
+    config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
+    if any(options.values()):
+        config["fetchKeys"].update({"casts", "damage"})
+    if spatial:
+        config["fetchKeys"].add("debuffs")
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    result = _build(config, analyze_mechanics, report_ids, options)
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []
     )
+    if not options["cystsReviewEnabled"]:
+        result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if row["key"] != "badCystPlacements"]
+    if not options["tempestReviewEnabled"]:
+        result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if row["key"] != "stormHits"]
     return result
 
 

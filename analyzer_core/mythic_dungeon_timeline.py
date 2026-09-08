@@ -86,8 +86,13 @@ PARTY_WIDE_PLAYER_ABILITIES = {
 }
 
 SPEC_INFO = {
+    250: ("鲜血", "死亡骑士", "坦克"),
+    62: ("奥术", "法师", "伤害"),
+    65: ("神圣", "圣骑士", "治疗"),
+    71: ("武器", "战士", "伤害"),
+    262: ("元素", "萨满祭司", "伤害"),
     104: ("守护", "德鲁伊", "坦克"),
-    252: ("冰霜", "死亡骑士", "伤害"),
+    252: ("邪恶", "死亡骑士", "伤害"),
     270: ("织雾", "武僧", "治疗"),
     1473: ("增辉", "唤魔师", "伤害"),
     # The 12.0 Devourer specialization may not yet be present in older static
@@ -95,6 +100,11 @@ SPEC_INFO = {
 }
 
 SPEC_NAME_ZH = {
+    "Blood": "鲜血",
+    "Arcane": "奥术",
+    "Holy": "神圣",
+    "Arms": "武器",
+    "Elemental": "元素",
     "Guardian": "守护",
     "Mistweaver": "织雾",
     "Devourer": "噬灭",
@@ -104,6 +114,10 @@ SPEC_NAME_ZH = {
 }
 
 CLASS_BY_TYPE = {
+    "Mage": "法师",
+    "Paladin": "圣骑士",
+    "Warrior": "战士",
+    "Shaman": "萨满祭司",
     "DemonHunter": "恶魔猎手",
     "DeathKnight": "死亡骑士",
     "Druid": "德鲁伊",

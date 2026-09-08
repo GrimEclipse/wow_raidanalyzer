@@ -2,6 +2,26 @@
 
 from __future__ import annotations
 
+from analyzer_core.config import resolve_analysis_options
+
+CONFIG_SCHEMA = [
+    {"key": "toxicDelugeReviewEnabled", "type": "boolean", "label": "剧毒洪流与毒液搬运", "default": True},
+    {"key": "severReviewEnabled", "type": "boolean", "label": "撕裂清场", "default": True},
+    {"key": "guillotineReviewEnabled", "type": "boolean", "label": "处斩分摊与跑离", "default": True},
+    {"key": "dreadmarchReviewEnabled", "type": "boolean", "label": "恐惧行军与救人", "default": True},
+    {"key": "manifestationsReviewEnabled", "type": "boolean", "label": "恐惧具象与凝视", "default": True},
+    {"key": "soulSeverReviewEnabled", "type": "boolean", "label": "灵魂撕裂", "default": True},
+    {"key": "gloombombReviewEnabled", "type": "boolean", "label": "幽暗炸弹分散", "default": True},
+    {"key": "graveboundReviewEnabled", "type": "boolean", "label": "墓缚致死", "default": True},
+    {"key": "eternalNightfallReviewEnabled", "type": "boolean", "label": "永恒夜幕破盾与打断", "default": True},
+    {"key": "blightedSeverReviewEnabled", "type": "boolean", "label": "凋零撕裂", "default": True},
+    {"key": "grimGuillotineReviewEnabled", "type": "boolean", "label": "冷酷处斩", "default": True},
+    {"key": "fieldReplayEnabled", "type": "boolean", "label": "场地推演", "default": True, "expensive": True,
+     "description": "为已选机制生成场地示意图。关闭后跳过制图；撕裂等位置判定仍会保留自身所需坐标与毒液、具象证据。"},
+    {"key": "intermissionReviewEnabled", "type": "boolean", "label": "转阶段残片、治疗与输出复盘", "default": True,
+     "description": "关闭后跳过转阶段治疗、Boss 承伤及药水光环取证。"},
+]
+
 import math
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
@@ -3195,15 +3215,31 @@ def build_field_audit(
     }
 
 
+def _analysis_needs(options):
+    # Clearing mechanics require the objects being cleared even when their own
+    # report section is deselected. Map generation never enables other reviews.
+    needs = dict(options)
+    needs["toxicDelugeReviewEnabled"] |= options["severReviewEnabled"] or options["blightedSeverReviewEnabled"]
+    needs["manifestationsReviewEnabled"] |= options["soulSeverReviewEnabled"] or options["blightedSeverReviewEnabled"]
+    needs["positions"] = any(needs[key] for key in (
+        "toxicDelugeReviewEnabled", "manifestationsReviewEnabled", "severReviewEnabled",
+        "blightedSeverReviewEnabled", "soulSeverReviewEnabled", "guillotineReviewEnabled",
+        "grimGuillotineReviewEnabled", "gloombombReviewEnabled"))
+    return needs
+
+
 def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
+    needs = _analysis_needs(options)
+    field_enabled = needs["positions"]
     players = build_player_catalog(actor_map, actor_type, raw["combatants"])
     deaths = [event for event in raw["deaths"] if event.get("targetID") in players]
     enemy_deaths = [event for event in raw["enemyDeaths"] if event.get("targetID") not in players]
     raw["deaths"] = deaths
     actor_catalog = build_actor_catalog(actor_rows)
     manifest_ids = manifest_actor_ids(actor_rows)
-    npc_position_events = _npc_position_events(raw, manifest_ids)
-    npc_position_index = build_npc_position_index(npc_position_events)
+    npc_position_events = _npc_position_events(raw, manifest_ids) if field_enabled else []
+    npc_position_index = build_npc_position_index(npc_position_events) if field_enabled else {}
     zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
     malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
     boss_id = zuljan_id or malacrass_id
@@ -3212,14 +3248,14 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         fight, raw["casts"], raw["enemyBuffs"],
         enemy_deaths=enemy_deaths, zuljan_id=zuljan_id, malacrass_id=malacrass_id,
     )
-    boss_position_events = _npc_position_events(raw, boss_ids)
+    boss_position_events = _npc_position_events(raw, boss_ids) if field_enabled else []
     caster_index = build_caster_self_position_index(
         list(raw.get("casts") or [])
         + list(raw.get("damage") or [])
         + list(raw.get("resources") or [])
         + list(raw.get("npcPositionEvents") or []),
         boss_ids or None,
-    )
+    ) if field_enabled else {}
     position_events = (
         list(raw.get("damage") or [])
         + list(raw.get("debuffs") or [])
@@ -3227,29 +3263,29 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         + list(raw.get("npcPositionEvents") or [])
         + boss_position_events
     )
-    position_index = build_position_index(position_events)
-    arena = coiledaltar_arena(position_index, list(players), boss_id=boss_id)
+    position_index = build_position_index(position_events) if field_enabled else {}
+    arena = coiledaltar_arena(position_index, list(players), boss_id=boss_id) if field_enabled else {}
 
     toxic_deluge = analyze_toxic_deluge(
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         damage_events=list(raw.get("damage") or []),
-    )
-    venom_points = build_active_venom_points(toxic_deluge)
+    ) if needs["toxicDelugeReviewEnabled"] else {}
+    venom_points = build_active_venom_points(toxic_deluge) if field_enabled else []
     manifestations = analyze_manifestations(
         fight, raw["debuffs"], npc_position_index, actor_map, players, actor_catalog, markers,
         enemy_deaths=enemy_deaths, position_index=position_index,
-    )
+    ) if needs["manifestationsReviewEnabled"] else {}
     active_points = venom_points + (manifestations.get("activePoints") or [])
 
     sever = analyze_cone_sever(
         "撕裂", SEVER_IDS, fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         venom_points, actor_catalog, boss_actor_id=zuljan_id, origin_index=caster_index,
-    )
+    ) if options["severReviewEnabled"] else {}
     blighted_sever = analyze_cone_sever(
         "凋零撕裂", BLIGHTED_SEVER_IDS, fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         active_points, actor_catalog, boss_actor_id=zuljan_id, origin_index=caster_index,
         npc_position_index=npc_position_index,
-    )
+    ) if options["blightedSeverReviewEnabled"] else {}
     guillotine = analyze_guillotine(
         fight, raw["casts"], raw["damage"], raw["debuffs"], position_index, actor_map, players, markers,
         GUILLOTINE_CAST_IDS, "处斩",
@@ -3257,7 +3293,7 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         in_range_damage_id=WIDOW_KISS_DAMAGE_ID,
         origin_index=caster_index,
         boss_actor_id=zuljan_id,
-    )
+    ) if options["guillotineReviewEnabled"] else {}
     grim_guillotine = analyze_guillotine(
         fight, raw["casts"], raw["damage"], raw["debuffs"], position_index, actor_map, players, markers,
         GRIM_GUILLOTINE_CAST_IDS, "冷酷处斩",
@@ -3267,31 +3303,31 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         in_range_damage_id=DEATH_EMBRACE_DAMAGE_ID,
         origin_index=caster_index,
         boss_actor_id=zuljan_id,
-    )
+    ) if options["grimGuillotineReviewEnabled"] else {}
     dreadmarch = analyze_dreadmarch(
         fight, raw["casts"], raw["debuffs"], raw["damage"], [],
         deaths, actor_map, players, markers,
-    )
+    ) if options["dreadmarchReviewEnabled"] else {}
     soul_sever = analyze_soul_sever(
         fight, raw["casts"], enemy_deaths, position_index, actor_map, markers, manifestations.get("activePoints") or [],
         boss_actor_id=malacrass_id, origin_index=caster_index, debuffs=raw["debuffs"],
         npc_position_index=npc_position_index,
-    )
+    ) if options["soulSeverReviewEnabled"] else {}
     gloombomb = analyze_gloombomb(
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         origin_index=caster_index, boss_actor_id=malacrass_id,
-    )
+    ) if options["gloombombReviewEnabled"] else {}
     gravebound = analyze_gravebound_failures(
         fight, raw["debuffs"], deaths, actor_map, players,
         damage_events=list(raw.get("damage") or []),
-    )
+    ) if options["graveboundReviewEnabled"] else {}
     eternal = analyze_eternal_nightfall(
         fight, raw["casts"], raw["enemyBuffs"], raw.get("interrupts") or [], actor_map,
         players=players,
         actor_rows=actor_rows,
         markers=markers,
         friendly_casts=raw.get("friendlyCasts") or [],
-    )
+    ) if options["eternalNightfallReviewEnabled"] else {}
     intermission = analyze_intermission(
         fight, raw["enemyBuffs"], raw["damage"], raw["debuffs"], actor_map, players, markers,
         heals=list(raw.get("heals") or []),
@@ -3302,19 +3338,20 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         zuljan_id=zuljan_id,
         actor_rows=actor_rows,
         buffs=raw.get("buffs") or [],
-    )
+    ) if options["intermissionReviewEnabled"] else {}
     field_audit = build_field_audit(
-        arena, toxic_deluge, sever, soul_sever, gloombomb, blighted_sever, manifestations,
+        arena, toxic_deluge if options["toxicDelugeReviewEnabled"] else {}, sever, soul_sever, gloombomb, blighted_sever,
+        manifestations if options["manifestationsReviewEnabled"] else {},
         guillotine=guillotine, grim_guillotine=grim_guillotine,
-    )
+    ) if options["fieldReplayEnabled"] and field_enabled else {}
 
     return {
         "phaseTimeline": markers,
-        "toxicDeluge": toxic_deluge,
+        "toxicDeluge": toxic_deluge if options["toxicDelugeReviewEnabled"] else {},
         "sever": sever,
         "guillotine": guillotine,
         "dreadmarch": dreadmarch,
-        "manifestations": manifestations,
+        "manifestations": manifestations if options["manifestationsReviewEnabled"] else {},
         "soulSever": soul_sever,
         "gloombomb": gloombomb,
         "graveboundFailures": gravebound,
@@ -3334,7 +3371,12 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     }
 
 
-def fetch_payload(client, report_id, fight, actor_rows=None):
+def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    needs = _analysis_needs(options)
+    field_enabled = needs["positions"]
+    phase_enabled = options["eternalNightfallReviewEnabled"]
+    intermission_enabled = options["intermissionReviewEnabled"]
     actor_rows = actor_rows or []
     zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
     malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
@@ -3342,46 +3384,48 @@ def fetch_payload(client, report_id, fight, actor_rows=None):
     boss_ids = {actor_id for actor_id in (zuljan_id, malacrass_id) if actor_id is not None}
     npc_filter = _npc_position_filter_expression(manifest_ids | boss_ids)
     npc_position_events = []
-    if npc_filter:
+    if field_enabled and npc_filter:
         npc_position_events.extend(client.events(
             report_id,
             "All",
             fight,
             filter_expression=npc_filter,
-            include_resources=True,
+            include_resources=field_enabled,
         ))
-    npc_position_events.extend(_fetch_manifest_position_events(client, report_id, fight, manifest_ids))
+    if needs["manifestationsReviewEnabled"]:
+        npc_position_events.extend(_fetch_manifest_position_events(client, report_id, fight, manifest_ids))
     boss_damage = []
-    if zuljan_id is not None:
+    if intermission_enabled and zuljan_id is not None:
         boss_damage = client.events(report_id, "DamageDone", fight, target_id=zuljan_id)
     return {
         "casts": _fetch_by_abilities(
             client, report_id, "Casts", fight, MECHANIC_CAST_IDS,
-            hostility_type="Enemies", include_resources=True,
+            hostility_type="Enemies", include_resources=field_enabled,
         ),
         "friendlyCasts": _fetch_by_abilities(
             client, report_id, "Casts", fight, FRIENDLY_CAST_IDS, hostility_type="Friendlies",
         ),
         "damage": _fetch_by_abilities(
-            client, report_id, "DamageTaken", fight, MECHANIC_DAMAGE_IDS, include_resources=True,
-        ),
-        "heals": _fetch_by_abilities(client, report_id, "Healing", fight, {RECLAIM_ESSENCE}),
+            client, report_id, "DamageTaken", fight, MECHANIC_DAMAGE_IDS, include_resources=field_enabled,
+        ) if any(options[key] for key in ("toxicDelugeReviewEnabled", "dreadmarchReviewEnabled", "guillotineReviewEnabled", "grimGuillotineReviewEnabled", "graveboundReviewEnabled", "intermissionReviewEnabled")) or needs["toxicDelugeReviewEnabled"] else [],
+        "heals": _fetch_by_abilities(client, report_id, "Healing", fight, {RECLAIM_ESSENCE}) if intermission_enabled else [],
         "debuffs": _fetch_by_abilities(
-            client, report_id, "Debuffs", fight, MECHANIC_DEBUFF_IDS, include_resources=True,
-        ),
+            client, report_id, "Debuffs", fight, MECHANIC_DEBUFF_IDS, include_resources=field_enabled,
+        ) if field_enabled or any(options[key] for key in ("dreadmarchReviewEnabled", "graveboundReviewEnabled", "intermissionReviewEnabled")) else [],
         "buffs": _fetch_by_abilities(
             client, report_id, "Buffs", fight, set(INTERMISSION_POTIONS), hostility_type="Friendlies",
-        ),
+        ) if intermission_enabled else [],
         "enemyBuffs": _fetch_by_abilities(
             client, report_id, "Buffs", fight, MECHANIC_ENEMY_BUFF_IDS, hostility_type="Enemies",
         ),
         "deaths": client.events(report_id, "Deaths", fight),
         "enemyDeaths": client.events(report_id, "Deaths", fight, hostility_type="Enemies"),
         "combatants": client.events(report_id, "CombatantInfo", fight),
-        "resources": client.events(report_id, "Resources", fight, include_resources=True),
-        "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Friendlies"),
+        "resources": client.events(report_id, "Resources", fight, include_resources=True) if field_enabled else [],
+        "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Friendlies") if phase_enabled else [],
         "npcPositionEvents": npc_position_events,
         "bossDamage": boss_damage,
+        "analysisOptions": options,
     }
 
 
@@ -3554,6 +3598,7 @@ def _mechanic_overview(rendered):
 
 
 def build_aggregated_json(report_ids, options=None):
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
     report_id_list = parse_wcl_report_ids(report_ids)
     if not report_id_list:
         raise RuntimeError("请传入至少一个 WCL report ID。")
@@ -3578,13 +3623,18 @@ def build_aggregated_json(report_ids, options=None):
         def fetch_one(item):
             index, fight = item
             progress(f"读取 Fight {fight['id']}（{index}/{len(fights)}）")
-            raw = fetch_payload(client, report_id, fight, actor_rows)
+            raw = fetch_payload(client, report_id, fight, actor_rows, options)
             return index, render_fight(report_id, report["startTime"], actor_map, actor_type, actor_rows, fight, raw)
 
         for _, row in run_parallel_indexed(list(enumerate(fights, start=1)), fetch_one):
             rendered.append(row)
     rendered.sort(key=lambda row: (row["startTimeIso"], row["reportID"], row["fightID"]))
     progress("生成盘卷祭坛阶段复盘与场地示意图", 96)
+    overview = _mechanic_overview(rendered)
+    metric_enabled = {"gloombombCollateralHits": options["gloombombReviewEnabled"],
+                      "unclearedSouls": options["soulSeverReviewEnabled"] or options["blightedSeverReviewEnabled"],
+                      "regularDreadmarch": options["dreadmarchReviewEnabled"], "graveboundDeaths": options["graveboundReviewEnabled"]}
+    overview["metrics"] = [row for row in overview["metrics"] if metric_enabled[row["key"]]]
     return {
         "code": 200,
         "meta": {
@@ -3595,10 +3645,14 @@ def build_aggregated_json(report_ids, options=None):
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
             "mechanicVersion": "coiledaltar-heroic-2026-08-29",
-            "tabDefinitions": [{"key": key, "label": label} for key, label in TABS],
+            "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
+                               if (key != "field" or options["fieldReplayEnabled"])
+                               and (key != "intermission" or options["intermissionReviewEnabled"])],
+            "analysisConfig": options,
+            "skippedAnalyses": [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]],
             "arenaImage": ARENA_IMAGE,
             "fieldIcons": dict(FIELD_ICONS),
-            "features": {"survival": True, "fieldReplay": True},
+            "features": {"survival": True, "fieldReplay": options["fieldReplayEnabled"]},
             "evidenceLimits": {
                 "positions": (
                     f"示意图把坐标 ({ARENA_CENTER_X_UNITS:g}, {ARENA_CENTER_Y_UNITS:g}) 映射为 "
@@ -3617,7 +3671,7 @@ def build_aggregated_json(report_ids, options=None):
         },
         "data": {
             "page1_wipeAnalysis": rendered,
-            "mechanicOverview": _mechanic_overview(rendered),
+            "mechanicOverview": overview,
         },
     }
 

@@ -513,6 +513,7 @@
                 "avoidable": { "enabled": true, "renderer": "venomous-progression" },
                 "replay": { "enabled": false, "renderer": "venomous-progression" }
               },
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/03-vashnik.png", "width": 1997, "height": 1118 }
@@ -534,6 +535,7 @@
                 "avoidable": { "enabled": true, "renderer": "venomous-progression" },
                 "replay": { "enabled": false, "renderer": "venomous-progression" }
               },
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/04-lostexplorers.jpg", "width": 1997, "height": 1118 }
@@ -555,6 +557,7 @@
                 "avoidable": { "enabled": true, "renderer": "venomous-progression" },
                 "replay": { "enabled": true, "renderer": "venomous-progression" }
               },
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/05-sszorak.jpg", "width": 1997, "height": 1118 }
@@ -576,6 +579,7 @@
                 "avoidable": { "enabled": true, "renderer": "venomous-progression" },
                 "replay": { "enabled": false, "renderer": "venomous-progression" }
               },
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/06-twinfangs.jpg", "width": 1997, "height": 1118 }
@@ -592,6 +596,7 @@
               "encounterIds": [3429, 53429],
               "supported": true,
               "disabledReason": "",
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/venomous_abyss/07-coiledaltar.jpg", "width": 1997, "height": 1118 }
@@ -608,6 +613,7 @@
               "encounterIds": [3492, 53492],
               "supported": true,
               "disabledReason": "",
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "arena", "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg", "width": 1997, "height": 1118 },

@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from analyzer_core.auth_store import AuthError, default_auth_store, validate_password
 from analyzer_core.catalog import find_boss, to_frontend_catalog
-from analyzer_core.concurrency import MAX_JOB_THREADS, requests_module
+from analyzer_core.concurrency import MAX_JOB_THREADS, MAX_USER_JOB_THREADS, JobSlots, requests_module
 from analyzer_core.runner import analyze_report
 from analyzer_core import raid_calendar_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
@@ -101,11 +101,12 @@ class Job:
     fight_total: int = 0
     report_index: int = 0
     report_total: int = 1
+    queue_status: Optional[dict] = None
 
 
 JOBS: Dict[str, Job] = {}
 JOBS_LOCK = threading.Lock()
-JOB_SEMAPHORE = threading.BoundedSemaphore(MAX_JOB_THREADS)
+JOB_SEMAPHORE = JobSlots(MAX_JOB_THREADS, MAX_USER_JOB_THREADS)
 
 
 def job_result_url(job_id: str, *, download=False) -> str:
@@ -216,6 +217,7 @@ def publish(job: Job, event: dict):
     event.setdefault("percent", job.percent)
     event.setdefault("message", job.message)
     event.setdefault("stage", job.stage)
+    event.setdefault("queue", job.queue_status if job.status == "queued" else None)
     job.events.append(event)
     if len(job.events) > 400:
         del job.events[: len(job.events) - 400]
@@ -232,6 +234,8 @@ def set_job_progress(job: Job, *, percent=None, message=None, stage=None, status
         job.stage = stage
     if status:
         job.status = status
+        if status != "queued":
+            job.queue_status = None
     event = {
         "type": "progress",
         "status": job.status,
@@ -244,6 +248,24 @@ def set_job_progress(job: Job, *, percent=None, message=None, stage=None, status
         for key in ("status", "percent", "message", "stage")
     ):
         publish(job, event)
+
+
+def acquire_job_slot(job: Job):
+    def report_queue(snapshot):
+        job.queue_status = snapshot
+        reason = {
+            "account_limit": f"当前账号已有 {snapshot['ownRunning']} 个任务运行（上限 {snapshot['ownLimit']}）",
+            "global_capacity": "服务器分析容量已满",
+            "queue_order": "等待前序任务调度",
+        }[snapshot["reason"]]
+        message = (
+            f"排队中：运行 {snapshot['running']}/{snapshot['capacity']}，"
+            f"等待 {snapshot['waiting']} 个，当前为入队顺序第 {snapshot['position']} 位；{reason}"
+        )
+        set_job_progress(job, status="queued", percent=1, message=message, stage="queued", force=True)
+
+    set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
+    JOB_SEMAPHORE.acquire(job.owner_user_id, on_wait=report_queue)
 
 
 def translate_plugin_progress(job: Job, raw_event: dict):
@@ -333,8 +355,7 @@ def translate_plugin_progress(job: Job, raw_event: dict):
 def run_job(job: Job, payload: dict, credentials: WclCredentials):
     acquired = False
     try:
-        set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
-        JOB_SEMAPHORE.acquire()
+        acquire_job_slot(job)
         acquired = True
         set_job_progress(job, status="running", percent=2, message="任务已开始", stage="queued", force=True)
         version = payload["version"]
@@ -386,7 +407,7 @@ def run_job(job: Job, payload: dict, credentials: WclCredentials):
         })
     finally:
         if acquired:
-            JOB_SEMAPHORE.release()
+            JOB_SEMAPHORE.release(job.owner_user_id)
 
 
 def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
@@ -395,8 +416,7 @@ def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
         from analyzer_core.single_fight import analyze_single_fight
         from analyzer_core.progress import progress_scope
 
-        set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
-        JOB_SEMAPHORE.acquire()
+        acquire_job_slot(job)
         acquired = True
         set_job_progress(job, status="running", percent=2, message="读取单场战斗", stage="discovery", force=True)
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
@@ -433,7 +453,7 @@ def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
         })
     finally:
         if acquired:
-            JOB_SEMAPHORE.release()
+            JOB_SEMAPHORE.release(job.owner_user_id)
 
 
 def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
@@ -443,8 +463,7 @@ def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredent
         from analyzer_core.progress import progress_scope
         from analyzer_core.wcl_api import WclClient
 
-        set_job_progress(job, status="queued", percent=1, message="等待可用分析线程", stage="queued", force=True)
-        JOB_SEMAPHORE.acquire()
+        acquire_job_slot(job)
         acquired = True
         set_job_progress(job, status="running", percent=3, message="查找工会最新 Boss 战", stage="discovery", force=True)
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
@@ -503,7 +522,7 @@ def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredent
         })
     finally:
         if acquired:
-            JOB_SEMAPHORE.release()
+            JOB_SEMAPHORE.release(job.owner_user_id)
 
 
 def json_bytes(data, status=HTTPStatus.OK):
@@ -1331,6 +1350,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                         "message": job.message,
                         "stage": job.stage,
                         "jobId": job.id,
+                        "queue": job.queue_status if job.status == "queued" else None,
                     })
             if job.events:
                 self.write_sse(job.events[-1])
@@ -1352,6 +1372,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "percent": 100,
                 "message": "分析结果已从任务缓存恢复",
                 "stage": "done",
+                "queue": None,
                 "resultUrl": job_result_url(job_id),
                 "downloadUrl": job_result_url(job_id, download=True),
             }))
@@ -1364,6 +1385,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "percent": job.percent,
             "message": job.error or job.message,
             "stage": job.stage,
+            "queue": job.queue_status if job.status == "queued" else None,
         }
         if job.status == "done":
             payload["resultUrl"] = job_result_url(job.id)

@@ -14,6 +14,7 @@
         .phase-chip::before{content:"";width:.38rem;height:.38rem;border-radius:50%;background:#22d3ee;box-shadow:0 0 12px #22d3ee}
         .phase-transition-row td{padding:.55rem 1rem;background:linear-gradient(90deg,rgba(126,34,206,.2),rgba(8,47,73,.16));color:#e9d5ff;font-size:.75rem;font-weight:700;letter-spacing:.02em}
         .phase-transition-row strong{color:#f0abfc;margin-right:.45rem}
+        .result-export{cursor:copy}.result-export:focus-visible{outline:2px solid #22d3ee;outline-offset:2px}
     </style>
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
@@ -72,17 +73,6 @@
     </section>
 
     <div id="status" class="mt-5 hidden rounded border px-4 py-3 text-sm"></div>
-    <details id="rename-panel" class="mt-5 hidden rounded-xl border border-slate-800 bg-slate-900/70">
-        <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-200">批量更改导出中的治疗玩家名</summary>
-        <div class="border-t border-slate-800 px-5 py-4">
-            <p class="mb-4 text-xs text-slate-500">填写自己团队内的玩家名。只影响 MRT、NSRT 和表格导出，不改动原始日志。</p>
-            <div id="rename-fields" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
-            <div class="mt-4 flex gap-2">
-                <button id="apply-renames" class="rounded bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-cyan-400">应用到全部导出</button>
-                <button id="reset-renames" class="rounded border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:border-slate-500">清空更名</button>
-            </div>
-        </div>
-    </details>
     <section id="results" class="mt-6 space-y-6"></section>
 </main>
 
@@ -97,6 +87,18 @@
             </div>
             <a class="result-wcl rounded border border-slate-700 px-3 py-2 text-xs text-cyan-300 hover:border-cyan-500" target="_blank" rel="noreferrer">打开 WCL</a>
         </div>
+        <details class="sample-renames border-b border-slate-800">
+            <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-200">更改本样本的治疗角色 ID</summary>
+            <div class="px-5 pb-4">
+                <p class="mb-4 text-xs text-slate-500">按本样本的治疗职业填写团内角色名。同职业多人分别填写；仅更改本样本的全部导出格式，留空保留原名。</p>
+                <div class="rename-fields grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                    <button type="button" class="apply-renames rounded bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950">应用到本样本</button>
+                    <button type="button" class="reset-renames rounded border border-slate-700 px-4 py-2 text-xs text-slate-300">恢复原名</button>
+                    <span class="rename-status text-xs text-cyan-300" role="status" aria-live="polite"></span>
+                </div>
+            </div>
+        </details>
         <div class="grid xl:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.55fr)]">
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[720px] text-left text-sm">
@@ -112,7 +114,9 @@
                     <button data-export="nsrt" class="rounded bg-fuchsia-400 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-fuchsia-300">复制 NSRT 导入串</button>
                     <button data-export="tsv" class="rounded border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-200 hover:border-slate-500">复制 TSV</button>
                 </div>
-                <pre class="result-export mt-3 max-h-[34rem] overflow-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-3 text-xs leading-6 text-slate-400"></pre>
+                <p class="mt-3 text-xs text-slate-500">点击内容或选中文字后松开鼠标，自动复制当前格式的完整内容；键盘可按 Enter / 空格复制。</p>
+                <pre tabindex="0" role="button" aria-label="复制当前格式的完整排轴" class="result-export mt-3 max-h-[34rem] overflow-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-3 text-xs leading-6 text-slate-400"></pre>
+                <p class="copy-status mt-2 min-h-5 text-xs text-cyan-300" role="status" aria-live="polite"></p>
             </div>
         </div>
     </article>
@@ -120,7 +124,7 @@
 
 <script>
 (() => {
-    const state = { options: null, results: [], renameMap: {}, timer: null };
+    const state = { options: null, results: [], renameMaps: new WeakMap(), exportTypes: new Map(), timer: null };
     const el = id => document.getElementById(id);
     const version = el('version');
     const raid = el('raid');
@@ -134,8 +138,6 @@
     const rangeStart = el('range-start');
     const rangeEnd = el('range-end');
     const reportCodes = el('report-codes');
-    const renamePanel = el('rename-panel');
-    const renameFields = el('rename-fields');
     const serviceHelp = '排轴服务暂时不可用，请确认完整 Web 服务已启动，或联系服务器管理员检查 WCL 接口与账号凭据。';
     const classColors = {
         deathknight:'#c41e3a', demonhunter:'#a330c9', druid:'#ff7c0a', evoker:'#33937f',
@@ -151,8 +153,26 @@
         return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     };
     const classColor = name => classColors[String(name || '').toLowerCase()] || '#cbd5e1';
-    const processedTimeline = match => (match.timeline || [])
-        .map(row => ({...row, player:state.renameMap[row.player] || row.player}));
+    const healerClassLabels = {priest:'牧师',paladin:'圣骑士',shaman:'萨满祭司',druid:'德鲁伊',monk:'武僧',evoker:'唤魔师'};
+    const healerAssignments = match => {
+        const counts = {};
+        return [...(match.healers || [])]
+            .sort((a, b) => String(a.specKey || a.specLabel || '').localeCompare(String(b.specKey || b.specLabel || '')))
+            .map(healer => {
+                const classKey = String(healer.class || '').toLowerCase();
+                const slot = counts[classKey] = (counts[classKey] || 0) + 1;
+                return {healer, classKey, slot, key:`${classKey}:${slot}`};
+            });
+    };
+    const processedTimeline = match => {
+        const assignments = healerAssignments(match);
+        return (match.timeline || []).map(row => {
+            const assignment = assignments.find(({healer}) => row.sourceID != null && healer.id != null
+                ? String(row.sourceID) === String(healer.id)
+                : row.player === healer.name && String(row.class || '').toLowerCase() === String(healer.class || '').toLowerCase());
+            return {...row, player:(assignment && state.renameMaps.get(match)?.[assignment.key]) || row.player};
+        });
+    };
     const displayTimeline = match => {
         const cooldowns = processedTimeline(match).map(row => ({...row, eventType:'cooldown'}));
         const transitions = (match.phases?.segments || []).slice(1).map(row => ({
@@ -242,10 +262,11 @@
                 ({wcl:'WCL 实际阶段',ptr_reference:'PTR 实测阶段',ptr_reference_scaled:'PTR 参考阶段（按战斗时长校准）',single_phase:'单阶段'})[match.phases?.source] || '阶段待确认'
             }`;
         article.querySelector('.result-wcl').href = match.wclUrl;
-        article.querySelector('.result-healers').innerHTML = match.healers.map(row => {
+        renderRenameFields(article, match, index);
+        article.querySelector('.result-healers').innerHTML = healerAssignments(match).map(({healer:row, key, slot}) => {
             const color = classColor(row.class);
-            const replacement = state.renameMap[row.name];
-            return `<span class="rounded-full border px-3 py-1 text-xs" style="color:${color};border-color:${color}55;background:${color}12">${escapeHtml(row.name)}${replacement ? ` → ${escapeHtml(replacement)}` : ''} · ${escapeHtml(row.specLabel)}</span>`;
+            const replacement = state.renameMaps.get(match)?.[key];
+            return `<span class="rounded-full border px-3 py-1 text-xs" style="color:${color};border-color:${color}55;background:${color}12">${escapeHtml(row.name)}${replacement ? ` → ${escapeHtml(replacement)}` : ''} · ${escapeHtml(row.specLabel)} · 槽位 ${slot}</span>`;
         }
         ).join('');
         article.querySelector('.result-phases').innerHTML = (match.phases?.segments || []).map(row =>
@@ -267,24 +288,57 @@
             `).join('')
             : '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-500">当前时间范围内没有检测到团队技能。</td></tr>';
         const preview = article.querySelector('.result-export');
-        preview.textContent = exportText(match, 'mrt');
-        article.querySelector('[data-export="mrt"]').addEventListener('click', async event => {
-            const value = exportText(match, 'mrt');
-            await navigator.clipboard.writeText(value);
-            preview.textContent = value;
-            event.currentTarget.textContent = '已复制 MRT';
-        });
-        article.querySelector('[data-export="nsrt"]').addEventListener('click', async event => {
-            const value = exportText(match, 'nsrt');
-            await navigator.clipboard.writeText(value);
-            preview.textContent = value;
-            event.currentTarget.textContent = '已复制 NSRT';
-        });
-        article.querySelector('[data-export="tsv"]').addEventListener('click', async event => {
-            const value = exportText(match, 'tsv');
-            await navigator.clipboard.writeText(value);
-            preview.textContent = value;
-            event.currentTarget.textContent = '已复制 TSV';
+        const feedback = article.querySelector('.copy-status');
+        let activeType = state.exportTypes.get(match) || 'mrt';
+        let copying = false;
+        const updatePreview = () => {
+            preview.textContent = exportText(match, activeType);
+            article.querySelectorAll('[data-export]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.export === activeType)));
+        };
+        const copyPreview = async () => {
+            if (copying) return;
+            const value = preview.textContent;
+            if (!value.trim()) { feedback.textContent = '当前没有可复制的排轴内容。'; return; }
+            copying = true;
+            const copiedType = activeType;
+            article.querySelectorAll('[data-export]').forEach(button => { button.disabled = true; });
+            feedback.textContent = '正在复制…';
+            try {
+                let copied = false;
+                try {
+                    if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(value);
+                        copied = true;
+                    }
+                } catch (_) { /* Try the selection-based fallback for HTTP or denied clipboard access. */ }
+                if (!copied) {
+                    const focused = document.activeElement;
+                    const textarea = document.createElement('textarea');
+                    textarea.value = value;
+                    textarea.style.cssText = 'position:fixed;left:-9999px;top:0';
+                    document.body.appendChild(textarea);
+                    try { textarea.select(); copied = document.execCommand('copy'); }
+                    finally { textarea.remove(); focused?.focus({preventScroll:true}); }
+                }
+                if (!copied) throw new Error('clipboard unavailable');
+                feedback.textContent = `已复制到剪贴板 · ${copiedType.toUpperCase()} 完整内容`;
+            } catch (_) {
+                feedback.textContent = '自动复制失败，请选中内容后按 Ctrl+C（Mac：⌘C）复制。';
+            } finally {
+                copying = false;
+                article.querySelectorAll('[data-export]').forEach(button => { button.disabled = false; });
+            }
+        };
+        updatePreview();
+        article.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => {
+            activeType = button.dataset.export;
+            state.exportTypes.set(match, activeType);
+            updatePreview();
+            copyPreview();
+        }));
+        preview.addEventListener('click', copyPreview);
+        preview.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); copyPreview(); }
         });
         return fragment;
     };
@@ -292,17 +346,32 @@
         results.innerHTML = '';
         state.results.forEach((match, index) => results.appendChild(renderMatch(match, index)));
     };
-    const renderRenameFields = () => {
-        const players = new Map();
-        state.results.forEach(match => (match.healers || []).forEach(row => players.set(row.name, row)));
-        renamePanel.classList.toggle('hidden', players.size === 0);
-        renameFields.innerHTML = [...players.values()].map(row => {
-            const color = classColor(row.class);
-            return `<label class="text-xs" style="color:${color}">${escapeHtml(row.name)} · ${escapeHtml(row.specLabel)}
-                <input data-original="${escapeHtml(row.name)}" value="${escapeHtml(state.renameMap[row.name] || '')}" placeholder="替换为团内玩家名"
-                       class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
-            </label>`;
-        }).join('');
+    const renderRenameFields = (article, match, index) => {
+        const assignments = healerAssignments(match);
+        const panel = article.querySelector('.sample-renames');
+        panel.hidden = assignments.length === 0;
+        const fields = article.querySelector('.rename-fields');
+        fields.innerHTML = assignments.map(({healer, classKey, slot, key}) => `
+            <label class="text-xs" style="color:${classColor(classKey)}">${escapeHtml(healerClassLabels[classKey] || classKey)} · ${escapeHtml(healer.specLabel || '')} · ${escapeHtml(healer.name)}（槽位 ${slot}）
+                <input data-slot="${escapeHtml(key)}" value="${escapeHtml(state.renameMaps.get(match)?.[key] || '')}" placeholder="团内角色 ID（玩家名）"
+                    class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+            </label>`).join('');
+        const refresh = message => {
+            const replacement = renderMatch(match, index);
+            replacement.querySelector('.sample-renames').open = true;
+            replacement.querySelector('.rename-status').textContent = message;
+            article.replaceWith(replacement);
+        };
+        article.querySelector('.apply-renames').addEventListener('click', () => {
+            const names = Object.fromEntries([...fields.querySelectorAll('input')]
+                .map(input => [input.dataset.slot, input.value.trim()]).filter(([, value]) => value));
+            state.renameMaps.set(match, names);
+            refresh(`本样本已更改 ${Object.keys(names).length} 个治疗角色，导出内容已更新。`);
+        });
+        article.querySelector('.reset-renames').addEventListener('click', () => {
+            state.renameMaps.delete(match);
+            refresh('本样本已恢复日志原名。');
+        });
     };
     const renderDemo = () => {
         const timeline = [
@@ -328,7 +397,7 @@
             },
         };
         state.results = [sample];
-        renderRenameFields();
+        state.exportTypes.clear();
         renderResults();
         const link = results.querySelector('.result-wcl');
         link.textContent = '纯本地示例';
@@ -341,7 +410,6 @@
         const startedAt = Date.now();
         button.textContent = '查询中 · 0.0 秒';
         results.innerHTML = '';
-        renamePanel.classList.add('hidden');
         showStatus('正在从速度榜前列开始核对治疗构成，已等待 0.0 秒。');
         clearInterval(state.timer);
         state.timer = setInterval(() => {
@@ -374,7 +442,7 @@
             const capped = selection.automaticSearchCapped ? ' 已达到本次自动检索上限；可粘贴已知 WCL 日志继续核对。' : '';
             showStatus(`${payload.message} 用时 ${elapsedSeconds} 秒。按速度榜优先检索：${sources}；发现 ${selection.encounterDifficultyKillCount || 0} 场指定首领与难度的击杀，其中 ${selection.durationFilteredFightCount || 0} 场符合 ${rangeLabel} 战斗时长，${stopped}。${capped}`, payload.status === 'ok' ? 'ok' : 'info');
             state.results = payload.matches || [];
-            renderRenameFields();
+            state.exportTypes.clear();
             renderResults();
         } catch (error) {
             const message = error instanceof TypeError && /fetch/i.test(error.message)
@@ -417,19 +485,6 @@
     healerCount.addEventListener('change', renderSlots);
     el('search').addEventListener('click', runSearch);
     el('demo').addEventListener('click', renderDemo);
-    el('apply-renames').addEventListener('click', () => {
-        state.renameMap = Object.fromEntries([...renameFields.querySelectorAll('input')]
-            .map(input => [input.dataset.original, input.value.trim()])
-            .filter(([, value]) => value));
-        renderResults();
-        showStatus(`已将 ${Object.keys(state.renameMap).length} 个玩家名应用到全部导出。`, 'ok');
-    });
-    el('reset-renames').addEventListener('click', () => {
-        state.renameMap = {};
-        renderRenameFields();
-        renderResults();
-        showStatus('已恢复日志中的原始玩家名。', 'ok');
-    });
 })();
 </script>
 <script src="/frontend/core/home-button.js?v=1"></script></body>

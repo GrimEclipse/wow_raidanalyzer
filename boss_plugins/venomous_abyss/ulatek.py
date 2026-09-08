@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from analyzer_core.config import resolve_analysis_options
+
+CONFIG_SCHEMA = [{'key': 'wavesReviewEnabled', 'type': 'boolean', 'label': '腐蚀浪潮与带蛋', 'description': '', 'default': True}, {'key': 'rageReviewEnabled', 'type': 'boolean', 'label': '被缚之怒', 'description': '', 'default': True}, {'key': 'fangsReviewEnabled', 'type': 'boolean', 'label': '攫取毒牙', 'description': '', 'default': True}, {'key': 'criticalReviewEnabled', 'type': 'boolean', 'label': '关键流程与蛇母之怒', 'description': '', 'default': True}]
+
 from collections import Counter, defaultdict
 
 from analyzer_core.court_rules import validate_court_profile
@@ -725,12 +730,13 @@ def _analyze_critical(fight, actor_map, players, raw):
 
 
 def analyze_ulatek(fight, actor_map, players, raw):
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     rage_windows = _rage_windows(fight, raw)
     return {
-        "wavesAndEggs": _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows),
-        "rage": _analyze_rage(fight, actor_map, players, raw, rage_windows),
-        "fangs": _analyze_fangs(fight, actor_map, players, raw),
-        "critical": _analyze_critical(fight, actor_map, players, raw),
+        "wavesAndEggs": _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows) if options["wavesReviewEnabled"] else {},
+        "rage": _analyze_rage(fight, actor_map, players, raw, rage_windows) if options["rageReviewEnabled"] else {},
+        "fangs": _analyze_fangs(fight, actor_map, players, raw) if options["fangsReviewEnabled"] else {},
+        "critical": _analyze_critical(fight, actor_map, players, raw) if options["criticalReviewEnabled"] else {},
     }
 
 
@@ -877,11 +883,32 @@ def _mechanic_overview(rendered):
 
 
 def build_aggregated_json(report_ids, options=None):
-    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    config = deepcopy(BOSS_CONFIG)
+    if not any(options.values()):
+        config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
+        config["fetchPositionResources"] = False
+        config["trackedActorGameIDs"] = set()
+        config["trackedActorEventFilters"] = []
+        config["trackedDamageTargetGameIDs"] = set()
+        config["tabs"] = [row for row in config["tabs"] if row[0] == "survival"]
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    config["tabs"] = [row for row in config["tabs"] if row[0] == "survival" or options[{"waves":"wavesReviewEnabled", "heart":"rageReviewEnabled", "fangs":"fangsReviewEnabled", "critical":"criticalReviewEnabled"}[row[0]]]]
+    if not options["rageReviewEnabled"]:
+        config["trackedDamageTargetGameIDs"] = set()
+    result = _build(config, analyze_mechanics, report_ids, options)
     result["meta"]["courtProfile"] = COURT_PROFILE
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []
     )
+    metric_options = {
+        "waveHits": "wavesReviewEnabled", "eggCarrierWaveHits": "wavesReviewEnabled",
+        "wrongFangBreaks": "fangsReviewEnabled", "platform2To3Defensives": "criticalReviewEnabled",
+        "nonTankMelee": "criticalReviewEnabled", "motherWrathRaidwide": "criticalReviewEnabled",
+    }
+    result["data"]["mechanicOverview"]["metrics"] = [
+        row for row in result["data"]["mechanicOverview"]["metrics"] if options[metric_options[row["key"]]]
+    ]
     return result
 
 

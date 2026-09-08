@@ -25,6 +25,12 @@ start_app.bat
 - `/raid-calendar`：开荒出勤、需求权与装备分配日历（旧 `/loot` 地址继续兼容）
 - `/audit`：奥蕾莉亚场地明细
 
+首页在团长工具下提供独立的 **Mythic TOOLS / 大秘境工具** 分区，入口为 `/mythic-dungeon`。本地样例清单包含第一赛季八本历史日志及第二赛季四份正式服指定阵容样本，支持本地 JSON 导入；S2 当前为实际施法候选预览，待筛选 Boss / 小怪关键技能。来源、维护清单与生成方式见 [S2 样本说明](docs/mythic-dungeon-s2-samples.md)。
+
+`/online` 整晚分析根据当前 Boss 插件显示逐项配置，选择应用于日志中的全部 Pull；分析项目默认全选，场地推演可单独关闭。高级单场选择也复用相同配置，首页一键分析保持完整分析。关闭项目会跳过对应计算及独占的 WCL 取证，其他已选项目仍保留必要的共享证据，报告明确标记未分析项目。
+
+服务器默认允许 4 个任务同时分析，同一账号同时运行 1 个任务；单任务内最多 4 个 Pull 并行，全进程 WCL 请求并发上限为 6。可在环境变量或 `.env` 配置 `WCL_MAX_JOB_THREADS`、`WCL_MAX_USER_JOB_THREADS`、`WCL_MAX_FIGHT_THREADS`、`WCL_MAX_REQUEST_THREADS`，修改后重启 `server.py`。4 不是硬上限，服务器允许时可将 `WCL_MAX_JOB_THREADS` 设为 8、16 或更高；如果旧部署显式设置为 1，需修改该配置才能跨账号并发。排队时状态区域显示运行数/容量、等待数、入队顺序位置及等待原因，并随队列变化更新。详细行为与验证见 [分析配置和任务并发](docs/analysis-options-and-concurrency.md)。
+
 命令行仍可用于开发和自动化：
 
 ```powershell

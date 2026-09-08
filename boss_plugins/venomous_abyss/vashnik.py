@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from analyzer_core.config import resolve_analysis_options
+
+CONFIG_SCHEMA = [{'key': 'avoidableReviewEnabled', 'type': 'boolean', 'label': '可规避伤害复盘', 'description': '', 'default': True}, {'key': 'infectionReviewEnabled', 'type': 'boolean', 'label': '适应性感染与接圈', 'description': '', 'default': True}]
+
 from analyzer_core.court_rules import validate_court_profile
 from boss_plugins.common import write_json_result
 from boss_plugins.venomous_abyss.runtime import build_aggregated_json as _build
@@ -64,10 +69,11 @@ COURT_PROFILE = {
 validate_court_profile(COURT_PROFILE)
 
 def analyze_vashnik(fight, actor_map, players, raw):
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     avoidable = _avoidable_board(fight, actor_map, players, raw["damage"], raw["deaths"], {
         1295798: spell_name(1295798),
         1286737: spell_name(1286737),
-    })
+    }) if options["avoidableReviewEnabled"] else []
     avoidable_summary = [
         {"spellID": spell_id, "spellName": spell_name(spell_id),
          "hitCount": sum(row["hitCount"] for row in avoidable if row["spellID"] == spell_id),
@@ -76,7 +82,7 @@ def analyze_vashnik(fight, actor_map, players, raw):
     ]
     infection_casts = sorted(_completed_casts(raw["casts"], 1282114), key=lambda event: event["timestamp"])
     rounds = []
-    for index, cast in enumerate(infection_casts, start=1):
+    for index, cast in enumerate(infection_casts if options["infectionReviewEnabled"] else [], start=1):
         start = int(cast["timestamp"])
         end = int(infection_casts[index]["timestamp"]) if index < len(infection_casts) else int(fight["endTime"])
         debuff_applies = [event for event in raw["debuffs"] if int(ability_id(event) or 0) in {1294994, 1295173, 1295224}
@@ -140,10 +146,23 @@ def _mechanic_overview(rendered):
 
 
 def build_aggregated_json(report_ids, options=None):
-    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    config = deepcopy(BOSS_CONFIG)
+    if not any(options.values()):
+        config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
+        config["fetchPositionResources"] = False
+        config["trackedActorGameIDs"] = set()
+        config["trackedActorEventFilters"] = []
+        config["trackedDamageTargetGameIDs"] = set()
+        config["tabs"] = [row for row in config["tabs"] if row[0] == "survival"]
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    config["tabs"] = [row for row in config["tabs"] if row[0] == "survival" or options[{"avoidable":"avoidableReviewEnabled", "infection":"infectionReviewEnabled"}[row[0]]]]
+    result = _build(config, analyze_mechanics, report_ids, options)
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []
     )
+    if not options["avoidableReviewEnabled"]:
+        result["data"]["mechanicOverview"] = {"title": "部分机制未分析", "subtitle": "、".join(config["skippedAnalyses"]), "metrics": []}
     return result
 
 

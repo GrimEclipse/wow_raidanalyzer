@@ -20,7 +20,7 @@
     const pull = current(), survival = pull?.survival || {};
     $("title").textContent = `乌拉特克 · Fight ${pull?.fightID || "-"}`;
     $("meta").textContent = `${pull?.difficultyName || "未知难度"} · ${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`} · ${pull?.date || ""} ${pull?.startClock || ""}`;
-    $("wclLink").href = pull?.wclDeepLink || "#";
+    if(state.payload?.meta?.skippedAnalyses?.length){$("meta").textContent += " · 未分析：" + state.payload.meta.skippedAnalyses.join("、");}$("wclLink").href = pull?.wclDeepLink || "#";
     const rows = [["战斗时长", pull?.duration || "—"], ["结果", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`], ["难度", pull?.difficultyName || "未知"], ["阵亡", survival.deathCount || 0], ["战复", survival.combatResCount || 0], ["结束存活", `${survival.survivorCount || 0}/${survival.rosterCount || 0}`]];
     $("stats").innerHTML = rows.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join("");
   }

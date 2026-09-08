@@ -42,21 +42,28 @@ def fetch_payload(
     tracked_actor_ids=(),
     tracked_damage_target_ids=(),
 ):
+    fetch_keys = config.get("fetchKeys")
+
+    def read(key, *args, **kwargs):
+        if fetch_keys is not None and key not in fetch_keys:
+            return []
+        return client.events(*args, **kwargs)
+
     payload = {
-        "casts": client.events(
+        "casts": read("casts",
             report_id,
             "Casts",
             fight,
             hostility_type="Enemies",
             include_resources=bool(config.get("fetchCastResources")),
         ),
-        "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies"),
-        "damage": client.events(report_id, "DamageTaken", fight, include_resources=True),
-        "debuffs": client.events(report_id, "Debuffs", fight, include_resources=True),
-        "enemyBuffs": client.events(report_id, "Buffs", fight, hostility_type="Enemies"),
-        "friendlyBuffs": client.events(report_id, "Buffs", fight, hostility_type="Friendlies"),
-        "deaths": client.events(report_id, "Deaths", fight),
-        "combatants": client.events(report_id, "CombatantInfo", fight),
+        "friendlyCasts": read("friendlyCasts", report_id, "Casts", fight, hostility_type="Friendlies"),
+        "damage": read("damage", report_id, "DamageTaken", fight, include_resources=bool(config.get("fetchEventResources", True))),
+        "debuffs": read("debuffs", report_id, "Debuffs", fight, include_resources=bool(config.get("fetchEventResources", True))),
+        "enemyBuffs": read("enemyBuffs", report_id, "Buffs", fight, hostility_type="Enemies"),
+        "friendlyBuffs": read("friendlyBuffs", report_id, "Buffs", fight, hostility_type="Friendlies"),
+        "deaths": read("deaths", report_id, "Deaths", fight),
+        "combatants": read("combatants", report_id, "CombatantInfo", fight),
         "resources": [],
         "bossPositionEvents": [],
         "trackedActorEvents": [],
@@ -203,6 +210,7 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 tracked_actor_ids=tracked_actor_ids,
                 tracked_damage_target_ids=tracked_damage_target_ids,
             )
+            raw["analysisOptions"] = dict(options or {})
             return index, render_fight(
                 config,
                 analyzer,
@@ -231,6 +239,8 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
             "bossName": config["name"],
             "analyzedReports": report_id_list,
             "mechanicVersion": config["mechanicVersion"],
+            "analysisConfig": dict(options or {}),
+            "skippedAnalyses": config.get("skippedAnalyses", []),
             "tabDefinitions": [
                 {"key": key, "label": label} for key, label in config["tabs"]
             ],

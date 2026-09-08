@@ -1,4 +1,5 @@
 import json
+from importlib import import_module
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -86,6 +87,8 @@ def build_catalog(document: Optional[dict] = None) -> List[BossEntry]:
                 supported = bool(boss.get("supported"))
                 plugin = str(boss.get("plugin") or "").strip()
                 config_schema = list(boss.get("configSchema") or [])
+                if boss.get("configSchemaFromPlugin"):
+                    config_schema = list(import_module(plugin).CONFIG_SCHEMA)
                 validate_config_schema(config_schema)
                 if supported and not plugin:
                     raise RuntimeError(f"已启用 Boss 缺少 plugin：{'/'.join(identity)}")

@@ -2,6 +2,24 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from analyzer_core.config import resolve_analysis_options
+
+CONFIG_SCHEMA = [
+    {"key": "defenseReviewEnabled", "type": "boolean", "label": "联合防御", "default": True},
+    {"key": "junkReviewEnabled", "type": "boolean", "label": "投掷垃圾与踩箱", "default": True},
+    {"key": "avoidableReviewEnabled", "type": "boolean", "label": "可规避伤害与旋壳命中", "default": True},
+    {"key": "interruptReviewEnabled", "type": "boolean", "label": "冰封烈焰漏断", "default": True},
+    {"key": "frostfireReviewEnabled", "type": "boolean", "label": "霜火连射移除", "default": True},
+    {"key": "elementalReviewEnabled", "type": "boolean", "label": "元素爆炸归因", "default": True},
+    {"key": "thudReviewEnabled", "type": "boolean", "label": "巨力重击分摊", "default": True},
+    {"key": "blastReviewEnabled", "type": "boolean", "label": "冲击波命中", "default": True},
+    {"key": "mushroomReviewEnabled", "type": "boolean", "label": "蘑菇激活与冲击波躲避", "default": True},
+    {"key": "shellReviewEnabled", "type": "boolean", "label": "旋壳引导方向", "default": True},
+
+]
+
+
 from collections import Counter, defaultdict
 import math
 
@@ -1147,79 +1165,88 @@ def _annotate_splinter_contexts(fight, throw_junk, mushrooms, volley_rounds):
     ]
 
 def analyze_lost(fight, actor_map, players, raw):
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
+    if not any(options.values()):
+        return {"enabled": False}
     casts, damage, debuffs, enemy_buffs, friendly_buffs = (raw[key] for key in ("casts", "damage", "debuffs", "enemyBuffs", "friendlyBuffs"))
-    defense_events = [event for event in enemy_buffs if int(ability_id(event) or 0) == 1297646]
-    per_boss_defense_rows = []
-    active = {}
-    for event in sorted(defense_events, key=lambda row: int(row.get("timestamp") or 0)):
-        boss_id = event.get("targetID") or event.get("sourceID")
-        if event_type(event) == "applybuff":
-            active[boss_id] = int(event["timestamp"])
-            continue
-        if event_type(event) != "removebuff" or boss_id not in active:
-            continue
-        start_ts, end_ts = active.pop(boss_id), int(event["timestamp"])
-        per_boss_defense_rows.append({
-            "index": len(per_boss_defense_rows) + 1,
-            "timestamp": start_ts,
-            "timeMs": start_ts - fight["startTime"],
-            "time": fmt_ms(start_ts - fight["startTime"]),
-            "endTimeMs": end_ts - fight["startTime"],
-            "endTime": fmt_ms(end_ts - fight["startTime"]),
-            "durationSec": round((end_ts - start_ts) / 1000, 1),
-            "bossID": boss_id,
-            "bossName": source_name(actor_map, boss_id, SOURCE_NAMES),
-        })
-    for boss_id, start_ts in active.items():
-        per_boss_defense_rows.append({
-            "index": len(per_boss_defense_rows) + 1,
-            "timestamp": start_ts,
-            "timeMs": start_ts - fight["startTime"],
-            "time": fmt_ms(start_ts - fight["startTime"]),
-            "endTimeMs": None,
-            "endTime": "战斗结束仍未结束",
-            "durationSec": round((int(fight["endTime"]) - start_ts) / 1000, 1),
-            "bossID": boss_id,
-            "bossName": source_name(actor_map, boss_id, SOURCE_NAMES),
-        })
-    defense_rows = []
-    for group in group_nearby(
-        sorted(per_boss_defense_rows, key=lambda row: row["timeMs"]), window_ms=300,
-    ):
-        start_ms = min(row["timeMs"] for row in group)
-        ended = [row["endTimeMs"] for row in group if row["endTimeMs"] is not None]
-        end_ms = max(ended) if len(ended) == len(group) else None
-        boss_names = sorted({row["bossName"] for row in group})
-        if len(boss_names) < 2:
-            continue
-        defense_rows.append({
-            "index": len(defense_rows) + 1,
-            "timeMs": start_ms,
-            "time": fmt_ms(start_ms),
-            "endTimeMs": end_ms,
-            "endTime": fmt_ms(end_ms) if end_ms is not None else "战斗结束仍未结束",
-            "durationSec": round(((end_ms if end_ms is not None else fight["endTime"] - fight["startTime"]) - start_ms) / 1000, 1),
-            "bossNames": boss_names,
-            "bossName": "、".join(boss_names),
-            "bossCount": len(boss_names),
-        })
-    total_defense_duration_sec = round(sum(row["durationSec"] for row in defense_rows), 1)
-    avoidable_damage = [
-        event for event in damage
-        if int(ability_id(event) or 0) != 1305844
-        or _counts_as_blast_wave_hit(event, raw["deaths"])
-    ]
-    avoidable = _avoidable_board(
-        fight, actor_map, players, avoidable_damage, raw["deaths"],
-        {1305844: spell_name(1305844)},
-    )
-    shell_hits = [event for event in debuffs if int(ability_id(event) or 0) == 1291918 and event_type(event) in {"applydebuff", "refreshdebuff"}]
-    shell_board = Counter(event.get("targetID") for event in shell_hits if event.get("targetID") in players)
-    avoidable.extend([{**player_ref(players, actor_map, player_id), "spellID": 1291918, "spellName": spell_name(1291918), "hitCount": count,
-                       "totalDamage": 0, "maxHit": 0, "deathCount": 0, "events": []} for player_id, count in shell_board.items()])
-    missed = _completed_casts(casts, 1286922)
+    defense_rows, total_defense_duration_sec = [], 0
+    if options["defenseReviewEnabled"]:
+        defense_events = [event for event in enemy_buffs if int(ability_id(event) or 0) == 1297646]
+        per_boss_defense_rows = []
+        active = {}
+        for event in sorted(defense_events, key=lambda row: int(row.get("timestamp") or 0)):
+            boss_id = event.get("targetID") or event.get("sourceID")
+            if event_type(event) == "applybuff":
+                active[boss_id] = int(event["timestamp"])
+                continue
+            if event_type(event) != "removebuff" or boss_id not in active:
+                continue
+            start_ts, end_ts = active.pop(boss_id), int(event["timestamp"])
+            per_boss_defense_rows.append({
+                "index": len(per_boss_defense_rows) + 1,
+                "timestamp": start_ts,
+                "timeMs": start_ts - fight["startTime"],
+                "time": fmt_ms(start_ts - fight["startTime"]),
+                "endTimeMs": end_ts - fight["startTime"],
+                "endTime": fmt_ms(end_ts - fight["startTime"]),
+                "durationSec": round((end_ts - start_ts) / 1000, 1),
+                "bossID": boss_id,
+                "bossName": source_name(actor_map, boss_id, SOURCE_NAMES),
+            })
+        for boss_id, start_ts in active.items():
+            per_boss_defense_rows.append({
+                "index": len(per_boss_defense_rows) + 1,
+                "timestamp": start_ts,
+                "timeMs": start_ts - fight["startTime"],
+                "time": fmt_ms(start_ts - fight["startTime"]),
+                "endTimeMs": None,
+                "endTime": "战斗结束仍未结束",
+                "durationSec": round((int(fight["endTime"]) - start_ts) / 1000, 1),
+                "bossID": boss_id,
+                "bossName": source_name(actor_map, boss_id, SOURCE_NAMES),
+            })
+        defense_rows = []
+        for group in group_nearby(
+            sorted(per_boss_defense_rows, key=lambda row: row["timeMs"]), window_ms=300,
+        ):
+            start_ms = min(row["timeMs"] for row in group)
+            ended = [row["endTimeMs"] for row in group if row["endTimeMs"] is not None]
+            end_ms = max(ended) if len(ended) == len(group) else None
+            boss_names = sorted({row["bossName"] for row in group})
+            if len(boss_names) < 2:
+                continue
+            defense_rows.append({
+                "index": len(defense_rows) + 1,
+                "timeMs": start_ms,
+                "time": fmt_ms(start_ms),
+                "endTimeMs": end_ms,
+                "endTime": fmt_ms(end_ms) if end_ms is not None else "战斗结束仍未结束",
+                "durationSec": round(((end_ms if end_ms is not None else fight["endTime"] - fight["startTime"]) - start_ms) / 1000, 1),
+                "bossNames": boss_names,
+                "bossName": "、".join(boss_names),
+                "bossCount": len(boss_names),
+            })
+        total_defense_duration_sec = round(sum(row["durationSec"] for row in defense_rows), 1)
 
-    volley_casts = _completed_casts(casts, 1295891)
+    avoidable = []
+    if options["avoidableReviewEnabled"]:
+        avoidable_damage = [
+            event for event in damage
+            if int(ability_id(event) or 0) != 1305844
+            or _counts_as_blast_wave_hit(event, raw["deaths"])
+        ]
+        avoidable = _avoidable_board(
+            fight, actor_map, players, avoidable_damage, raw["deaths"],
+            {1305844: spell_name(1305844)},
+        )
+        shell_hits = [event for event in debuffs if int(ability_id(event) or 0) == 1291918 and event_type(event) in {"applydebuff", "refreshdebuff"}]
+        shell_board = Counter(event.get("targetID") for event in shell_hits if event.get("targetID") in players)
+        avoidable.extend([{**player_ref(players, actor_map, player_id), "spellID": 1291918, "spellName": spell_name(1291918), "hitCount": count,
+                           "totalDamage": 0, "maxHit": 0, "deathCount": 0, "events": []} for player_id, count in shell_board.items()])
+
+    missed = _completed_casts(casts, 1286922) if options["interruptReviewEnabled"] else []
+
+    volley_casts = _completed_casts(casts, 1295891) if options["frostfireReviewEnabled"] or options["elementalReviewEnabled"] else []
     volley_rounds = []
     for index, cast in enumerate(volley_casts, start=1):
         start = int(cast["timestamp"])
@@ -1404,7 +1431,7 @@ def analyze_lost(fight, actor_map, players, raw):
             "assignments": assignment_rows,
         })
 
-    thud_casts = _completed_casts(casts, 1296094)
+    thud_casts = _completed_casts(casts, 1296094) if options["thudReviewEnabled"] else []
     thud_rounds = []
     for index, cast in enumerate(thud_casts, start=1):
         timestamp = int(cast["timestamp"])
@@ -1440,8 +1467,8 @@ def analyze_lost(fight, actor_map, players, raw):
         raw.get("friendlyCasts"),
         raw.get("resources"),
         raw.get("trackedActorEvents"),
-    )
-    blast_wave = _blast_wave_summary(fight, actor_map, players, damage, raw["deaths"])
+    ) if options["junkReviewEnabled"] else {}
+    blast_wave = _blast_wave_summary(fight, actor_map, players, damage, raw["deaths"]) if options["blastReviewEnabled"] else {}
     mushrooms = _mushroom_activations(
         fight,
         actor_map,
@@ -1452,13 +1479,14 @@ def analyze_lost(fight, actor_map, players, raw):
         deaths=raw["deaths"],
         friendly_casts=raw.get("friendlyCasts"),
         resources=raw.get("resources"),
-    )
-    _annotate_splinter_contexts(fight, throw_junk, mushrooms, volley_rounds)
-    elemental_explosions = _elemental_explosions(fight, actor_map, players, damage, volley_rounds)
+    ) if options["mushroomReviewEnabled"] else []
+    if options["junkReviewEnabled"]:
+        _annotate_splinter_contexts(fight, throw_junk, mushrooms, volley_rounds)
+    elemental_explosions = _elemental_explosions(fight, actor_map, players, damage, volley_rounds) if options["elementalReviewEnabled"] else []
     shell_spins = _shell_spin_rounds(
         fight, actor_map, players, casts, debuffs,
         resources=raw.get("resources"), damage=damage,
-    )
+    ) if options["shellReviewEnabled"] else []
     return {"unitedDefense": defense_rows, "unitedDefenseTotalSec": total_defense_duration_sec,
             "throwJunk": throw_junk,
             "avoidable": {"players": avoidable, "missedIceboundFlames": len(missed),
@@ -1467,7 +1495,7 @@ def analyze_lost(fight, actor_map, players, raw):
             "mushroomActivations": mushrooms,
             "elementalExplosions": elemental_explosions,
             "shellSpins": shell_spins,
-            "frostfireVolley": volley_rounds, "mightyThud": thud_rounds}
+            "frostfireVolley": volley_rounds if options["frostfireReviewEnabled"] else [], "mightyThud": thud_rounds}
 
 analyze_mechanics = analyze_lost
 
@@ -1670,9 +1698,36 @@ def _mechanic_overview(rendered):
 
 
 def build_aggregated_json(report_ids, options=None):
-    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    config = deepcopy(BOSS_CONFIG)
+    spatial = any(options[key] for key in ("junkReviewEnabled", "mushroomReviewEnabled", "shellReviewEnabled"))
+    config["fetchPositionResources"] = spatial
+    config["fetchCastResources"] = spatial
+    config["fetchEventResources"] = spatial
+    if not options["junkReviewEnabled"]:
+        config["trackedActorGameIDs"] = set()
+        config["trackedActorEventFilters"] = []
+    config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
+    if options["defenseReviewEnabled"]:
+        config["fetchKeys"].add("enemyBuffs")
+    if any(value for key, value in options.items() if key != "defenseReviewEnabled"):
+        config["fetchKeys"].add("casts")
+    if any(value for key, value in options.items() if key not in {"defenseReviewEnabled", "interruptReviewEnabled"}):
+        config["fetchKeys"].update({"damage", "debuffs"})
+    if options["junkReviewEnabled"]:
+        config["fetchKeys"].add("friendlyBuffs")
+    tab_enabled = {"survival": True, "defense": options["defenseReviewEnabled"] or options["junkReviewEnabled"],
+                   "avoidable": options["avoidableReviewEnabled"] or options["interruptReviewEnabled"],
+                   "special": any(options[key] for key in ("frostfireReviewEnabled", "elementalReviewEnabled", "thudReviewEnabled", "blastReviewEnabled", "mushroomReviewEnabled", "shellReviewEnabled"))}
+    config["tabs"] = [row for row in config["tabs"] if tab_enabled[row[0]]]
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    result = _build(config, analyze_mechanics, report_ids, options)
     rendered = result.get("data", {}).get("page1_wipeAnalysis") or []
     result["data"]["mechanicOverview"] = _mechanic_overview(rendered)
+    metric_options = {"crateDirectHits": "junkReviewEnabled", "crateStacksOverThree": "junkReviewEnabled",
+                      "prematureMushroomWipes": "mushroomReviewEnabled", "individualBlastWaveDeaths": "mushroomReviewEnabled",
+                      "frostfireRemovalFailures": "frostfireReviewEnabled"}
+    result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if options[metric_options[row["key"]]]]
     return result
 
 

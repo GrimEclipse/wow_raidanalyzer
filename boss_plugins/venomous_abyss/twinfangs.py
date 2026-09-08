@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+from analyzer_core.config import resolve_analysis_options
+
+CONFIG_SCHEMA = [
+    {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
+    {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
+    {"key": "globulesReviewEnabled", "type": "boolean", "label": "每轮吃球与漏吃", "default": True},
+    {"key": "waveReviewEnabled", "type": "boolean", "label": "腐蚀洪流波浪命中", "default": True},
+
+]
+
+
 from collections import Counter, defaultdict
 
 from boss_plugins.common import write_json_result
@@ -121,12 +133,15 @@ def _venom_stack_at(events, player_id, timestamp):
     return current
 
 def analyze_twinfangs(fight, actor_map, players, raw):
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
+    if not any(options.values()):
+        return {"enabled": False}
     debuffs, casts, damage, buffs, deaths = (
         raw["debuffs"], raw["casts"], raw["damage"], raw["friendlyBuffs"], raw["deaths"],
     )
     venom_events = [event for event in debuffs if int(ability_id(event) or 0) == 1290336]
     histories = []
-    for player_id in players:
+    for player_id in (players if options["venomReviewEnabled"] else []):
         current, peak, rows = 0, 0, []
         for event in sorted((item for item in venom_events if item.get("targetID") == player_id), key=lambda item: int(item.get("timestamp") or 0)):
             kind, before = event_type(event), current
@@ -219,7 +234,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
         )
     ]
     feast_checks = []
-    for index, cast in enumerate(feast_casts, start=1):
+    for index, cast in enumerate(feast_casts if options["feastReviewEnabled"] else [], start=1):
         timestamp = int(cast["timestamp"])
         present = sorted(
             player_id for player_id in players
@@ -243,7 +258,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
     emergences = sorted(int(event["timestamp"]) for event in casts if int(ability_id(event) or 0) == 1291404 and event_type(event) == "begincast")
     death_times = {player_id: min((int(event["timestamp"]) for event in raw["deaths"] if event.get("targetID") == player_id), default=10**18) for player_id in players}
     globule_rounds = []
-    for index, cast in enumerate(deluges, start=1):
+    for index, cast in enumerate(deluges if options["globulesReviewEnabled"] else [], start=1):
         start = int(cast["timestamp"])
         end = next((timestamp for timestamp in emergences if timestamp > start), int(fight["endTime"]))
         hits = _events_between(damage, start, end, {1289201})
@@ -285,7 +300,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                 })
     wave_hits = _avoidable_board(
         fight, actor_map, players, damage, deaths, {1289994: "腐蚀洪流波浪"}
-    )
+    ) if options["waveReviewEnabled"] else []
     return {
         "eternalVenom": {"players": histories, "feastChecks": feast_checks, "abnormalGains": abnormal_gains},
         "globules": {"rounds": globule_rounds},
@@ -320,10 +335,26 @@ def _mechanic_overview(rendered):
 
 
 def build_aggregated_json(report_ids, options=None):
-    result = _build(BOSS_CONFIG, analyze_mechanics, report_ids, options)
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    config = deepcopy(BOSS_CONFIG)
+    config["fetchEventResources"] = False
+    config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
+    if options["venomReviewEnabled"] or options["feastReviewEnabled"]:
+        config["fetchKeys"].update({"debuffs", "casts"})
+    if options["venomReviewEnabled"] or options["globulesReviewEnabled"] or options["waveReviewEnabled"]:
+        config["fetchKeys"].add("damage")
+    if options["globulesReviewEnabled"]:
+        config["fetchKeys"].update({"casts", "friendlyBuffs"})
+    tab_enabled = {"survival": True, "venom": options["venomReviewEnabled"] or options["feastReviewEnabled"],
+                   "globules": options["globulesReviewEnabled"], "mythic": any(options.values())}
+    config["tabs"] = [row for row in config["tabs"] if tab_enabled[row[0]]]
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    result = _build(config, analyze_mechanics, report_ids, options)
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []
     )
+    if not options["waveReviewEnabled"]:
+        result["data"]["mechanicOverview"] = {"title": "部分机制未分析", "subtitle": "、".join(config["skippedAnalyses"]), "metrics": []}
     return result
 
 

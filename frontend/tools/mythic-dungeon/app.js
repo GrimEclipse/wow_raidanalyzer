@@ -8,6 +8,7 @@ const state = {
   filter: "all",
   clock: "auto",
   relatedPlayerId: null,
+  loadId: 0,
 };
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -59,7 +60,9 @@ function toast(message) {
 }
 
 function validateDocument(document) {
-  if (!document || document.kind !== "mythic-dungeon-route-timeline" || !Array.isArray(document.pulls)) {
+  if (!document || document.kind !== "mythic-dungeon-route-timeline" || !Array.isArray(document.pulls)
+      || !document.dungeon || !document.source || !Array.isArray(document.team)
+      || document.pulls.some(pull => !pull || !Array.isArray(pull.enemies) || !Array.isArray(pull.enemySummary) || !Array.isArray(pull.timeline))) {
     throw new Error("不是受支持的大秘境抄轴 JSON");
   }
   return document;
@@ -77,11 +80,15 @@ function setDocument(document) {
   state.relatedPlayerId = null;
   renderRun();
   renderPullList();
-  selectPull(0);
+  if (document.pulls.length) selectPull(0);
+  else setLoading("这份日志没有可显示的 Pull，请选择其他样板或导入 JSON。");
 }
 
 function renderRun() {
   const { dungeon, team, source, pulls } = state.document;
+  $("#season-notice").textContent = state.document.skillSelection?.status === "needs-review"
+    ? `S${dungeon.season || 2} 正式服样本 · ${team.map(member => `${member.spec}${member.className}`).join("、")}。当前展示实际施法候选，Boss 与小怪的关键技能筛选尚待确认。`
+    : dungeon.season ? `S${dungeon.season} 样本 · 已配置技能时间轴。` : "S1 历史样本 · 已配置技能时间轴。";
   $("#dungeon-name").textContent = dungeon.nameZh || dungeon.name;
   $("#key-level").textContent = `+${dungeon.keystoneLevel}`;
   $("#run-meta").textContent = `${dungeon.completed ? "限时完成" : "未完成"} · ${dungeon.keystoneTime || dungeon.duration} · ${source.reportCode} / Fight ${source.fightId}`;
@@ -105,10 +112,14 @@ async function fetchJson(url, label) {
 }
 
 async function loadSample(sample) {
+  const loadId = ++state.loadId;
   setLoading(`正在读取 ${sample.nameZh} +${sample.keystoneLevel} 真实日志样板……`);
   try {
-    setDocument(await fetchJson(sample.file, "样板 JSON "));
+    const document = await fetchJson(sample.file, "样板 JSON ");
+    if (loadId !== state.loadId) return;
+    setDocument(document);
   } catch (error) {
+    if (loadId !== state.loadId) return;
     setLoading(error.message || "样板 JSON 读取失败");
     toast(error.message || "样板 JSON 读取失败");
   }
@@ -123,10 +134,12 @@ async function loadManifest() {
     }
     state.manifest = manifest;
     const selector = $("#sample-select");
-    selector.innerHTML = manifest.samples.map((sample) =>
-      `<option value="${escapeHtml(sample.key)}">${escapeHtml(sample.nameZh)} +${sample.keystoneLevel} · ${escapeHtml(sample.duration)}</option>`
-    ).join("");
-    const selected = manifest.samples.find((sample) => sample.key === DEFAULT_SAMPLE_KEY) || manifest.samples[0];
+    const seasons = [...new Set(manifest.samples.map(sample => sample.season || 1))].sort((a,b) => b-a);
+    selector.innerHTML = seasons.map(season => `<optgroup label="S${season}${season === 1 ? ' · 历史样本' : ' · 正式服样本'}">${manifest.samples.filter(sample => (sample.season || 1) === season).map(sample =>
+      `<option value="${escapeHtml(sample.key)}">S${season} · ${escapeHtml(sample.nameZh)} +${sample.keystoneLevel} · ${escapeHtml(sample.duration)}</option>`
+    ).join('')}</optgroup>`).join('');
+    const selected = manifest.samples.find((sample) => sample.key === manifest.defaultSampleKey)
+      || manifest.samples.find((sample) => sample.key === DEFAULT_SAMPLE_KEY) || manifest.samples[0];
     selector.value = selected.key;
     await loadSample(selected);
   } catch (error) {
@@ -160,7 +173,8 @@ function renderPull() {
   const pull = state.document.pulls[state.pullIndex];
   $("#pull-kicker").textContent = pull.type === "boss" ? `BOSS · Encounter ${pull.encounterId}` : `PULL ${pull.ordinal}`;
   $("#pull-title").textContent = pull.name;
-  $("#pull-meta").textContent = `全局 ${pull.dungeonTime} 开始 · 战斗 ${pull.duration} · ${pull.enemies.length} 个敌方实例 · ${pull.timeline.length} 条关键事件`;
+  const eventLabel = state.document.skillSelection?.status === "needs-review" ? "候选事件" : "关键事件";
+  $("#pull-meta").textContent = `全局 ${pull.dungeonTime} 开始 · 战斗 ${pull.duration} · ${pull.enemies.length} 个敌方实例 · ${pull.timeline.length} 条${eventLabel}`;
   $("#enemy-summary").innerHTML = pull.enemySummary.map((row) => `<span class="enemy-pill">${escapeHtml(row.name)}<strong>×${row.count}</strong></span>`).join("");
   $("#opener-body").innerHTML = pull.enemies.map((enemy) => {
     const opener = enemy.opener;
@@ -189,7 +203,8 @@ function selectedClock(pull) {
 }
 
 function renderTimeline() {
-  const pull = state.document.pulls[state.pullIndex];
+  const pull = state.document?.pulls[state.pullIndex];
+  if (!pull) return;
   const clock = selectedClock(pull);
   const events = pull.timeline.filter((event) => {
     if (state.filter !== "all" && event.kind !== state.filter) return false;
@@ -241,8 +256,11 @@ $$('[data-filter]').forEach((button) => button.addEventListener("click", () => {
 $("#json-input").addEventListener("change", async (event) => {
   const [file] = event.target.files;
   if (!file) return;
+  const loadId = ++state.loadId;
   try {
-    setDocument(JSON.parse(await file.text()));
+    const document = JSON.parse(await file.text());
+    if (loadId !== state.loadId) return;
+    setDocument(document);
     $("#sample-select").selectedIndex = -1;
     toast(`已导入 ${file.name}`);
   } catch (error) {

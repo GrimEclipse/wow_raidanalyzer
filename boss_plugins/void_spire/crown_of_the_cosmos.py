@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from collections import defaultdict
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -63,8 +64,7 @@ WCL_BASE_URL = os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com").rstrip(
 PROXY_URL = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL} if PROXY_URL else None
 CN_TZ = timezone(timedelta(hours=8))
-_API_METRICS_LOCK = threading.Lock()
-_API_LOGICAL_REQUESTS = 0
+_API_METRICS = ContextVar("crown_api_metrics", default=None)
 
 
 SPELLS = {
@@ -315,9 +315,10 @@ def get_token():
 
 
 def graphql(token, query, variables):
-    global _API_LOGICAL_REQUESTS
-    with _API_METRICS_LOCK:
-        _API_LOGICAL_REQUESTS += 1
+    metrics = _API_METRICS.get()
+    if metrics is not None:
+        with metrics["lock"]:
+            metrics["requests"] += 1
     headers = {"Authorization": f"Bearer {token}"}
     last_error = None
     for attempt in range(1, MAX_REQUEST_RETRIES + 1):
@@ -4744,11 +4745,16 @@ def fetch_fight_payload(token, report_id, fight, actor_game_id=None, analysis_co
 
 
 def build_aggregated_json(report_ids, options=None):
-    global _API_LOGICAL_REQUESTS
+    token = _API_METRICS.set({"lock": threading.Lock(), "requests": 0})
+    try:
+        return _build_aggregated_json(report_ids, options)
+    finally:
+        _API_METRICS.reset(token)
+
+
+def _build_aggregated_json(report_ids, options=None):
     analysis_config = resolve_crown_analysis_config(options)
     started_at = time.perf_counter()
-    with _API_METRICS_LOCK:
-        _API_LOGICAL_REQUESTS = 0
     progress(f"WCL 基础地址：{WCL_BASE_URL}", 1)
     progress(f"WCL 代理：{PROXY_URL or '未启用'}", 1)
     progress("启动宇宙之冕复盘分析")
@@ -4938,8 +4944,9 @@ def build_aggregated_json(report_ids, options=None):
         item["iqLoss"] = round(max(0, item["penaltyUnits"] - item["appealAcquittalCount"] * multiplier) * VERDICT_POINTS_PER_COUNT)
     final_output["data"]["page4_finalVerdict"] = sorted(verdict_players.values(), key=lambda item: (item["iqLoss"], item["recognitionCount"]), reverse=True)
     elapsed_seconds = round(time.perf_counter() - started_at, 3)
-    with _API_METRICS_LOCK:
-        logical_requests = _API_LOGICAL_REQUESTS
+    metrics = _API_METRICS.get()
+    with metrics["lock"]:
+        logical_requests = metrics["requests"]
     final_output["meta"]["performance"] = {
         "fightCount": len(final_output["data"]["page1_wipeAnalysis"]),
         "elapsedSeconds": elapsed_seconds,
