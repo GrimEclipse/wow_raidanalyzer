@@ -191,9 +191,11 @@ TEAM_COOLDOWNS = {
     # Preservation Evoker
     363534: {"name": "回溯", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
     359816: {"name": "梦境飞行", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
-    370537: {"name": "静滞", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
+    # WCL distinguishes the storage cast, release cast, and ready aura (370562).
+    370537: {"name": "静滞（存储）", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
+    370564: {"name": "静滞（释放）", "class": "Evoker", "category": "healing", "specKeys": ["preservation-evoker"]},
     357170: {"name": "时间膨胀", "class": "Evoker", "category": "external", "specKeys": ["preservation-evoker"]},
-    374227: {"name": "微风", "class": "Evoker", "category": "raid_defensive", "specKeys": ["preservation-evoker", "augmentation-evoker"]},
+    374227: {"name": "微风", "class": "Evoker", "category": "raid_defensive", "specKeys": ["preservation-evoker", "augmentation-evoker", "devastation-evoker"]},
     # Cross-role raid defensives
     97462: {"name": "命令怒吼", "class": "Warrior", "category": "raid_defensive", "specKeys": []},
     51052: {"name": "反魔法领域", "class": "DeathKnight", "category": "raid_defensive", "specKeys": []},

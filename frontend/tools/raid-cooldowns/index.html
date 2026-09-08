@@ -88,9 +88,9 @@
             <a class="result-wcl rounded border border-slate-700 px-3 py-2 text-xs text-cyan-300 hover:border-cyan-500" target="_blank" rel="noreferrer">打开 WCL</a>
         </div>
         <details class="sample-renames border-b border-slate-800">
-            <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-200">更改本样本的治疗角色 ID</summary>
+            <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-slate-200">更改本样本的玩家 ID</summary>
             <div class="px-5 pb-4">
-                <p class="mb-4 text-xs text-slate-500">按本样本的治疗职业填写团内角色名。同职业多人分别填写；仅更改本样本的全部导出格式，留空保留原名。</p>
+                <p class="mb-4 text-xs text-slate-500">按职业填写团内角色名，包含治疗及排轴中施放微风、群奔、反魔法领域等团队技能的玩家。同职业多人分别填写；仅更改本样本的全部导出格式，留空保留原名。</p>
                 <div class="rename-fields grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
                 <div class="mt-4 flex flex-wrap items-center gap-3">
                     <button type="button" class="apply-renames rounded bg-cyan-500 px-4 py-2 text-xs font-semibold text-slate-950">应用到本样本</button>
@@ -153,23 +153,33 @@
         return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     };
     const classColor = name => classColors[String(name || '').toLowerCase()] || '#cbd5e1';
-    const healerClassLabels = {priest:'牧师',paladin:'圣骑士',shaman:'萨满祭司',druid:'德鲁伊',monk:'武僧',evoker:'唤魔师'};
-    const healerAssignments = match => {
+    const playerClassLabels = {deathknight:'死亡骑士',demonhunter:'恶魔猎手',druid:'德鲁伊',evoker:'唤魔师',hunter:'猎人',mage:'法师',monk:'武僧',paladin:'圣骑士',priest:'牧师',rogue:'潜行者',shaman:'萨满祭司',warlock:'术士',warrior:'战士'};
+    const samePlayer = (player, row) => row.sourceID != null && player.id != null
+        ? String(row.sourceID) === String(player.id)
+        : row.player === player.name && String(row.class || '').toLowerCase() === String(player.class || '').toLowerCase();
+    const playerAssignments = match => {
+        const players = (match.healers || []).map(player => ({...player, role:'healer'}));
+        for (const row of match.timeline || []) {
+            if (!players.some(player => samePlayer(player, row))) {
+                players.push({id:row.sourceID, name:row.player, class:row.class, specKey:row.specKey, specLabel:row.specLabel, role:row.role});
+            }
+        }
         const counts = {};
-        return [...(match.healers || [])]
-            .sort((a, b) => String(a.specKey || a.specLabel || '').localeCompare(String(b.specKey || b.specLabel || '')))
-            .map(healer => {
-                const classKey = String(healer.class || '').toLowerCase();
+        return players
+            .sort((a, b) => String(a.class || '').toLowerCase().localeCompare(String(b.class || '').toLowerCase())
+                || Number(b.role === 'healer') - Number(a.role === 'healer')
+                || String(a.specKey || a.specLabel || '').localeCompare(String(b.specKey || b.specLabel || ''))
+                || String(a.id ?? a.name).localeCompare(String(b.id ?? b.name), undefined, {numeric:true}))
+            .map(player => {
+                const classKey = String(player.class || '').toLowerCase();
                 const slot = counts[classKey] = (counts[classKey] || 0) + 1;
-                return {healer, classKey, slot, key:`${classKey}:${slot}`};
+                return {player, classKey, slot, key:`${classKey}:${slot}`};
             });
     };
     const processedTimeline = match => {
-        const assignments = healerAssignments(match);
+        const assignments = playerAssignments(match);
         return (match.timeline || []).map(row => {
-            const assignment = assignments.find(({healer}) => row.sourceID != null && healer.id != null
-                ? String(row.sourceID) === String(healer.id)
-                : row.player === healer.name && String(row.class || '').toLowerCase() === String(healer.class || '').toLowerCase());
+            const assignment = assignments.find(({player}) => samePlayer(player, row));
             return {...row, player:(assignment && state.renameMaps.get(match)?.[assignment.key]) || row.player};
         });
     };
@@ -263,7 +273,7 @@
             }`;
         article.querySelector('.result-wcl').href = match.wclUrl;
         renderRenameFields(article, match, index);
-        article.querySelector('.result-healers').innerHTML = healerAssignments(match).map(({healer:row, key, slot}) => {
+        article.querySelector('.result-healers').innerHTML = playerAssignments(match).map(({player:row, key, slot}) => {
             const color = classColor(row.class);
             const replacement = state.renameMaps.get(match)?.[key];
             return `<span class="rounded-full border px-3 py-1 text-xs" style="color:${color};border-color:${color}55;background:${color}12">${escapeHtml(row.name)}${replacement ? ` → ${escapeHtml(replacement)}` : ''} · ${escapeHtml(row.specLabel)} · 槽位 ${slot}</span>`;
@@ -347,12 +357,12 @@
         state.results.forEach((match, index) => results.appendChild(renderMatch(match, index)));
     };
     const renderRenameFields = (article, match, index) => {
-        const assignments = healerAssignments(match);
+        const assignments = playerAssignments(match);
         const panel = article.querySelector('.sample-renames');
         panel.hidden = assignments.length === 0;
         const fields = article.querySelector('.rename-fields');
-        fields.innerHTML = assignments.map(({healer, classKey, slot, key}) => `
-            <label class="text-xs" style="color:${classColor(classKey)}">${escapeHtml(healerClassLabels[classKey] || classKey)} · ${escapeHtml(healer.specLabel || '')} · ${escapeHtml(healer.name)}（槽位 ${slot}）
+        fields.innerHTML = assignments.map(({player, classKey, slot, key}) => `
+            <label class="text-xs" style="color:${classColor(classKey)}">${escapeHtml(playerClassLabels[classKey] || classKey)} · ${escapeHtml(player.specLabel || '')} · ${escapeHtml(player.name)}（槽位 ${slot}）
                 <input data-slot="${escapeHtml(key)}" value="${escapeHtml(state.renameMaps.get(match)?.[key] || '')}" placeholder="团内角色 ID（玩家名）"
                     class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
             </label>`).join('');
@@ -366,7 +376,7 @@
             const names = Object.fromEntries([...fields.querySelectorAll('input')]
                 .map(input => [input.dataset.slot, input.value.trim()]).filter(([, value]) => value));
             state.renameMaps.set(match, names);
-            refresh(`本样本已更改 ${Object.keys(names).length} 个治疗角色，导出内容已更新。`);
+            refresh(`本样本已更改 ${Object.keys(names).length} 个玩家，导出内容已更新。`);
         });
         article.querySelector('.reset-renames').addEventListener('click', () => {
             state.renameMaps.delete(match);
