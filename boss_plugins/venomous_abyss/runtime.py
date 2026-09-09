@@ -41,6 +41,7 @@ def fetch_payload(
     boss_id=None,
     tracked_actor_ids=(),
     tracked_damage_target_ids=(),
+    pet_owners=None,
 ):
     fetch_keys = config.get("fetchKeys")
 
@@ -68,6 +69,7 @@ def fetch_payload(
         "bossPositionEvents": [],
         "trackedActorEvents": [],
         "trackedDamageTaken": [],
+        "petOwners": dict(pet_owners or {}),
         "bossID": boss_id,
     }
     tracked_filters = config.get("trackedActorEventFilters") or []
@@ -180,6 +182,11 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
         actors = client.actors(report_id)
         actor_map = {actor["id"]: actor["name"] for actor in actors}
         actor_type = {actor["id"]: actor.get("type") for actor in actors}
+        pet_owners = {
+            actor["id"]: actor.get("petOwner")
+            for actor in actors
+            if actor.get("petOwner") is not None
+        }
         tracked_actor_ids = [
             actor["id"] for actor in actors
             if int(actor.get("gameID") or 0) in set(config.get("trackedActorGameIDs") or ())
@@ -209,6 +216,7 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 boss_id=boss_id,
                 tracked_actor_ids=tracked_actor_ids,
                 tracked_damage_target_ids=tracked_damage_target_ids,
+                pet_owners=pet_owners,
             )
             raw["analysisOptions"] = dict(options or {})
             return index, render_fight(
