@@ -33,7 +33,8 @@ GUIDE_SPELLS = load_confirmed_spell_names()
 
 CONFIG_SCHEMA = [
     {"key": "predatorReviewEnabled", "type": "boolean", "label": "顶级掠食者技能处理", "default": True},
-    {"key": "tempestReviewEnabled", "type": "boolean", "label": "风暴承伤", "default": True},
+    {"key": "tempestReviewEnabled", "type": "boolean", "label": "风暴施加与驱散", "default": True},
+    {"key": "serpentsFuryReviewEnabled", "type": "boolean", "label": "史诗印记分摊", "default": True},
     {"key": "cystsReviewEnabled", "type": "boolean", "label": "囊肿放置与激活", "default": True,
      "description": "需要坐标与风向采样；关闭场地推演后仍可单独分析。"},
     {"key": "crosswindsReviewEnabled", "type": "boolean", "label": "狂怒侧风位置归因", "default": True},
@@ -54,8 +55,9 @@ BOSS_CONFIG = {
         ["replay", "场地推演"],
         ["cysts", "腐蚀囊肿"],
         ["crosswinds", "狂怒侧风"],
+        ["fury", "毒蛇之怒"],
     ],
-    "mechanicVersion": "sszorak-progression-2026-08-28",
+    "mechanicVersion": "sszorak-mythic-active-dispels-2026-09-12",
     "features": {"survival": True, "fieldReplay": True},
     "bossGameID": 257347,
     "bossNameKeywords": ["Sszorak", "斯索拉克"],
@@ -73,6 +75,13 @@ PREDATOR_DAMAGE = {
 PREDATOR_LABELS = {1277002: "劫掠", 1277027: "毁伤", 1287072: "风暴"}
 
 CYST_PLACEMENT_DEBUFF_ID = 1305963
+
+TEMPEST_DEBUFF_ID = 1287083
+SERPENTS_FURY_MARK_ID = 1305621
+UNBOUND_FEROCITY_ID = 1296898
+FURY_SOAK_RADIUS_YARDS = 8
+FURY_REQUIRED_PLAYERS = 14
+FURY_POSITION_WINDOW_MS = 500
 
 CYST_TRIGGER_DEBUFF_ID = 1287205
 
@@ -183,10 +192,9 @@ CROSSWIND_DIRECTIONS = {
         "angleDegrees": _asset_angle(_WIND_SKULL_TO_CROSS),
         "wclAngleDegrees": _WIND_SKULL_TO_CROSS,
     },
-    # 史诗难度新增的两种点名实例。方向最终以起飞后的坐标矢量为准，
-    # 不把尚未由日志证明的图标方向硬编码进结论。
-    1297096: {"key": "C", "label": "史诗额外方向 1297096", "angleDegrees": None, "wclAngleDegrees": None},
-    1297111: {"key": "D", "label": "史诗额外方向 1297111", "angleDegrees": None, "wclAngleDegrees": None},
+    # 史诗增加一条与 A/B 垂直的对穿轴；不要用混有主动移动的短轨迹扭曲箭头。
+    1297096: {"key": "C", "label": "三角 → 紫菱", "angleDegrees": _asset_angle(15), "wclAngleDegrees": 15},
+    1297111: {"key": "D", "label": "紫菱 → 三角", "angleDegrees": _asset_angle(195), "wclAngleDegrees": 195},
 }
 
 CROSSWIND_MOBILITY_SPELLS = {
@@ -914,12 +922,13 @@ def _sszorak_crosswind_waves(
         # 不以相近坐标猜测：只将相反方向且 1285447 在同一时间窗移除的玩家配为一次对撞。
         pairings = []
         paired_ids = set()
-        group_a = [row for row in targets if row["directionGroup"] == "A" and row["resolutionTimestamp"]]
-        group_b = [row for row in targets if row["directionGroup"] == "B" and row["resolutionTimestamp"]]
+        group_a = [row for row in targets if row["directionGroup"] in {"A", "C"} and row["resolutionTimestamp"]]
+        group_b = [row for row in targets if row["directionGroup"] in {"B", "D"} and row["resolutionTimestamp"]]
         for left in sorted(group_a, key=lambda row: row["resolutionTimestamp"]):
             candidates = [
                 right for right in group_b
                 if right["playerID"] not in paired_ids
+                and right["directionGroup"] == {"A": "B", "C": "D"}[left["directionGroup"]]
                 and abs(right["resolutionTimestamp"] - left["resolutionTimestamp"])
                 <= CROSSWIND_COLLISION_WINDOW_MS
             ]
@@ -1019,8 +1028,11 @@ def _sszorak_crosswind_waves(
             "applyTime": fmt_ms(apply_ts - fight["startTime"]),
             "launchTimeMs": min(launch_times) - fight["startTime"] if launch_times else None,
             "launchTime": fmt_ms(min(launch_times) - fight["startTime"]) if launch_times else None,
-            "directionGroup": "A+B",
-            "inferredDirection": "骷髅 ↔ 红叉",
+            "directionGroup": "+".join(group["key"] for group in direction_groups),
+            "inferredDirection": "骷髅 ↔ 红叉；三角 ↔ 紫菱" if any(group["key"] in {"C", "D"} for group in direction_groups) else "骷髅 ↔ 红叉",
+            "axes": [{"label": "骷髅 ↔ 红叉", "angleDegrees": CROSSWIND_DIRECTIONS[1285425]["angleDegrees"]}]
+                    + ([{"label": "三角 ↔ 紫菱", "angleDegrees": CROSSWIND_DIRECTIONS[1297096]["angleDegrees"]}]
+                       if any(group["key"] in {"C", "D"} for group in direction_groups) else []),
             "arrowAngleDegrees": CROSSWIND_DIRECTIONS[1285425]["angleDegrees"],
             "wclAngleDegrees": CROSSWIND_DIRECTIONS[1285425]["wclAngleDegrees"],
             "targets": targets,
@@ -1048,6 +1060,111 @@ def _predator_cycles(casts):
     if current:
         cycles.append(current)
     return cycles
+
+def _tempest_aura_counts(fight, actor_map, players, raw):
+    applications, dispels = [], []
+    seen = set()
+    for event in sorted(raw.get("debuffs", []) + raw.get("trackedActorEvents", []), key=lambda e: e["timestamp"]):
+        kind, target = event_type(event), event.get("targetID")
+        if target not in players:
+            continue
+        is_apply = ability_id(event) == TEMPEST_DEBUFF_ID and kind in {"applydebuff", "applydebuffstack", "refreshdebuff"}
+        is_dispel = kind == "dispel" and event.get("extraAbilityGameID") == TEMPEST_DEBUFF_ID
+        if not (is_apply or is_dispel):
+            continue
+        key = (event["timestamp"], kind, event.get("sourceID"), target, ability_id(event), event.get("stack"))
+        if key in seen:
+            continue
+        seen.add(key)
+        row = {**player_ref(players, actor_map, target), "timeMs": event["timestamp"] - fight["startTime"],
+               "time": fmt_ms(event["timestamp"] - fight["startTime"]), "eventType": kind,
+               "spellID": TEMPEST_DEBUFF_ID}
+        if is_dispel:
+            source = event.get("sourceID")
+            # 图腾等宠物的驱散保留实体，同时归到主人名下。
+            owner = raw.get("petOwners", {}).get(source, source)
+            row.update({"dispelSourceID": source, "dispelSpellID": ability_id(event),
+                        "dispeller": player_ref(players, actor_map, owner)})
+        (applications if is_apply else dispels).append(row)
+    ids = {row["playerID"] for row in applications} | {
+        row["dispeller"]["playerID"] for row in dispels if row["dispeller"]["playerID"] in players
+    }
+    return {"applications": applications, "dispels": dispels,
+            "applicationCount": len(applications), "dispelCount": len(dispels),
+            "players": [{**player_ref(players, actor_map, pid),
+                         "applicationCount": sum(row["playerID"] == pid for row in applications),
+                         "dispelCount": sum(row["dispeller"]["playerID"] == pid for row in dispels)} for pid in sorted(ids)]}
+
+
+def _serpents_fury(fight, actor_map, players, raw, position_index):
+    result = {"enabled": True, "requiredPlayers": FURY_REQUIRED_PLAYERS, "radiusYards": FURY_SOAK_RADIUS_YARDS,
+              "events": [], "players": [], "enrageCount": 0, "exemptCount": 0,
+              "evidenceNote": "仅统计史诗未击杀 Pull 的怒不可遏施加；结算前全团死亡超过 3 人豁免。排除所有治疗者，其他存活玩家以印记目标 8 码范围判定，双方坐标须在 500ms 内，缺失坐标不计圈外。"}
+    if int(fight.get("difficulty") or 0) != 5 or fight.get("kill"):
+        return result
+    boss_id = raw.get("bossID")
+    enrages = sorted({int(e["timestamp"]) for e in raw.get("enemyBuffs", [])
+                      if ability_id(e) == UNBOUND_FEROCITY_ID and event_type(e) == "applybuff"
+                      and (boss_id is None or e.get("targetID") == boss_id)})
+    marks = sorted([e for e in raw.get("debuffs", []) if ability_id(e) == SERPENTS_FURY_MARK_ID], key=lambda e: e["timestamp"])
+    life_events = sorted(raw.get("deaths", []) + [e for e in raw.get("trackedActorEvents", []) if event_type(e) == "resurrect"],
+                         key=lambda e: e["timestamp"])
+    misses = Counter()
+    for timestamp in enrages:
+        dead = set()
+        for event in life_events:
+            if int(event["timestamp"]) >= timestamp:
+                break
+            pid = event.get("targetID")
+            if pid not in players:
+                continue
+            if event_type(event) == "death":
+                dead.add(pid)
+            elif event_type(event) == "resurrect":
+                dead.discard(pid)
+        active = {}
+        for event in marks:
+            if int(event["timestamp"]) >= timestamp:
+                break
+            pid = event.get("targetID")
+            if event_type(event) in {"applydebuff", "refreshdebuff"}:
+                active[pid] = event["timestamp"]
+            elif event_type(event) == "removedebuff":
+                active.pop(pid, None)
+        target = next(iter(active)) if len(active) == 1 else None
+        row = {"timeMs": timestamp - fight["startTime"], "time": fmt_ms(timestamp - fight["startTime"]),
+               "spellID": UNBOUND_FEROCITY_ID, "deadCount": len(dead), "exempt": len(dead) > 3,
+               "markTarget": player_ref(players, actor_map, target) if target is not None else None,
+               "outsidePlayers": [], "insidePlayers": [], "unknownPlayers": [],
+               "excludedHealers": [player_ref(players, actor_map, pid) for pid, p in players.items() if str(p.get("role") or "").endswith("healer")]}
+        if row["exempt"]:
+            row["status"] = "死亡超过 3 人，豁免"
+        else:
+            mark_position = position_at_interpolated(position_index, target, timestamp - 1, reliable_window_ms=FURY_POSITION_WINDOW_MS) if target not in dead else None
+            for pid in players:
+                if pid in dead or str(players[pid].get("role") or "").endswith("healer"):
+                    continue
+                ref = player_ref(players, actor_map, pid)
+                point = position_at_interpolated(position_index, pid, timestamp - 1, reliable_window_ms=FURY_POSITION_WINDOW_MS)
+                if not mark_position or not mark_position.get("reliable") or not point or not point.get("reliable"):
+                    row["unknownPlayers"].append(ref)
+                    continue
+                distance = math.hypot(point["x"] - mark_position["x"], point["y"] - mark_position["y"])/100
+                ref.update({"distanceYards": round(distance, 2), "sampleOffsetMs": point["sampleOffsetMs"],
+                            "markSampleOffsetMs": mark_position["sampleOffsetMs"]})
+                row["insidePlayers" if distance <= FURY_SOAK_RADIUS_YARDS else "outsidePlayers"].append(ref)
+                if distance > FURY_SOAK_RADIUS_YARDS:
+                    misses[pid] += 1
+            row["status"] = "坐标证据不足，部分或全部未确认" if row["unknownPlayers"] else "已按狂暴前位置结算"
+        row["insideCount"] = len(row["insidePlayers"])
+        row["outsideCount"] = len(row["outsidePlayers"])
+        row["unknownCount"] = len(row["unknownPlayers"])
+        result["events"].append(row)
+    result["enrageCount"] = len(enrages)
+    result["exemptCount"] = sum(row["exempt"] for row in result["events"])
+    result["players"] = [{**player_ref(players, actor_map, pid), "count": count} for pid, count in misses.most_common()]
+    return result
+
 
 def analyze_sszorak(fight, actor_map, players, raw):
     casts, damage, debuffs = raw["casts"], raw["damage"], raw["debuffs"]
@@ -1099,13 +1216,17 @@ def analyze_sszorak(fight, actor_map, players, raw):
             })
 
     tempest = _avoidable_board(fight, actor_map, players, damage, deaths, {1287083: spell_name(1287083)}) if options["tempestReviewEnabled"] else []
-    if not any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled")):
+    tempest_auras = _tempest_aura_counts(fight, actor_map, players, raw) if options["tempestReviewEnabled"] else {"enabled": False}
+    fury_enabled = options["serpentsFuryReviewEnabled"] and int(fight.get("difficulty") or 0) == 5
+    if not fury_enabled and not any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled")):
         return {"apexPredator": {"cycles": len(_predator_cycles(casts)), "sequence": sequence, "tempestDamage": tempest},
+                "tempest": tempest_auras, "serpentsFury": {"enabled": False},
                 "cysts": {"enabled": False}, "crosswinds": {"enabled": False},
                 "fieldReplay": {"enabled": False}, "fallDeaths": []}
     boss_id = raw.get("bossID")
     combat_position_index = build_position_index(raw.get("bossPositionEvents", []) + raw["resources"] + damage + debuffs)
     position_index = _sszorak_map_position_index(combat_position_index)
+    fury = _serpents_fury(fight, actor_map, players, raw, position_index) if fury_enabled else {"enabled": False}
     arena = _sszorak_arena(position_index, boss_id=boss_id)
 
     all_cysts = _sszorak_cysts(fight, actor_map, players, raw, position_index, arena) if options["cystsReviewEnabled"] or options["fieldReplayEnabled"] else []
@@ -1226,6 +1347,8 @@ def analyze_sszorak(fight, actor_map, players, raw):
 
     return {
         "apexPredator": {"cycles": len(_predator_cycles(casts)), "sequence": sequence, "tempestDamage": tempest},
+        "tempest": tempest_auras,
+        "serpentsFury": fury,
         "cysts": {
             "rounds": cyst_rounds,
             "placements": all_cysts,
@@ -1252,7 +1375,8 @@ analyze_mechanics = analyze_sszorak
 
 def _mechanic_overview(rendered):
     bad_cysts = []
-    storm_hits = []
+    storm_applications, storm_dispels, fury_misses = [], [], []
+    fury_enrages = fury_exempt = 0
     for pull in rendered:
         mechanics = pull.get(BOSS_CONFIG["key"]) or {}
         for round_row in (mechanics.get("cysts") or {}).get("rounds") or []:
@@ -1264,17 +1388,28 @@ def _mechanic_overview(rendered):
                     f"{placement.get('player') or '未知玩家'} 囊肿放置错误：{placement.get('expected') or '未落在本轮要求位置'}",
                     player=placement.get("player"), classColor=placement.get("classColor"),
                 ))
-        for player_row in (mechanics.get("apexPredator") or {}).get("tempestDamage") or []:
-            for event in player_row.get("events") or []:
-                storm_hits.append(nightly_detail(
-                    pull, event.get("time"),
-                    f"{player_row.get('player') or '未知玩家'} 命中风暴",
-                    player=player_row.get("player"), classColor=player_row.get("classColor"),
-                    spellID=1287083,
-                ))
+        for field, output, label in (("applications", storm_applications, "被施加风暴"), ("dispels", storm_dispels, "主动驱散风暴")):
+            for event in (mechanics.get("tempest") or {}).get(field, []):
+                credited = event["dispeller"] if field == "dispels" else event
+                detail = f"{credited['player']} {label}"
+                if field == "dispels":
+                    detail += f"（目标：{event['player']}）"
+                output.append(nightly_detail(pull, event.get("time"), detail,
+                                            player=credited["player"], classColor=credited.get("classColor"),
+                                            playerID=credited["playerID"], spellID=TEMPEST_DEBUFF_ID,
+                                            targetPlayer=event["player"], targetPlayerID=event["playerID"],
+                                            dispeller=event.get("dispeller"), eventType=event.get("eventType")))
+        for event in (mechanics.get("serpentsFury") or {}).get("events", []):
+            fury_enrages += 1
+            fury_exempt += int(event["exempt"])
+            for player_row in event["outsidePlayers"]:
+                fury_misses.append(nightly_detail(pull, event["time"],
+                    f"{player_row['player']} 怒满狂暴时未在印记 8 码内（{player_row['distanceYards']} 码）",
+                    player=player_row["player"], playerID=player_row["playerID"], classColor=player_row.get("classColor"),
+                    spellID=UNBOUND_FEROCITY_ID, distanceYards=player_row["distanceYards"]))
     return {
         "title": "整夜机制统计",
-        "subtitle": "按所有 Pull 汇总囊肿放置判定与风暴实际伤害。",
+        "subtitle": "按所有 Pull 汇总囊肿、风暴施加与驱散、史诗印记未进圈次数。",
         "metrics": [
             {
                 "key": "badCystPlacements", "label": "囊肿放置错误", "value": len(bad_cysts), "unit": "次",
@@ -1282,9 +1417,20 @@ def _mechanic_overview(rendered):
                 "players": nightly_player_totals(bad_cysts), "events": bad_cysts,
             },
             {
-                "key": "stormHits", "label": "命中风暴", "value": len(storm_hits), "unit": "次",
-                "tone": "warning", "description": "风暴伤害 1287083 命中玩家的总人次。",
-                "players": nightly_player_totals(storm_hits), "events": storm_hits,
+                "key": "stormApplications", "label": "风暴施加", "value": len(storm_applications), "unit": "次",
+                "tone": "warning", "description": "统计风暴光环的首次施加、叠层与刷新，不统计持续伤害跳数。",
+                "players": nightly_player_totals(storm_applications), "events": storm_applications,
+            },
+            {
+                "key": "stormDispels", "label": "主动驱散风暴", "value": len(storm_dispels), "unit": "次",
+                "tone": "info", "description": "按实际驱散者统计成功驱散风暴的事件次数；图腾等宠物归属主人，自然消失与死亡移除不计。",
+                "players": nightly_player_totals(storm_dispels), "events": storm_dispels,
+            },
+            {
+                "key": "furyOutside", "label": "怒满时未进印记", "value": len(fury_misses), "unit": "次",
+                "tone": "danger", "description": "仅计存活非治疗玩家，印记半径 8 码；全团死亡超过 3 人豁免，坐标不足不计。",
+                "enrageCount": fury_enrages, "exemptCount": fury_exempt,
+                "players": nightly_player_totals(fury_misses), "events": fury_misses,
             },
         ],
     }
@@ -1293,19 +1439,26 @@ def _mechanic_overview(rendered):
 def build_aggregated_json(report_ids, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
     config = deepcopy(BOSS_CONFIG)
-    spatial = any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled"))
+    spatial = any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled", "serpentsFuryReviewEnabled"))
     config["fetchPositionResources"] = spatial
     config["fetchEventResources"] = spatial
     config["features"]["fieldReplay"] = options["fieldReplayEnabled"]
     tab_enabled = {"survival": True, "predator": options["predatorReviewEnabled"] or options["tempestReviewEnabled"],
                    "replay": options["fieldReplayEnabled"], "cysts": options["cystsReviewEnabled"],
-                   "crosswinds": options["crosswindsReviewEnabled"]}
+                   "crosswinds": options["crosswindsReviewEnabled"], "fury": options["serpentsFuryReviewEnabled"]}
     config["tabs"] = [row for row in config["tabs"] if tab_enabled.get(row[0], False)]
     config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
     if any(options.values()):
         config["fetchKeys"].update({"casts", "damage"})
-    if spatial:
+    if spatial or options["tempestReviewEnabled"]:
         config["fetchKeys"].add("debuffs")
+    filters = []
+    if options["tempestReviewEnabled"]:
+        filters.append("type = 'dispel'")
+    if options["serpentsFuryReviewEnabled"]:
+        config["fetchKeys"].add("enemyBuffs")
+        filters.append("type = 'resurrect'")
+    config["trackedActorEventFilters"] = [" OR ".join(filters)] if filters else []
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
     result = _build(config, analyze_mechanics, report_ids, options)
     result["data"]["mechanicOverview"] = _mechanic_overview(
@@ -1314,7 +1467,9 @@ def build_aggregated_json(report_ids, options=None):
     if not options["cystsReviewEnabled"]:
         result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if row["key"] != "badCystPlacements"]
     if not options["tempestReviewEnabled"]:
-        result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if row["key"] != "stormHits"]
+        result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if row["key"] not in {"stormApplications", "stormDispels"}]
+    if not options["serpentsFuryReviewEnabled"]:
+        result["data"]["mechanicOverview"]["metrics"] = [row for row in result["data"]["mechanicOverview"]["metrics"] if row["key"] != "furyOutside"]
     return result
 
 
