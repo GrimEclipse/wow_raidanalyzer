@@ -90,6 +90,8 @@ EGG_CARRY_ID = 1295360
 WAVE_ID = 1292403
 RAGE_ID = 1286860
 HEART_ID = 1299526
+ULATEK_GAME_ID = 257758
+HEART_GAME_ID = 267460
 FANG_AURA_ID = 1311611
 BLIGHT_VEIN_ID = 1311609
 SAFE_BLIGHT_STACK = 2
@@ -103,7 +105,7 @@ BOSS_CONFIG = {
     "name": "乌拉特克",
     "arena": "assets/raids/venomous_abyss/08-ulatek-arena.jpg",
     "spellNames": GUIDE_SPELLS,
-    "trackedDamageTargetGameIDs": {267460},
+    "trackedDamageTargetGameIDs": {ULATEK_GAME_ID, HEART_GAME_ID},
     "tabs": [
         ["survival", "全场存活情况"],
         ["waves", "腐蚀浪潮和带蛋情况"],
@@ -111,7 +113,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-progression-2026-09-04-v3",
+    "mechanicVersion": "ulatek-rage-total-damage-2026-09-09-v4",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -341,17 +343,52 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
     rounds = []
     for index, window in enumerate(rage_windows, start=1):
         start, end = window["start"], window["end"]
-        heart_damage = [
+        window_damage = [
             event for event in raw.get("trackedDamageTaken") or []
             if start <= int(event.get("timestamp") or 0) <= end
         ]
-        by_player = defaultdict(lambda: {"damage": 0, "hits": 0})
+        boss_id = window.get("playerID")
+        boss_damage = [event for event in window_damage if event.get("targetID") == boss_id]
+        heart_damage = [event for event in window_damage if event.get("targetID") != boss_id]
+        by_player = defaultdict(lambda: {
+            "heartDamage": 0,
+            "bossDamage": 0,
+            "heartHits": 0,
+            "bossHits": 0,
+        })
+        pet_owners = raw.get("petOwners") or {}
+
+        def owner_id(event):
+            source_id = event.get("sourceID")
+            seen = set()
+            while source_id not in players and source_id in pet_owners and source_id not in seen:
+                seen.add(source_id)
+                source_id = pet_owners[source_id]
+            return source_id if source_id in players else None
+
         for event in heart_damage:
-            player_id = event.get("sourceID")
-            if player_id not in players:
+            player_id = owner_id(event)
+            if player_id is None:
                 continue
-            by_player[player_id]["damage"] += _amount(event)
-            by_player[player_id]["hits"] += 1
+            by_player[player_id]["heartDamage"] += _amount(event)
+            by_player[player_id]["heartHits"] += 1
+        for event in boss_damage:
+            player_id = owner_id(event)
+            if player_id is None:
+                continue
+            by_player[player_id]["bossDamage"] += _amount(event)
+            by_player[player_id]["bossHits"] += 1
+        damage_by_player = []
+        for player_id, values in by_player.items():
+            total_damage = values["heartDamage"] + values["bossDamage"]
+            damage_by_player.append({
+                **player_ref(players, actor_map, player_id),
+                **values,
+                "totalDamage": total_damage,
+                "damage": total_damage,
+                "hitCount": values["heartHits"] + values["bossHits"],
+            })
+        damage_by_player.sort(key=lambda row: row["totalDamage"], reverse=True)
         debris = [
             event for event in raw["damage"]
             if int(ability_id(event) or 0) == 1286885
@@ -368,14 +405,18 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
             "endTime": fmt_ms(end - fight["startTime"]),
             "durationSec": round((end - start) / 1000, 2),
             "heartDamage": sum(_amount(event) for event in heart_damage),
+            "bossDamage": sum(_amount(event) for event in boss_damage),
+            "totalDamage": sum(_amount(event) for event in window_damage),
+            "damageByPlayer": damage_by_player,
             "heartDamageByPlayer": sorted(
                 [
                     {
-                        **player_ref(players, actor_map, player_id),
-                        "damage": values["damage"],
-                        "hitCount": values["hits"],
+                        **row,
+                        "damage": row["heartDamage"],
+                        "hitCount": row["heartHits"],
                     }
-                    for player_id, values in by_player.items()
+                    for row in damage_by_player
+                    if row["heartDamage"] > 0
                 ],
                 key=lambda row: row["damage"],
                 reverse=True,
@@ -404,7 +445,13 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
                 for event in deaths
             ],
         })
-    return {"rounds": rounds, "totalDeathCount": sum(row["deathCount"] for row in rounds)}
+    return {
+        "rounds": rounds,
+        "totalDeathCount": sum(row["deathCount"] for row in rounds),
+        "totalHeartDamage": sum(row["heartDamage"] for row in rounds),
+        "totalBossDamage": sum(row["bossDamage"] for row in rounds),
+        "totalDamage": sum(row["totalDamage"] for row in rounds),
+    }
 
 
 def _analyze_fangs(fight, actor_map, players, raw):

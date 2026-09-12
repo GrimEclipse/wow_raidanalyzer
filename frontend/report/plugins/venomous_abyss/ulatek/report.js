@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const state = { payload: null, pulls: [], pull: 0, tab: "survival" };
+  const state = { payload: null, pulls: [], pull: 0, tab: "survival", heartView: "total" };
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
   const num = value => Number(value || 0).toLocaleString("zh-CN");
@@ -45,7 +45,19 @@
   function renderHeart() {
     const data = boss().rage || {};
     const rounds = data.rounds || [];
-    return `<section class="summary-strip">${metric("被缚之怒", `${rounds.length} 轮`)}${metric("易伤期间死亡", `${data.totalDeathCount || 0} 人次`)}${metric("落石命中", `${rounds.reduce((sum,row)=>sum+(row.fallingDebrisHitCount||0),0)} 次`)}${metric("烈毒之心总伤害", num(rounds.reduce((sum,row)=>sum+(row.heartDamage||0),0)))}</section><div class="rage-rounds">${rounds.map(row => `<article class="card round-card ${row.deathCount || row.fallingDebrisHitCount ? "bad" : "good"}"><h3>${spell(1286860,`${ordinal(row.index)}被缚之怒`)} <span class="muted">${esc(row.time)}–${esc(row.endTime)}</span> ${badge(`${row.durationSec} 秒`)} ${row.deathCount ? badge(`死亡 ${row.deathCount}`,"bad") : badge("无人死亡","good")}</h3><h4>${spell(1299526,"烈毒之心")} · 总伤害 ${num(row.heartDamage)}</h4><div class="rage-damage-table">${table(["玩家","伤害"], (row.heartDamageByPlayer || []).map(item => [player(item),num(item.damage)]))}</div><h4>${spell(1286885,"落石")} · ${row.fallingDebrisHitCount || 0} 次 / ${num(row.fallingDebrisDamage)} 伤害</h4>${table(["时间","玩家","伤害"], (row.fallingDebrisHits || []).map(item => [esc(item.time),player(item),num(item.amount)]))}<h4>易伤期间死亡</h4>${table(["时间","玩家","致死技能"], (row.deaths || []).map(item => [esc(item.time),player(item),spell(item.abilityID,item.ability)]))}</article>`).join("") || '<div class="empty">本场没有记录到被缚之怒窗口。</div>'}</div>`;
+    const totalHeartDamage = data.totalHeartDamage ?? rounds.reduce((sum,row)=>sum+(row.heartDamage||0),0);
+    const totalBossDamage = data.totalBossDamage ?? rounds.reduce((sum,row)=>sum+(row.bossDamage||0),0);
+    const totalDamage = data.totalDamage ?? totalHeartDamage + totalBossDamage;
+    const damageRows = row => {
+      const source = row.damageByPlayer || (row.heartDamageByPlayer || []).map(item => ({...item, heartDamage:item.damage || 0, bossDamage:0, totalDamage:item.damage || 0}));
+      const key = state.heartView === "heart" ? "heartDamage" : "totalDamage";
+      return [...source].sort((left,right)=>(right[key]||0)-(left[key]||0));
+    };
+    const damageTable = row => state.heartView === "heart"
+      ? table(["玩家","心脏伤害"], damageRows(row).filter(item => item.heartDamage > 0).map(item => [player(item),num(item.heartDamage)]))
+      : table(["玩家","有效伤害总和","心脏伤害","Boss 本体伤害"], damageRows(row).map(item => [player(item),num(item.totalDamage),num(item.heartDamage),num(item.bossDamage)]));
+    const switcher = `<div class="rage-view-toggle" role="group" aria-label="易伤伤害显示口径"><button type="button" data-heart-view="total" class="${state.heartView === "total" ? "active" : ""}" aria-pressed="${state.heartView === "total"}">总有效伤害</button><button type="button" data-heart-view="heart" class="${state.heartView === "heart" ? "active" : ""}" aria-pressed="${state.heartView === "heart"}">只看心脏伤害</button></div>`;
+    return `<section class="summary-strip">${metric("被缚之怒", `${rounds.length} 轮`)}${metric("易伤有效伤害", num(totalDamage))}${metric("烈毒之心伤害", num(totalHeartDamage))}${metric("Boss 本体伤害", num(totalBossDamage))}</section><section class="panel rage-view-panel"><div><h2>易伤期间有效伤害</h2><p class="muted">总有效伤害 = 烈毒之心伤害 + 同一被缚之怒窗口内对乌拉特克本体造成的伤害；宠物和召唤物伤害归入主人。</p></div>${switcher}</section><div class="rage-rounds">${rounds.map(row => `<article class="card round-card ${row.deathCount || row.fallingDebrisHitCount ? "bad" : "good"}"><h3>${spell(1286860,`${ordinal(row.index)}被缚之怒`)} <span class="muted">${esc(row.time)}–${esc(row.endTime)}</span> ${badge(`${row.durationSec} 秒`)} ${row.deathCount ? badge(`死亡 ${row.deathCount}`,"bad") : badge("无人死亡","good")}</h3><h4>有效伤害 ${num(row.totalDamage ?? row.heartDamage)} · ${spell(1299526,"烈毒之心")} ${num(row.heartDamage)} + Boss 本体 ${num(row.bossDamage)}</h4><div class="rage-damage-table">${damageTable(row)}</div><h4>${spell(1286885,"落石")} · ${row.fallingDebrisHitCount || 0} 次 / ${num(row.fallingDebrisDamage)} 伤害</h4>${table(["时间","玩家","伤害"], (row.fallingDebrisHits || []).map(item => [esc(item.time),player(item),num(item.amount)]))}<h4>易伤期间死亡</h4>${table(["时间","玩家","致死技能"], (row.deaths || []).map(item => [esc(item.time),player(item),spell(item.abilityID,item.ability)]))}</article>`).join("") || '<div class="empty">本场没有记录到被缚之怒窗口。</div>'}</div>`;
   }
 
   function renderFangs() {
@@ -68,6 +80,10 @@
   function renderContent() {
     const renderers = { survival: renderSurvival, waves: renderWaves, heart: renderHeart, fangs: renderFangs, critical: renderCritical };
     $("content").innerHTML = (renderers[state.tab] || (() => '<div class="empty">该页暂无数据。</div>'))();
+    document.querySelectorAll("[data-heart-view]").forEach(button => button.onclick = () => {
+      state.heartView = button.dataset.heartView;
+      renderContent();
+    });
     refreshTooltips();
   }
 

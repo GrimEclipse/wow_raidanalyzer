@@ -15,4 +15,8 @@ window and require a nearby `1301268` raid-aura mutation as hatch evidence.
 
 Heroic Grasping Fangs is one six-player assignment per fight even when the two
 Wardens apply their three targets about 1.2 seconds apart. Report each removal
-and the corresponding `1311609` transition; the current safe cap is two stacks.
+and the corresponding `1311609` transition; the Heroic safe cap is three stacks.
+
+During each `1286860` Bound Fury window, damage to both Ula'tek (`257758`) and
+the Venomous Heart (`267460`) is effective. Return the separate target totals
+and their sum; attribute pet and guardian damage to the owning player.
