@@ -212,3 +212,79 @@ systemctl restart wow-raidanalyzer
 - raid-guide 页技能名/物品名是**文本链接**（`wowhead.com/cn/spell=...`），点击跳转 wowhead 详情页仍需 VPN
   （图标已本地化；详情页代理成本高，未做）。
 - raid-calendar（团本日历与掉落）页无图标，仅文本链接，不受影响。
+
+---
+
+# 补丁 D：wowhead 中转 CSS 的 sub_filter 静默失效 → tooltip 又变透明无遮罩（2026-09-13）
+
+## 症状（机主报「tooltip 缺少遮罩导致文字互相覆盖」）
+
+hover 技能名弹出的 wowhead tooltip 没有深色底图，页面里的表格文字 / 行分隔线从 tooltip 底下透出来，
+两组文字叠在一起。
+
+## 根因链（全部 HTTP 回读实证）
+
+1. tooltips.js 给 tooltip 的皮肤只定义了**图片背景**：universal.css 里
+   `.wowhead-tooltip td,.wowhead-tooltip th{background:url("/images/wow/tooltip.png")}` —— 绝对路径。
+2. 这份 CSS 由本地化脚本按 `WH.STATIC_URL="/zamimg"` 从 `/zamimg/css/universal.css?20` 取；
+   nginx `/zamimg/` 的 sub_filter 本该把 `url(/images/` 改写成 `url(/zamimg/images/`。
+3. **2026-08-24 16:34 起，nginx 缓存里那份 universal.css 存的是 gzip 压缩体**（CloudFront 对 CSS 自动压缩），
+   而 **sub_filter 只能改写明文响应，遇到 gzip 二进制直接静默跳过** → 下发的 CSS 里 46 处
+   `url(/images/...)` 一处都没被改写（实测改写 0 处，响应 `content-encoding: gzip`）。
+4. 浏览器于是按本站根解析 `/images/wow/tooltip.png` → 落到应用上 → 303/404 → 皮肤图取不到 → tooltip 透明。
+5. **为什么 08-14 修好、08-24 又坏、09-13 才被发现**：08-14 验证后浏览器把改写好的 CSS 缓存 30 天
+   （`expires 30d`），正好 **09-13 到期**；用户再拉一次就吃到 nginx 缓存里那份坏的，于是「又出现」。
+
+## 改动（线上权威配置 `/etc/nginx/sites-available/wow-wuwo.conf`；sites-enabled 是它的软链）
+
+`location /zamimg/` 内新增一行（关键）：
+
+```nginx
+proxy_set_header Accept-Encoding "";
+```
+
+回源不带编码协商 → CloudFront 返回明文 CSS → sub_filter 生效。
+
+另新增兜底 location（浏览器里已缓存 30 天的旧 CSS 仍会去请求 `/images/...`）：
+
+```nginx
+location /images/ {
+    proxy_pass https://wow.zamimg.com/images/;
+    proxy_http_version 1.1;
+    proxy_ssl_server_name on;
+    proxy_set_header Host wow.zamimg.com;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_ignore_headers Cache-Control Expires Set-Cookie Vary;
+    proxy_hide_header Set-Cookie;
+    proxy_cache wow_static;
+    proxy_cache_valid 200 30d;
+    proxy_cache_key $host$uri;
+    add_header X-Cache-Status $upstream_cache_status always;
+    expires 30d;
+    proxy_read_timeout 30s;
+}
+```
+
+应用自身没有 `/images/` 路由（`handle_static` 只放行 `/assets/`、`/frontend/`、`/data/`），不会误伤。
+
+同时删掉缓存里那份坏的 CSS：`rm -f /var/cache/nginx/wow_static/a/b9/48139171906d6c2c1f1ded7dcd4b3b9a`
+（cache key = `wow.wuwoapp.com/zamimg/css/universal.css` 的 md5）。
+
+备份：`/root/backups/wow-nginx-20260913T182129/wow-wuwo.conf`（改前原件）。
+
+## 验收（2026-09-13 实测）
+
+- `/zamimg/css/universal.css?20`：46 处 `url(/zamimg/`、0 处裸 `url(/images/`；二次请求
+  `X-Cache-Status: HIT` 仍是改写版（缓存里存的已经是明文）。
+- `.wowhead-tooltip td` 的 computed `background-image` =
+  `url("https://wow.wuwoapp.com/zamimg/images/wow/tooltip.png")`，该 URL 直回 200 `image/png` 6051B。
+- 无头 Chrome（playwright + chromium_headless_shell-1234）实拍 A/B：正常态 tooltip 深色底不透明、
+  文字清晰；把 `tooltip.png` 请求 abort 掉（复现旧故障）后，页面表格文字与行线从 tooltip 底下透出
+  —— 与机主描述一致，修复后消失。截图：`/tmp/wowprobe/crop_{with,no}_skin.png`。
+
+## ⚠ 以后升级 / 排查注意
+
+- 动 `/zamimg/` 的缓存或 sub_filter 时**必须回读 CSS 内容确认改写真的生效**，只看 HTTP 200 会漏。
+- 上游 `wow-tooltips.js` 升级后要重跑 08-14 那套本地化补丁（`STATIC_URL` / `Se()` 两处替换）。
+- 本目录的 `deploy/nginx-wow-wuwo.conf` 是**上游模板**（还停在 07-31 的 127.0.0.1:8444 版），
+  不是线上配置；线上权威 = `/etc/nginx/sites-available/wow-wuwo.conf`。
