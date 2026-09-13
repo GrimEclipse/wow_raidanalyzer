@@ -38,7 +38,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <h1 id="hero-title">开荒工具包</h1>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.1 更新公告">v1.3.1</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈 Issue ↗</a></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v1.3.2 更新公告">v1.3.2</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈 Issue ↗</a></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -68,11 +68,19 @@
 <div id="releaseNotice" class="notice-layer" hidden>
   <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
     <header class="notice-head">
-      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.3.1</span></div>
+      <div><small>UPDATE NOTICE</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 · v1.3.2</span></div>
       <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
     </header>
     <div class="notice-content">
       <ol>
+        <li>
+          <p><strong>v1.3.2  M5 斯索拉克与乌拉特克复盘更新</strong></p>
+          <ul>
+            <li>M5 斯索拉克补齐史诗毒蛇之怒、四向侧风，以及风暴施加/刷新和主动驱散归属。</li>
+            <li>乌拉特克新增固定左右场拉线批次、毒蛇之咬实际分摊、P1/P3 吃波死亡与盘绕猎物死亡统计。</li>
+            <li>P3 蛋会排除固定尖啸者；额外孵化时返回漏蛋的玩家转火伤害。拉线每场只归责首个违规者。</li>
+          </ul>
+        </li>
         <li>
           <p><strong>v1.3.1  陵寝哨兵史诗复盘与输入优化</strong></p>
           <ul>
@@ -136,7 +144,7 @@
 </div>
 <script>
 (() => {
-  const RELEASE_VERSION = 'v1.3.1';
+  const RELEASE_VERSION = 'v1.3.2';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
