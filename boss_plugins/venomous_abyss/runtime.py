@@ -40,7 +40,9 @@ def fetch_payload(
     config,
     boss_id=None,
     tracked_actor_ids=(),
+    tracked_actor_game_ids=None,
     tracked_damage_target_ids=(),
+    tracked_damage_target_game_ids=None,
     pet_owners=None,
 ):
     fetch_keys = config.get("fetchKeys")
@@ -68,7 +70,9 @@ def fetch_payload(
         "resources": [],
         "bossPositionEvents": [],
         "trackedActorEvents": [],
+        "trackedActorGameIDByActorID": dict(tracked_actor_game_ids or {}),
         "trackedDamageTaken": [],
+        "trackedDamageTargetGameIDByActorID": dict(tracked_damage_target_game_ids or {}),
         "petOwners": dict(pet_owners or {}),
         "bossID": boss_id,
     }
@@ -196,6 +200,17 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
             if int(actor.get("gameID") or 0)
             in set(config.get("trackedDamageTargetGameIDs") or ())
         ]
+        tracked_actor_game_ids = {
+            actor["id"]: int(actor.get("gameID") or 0)
+            for actor in actors
+            if int(actor.get("gameID") or 0) in set(config.get("trackedActorGameIDs") or ())
+        }
+        tracked_damage_target_game_ids = {
+            actor["id"]: int(actor.get("gameID") or 0)
+            for actor in actors
+            if int(actor.get("gameID") or 0)
+            in set(config.get("trackedDamageTargetGameIDs") or ())
+        }
         boss_id = None
         if config.get("bossGameID"):
             boss_id = resolve_boss_actor_id(
@@ -215,7 +230,9 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 config,
                 boss_id=boss_id,
                 tracked_actor_ids=tracked_actor_ids,
+                tracked_actor_game_ids=tracked_actor_game_ids,
                 tracked_damage_target_ids=tracked_damage_target_ids,
+                tracked_damage_target_game_ids=tracked_damage_target_game_ids,
                 pet_owners=pet_owners,
             )
             raw["analysisOptions"] = dict(options or {})

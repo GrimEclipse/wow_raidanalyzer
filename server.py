@@ -659,7 +659,7 @@ def safe_redirect_target(value, default="/online"):
 
 
 class AnalyzerHandler(BaseHTTPRequestHandler):
-    server_version = "MythicAnalyzer/1.3.1"
+    server_version = "MythicAnalyzer/1.3.2"
 
     def do_GET(self):
         path = self.request_path()
