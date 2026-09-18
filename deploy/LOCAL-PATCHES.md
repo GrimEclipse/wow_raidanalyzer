@@ -288,3 +288,44 @@ location /images/ {
 - 上游 `wow-tooltips.js` 升级后要重跑 08-14 那套本地化补丁（`STATIC_URL` / `Se()` 两处替换）。
 - 本目录的 `deploy/nginx-wow-wuwo.conf` 是**上游模板**（还停在 07-31 的 127.0.0.1:8444 版），
   不是线上配置；线上权威 = `/etc/nginx/sites-available/wow-wuwo.conf`。
+
+---
+
+# 补丁 E：斯索拉克机制脚本的前端缓存版本号（2026-09-18）
+
+## 症状
+
+上游 `e89f782 fix(sszorak): audit tactical fury checkpoints` 改了
+`frontend/report/plugins/venomous_abyss/sszorak/mechanics.js`（毒蛇之怒面板从「怒满时未进印记」
+改成「战术集合点」，新增轮次 / 战术板时间 / Combo 漂移列），但**没有动引用它的
+`progression/report.html`**：`<script src="…/sszorak/mechanics.js?v=20260912">` 仍是 09-12 那版。
+
+## 根因
+
+本项目的静态资源没有内容哈希，靠 URL 上的 `?v=` 做缓存失效。版本号不升 = 浏览器（和任何中间缓存）
+继续用旧脚本渲染新数据：后端已经产出 `checkCount` / `round` / `plannedTime` / `comboDriftMs`，
+页面却还是旧标题与旧字段，机主会以为「同步没生效」。
+
+## 改动
+
+`frontend/report/plugins/venomous_abyss/progression/report.html`：
+
+```text
+- <script src="frontend/report/plugins/venomous_abyss/sszorak/mechanics.js?v=20260912">
++ <script src="frontend/report/plugins/venomous_abyss/sszorak/mechanics.js?v=20260918">
+```
+
+纯缓存失效，不改任何逻辑；上游下次自己升版本号时以较大者为准（本补丁可删）。
+
+## 验收（2026-09-18 实测）
+
+- 回环 `GET /frontend/report/plugins/venomous_abyss/progression/report.html`（带登录 cookie）
+  回读含 `mechanics.js?v=20260918`。
+- 无头 Chrome 打开斯索拉克报告页：面板标题为「毒蛇之怒 · 战术集合点」，
+  计数行显示「已检查 N 个集合点 · 实际怒不可遏 M 次 · 豁免 K 次」，控制台无报错。
+
+## ⚠ 以后升级 / 排查注意
+
+- **上游改 `frontend/**/*.js` 而没升 `report.html` 里的 `?v=` 时，必须自己升一次**，
+  否则「同步了但页面没变」。判据是回读线上 HTML 的版本串，不是看文件时间。
+- 同类历史坑：`assets/vendor/zone54-raid-guide-data.js?v=N`（手册数据，2026-09-12/09-14 踩过两次）。
