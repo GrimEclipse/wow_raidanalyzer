@@ -11,12 +11,12 @@ function renderSszorakFury() {
   const data = boss().serpentsFury;
   if (!data || data.enabled === false) return '<div class="empty">仅适用于启用印记分析的史诗战斗，请重新分析日志。</div>';
   const outside = rows => (rows || []).map(row => `${player(row)}（${row.distanceYards} 码）`).join('、') || '—';
-  return `<section class="panel" data-analysis-option="serpentsFuryReviewEnabled"><h2>毒蛇之怒 · 怒满时未进印记</h2>
-    <p class="muted">印记需要至少 ${data.requiredPlayers} 人进入 ${data.radiusYards} 码范围触发。${esc(data.evidenceNote)}</p><p>怒满狂暴 ${data.enrageCount || 0} 次 · 豁免 ${data.exemptCount || 0} 次</p>
+  return `<section class="panel" data-analysis-option="serpentsFuryReviewEnabled"><h2>毒蛇之怒 · 战术集合点</h2>
+    <p class="muted">印记需要至少 ${data.requiredPlayers} 人进入 ${data.radiusYards} 码范围触发。${esc(data.evidenceNote)}</p><p>已检查 ${data.checkCount || 0} 个集合点 · 实际怒不可遏 ${data.actualEnrageCount ?? data.enrageCount ?? 0} 次 · 豁免 ${data.exemptCount || 0} 次</p>
     ${table(['玩家', '未进圈次数'], (data.players || []).map(row => [player(row), row.count]))}
-    ${(data.events || []).map(row => `<article class="card"><h3>${esc(row.time)} · ${esc(row.status)}</h3>
-      <p>印记目标：${player(row.markTarget)} · 结算前死亡：${row.deadCount} 人</p>
+    ${(data.events || []).map(row => `<article class="card"><h3>第 ${row.round || '—'} 次 · ${esc(row.time)} · ${esc(row.status)}</h3>
+      <p>印记目标：${player(row.markTarget)} · 战术板：${esc(row.plannedTime || row.time)} · Combo 漂移：${row.comboDriftMs > 0 ? '+' : ''}${row.comboDriftMs || 0}ms · 结算前死亡：${row.deadCount} 人</p>
       ${row.exempt ? '' : `<p>圈外非治疗：${outside(row.outsidePlayers)}</p><p>圈内非治疗：${players(row.insidePlayers)}</p><p>坐标未确认：${players(row.unknownPlayers)}</p>`}
       <p class="muted">排除治疗：${players(row.excludedHealers)}</p></article>`).join('')}
-    ${!(data.events || []).length ? '<div class="empty">本场没有符合条件的怒满狂暴记录。</div>' : ''}</section>`;
+    ${!(data.events || []).length ? '<div class="empty">本场尚未走到一个完整的战术集合点。</div>' : ''}</section>`;
 }

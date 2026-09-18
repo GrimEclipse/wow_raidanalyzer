@@ -57,7 +57,7 @@ BOSS_CONFIG = {
         ["crosswinds", "狂怒侧风"],
         ["fury", "毒蛇之怒"],
     ],
-    "mechanicVersion": "sszorak-mythic-active-dispels-2026-09-12",
+    "mechanicVersion": "sszorak-mythic-fury-tactical-checkpoints-2026-09-18",
     "features": {"survival": True, "fieldReplay": True},
     "bossGameID": 257347,
     "bossNameKeywords": ["Sszorak", "斯索拉克"],
@@ -82,6 +82,14 @@ UNBOUND_FEROCITY_ID = 1296898
 FURY_SOAK_RADIUS_YARDS = 8
 FURY_REQUIRED_PLAYERS = 14
 FURY_POSITION_WINDOW_MS = 500
+
+# 团队战术板要求的六次集合时点；06:00 是硬狂暴，不再建立集合检查。
+# 每轮实际时间会跟随该轮顶级掠食者（剑技）Combo 的首个实测技能漂移，
+# 避免前序技能延迟时仍机械地使用绝对开怪时间。
+FURY_TACTICAL_CHECKPOINTS_MS = (27_000, 76_000, 152_000, 202_000, 279_000, 328_000)
+FURY_NOMINAL_COMBO_ANCHORS_MS = (8_000, 55_000, 135_000, 182_000, 262_000, 314_000)
+FURY_COMBO_DRIFT_TOLERANCE_MS = 1_000
+FURY_HARD_ENRAGE_MS = 360_000
 
 CYST_TRIGGER_DEBUFF_ID = 1287205
 
@@ -1096,10 +1104,42 @@ def _tempest_aura_counts(fight, actor_map, players, raw):
                          "dispelCount": sum(row["dispeller"]["playerID"] == pid for row in dispels)} for pid in sorted(ids)]}
 
 
+def _fury_tactical_checkpoints(fight, casts):
+    """Map the raid-plan checkpoints onto this pull's observed sword combos."""
+    start = int(fight["startTime"])
+    end = int(fight["endTime"])
+    rows = []
+    for index, cycle in enumerate(_predator_cycles(casts)):
+        if index >= len(FURY_TACTICAL_CHECKPOINTS_MS):
+            break
+        # 不能等待五段剑技全部结束：后半段战术点可能落在 Combo 仍在
+        # 进行时。每轮首个完成的剑技已经足够确认该轮实际时间漂移。
+        combo_anchor = int(cycle[0]["timestamp"])
+        nominal_combo_anchor = start + FURY_NOMINAL_COMBO_ANCHORS_MS[index]
+        observed_drift_ms = combo_anchor - nominal_combo_anchor
+        # 战术板精确到秒；亚秒级施法/日志抖动不应把 00:27 显示成 00:26.997。
+        drift_ms = observed_drift_ms if abs(observed_drift_ms) >= FURY_COMBO_DRIFT_TOLERANCE_MS else 0
+        timestamp = start + FURY_TACTICAL_CHECKPOINTS_MS[index] + drift_ms
+        if timestamp > end:
+            continue
+        rows.append({
+            "round": index + 1,
+            "timestamp": timestamp,
+            "plannedTimeMs": FURY_TACTICAL_CHECKPOINTS_MS[index],
+            "comboAnchorTimestamp": combo_anchor,
+            "comboDriftMs": drift_ms,
+            "comboObservedDriftMs": observed_drift_ms,
+        })
+    return rows
+
+
 def _serpents_fury(fight, actor_map, players, raw, position_index):
     result = {"enabled": True, "requiredPlayers": FURY_REQUIRED_PLAYERS, "radiusYards": FURY_SOAK_RADIUS_YARDS,
-              "events": [], "players": [], "enrageCount": 0, "exemptCount": 0,
-              "evidenceNote": "仅统计史诗未击杀 Pull 的怒不可遏施加；结算前全团死亡超过 3 人豁免。排除所有治疗者，其他存活玩家以印记目标 8 码范围判定，双方坐标须在 500ms 内，缺失坐标不计圈外。"}
+              "events": [], "players": [], "checkCount": 0, "enrageCount": 0,
+              "actualEnrageCount": 0, "exemptCount": 0,
+              "tacticalCheckpointsMs": list(FURY_TACTICAL_CHECKPOINTS_MS),
+              "hardEnrageTimeMs": FURY_HARD_ENRAGE_MS,
+              "evidenceNote": "按战术板 00:27、01:16、02:32、03:22、04:39、05:28 建立集合检查，06:00 为硬狂暴；用每轮剑技 Combo 的首个实测技能校正至少 1 秒的前序延迟，不等待 Combo 结束或怒不可遏生效。排除所有治疗者；其余当时存活玩家按印记目标 8 码判定，双方坐标须在 500ms 内，缺失坐标不计异常。结算前全团死亡超过 3 人豁免。"}
     if int(fight.get("difficulty") or 0) != 5 or fight.get("kill"):
         return result
     boss_id = raw.get("bossID")
@@ -1110,7 +1150,8 @@ def _serpents_fury(fight, actor_map, players, raw, position_index):
     life_events = sorted(raw.get("deaths", []) + [e for e in raw.get("trackedActorEvents", []) if event_type(e) == "resurrect"],
                          key=lambda e: e["timestamp"])
     misses = Counter()
-    for timestamp in enrages:
+    for checkpoint in _fury_tactical_checkpoints(fight, raw.get("casts", [])):
+        timestamp = checkpoint["timestamp"]
         dead = set()
         for event in life_events:
             if int(event["timestamp"]) >= timestamp:
@@ -1123,44 +1164,70 @@ def _serpents_fury(fight, actor_map, players, raw, position_index):
             elif event_type(event) == "resurrect":
                 dead.discard(pid)
         active = {}
+        latest_target = None
         for event in marks:
-            if int(event["timestamp"]) >= timestamp:
+            if int(event["timestamp"]) > timestamp:
                 break
             pid = event.get("targetID")
             if event_type(event) in {"applydebuff", "refreshdebuff"}:
                 active[pid] = event["timestamp"]
+                latest_target = pid
             elif event_type(event) == "removedebuff":
                 active.pop(pid, None)
-        target = next(iter(active)) if len(active) == 1 else None
-        row = {"timeMs": timestamp - fight["startTime"], "time": fmt_ms(timestamp - fight["startTime"]),
-               "spellID": UNBOUND_FEROCITY_ID, "deadCount": len(dead), "exempt": len(dead) > 3,
-               "markTarget": player_ref(players, actor_map, target) if target is not None else None,
+        target = next(iter(active)) if len(active) == 1 else latest_target
+        mark_ref = player_ref(players, actor_map, target) if target is not None else None
+        row = {"round": checkpoint["round"],
+               "timeMs": timestamp - fight["startTime"], "time": fmt_ms(timestamp - fight["startTime"]),
+               "plannedTimeMs": checkpoint["plannedTimeMs"],
+               "plannedTime": fmt_ms(checkpoint["plannedTimeMs"]),
+               "comboAnchorTimeMs": checkpoint["comboAnchorTimestamp"] - fight["startTime"],
+               "comboDriftMs": checkpoint["comboDriftMs"],
+               "comboObservedDriftMs": checkpoint["comboObservedDriftMs"],
+               "spellID": SERPENTS_FURY_MARK_ID, "deadCount": len(dead), "exempt": len(dead) > 3,
+               "markTarget": mark_ref, "markActive": target in active,
                "outsidePlayers": [], "insidePlayers": [], "unknownPlayers": [],
                "excludedHealers": [player_ref(players, actor_map, pid) for pid, p in players.items() if str(p.get("role") or "").endswith("healer")]}
         if row["exempt"]:
             row["status"] = "死亡超过 3 人，豁免"
         else:
-            mark_position = position_at_interpolated(position_index, target, timestamp - 1, reliable_window_ms=FURY_POSITION_WINDOW_MS) if target not in dead else None
+            mark_position = position_at_interpolated(position_index, target, timestamp, reliable_window_ms=FURY_POSITION_WINDOW_MS) if target not in dead else None
+            if mark_ref is not None and mark_position and mark_position.get("reliable"):
+                mark_ref.update({
+                    "position": {"x": round(mark_position["x"], 1), "y": round(mark_position["y"], 1)},
+                    "sampleOffsetMs": mark_position["sampleOffsetMs"],
+                })
             for pid in players:
                 if pid in dead or str(players[pid].get("role") or "").endswith("healer"):
                     continue
                 ref = player_ref(players, actor_map, pid)
-                point = position_at_interpolated(position_index, pid, timestamp - 1, reliable_window_ms=FURY_POSITION_WINDOW_MS)
+                point = position_at_interpolated(position_index, pid, timestamp, reliable_window_ms=FURY_POSITION_WINDOW_MS)
                 if not mark_position or not mark_position.get("reliable") or not point or not point.get("reliable"):
+                    ref["inTarget"] = None
                     row["unknownPlayers"].append(ref)
                     continue
                 distance = math.hypot(point["x"] - mark_position["x"], point["y"] - mark_position["y"])/100
                 ref.update({"distanceYards": round(distance, 2), "sampleOffsetMs": point["sampleOffsetMs"],
-                            "markSampleOffsetMs": mark_position["sampleOffsetMs"]})
+                            "markSampleOffsetMs": mark_position["sampleOffsetMs"],
+                            "position": {"x": round(point["x"], 1), "y": round(point["y"], 1)},
+                            "inTarget": distance <= FURY_SOAK_RADIUS_YARDS})
                 row["insidePlayers" if distance <= FURY_SOAK_RADIUS_YARDS else "outsidePlayers"].append(ref)
                 if distance > FURY_SOAK_RADIUS_YARDS:
                     misses[pid] += 1
-            row["status"] = "坐标证据不足，部分或全部未确认" if row["unknownPlayers"] else "已按狂暴前位置结算"
+            if target is None:
+                row["status"] = "未找到本轮印记目标"
+            elif row["unknownPlayers"]:
+                row["status"] = "坐标证据不足，部分或全部未确认"
+            elif row["outsidePlayers"]:
+                row["status"] = f"{len(row['outsidePlayers'])} 人未进入印记"
+            else:
+                row["status"] = "全部非治疗玩家已进入印记"
         row["insideCount"] = len(row["insidePlayers"])
         row["outsideCount"] = len(row["outsidePlayers"])
         row["unknownCount"] = len(row["unknownPlayers"])
         result["events"].append(row)
+    result["checkCount"] = len(result["events"])
     result["enrageCount"] = len(enrages)
+    result["actualEnrageCount"] = len(enrages)
     result["exemptCount"] = sum(row["exempt"] for row in result["events"])
     result["players"] = [{**player_ref(players, actor_map, pid), "count": count} for pid, count in misses.most_common()]
     return result
@@ -1376,7 +1443,7 @@ analyze_mechanics = analyze_sszorak
 def _mechanic_overview(rendered):
     bad_cysts = []
     storm_applications, storm_dispels, fury_misses = [], [], []
-    fury_enrages = fury_exempt = 0
+    fury_checks = fury_exempt = 0
     for pull in rendered:
         mechanics = pull.get(BOSS_CONFIG["key"]) or {}
         for round_row in (mechanics.get("cysts") or {}).get("rounds") or []:
@@ -1400,13 +1467,13 @@ def _mechanic_overview(rendered):
                                             targetPlayer=event["player"], targetPlayerID=event["playerID"],
                                             dispeller=event.get("dispeller"), eventType=event.get("eventType")))
         for event in (mechanics.get("serpentsFury") or {}).get("events", []):
-            fury_enrages += 1
+            fury_checks += 1
             fury_exempt += int(event["exempt"])
             for player_row in event["outsidePlayers"]:
                 fury_misses.append(nightly_detail(pull, event["time"],
-                    f"{player_row['player']} 怒满狂暴时未在印记 8 码内（{player_row['distanceYards']} 码）",
+                    f"{player_row['player']} 战术集合点未在印记 8 码内（{player_row['distanceYards']} 码）",
                     player=player_row["player"], playerID=player_row["playerID"], classColor=player_row.get("classColor"),
-                    spellID=UNBOUND_FEROCITY_ID, distanceYards=player_row["distanceYards"]))
+                    spellID=SERPENTS_FURY_MARK_ID, distanceYards=player_row["distanceYards"]))
     return {
         "title": "整夜机制统计",
         "subtitle": "按所有 Pull 汇总囊肿、风暴施加与驱散、史诗印记未进圈次数。",
@@ -1427,9 +1494,9 @@ def _mechanic_overview(rendered):
                 "players": nightly_player_totals(storm_dispels), "events": storm_dispels,
             },
             {
-                "key": "furyOutside", "label": "怒满时未进印记", "value": len(fury_misses), "unit": "次",
-                "tone": "danger", "description": "仅计存活非治疗玩家，印记半径 8 码；全团死亡超过 3 人豁免，坐标不足不计。",
-                "enrageCount": fury_enrages, "exemptCount": fury_exempt,
+                "key": "furyOutside", "label": "集合点未进印记", "value": len(fury_misses), "unit": "次",
+                "tone": "danger", "description": "按战术板六个集合点并随当轮剑技 Combo 的实测起点漂移校正；仅计存活非治疗玩家，印记半径 8 码；全团死亡超过 3 人豁免，坐标不足不计。",
+                "checkCount": fury_checks, "exemptCount": fury_exempt,
                 "players": nightly_player_totals(fury_misses), "events": fury_misses,
             },
         ],

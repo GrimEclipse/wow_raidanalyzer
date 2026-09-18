@@ -6,15 +6,19 @@ from boss_plugins.venomous_abyss import sszorak as s
 
 class SszorakMythicTests(unittest.TestCase):
     def setUp(self):
-        self.fight = {"startTime": 0, "endTime": 20000, "difficulty": 5, "kill": False}
+        self.fight = {"startTime": 0, "endTime": 30000, "difficulty": 5, "kill": False}
         self.players = {i: {"name": f"P{i}", "role": "range-dps"} for i in range(1, 21)}
         self.players[19]["role"] = "range-healer"
         self.players[20]["role"] = "melee-healer"
         self.actors = {i: f"P{i}" for i in self.players}
         self.raw = {"bossID": 99, "enemyBuffs": [self.event(10000, "applybuff", s.UNBOUND_FEROCITY_ID, 99)],
                     "debuffs": [self.event(1, "applydebuff", s.SERPENTS_FURY_MARK_ID, 1)],
+                    "casts": [self.event(timestamp, "cast", spell, -1) for timestamp, spell in (
+                        (8000, 1277002), (12000, 1277027), (16000, 1287072),
+                        (20500, 1277002), (24500, 1277027),
+                    )],
                     "deaths": [], "trackedActorEvents": []}
-        self.positions = {i: [{"timestamp": 9999, "x": 0 if i == 1 else 1000, "y": 0}] for i in self.players}
+        self.positions = {i: [{"timestamp": 27000, "x": 0 if i == 1 else 1000, "y": 0}] for i in self.players}
 
     def event(self, timestamp, kind, spell, target, **kw):
         return {"timestamp": timestamp, "type": kind, "abilityGameID": spell, "targetID": target, "sourceID": 99, **kw}
@@ -23,11 +27,11 @@ class SszorakMythicTests(unittest.TestCase):
         return s._serpents_fury(self.fight, self.actors, self.players, self.raw, self.positions)
 
     def test_three_dead_counts_four_dead_exempts(self):
-        self.raw["deaths"] = [self.event(8000, "death", 0, i) for i in (2, 3, 4)]
+        self.raw["deaths"] = [self.event(25000, "death", 0, i) for i in (2, 3, 4)]
         result = self.analyze()
         self.assertFalse(result["events"][0]["exempt"])
         self.assertEqual(len(result["players"]), 14)  # 20 - 3 dead - 2 healers - marked player
-        self.raw["deaths"].append(self.event(8000, "death", 0, 5))
+        self.raw["deaths"].append(self.event(25000, "death", 0, 5))
         result = self.analyze()
         self.assertTrue(result["events"][0]["exempt"])
         self.assertEqual(result["players"], [])
@@ -42,16 +46,16 @@ class SszorakMythicTests(unittest.TestCase):
         self.assertFalse({19, 20} & {p["playerID"] for p in row["outsidePlayers"]})
 
     def test_resurrect_and_same_timestamp_deaths(self):
-        self.raw["deaths"] = [self.event(8000, "death", 0, i) for i in (2, 3, 4, 19)]
-        self.raw["trackedActorEvents"] = [self.event(9000, "resurrect", 0, 19)]
-        self.raw["deaths"].append(self.event(10000, "death", 0, 5))
+        self.raw["deaths"] = [self.event(25000, "death", 0, i) for i in (2, 3, 4, 19)]
+        self.raw["trackedActorEvents"] = [self.event(26000, "resurrect", 0, 19)]
+        self.raw["deaths"].append(self.event(27000, "death", 0, 5))
         row = self.analyze()["events"][0]
         self.assertEqual(row["deadCount"], 3)
         self.assertFalse(row["exempt"])
 
     def test_missing_and_stale_coordinates_never_count(self):
         self.positions.pop(2)
-        self.positions[3][0]["timestamp"] = 7000
+        self.positions[3][0]["timestamp"] = 24000
         row = self.analyze()["events"][0]
         self.assertEqual({p["playerID"] for p in row["unknownPlayers"]}, {2, 3})
         self.positions.pop(1)
@@ -69,6 +73,46 @@ class SszorakMythicTests(unittest.TestCase):
         self.raw["enemyBuffs"] *= 2
         self.raw["enemyBuffs"].append(self.event(11000, "refreshbuff", s.UNBOUND_FEROCITY_ID, 99))
         self.assertEqual(self.analyze()["enrageCount"], 1)
+
+    def test_checkpoint_uses_tactical_time_without_waiting_for_enrage(self):
+        self.raw["enemyBuffs"] = []
+        row = self.analyze()["events"][0]
+        self.assertEqual(row["timeMs"], 27000)
+        self.assertEqual(row["plannedTimeMs"], 27000)
+        self.assertEqual(row["comboDriftMs"], 0)
+        self.assertEqual(row["markTarget"]["playerID"], 1)
+        self.assertEqual(row["markTarget"]["position"], {"x": 0, "y": 0})
+        self.assertTrue(row["insidePlayers"][0]["inTarget"])
+
+    def test_checkpoint_follows_delayed_sword_combo(self):
+        self.raw["enemyBuffs"] = []
+        for event in self.raw["casts"]:
+            event["timestamp"] += 2000
+        self.fight["endTime"] = 31000
+        for rows in self.positions.values():
+            rows[0]["timestamp"] = 29000
+        row = self.analyze()["events"][0]
+        self.assertEqual(row["timeMs"], 29000)
+        self.assertEqual(row["comboDriftMs"], 2000)
+
+    def test_subsecond_log_jitter_keeps_exact_tactical_second(self):
+        for event in self.raw["casts"]:
+            event["timestamp"] += 500
+        row = self.analyze()["events"][0]
+        self.assertEqual(row["timeMs"], 27000)
+        self.assertEqual(row["comboObservedDriftMs"], 500)
+        self.assertEqual(row["comboDriftMs"], 0)
+
+    def test_checkpoint_does_not_wait_for_combo_to_finish(self):
+        self.raw["casts"] = self.raw["casts"][:1]
+        row = self.analyze()["events"][0]
+        self.assertEqual(row["timeMs"], 27000)
+
+    def test_latest_mark_target_survives_success_removal_before_checkpoint(self):
+        self.raw["debuffs"].append(self.event(26700, "removedebuff", s.SERPENTS_FURY_MARK_ID, 1))
+        row = self.analyze()["events"][0]
+        self.assertEqual(row["markTarget"]["playerID"], 1)
+        self.assertFalse(row["markActive"])
 
     def test_tempest_aura_and_actual_dispel_not_ticks_or_removals(self):
         raw = {"debuffs": [self.event(i, kind, s.TEMPEST_DEBUFF_ID, 1) for i, kind in enumerate(
