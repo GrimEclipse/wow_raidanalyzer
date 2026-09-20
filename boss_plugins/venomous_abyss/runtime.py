@@ -67,6 +67,7 @@ def fetch_payload(
         "friendlyBuffs": read("friendlyBuffs", report_id, "Buffs", fight, hostility_type="Friendlies"),
         "deaths": read("deaths", report_id, "Deaths", fight),
         "combatants": read("combatants", report_id, "CombatantInfo", fight),
+        "interrupts": read("interrupts", report_id, "Interrupts", fight) if config.get("fetchInterrupts") else [],
         "resources": [],
         "bossPositionEvents": [],
         "trackedActorEvents": [],
