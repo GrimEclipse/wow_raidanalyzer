@@ -329,3 +329,13 @@ location /images/ {
 - **上游改 `frontend/**/*.js` 而没升 `report.html` 里的 `?v=` 时，必须自己升一次**，
   否则「同步了但页面没变」。判据是回读线上 HTML 的版本串，不是看文件时间。
 - 同类历史坑：`assets/vendor/zone54-raid-guide-data.js?v=N`（手册数据，2026-09-12/09-14 踩过两次）。
+
+## 后续（2026-09-20，上游 709e46a 同步时）
+
+上游从这版起**自己也会升 `report.html` 的脚本清单**（新增 `twinfangs/mechanics.js?v=20260920-death-names`、
+`report.js?v=1.3.7-20260912 → ?v=20260920`、`overview.js?v=20260920-health-colors`），与补丁 E 改的
+`sszorak/mechanics.js?v=20260918` 在**同一行**，于是每次同步必冲突。
+
+**解决方式（已实测两次：分支 + main 镜像）**：整行取上游版，然后把 `sszorak/mechanics.js` 的版本串改回
+`20260918`（或当天日期）。判据是合并后回读线上 HTML，四个版本串都要对；只看「合并成功」会漏。
+上游哪天自己升了 sszorak 那一串，本补丁即可删除。
