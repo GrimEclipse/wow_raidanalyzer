@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from math import hypot
+from statistics import median
 from analyzer_core.config import resolve_analysis_options
 
 CONFIG_SCHEMA = [
@@ -10,7 +12,29 @@ CONFIG_SCHEMA = [
     {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
     {"key": "globulesReviewEnabled", "type": "boolean", "label": "每轮吃球与漏吃", "default": True},
     {"key": "waveReviewEnabled", "type": "boolean", "label": "腐蚀洪流波浪命中", "default": True},
-
+    {"key": "broodReviewEnabled", "type": "boolean", "label": "史诗蛇头打断与点位", "default": True},
+    {"key": "venomDeathReviewEnabled", "type": "boolean", "label": "史诗带毒死亡与后续爆球", "default": True},
+    {"key": "stoneReviewEnabled", "type": "boolean", "label": "裂石击接圈与全团伤害", "default": True},
+    {"key": "earlyDeathReviewEnabled", "type": "boolean", "label": "提前死亡与死亡伤害明细", "default": True},
+    {"key": "feastStrategy", "type": "select", "label": "史诗贪婪盛宴打法", "default": "normal",
+     "options": [{"value": "normal", "label": "非免疫分摊"}, {"value": "immunity", "label": "首段全团、后两段免疫组"}],
+     "visibleWhen": {"field": "feastReviewEnabled", "equals": True}},
+    {"key": "feastGroups", "type": "interruptGroups", "label": "免疫分摊名单（每轮四人）", "default": {},
+     "description": "填写玩家名或本报告 Actor ID。每轮对应一次盛宴的后两段；第五轮以后须补充安排，不自动循环。未配置或名单无法唯一匹配时只显示证据，不计个人失误。",
+     "groups": [{"key": "round1", "label": "第一轮：三法师＋猎人"}, {"key": "round2", "label": "第二轮：两战士保护＋两防骑无敌"},
+                {"key": "round3", "label": "第三轮：三法师＋猎人"}, {"key": "round4", "label": "第四轮：两冰法＋奶骑无敌＋战士保护"}],
+     "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
+    {"key": "protectionPairs", "type": "interruptGroups", "label": "保护责任人（依次填写施法者、受保护战士）", "default": {},
+     "groups": [{"key": "round2a", "label": "第二轮第一组保护"}, {"key": "round2b", "label": "第二轮第二组保护"}, {"key": "round4", "label": "第四轮奶骑保护"}],
+     "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
+    {"key": "broodGroups", "type": "interruptGroups", "label": "蛇头打断名单", "default": {},
+     "description": "每侧远程按每次召唤中远点蛇头首次出现顺序分配，非固定点位号。近点 1、2 号由当前接该侧 Boss 的坦克主断，近战为补断。每个远程槽位填写一人。",
+     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个"} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 4)]
+               + [{"key": "leftBackup", "label": "左侧近战补断"}, {"key": "rightBackup", "label": "右侧近战补断"},
+                  {"key": "leftRangedBackup", "label": "左侧远程第四个及以后补断（可选）"}, {"key": "rightRangedBackup", "label": "右侧远程第四个及以后补断（可选）"}],
+     "visibleWhen": {"field": "broodReviewEnabled", "equals": True}},
+    {"key": "earlyDeathGapSeconds", "type": "number", "label": "提前死亡与后续死亡间隔（秒）", "default": 8, "min": 3, "max": 60,
+     "visibleWhen": {"field": "earlyDeathReviewEnabled", "equals": True}},
 ]
 
 
@@ -36,6 +60,11 @@ from boss_plugins.venomous_abyss.shared import (
 )
 
 GUIDE_SPELLS = load_confirmed_spell_names()
+GUIDE_SPELLS.update({1306876: "血色风暴", 1294976: "剧毒烟气", 1295107: "浓缩唾液",
+                     1292348: "永恒毒液", 1310105: "污秽爆发"})
+DEATH_MECHANIC_NOTES = {1306876: "可躲避伤害：地板红色AOE", 1294976: "环境AOE",
+                        1295107: "浓缩唾液", 1292348: "永恒毒液",
+                        1310105: "吸圈未处理产生的全团爆发"}
 
 BOSS_CONFIG = {
     "key": "twinfangs",
@@ -47,9 +76,10 @@ BOSS_CONFIG = {
         ["survival", "全场存活情况"],
         ["venom", "永恒毒液"],
         ["globules", "地板炸圈"],
-        ["mythic", "史诗难度占位"],
+        ["feast", "盛宴分摊"], ["brood", "蛇头打断"],
+        ["venomDeaths", "带毒死亡"], ["stone", "裂石击"], ["earlyDeaths", "提前死亡"],
     ],
-    "mechanicVersion": "twinfangs-progression-2026-08-28",
+    "mechanicVersion": "twinfangs-mythic-assignments-tank-cutoff-2026-09-20",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -73,6 +103,448 @@ VENOM_ABNORMAL_DAMAGE = {
 }
 
 FEAST_IDS = {1290516, 1290654, 1290662, 1310211}
+
+# WCL coordinates are hundredths of a yard. Centers calibrated from three live
+# Mythic kills and vgdPJBnLNmzt13Qk; keep all encounter geometry in this module.
+BROOD_ARENAS = (
+    {"key": "north", "label": "上方场地", "bosses": {"left": (-1616, 69157), "right": (1586, 69132)},
+     "left": [(-608, 69221), (-2621, 68385), (-3066, 67684), (-3259, 66245), (-3733, 65496)],
+     "right": [(549, 69187), (2537, 68338), (2999, 67581), (3307, 66207), (3831, 65404)]},
+    {"key": "southeast", "label": "右下场地", "bosses": {"left": (7684, 58466), "right": (6103, 55739)},
+     "left": [(7347, 57244), (7186, 59504), (6642, 60475), (6112, 61455), (5641, 62417)],
+     "right": [(6934, 56535), (5071, 55638), (3891, 55570), (2887, 55607), (1958, 55528)]},
+    {"key": "southwest", "label": "左下场地", "bosses": {"left": (-6055, 55691), "right": (-7797, 58496)},
+     "left": [(-6868, 56570), (-4893, 55657), (-4096, 55697), (-3289, 55662), (-2372, 55653)],
+     "right": [(-7258, 57339), (-7189, 59537), (-6754, 60323), (-6363, 60931), (-5915, 61687)]},
+)
+BROOD_NPC_ID = 270898
+BOSS_NPC_IDS = {257361, 257368}
+BROOD_CAST_ID = 1308385
+BROOD_SUMMON_ID = 1308356
+FEAST_HIT_ID = 1290662
+STONE_RAID_DAMAGE_ID = 1289153
+IMMUNITY_NAMES = {45438: "寒冰屏障", 642: "圣盾术", 1022: "保护祝福", 186265: "灵龟守护"}
+REVIEW_KEYS = [field["key"] for field in CONFIG_SCHEMA if field["type"] == "boolean"]
+
+
+def _unique_events(events):
+    result, seen = [], set()
+    for e in sorted(events, key=lambda e: int(e.get("timestamp") or 0)):
+        key = (e.get("timestamp"), event_type(e), ability_id(e), e.get("sourceID"), e.get("sourceInstance", 1),
+               e.get("targetID"), e.get("targetInstance", 1), e.get("extraAbilityGameID"))
+        if key not in seen:
+            result.append(e)
+            seen.add(key)
+    return result
+
+
+def _match_names(names, players):
+    resolved, unresolved = [], []
+    for name in names or []:
+        matches = [pid for pid, p in players.items() if str(pid) == str(name) or p.get("name") == name]
+        if len(matches) == 1 and matches[0] not in resolved:
+            resolved.append(matches[0])
+        else:
+            unresolved.append(str(name))
+    return resolved, unresolved
+
+
+def _life_at(raw, pid, timestamp):
+    alive = True
+    if "_twinLifeEvents" not in raw:
+        raw["_twinLifeEvents"] = _unique_events([e for e in raw.get("deaths", []) + raw.get("trackedActorEvents", []) + raw.get("friendlyCasts", [])
+                                                if event_type(e) in {"death", "resurrect"}])
+    for e in raw["_twinLifeEvents"]:
+        if int(e.get("timestamp") or 0) > timestamp:
+            break
+        if e.get("targetID") != pid:
+            continue
+        if event_type(e) == "death":
+            alive = False
+        elif event_type(e) == "resurrect":
+            alive = True
+    return alive
+
+
+def _locate_head(x, y):
+    candidates = [(hypot(x - point[0], y - point[1]), arena, side, i, point)
+                  for arena in BROOD_ARENAS for side in ("left", "right") for i, point in enumerate(arena[side], 1)]
+    distance, arena, side, slot, point = min(candidates, key=lambda item: item[0])
+    if distance > 400:
+        return None
+    return {"arena": arena["key"], "arenaLabel": arena["label"], "side": side, "slot": slot,
+            "label": ("左" if side == "left" else "右") + str(slot), "x": x, "y": y,
+            "centerX": point[0], "centerY": point[1], "offsetYards": round(distance / 100, 2)}
+
+
+def _tank_for_boss(raw, players, boss_id, timestamp):
+    # Current target evidence, not a fixed tank name or the Feast/Stone target.
+    candidates = [e for e in raw.get("damage", []) if e.get("sourceID") == boss_id and int(ability_id(e) or 0) == 1
+                  and e.get("targetID") in players and players[e["targetID"]].get("role", "").endswith("tank")
+                  and 0 <= timestamp - int(e.get("timestamp") or 0) <= 15000]
+    taunts = [e for e in raw.get("friendlyCasts", []) if e.get("targetID") == boss_id
+              and e.get("sourceID") in players and players[e["sourceID"]].get("role", "").endswith("tank")
+              and int(ability_id(e) or 0) in {62124, 355, 6795, 56222, 116189, 185245}
+              and 0 <= timestamp - int(e.get("timestamp") or 0) <= 15000 and event_type(e) == "cast"]
+    evidence = [(int(e["timestamp"]), e["targetID"], "Boss 普攻目标") for e in candidates]
+    evidence += [(int(e["timestamp"]), e["sourceID"], "最近嘲讽") for e in taunts]
+    evidence += [(int(e["timestamp"]), e["targetID"], "Boss 最近坦克技能目标")
+                 for e in raw.get("casts", []) if e.get("sourceID") == boss_id
+                 and ability_id(e) in {1289092, 1289192} and event_type(e) == "cast"
+                 and e.get("targetID") in players and players[e["targetID"]].get("role", "").endswith("tank")
+                 and 0 <= timestamp - int(e["timestamp"]) <= 15000]
+    if not evidence:
+        return None, None
+    ts, pid, reason = max(evidence)
+    if not _life_at(raw, pid, timestamp):
+        return None, {"reason": "最近仇恨目标已死亡", "timestamp": ts}
+    return pid, {"reason": reason, "timestamp": ts, "ageMs": timestamp - ts}
+
+
+def _boss_for_side(raw, position, timestamp):
+    arena = next(a for a in BROOD_ARENAS if a["key"] == position["arena"])
+    point = arena["bosses"][position["side"]]
+    game_ids = raw.get("trackedActorGameIDByActorID", {})
+    ids = {int(aid) for aid, gid in game_ids.items() if gid in BOSS_NPC_IDS}
+    # Casts expose the stationary boss position even while its melee is paused.
+    samples = [e for e in raw.get("casts", []) if e.get("sourceID") in ids and e.get("x") is not None
+               and e.get("y") is not None and 0 <= timestamp - int(e["timestamp"]) <= 60000
+               and hypot(e["x"] - point[0], e["y"] - point[1]) <= 500]
+    return max(samples, key=lambda e: e["timestamp"])["sourceID"] if samples else None
+
+
+def _brood_review(fight, actor_map, players, raw, options):
+    if int(fight.get("difficulty") or 0) != 5:
+        return {"enabled": False, "reason": "仅适用于史诗难度", "events": []}
+    start = int(fight["startTime"])
+    casts = _unique_events(raw.get("casts", []) + raw.get("trackedActorEvents", []))
+    summons = [e for e in casts if ability_id(e) == BROOD_SUMMON_ID and event_type(e) == "cast"]
+    heads = defaultdict(list)
+    for e in casts:
+        if ability_id(e) == BROOD_CAST_ID and event_type(e) in {"begincast", "cast"}:
+            heads[(e.get("sourceID"), e.get("sourceInstance", 1))].append(e)
+    interrupts = [e for e in _unique_events(raw.get("interrupts", []) + raw.get("trackedActorEvents", []))
+                  if event_type(e) == "interrupt" and e.get("extraAbilityGameID") == BROOD_CAST_ID]
+    output = []
+    for (actor, instance), events in heads.items():
+        begun = min(int(e["timestamp"]) for e in events)
+        completed = [e for e in events if event_type(e) == "cast"]
+        kicks = [e for e in interrupts if e.get("targetID") == actor and e.get("targetInstance", 1) == instance]
+        coordinates = []
+        for e in raw.get("trackedActorEvents", []) + events:
+            if e.get("x") is None or e.get("y") is None:
+                continue
+            source = e.get("resourceActor") in {1, "1"} or (e.get("resourceActor") is None and event_type(e) == "cast")
+            side = "source" if source else "target" if e.get("resourceActor") in {2, "2"} else None
+            if side and e.get(side + "ID") == actor and e.get(side + "Instance", 1) == instance:
+                coordinates.append((e["x"], e["y"]))
+        point = _locate_head(median(p[0] for p in coordinates), median(p[1] for p in coordinates)) if coordinates else None
+        round_no = sum(int(e["timestamp"]) <= begun for e in summons)
+        output.append({"round": round_no, "timeMs": begun - start, "time": fmt_ms(begun - start), "actorID": actor,
+                       "instance": instance, "position": point, "successfulCasts": len(completed),
+                       "successTimesMs": [int(e["timestamp"]) - start for e in completed],
+                       "interrupts": [{"time": fmt_ms(int(e["timestamp"]) - start), "spellID": ability_id(e),
+                                       "player": player_ref(players, actor_map, raw.get("petOwners", {}).get(e.get("sourceID"), e.get("sourceID")))} for e in kicks],
+                       "status": "漏断成功施法" if completed else "已打断" if kicks else "未见成功施法，结局未确认",
+                       "assigned": [], "backup": [], "failures": [], "assignmentNote": "", "rangedOrder": None})
+    output.sort(key=lambda row: row["timeMs"])
+    group_counts = Counter()
+    for row in output:
+        position = row["position"]
+        if not position or not row["round"]:
+            row["assignmentNote"] = "点位或召唤轮次证据不足，不作个人归责"
+            continue
+        side = position["side"]
+        group = "melee" if position["slot"] <= 2 else "ranged"
+        group_key = (row["round"], position["arena"], side, group)
+        group_counts[group_key] += 1
+        row["groupOrder"] = group_counts[group_key]
+        row["groupLabel"] = ("左侧" if side == "left" else "右侧") + ("近战组" if group == "melee" else "远程组")
+        row["leakLabel"] = f"{row['groupLabel']}第{row['groupOrder']}个蛇头漏断脏腑爆裂" if row["successfulCasts"] else None
+        timestamp = start + (min(row["successTimesMs"]) if row["successTimesMs"] else row["timeMs"])
+        backup, _ = _match_names(options["broodGroups"].get(side + "Backup"), players)
+        assigned = []
+        if position["slot"] <= 2:
+            boss_id = _boss_for_side(raw, position, timestamp)
+            tank, evidence = _tank_for_boss(raw, players, boss_id, timestamp) if boss_id is not None else (None, None)
+            assigned = [tank] if tank is not None else []
+            row.update({"bossActorID": boss_id, "tankEvidence": evidence, "backup": [player_ref(players, actor_map, pid) for pid in backup]})
+            row["assignmentNote"] = "近点由当前坦克主断，近战补断；日志无法确认是否口头交接补断" if assigned else "缺少可靠的当时仇恨目标，无法分配坦克责任"
+        else:
+            order = row["groupOrder"]
+            row["rangedOrder"] = order
+            names = options["broodGroups"].get(side + str(order), [])
+            assigned, unresolved = _match_names(names, players)
+            if order > 3:
+                assigned = []
+                backup, _ = _match_names(options["broodGroups"].get(side + "RangedBackup", []), players)
+                row["backup"] = [player_ref(players, actor_map, pid) for pid in backup]
+                row["assignmentNote"] = "远程第四个及以后交补断，不重新轮转到第一人"
+            elif len(assigned) != 1 or unresolved:
+                assigned = []
+                row["assignmentNote"] = "远程槽位未配置、重名或出现顺序超出三人安排，不计个人失误"
+            else:
+                row["assignmentNote"] = "按本轮该侧远点蛇头出现顺序分配"
+        row["assigned"] = [player_ref(players, actor_map, pid) for pid in assigned]
+        row["responsibilitySlot"] = ("左" if side == "left" else "右") + ("前" if group == "melee" else "后") + str(row["groupOrder"]) + "断"
+        row["responsiblePlayers"] = row["assigned"]
+    leaks = [row for row in output if row["successTimesMs"]]
+    first = min(leaks, key=lambda row: min(row["successTimesMs"])) if leaks else None
+    dead_count = sum(not _life_at(raw, pid, start + min(first["successTimesMs"]) - 1) for pid in players) if first else 0
+    excluded = None
+    if first and dead_count >= 3:
+        excluded = {"time": fmt_ms(min(first["successTimesMs"])), "deadCount": dead_count,
+                    "reason": "首次漏断前已有至少3人死亡且未战复，崩溃阶段不归责"}
+        first = None
+    if first:
+        first["spawnTime"] = first["time"]
+        first["spawnTimeMs"] = first["timeMs"]
+        first["timeMs"] = min(first["successTimesMs"])
+        first["time"] = fmt_ms(first["timeMs"])
+        first["successTimesMs"] = [first["timeMs"]]
+        first["successfulCasts"] = 1
+    output = [first] if first else []
+    return {"enabled": True, "events": output, "successfulCastCount": int(first is not None), "firstLeakOnly": True, "collapseExemption": excluded,
+            "unresolvedCount": sum(r["position"] is None for r in output),
+            "positionNote": "每场仅返回首次脏腑爆裂成功施法，后续漏断忽略。序号按此前该组蛇头出现顺序计算。面向场地尖端按左5→左1、右1→右5编号；坐标误差超过4码不匹配。", "arenas": BROOD_ARENAS}
+
+
+def _immunity_state(raw, pid, timestamp, hits=()):
+    if "_twinImmunityIntervals" not in raw:
+        indexed, active = defaultdict(list), {}
+        for e in sorted(raw.get("friendlyBuffs", []), key=lambda e: int(e.get("timestamp") or 0)):
+            sid = int(ability_id(e) or 0)
+            if sid not in IMMUNITY_NAMES:
+                continue
+            target, ts, kind = e.get("targetID"), int(e["timestamp"]), event_type(e)
+            key = (target, sid)
+            if kind in {"applybuff", "refreshbuff"}:
+                active.setdefault(key, (ts, e.get("sourceID")))
+            elif kind == "removebuff" and key in active:
+                begin, source = active.pop(key)
+                indexed[target].append((sid, begin, ts, source))
+        for (target, sid), (begin, source) in active.items():
+            indexed[target].append((sid, begin, 10**18, source))
+        raw["_twinImmunityIntervals"] = indexed
+    intervals = raw["_twinImmunityIntervals"].get(pid, [])
+    covered = [{"spellID": sid, "spell": IMMUNITY_NAMES[sid], "sourceID": source, "start": begin, "end": end if end < 10**18 else None}
+               for sid, begin, end, source in intervals if begin <= timestamp < end]
+    # Buff snapshots on the exact hit are stronger evidence than an imprecise
+    # apply timestamp. They also cover aura application before the pull starts.
+    for hit in hits:
+        snapshot = {int(v) for v in str(hit.get("buffs") or "").split('.') if v.isdigit()}
+        for sid in snapshot.intersection(IMMUNITY_NAMES):
+            if not any(r["spellID"] == sid for r in covered):
+                covered.append({"spellID": sid, "spell": IMMUNITY_NAMES[sid], "sourceID": None, "start": None, "end": None})
+    ended = [{"spellID": sid, "spell": IMMUNITY_NAMES[sid], "end": end, "sourceID": source, "secondsBefore": round((timestamp - end) / 1000, 3)}
+             for sid, begin, end, source in intervals if 0 < timestamp - end <= 10000]
+    immune_hit = any(h.get("hitType") == 10 for h in hits)
+    protected_hit = bool(hits) and all(float(h.get("amount") or 0) == 0 for h in hits) and (immune_hit or bool(covered))
+    return {"auras": covered, "recentlyEnded": ended, "immuneHit": immune_hit, "protectedHit": protected_hit,
+            "hitTypes": sorted({h.get("hitType") for h in hits if h.get("hitType") is not None})}
+
+
+def _feast_review(fight, actor_map, players, raw, options):
+    if int(fight.get("difficulty") or 0) != 5:
+        return {"enabled": False, "reason": "英雄消层检查见永恒毒液页", "rounds": []}
+    start = int(fight["startTime"])
+    casts = [e for e in _unique_events(raw.get("casts", [])) if ability_id(e) == 1290516 and event_type(e) == "cast"]
+    hits = [e for e in raw.get("damage", []) if ability_id(e) == FEAST_HIT_ID and e.get("targetID") in players]
+    rounds = []
+    for index, cast in enumerate(casts, 1):
+        ts = int(cast["timestamp"])
+        buckets = defaultdict(list)
+        for e in hits:
+            offset = int(e["timestamp"]) - ts
+            if not -200 <= offset <= 6000:
+                continue
+            closest = min(enumerate((0, 2000, 3500), 1), key=lambda item: abs(offset - item[1]))
+            if abs(offset - closest[1]) <= 750:
+                buckets[closest[0]].append(e)
+        groups = sorted(buckets.items())
+        ids, unresolved = _match_names(options["feastGroups"].get("round" + str(index), []), players)
+        configured = len(ids) == 4 and not unresolved
+        round_row = {"index": index, "time": fmt_ms(ts - start), "timeMs": ts - start, "strikes": [], "failures": [],
+                     "assigned": [player_ref(players, actor_map, pid) for pid in ids], "unresolvedNames": unresolved,
+                     "assignmentValid": configured, "configurationNote": "" if configured else "本轮需配置四名可唯一识别的免疫玩家，当前只展示实测证据"}
+        failures = {}
+        for strike_index, group in groups:
+            hit_time = min(int(e["timestamp"]) for e in group)
+            # Underfilled soaks produce a later raid-wide burst using the SAME
+            # damage ID (~325ms later in live logs). Those victims did not soak.
+            primary = [e for e in group if int(e["timestamp"]) - hit_time <= 200]
+            spill = [e for e in group if int(e["timestamp"]) - hit_time > 200]
+            by_player = defaultdict(list)
+            for e in primary:
+                by_player[e["targetID"]].append(e)
+            participants = []
+            for pid, events in by_player.items():
+                immunity = _immunity_state(raw, pid, hit_time, events)
+                participants.append({**player_ref(players, actor_map, pid), "damage": sum(int(e.get("amount") or 0) for e in events),
+                                     "immunity": immunity, "result": "免疫" if immunity["immuneHit"] else "偏转/免疫覆盖的零伤害" if immunity["protectedHit"] else "实际命中"})
+            strike = {"index": strike_index, "time": fmt_ms(hit_time - start), "timeMs": hit_time - start,
+                      "participants": participants, "participantCount": len(by_player), "minimum": 4,
+                      "underfilled": len(by_player) < 4, "assignmentChecks": [],
+                      "secondaryRaidDamage": [{**player_ref(players, actor_map, e["targetID"]), "damage": int(e.get("amount") or 0),
+                                               "delayMs": int(e["timestamp"]) - hit_time} for e in spill]}
+            if options["feastStrategy"] == "immunity" and strike_index in {2, 3} and configured:
+                for pid in ids:
+                    events = by_player.get(pid, [])
+                    immunity = _immunity_state(raw, pid, hit_time, events)
+                    alive = _life_at(raw, pid, hit_time - 1)
+                    reason = None
+                    if not alive:
+                        status = "此前已死亡，不追加分摊失误"
+                    elif not events:
+                        status = reason = "未见参与本段分摊的命中/免疫记录"
+                        if len(participants) >= 4 and all(p["immunity"]["protectedHit"] for p in participants) and not spill:
+                            status, reason = "其他玩家成功补位完成免疫分摊，不计名单缺席", None
+                    elif not immunity["protectedHit"]:
+                        status = reason = "免疫提前结束，未覆盖本段" if immunity["recentlyEnded"] else "参与分摊但未获得有效免疫"
+                    else:
+                        status = "正确免疫分摊"
+                    uses = [e for e in raw.get("friendlyCasts", []) if e.get("sourceID") == pid and ability_id(e) in IMMUNITY_NAMES
+                            and event_type(e) == "cast" and int(e["timestamp"]) <= hit_time]
+                    check = {**player_ref(players, actor_map, pid), "status": status, "immunity": immunity,
+                             "recentCasts": [{"spellID": ability_id(e), "time": fmt_ms(int(e["timestamp"]) - start),
+                                              "secondsBefore": round((hit_time - int(e["timestamp"])) / 1000, 2)} for e in uses[-4:]],
+                             "cooldownNote": "施法历史供核对；日志不直接提供技能剩余冷却，不能断言没CD或误触取消。"}
+                    strike["assignmentChecks"].append(check)
+                    if reason:
+                        # Explicit external-protection assignment attributes a missing
+                        # protection to its provider, while an absent warrior remains
+                        # the warrior's missed-soak record.
+                        responsible = pid
+                        if players[pid].get("specID") in {71, 72, 73}:
+                            for key, pair in options["protectionPairs"].items():
+                                pair_ids, errors = _match_names(pair, players)
+                                if key.startswith("round" + str(index)) and len(pair_ids) == 2 and not errors and pair_ids[1] == pid:
+                                    first_hits = buckets.get(1, [])
+                                    first_time = min((int(e["timestamp"]) for e in first_hits), default=ts)
+                                    pre = _immunity_state(raw, pid, first_time, [e for e in first_hits if e.get("targetID") == pid])
+                                    pre_protection = any(a["spellID"] == 1022 for a in pre["auras"])
+                                    current_protection = any(a["spellID"] == 1022 for a in immunity["auras"])
+                                    if not pre_protection or not current_protection:
+                                        responsible = pair_ids[0]
+                                        reason = ("未在首段击飞前施加保护，影响 " if not pre_protection else "保护未覆盖 ") + str(players[pid].get("name")) + " 的分摊"
+                                    check["status"] = reason
+                                    check["responsiblePlayer"] = player_ref(players, actor_map, responsible)
+                                    break
+                        failure = failures.setdefault(responsible, {**player_ref(players, actor_map, responsible), "strikeIndices": [], "reasons": []})
+                        failure["strikeIndices"].append(strike_index)
+                        if reason not in failure["reasons"]:
+                            failure["reasons"].append(reason)
+            round_row["strikes"].append(strike)
+        round_row["observedStrikeCount"] = len(groups)
+        round_row["incomplete"] = {s["index"] for s in round_row["strikes"]} != {1, 2, 3}
+        round_row["failures"] = list(failures.values())
+        rounds.append(round_row)
+    return {"enabled": True, "strategy": options["feastStrategy"], "rounds": rounds,
+            "evidenceNote": "每次盛宴分三段；首段全团，免疫打法只核对后两段。命中包含 immune、偏转及零伤害，按玩家去重；延迟超过200ms的同ID全团溅射单列，不算分摊参与者。每人每轮最多计一次失误；缺失整段记录不凭空归责。"}
+
+
+def _stone_review(fight, actor_map, players, raw):
+    start = int(fight["startTime"])
+    tank_ids = {pid for pid, p in players.items() if p.get("role", "").endswith("tank")}
+    tank_deaths = [int(e["timestamp"]) for e in raw.get("deaths", [])
+                   if event_type(e) == "death" and e.get("targetID") in tank_ids]
+    cutoff = min(tank_deaths) if tank_deaths else int(fight["endTime"]) + 1
+    targeted = [e for e in _unique_events(raw.get("casts", [])) if ability_id(e) == 1289092 and event_type(e) == "cast"]
+    casts = [e for e in _unique_events(raw.get("casts", [])) if ability_id(e) == 1288538 and event_type(e) == "cast"] or targeted
+    bursts = group_nearby([e for e in raw.get("damage", []) if ability_id(e) == STONE_RAID_DAMAGE_ID and e.get("targetID") in players and int(e["timestamp"]) < cutoff], window_ms=250)
+    rows = []
+    used = set()
+    for index, cast in enumerate(casts, 1):
+        ts = int(cast["timestamp"])
+        if ts >= cutoff:
+            continue
+        matched = [(i, group) for i, group in enumerate(bursts) if i not in used and abs(int(group[0]["timestamp"]) - ts) <= 1500]
+        for i, _ in matched:
+            used.add(i)
+        damage = [e for _, group in matched for e in group]
+        direct = [e for e in targeted if e.get("sourceID") == cast.get("sourceID") and abs(int(e["timestamp"]) - ts) <= 500 and e.get("targetID") in players]
+        earlier = [e for e in targeted if e.get("sourceID") == cast.get("sourceID") and 0 <= ts - int(e["timestamp"]) <= 7500 and e.get("targetID") in players]
+        target_evidence = "实际裂石击命中目标" if direct else "同组三连击最近接圈目标"
+        prior = max(direct or earlier, key=lambda e: e["timestamp"]) if direct or earlier else None
+        pid = prior.get("targetID") if prior else None
+        if pid not in tank_ids:
+            pid, tank_evidence = _tank_for_boss(raw, players, cast.get("sourceID"), ts - 1500)
+            target_evidence = "读条时当前仇恨目标（接圈目标未直接确认）" if pid is not None else "接圈目标证据不足"
+        rows.append({"index": index, "time": fmt_ms(ts - start), "timeMs": ts - start,
+                     "tank": player_ref(players, actor_map, pid) if pid in tank_ids else None,
+                     "targetIsTank": players.get(pid, {}).get("role", "").endswith("tank"),
+                     "raidDamageCount": len(matched), "raidDamage": bool(matched),
+                     "victims": [player_ref(players, actor_map, pid) for pid in sorted({e["targetID"] for e in damage})],
+                     "totalDamage": sum(int(e.get("amount") or 0) for e in damage),
+                     "evidence": target_evidence + ("；全团伤害由独立爆发伤害确认" if matched else "；未见全团爆发伤害")})
+    for i, group in enumerate(bursts):
+        if i not in used:
+            ts = int(group[0]["timestamp"])
+            if ts >= cutoff:
+                continue
+            rows.append({"index": None, "time": fmt_ms(ts - start), "timeMs": ts - start, "tank": None,
+                         "targetIsTank": False, "raidDamageCount": 1, "raidDamage": True,
+                         "victims": [player_ref(players, actor_map, pid) for pid in sorted({e["targetID"] for e in group})],
+                         "totalDamage": sum(int(e.get("amount") or 0) for e in group), "evidence": "全团伤害已确认，缺少对应点名目标"})
+    return {"enabled": True, "events": sorted(rows, key=lambda r: r["timeMs"]),
+            "raidDamageCount": sum(r["raidDamageCount"] for r in rows),
+            "tankDeathCutoffMs": cutoff - start if tank_deaths else None}
+
+
+def _venom_death_stack(events, pid, timestamp):
+    # Death removes the aura in the same log batch, sometimes a few ms first.
+    trimmed = [e for e in events if not (e.get("targetID") == pid and event_type(e) == "removedebuff"
+                                       and 0 <= timestamp - int(e["timestamp"]) <= 100)]
+    return _venom_stack_at(trimmed, pid, timestamp)
+
+
+def _death_reviews(fight, actor_map, players, raw, options):
+    start = int(fight["startTime"])
+    deaths = [e for e in _unique_events(raw.get("deaths", [])) if e.get("targetID") in players]
+    venom = [e for e in raw.get("debuffs", []) if ability_id(e) == 1290336]
+    all_rows = []
+    for death in deaths:
+        ts, pid = int(death["timestamp"]), death["targetID"]
+        incoming = [e for e in raw.get("damage", []) if e.get("targetID") == pid and ts - 8000 <= int(e["timestamp"]) <= ts]
+        killer = int(death.get("killingAbilityGameID") or 0)
+        row = {**player_ref(players, actor_map, pid), "time": fmt_ms(ts - start), "timeMs": ts - start,
+               "killingSpellID": killer, "killingSpell": spell_name(killer, GUIDE_SPELLS),
+               "mechanicNote": DEATH_MECHANIC_NOTES.get(killer, ""), "avoidable": killer == 1306876,
+               "venomStacks": _venom_death_stack(venom, pid, ts), "early": False,
+               "precedingDamage": [{"time": fmt_ms(int(e["timestamp"]) - start), "spellID": ability_id(e),
+                                    "spell": spell_name(ability_id(e), GUIDE_SPELLS), "source": actor_map.get(e.get("sourceID"), "未知"),
+                                    "amount": int(e.get("amount") or 0), "absorbed": int(e.get("absorbed") or 0),
+                                    "overkill": int(e.get("overkill") or 0), "hitType": e.get("hitType")} for e in incoming]}
+        all_rows.append(row)
+    gap_ms = int(options["earlyDeathGapSeconds"] * 1000)
+    cutoff = None
+    for i, row in enumerate(all_rows[:-1]):
+        gap = all_rows[i + 1]["timeMs"] - row["timeMs"]
+        if gap >= gap_ms:
+            cutoff = i
+            break
+    if cutoff is None and len(all_rows) == 1 and int(fight["endTime"]) - start - all_rows[0]["timeMs"] >= gap_ms:
+        cutoff = 0
+    if cutoff is not None:
+        boundary = all_rows[cutoff + 1]["timeMs"] if cutoff + 1 < len(all_rows) else int(fight["endTime"]) - start
+        for row in all_rows[:cutoff + 1]:
+            row["early"] = True
+            row["gapToFollowingDeathsSeconds"] = round((boundary - row["timeMs"]) / 1000, 2)
+    explosions = group_nearby([e for e in raw.get("damage", []) if ability_id(e) == 1290338 and e.get("targetID") in players], window_ms=250)
+    burst_rows = []
+    venom_rows = [r for r in all_rows if r["venomStacks"] > 0]
+    for group in explosions:
+        ts = int(group[0]["timestamp"]) - start
+        candidates = [r for r in venom_rows if 0 < ts - r["timeMs"] <= 15000]
+        burst_rows.append({"time": fmt_ms(ts), "timeMs": ts, "totalDamage": sum(int(e.get("amount") or 0) for e in group),
+                           "victims": [player_ref(players, actor_map, pid) for pid in sorted({e["targetID"] for e in group})],
+                           "nearbyVenomDeaths": [{"player": r["player"], "playerID": r["playerID"], "time": r["time"], "stacks": r["venomStacks"]} for r in candidates],
+                           "causality": "时间上相邻；无法唯一确认每颗球来源，不作一对一因果归责"})
+    return ({"enabled": True, "gapSeconds": options["earlyDeathGapSeconds"], "deaths": all_rows,
+             "earlyDeaths": [r for r in all_rows if r["early"]], "evidenceNote": "将首次明显死亡间隔之前的死亡单列，提供全部死亡前8秒伤害；提前死亡是复盘线索，不等同于自动判责。"},
+            {"enabled": int(fight.get("difficulty") or 0) == 5, "deaths": venom_rows,
+             "expectedGlobuleCount": sum(r["venomStacks"] for r in venom_rows), "explosions": burst_rows,
+             "evidenceNote": "带毒死亡层数对应机制预期额外球数，并非日志观测到的实体生成数量；球爆炸单独按实测全团伤害展示。"})
 
 def _venom_attribution(damage_events, casts, timestamp, player_id):
     nearby = sorted(
@@ -134,7 +606,7 @@ def _venom_stack_at(events, player_id, timestamp):
 
 def analyze_twinfangs(fight, actor_map, players, raw):
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
-    if not any(options.values()):
+    if not any(options[key] for key in REVIEW_KEYS):
         return {"enabled": False}
     debuffs, casts, damage, buffs, deaths = (
         raw["debuffs"], raw["casts"], raw["damage"], raw["friendlyBuffs"], raw["deaths"],
@@ -301,19 +773,52 @@ def analyze_twinfangs(fight, actor_map, players, raw):
     wave_hits = _avoidable_board(
         fight, actor_map, players, damage, deaths, {1289994: "腐蚀洪流波浪"}
     ) if options["waveReviewEnabled"] else []
+    mythic = int(fight.get("difficulty") or 0) == 5
+    if mythic:
+        # Heroic's one-ball-per-player allocation is not a Mythic assignment.
+        feast_checks = []
+        for row in globule_rounds:
+            row["missed"] = []
+            row["nonParticipants"] = []
+            row["abnormal"] = []
+            for person in row["eaten"]:
+                person["abnormal"] = False
+            row["evidenceNote"] = "史诗包含坦克洪流与带毒死亡额外球，只统计实测吃球，不套用每人一球归责。"
+    early, venom_deaths = ({"enabled": False}, {"enabled": False})
+    if options["earlyDeathReviewEnabled"] or (mythic and options["venomDeathReviewEnabled"]):
+        early, venom_deaths = _death_reviews(fight, actor_map, players, raw, options)
+    tank_globules = []
+    if mythic and options["globulesReviewEnabled"]:
+        for index, cast in enumerate(deluges, 1):
+            ts = int(cast["timestamp"])
+            cover = [e for e in casts if int(ability_id(e) or 0) == 1303378 and event_type(e) == "cast"
+                     and ts <= int(e["timestamp"]) <= ts + 10000]
+            tank_globules.append({"index": index, "time": fmt_ms(ts - fight["startTime"]),
+                                  "target": player_ref(players, actor_map, cast.get("targetID")),
+                                  "bulwarks": [{"actorID": e.get("sourceID"), "instance": e.get("sourceInstance", 1),
+                                                "x": e.get("x"), "y": e.get("y"), "time": fmt_ms(int(e["timestamp"]) - fight["startTime"])} for e in cover]})
     return {
         "eternalVenom": {"players": histories, "feastChecks": feast_checks, "abnormalGains": abnormal_gains},
         "globules": {"rounds": globule_rounds},
         "waveHits": {"spellID": 1289994, "players": wave_hits},
-        "mythicPlaceholder": "该部分暂时没有可用的信息。",
+        "isMythic": mythic,
+        "tankGlobules": {"enabled": mythic and options["globulesReviewEnabled"], "rounds": tank_globules},
+        "feast": _feast_review(fight, actor_map, players, raw, options) if options["feastReviewEnabled"] else {"enabled": False},
+        "brood": _brood_review(fight, actor_map, players, raw, options) if options["broodReviewEnabled"] else {"enabled": False},
+        "stone": _stone_review(fight, actor_map, players, raw) if options["stoneReviewEnabled"] else {"enabled": False},
+        "earlyDeaths": early if options["earlyDeathReviewEnabled"] else {"enabled": False},
+        "venomDeaths": venom_deaths if options["venomDeathReviewEnabled"] else {"enabled": False},
     }
 
 analyze_mechanics = analyze_twinfangs
 
 
-def _mechanic_overview(rendered):
+def _mechanic_overview(rendered, options=None):
+    options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
     wave_hits = []
     for pull in rendered:
+        if pull.get("shortPull"):
+            continue
         mechanics = pull.get(BOSS_CONFIG["key"]) or {}
         for player_row in (mechanics.get("waveHits") or {}).get("players") or []:
             for event in player_row.get("events") or []:
@@ -323,7 +828,7 @@ def _mechanic_overview(rendered):
                     player=player_row.get("player"), classColor=player_row.get("classColor"),
                     spellID=1289994,
                 ))
-    return {
+    result = {
         "title": "整夜机制统计",
         "subtitle": "按所有 Pull 汇总实际命中事件；单场毒液与吃球明细保持原样。",
         "metrics": [{
@@ -332,6 +837,63 @@ def _mechanic_overview(rendered):
             "players": nightly_player_totals(wave_hits), "events": wave_hits,
         }],
     }
+    if not options["waveReviewEnabled"]:
+        result["metrics"] = []
+    specs = [
+        ("broodReviewEnabled", "broodLeaks", "脏腑爆裂首漏断", "每场仅统计首次成功施法；按责任槽位和已配置玩家汇总，未配置时保留左右侧及组内序号。"),
+        ("feastReviewEnabled", "feastFailures", "免疫分摊失误", "仅免疫打法且四人名单有效时计数，每人每轮最多一次；保护责任按配置施法者归属。"),
+        ("stoneReviewEnabled", "stoneRaidDamage", "裂石击全团伤害", "按爆发次数统计，附接圈坦克；从本场首次倒坦起停止统计，不把非坦克接怪当作接圈责任。"),
+        ("earlyDeathReviewEnabled", "earlyDeaths", "提前死亡", "首批明显早于后续死亡的玩家，按配置间隔筛选；完整死亡伤害仍保留。"),
+    ]
+    for option, key, label, description in specs:
+        if not options[option] or (key == "feastFailures" and options["feastStrategy"] != "immunity"):
+            continue
+        details, value = [], 0
+        for pull in rendered:
+            if pull.get("shortPull"):
+                continue
+            data = pull.get(BOSS_CONFIG["key"]) or {}
+            if key == "broodLeaks":
+                for row in (data.get("brood") or {}).get("events", []):
+                    value += row["successfulCasts"]
+                    if not row["successfulCasts"]:
+                        continue
+                    responsible = row.get("responsiblePlayers") or []
+                    slot = row.get("responsibilitySlot") or "点位未确认"
+                    display = responsible[0]["player"] if len(responsible) == 1 else slot
+                    owner = responsible[0] if len(responsible) == 1 else {}
+                    details.append(nightly_detail(pull, row["time"], (row.get("leakLabel") or "点位未确认的蛇头漏断脏腑爆裂") + "；责任：" + display,
+                                                  player=display, classColor=owner.get("classColor"), playerID=owner.get("playerID"), responsibilitySlot=slot, responsiblePlayers=responsible,
+                                                  spellID=BROOD_CAST_ID, position=row.get("position"), groupOrder=row.get("groupOrder"),
+                                                  groupLabel=row.get("groupLabel"), assignmentNote=row.get("assignmentNote"),
+                                                  count=row["successfulCasts"]))
+            elif key == "feastFailures":
+                for row in (data.get("feast") or {}).get("rounds", []):
+                    for p in row["failures"]:
+                        value += 1
+                        details.append(nightly_detail(pull, row["time"], p["player"] + "：第" + str(row["index"]) + "轮，第" + "、".join(map(str, sorted(set(p["strikeIndices"])))) + "段，" + "；".join(p["reasons"]), **p, round=row["index"], spellID=1290516))
+            elif key == "stoneRaidDamage":
+                for row in (data.get("stone") or {}).get("events", []):
+                    if row["raidDamage"]:
+                        value += row["raidDamageCount"]
+                        tank = row.get("tank") or {}
+                        details.append(nightly_detail(pull, row["time"], "裂石击产生全团伤害；当前处理坦克：" + str(tank.get("player") or "未确认") + "；坦克ID：" + str(tank.get("playerID") or "未确认"), **tank, tankID=tank.get("playerID"), spellID=STONE_RAID_DAMAGE_ID))
+            else:
+                section = data.get(key) or {}
+                if not section.get("enabled"):
+                    continue
+                for row in section.get("deaths" if key == "venomDeaths" else "earlyDeaths", []):
+                    value += 1
+                    details.append(nightly_detail(pull, row["time"], f"{row['player']}：{row['killingSpell']} 致死，携带 {row['venomStacks']} 层永恒毒液" + ("；" + row["mechanicNote"] if row.get("mechanicNote") else ""),
+                                                  player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"), spellID=row["killingSpellID"], venomStacks=row["venomStacks"]))
+        result["metrics"].append({"key": key, "label": label, "value": value, "unit": "次", "tone": "warning",
+                                   "description": description, "players": nightly_player_totals([r for r in details if r.get("player")]), "events": details})
+        if key == "broodLeaks":
+            result["metrics"][-1]["summaryViews"] = [
+                {"key": "slots", "label": "责任位置", "rows": nightly_player_totals([{**r, "player": r["responsibilitySlot"], "classColor": None} for r in details])},
+                {"key": "players", "label": "归责玩家", "rows": nightly_player_totals(details)}]
+    result["subtitle"] = "按已选项目汇总；漏断、分摊、全团伤害与提前死亡均可展开查看证据。"
+    return result
 
 
 def build_aggregated_json(report_ids, options=None):
@@ -345,16 +907,37 @@ def build_aggregated_json(report_ids, options=None):
         config["fetchKeys"].add("damage")
     if options["globulesReviewEnabled"]:
         config["fetchKeys"].update({"casts", "friendlyBuffs"})
+    if options["feastReviewEnabled"]:
+        config["fetchKeys"].update({"damage", "friendlyBuffs"})
+    if options["broodReviewEnabled"] or options["stoneReviewEnabled"]:
+        config["fetchKeys"].update({"casts", "damage"})
+    if options["earlyDeathReviewEnabled"] or options["venomDeathReviewEnabled"]:
+        config["fetchKeys"].update({"damage", "debuffs"})
+    config["fetchCastResources"] = options["broodReviewEnabled"] or options["globulesReviewEnabled"]
+    config["trackedActorGameIDs"] = BOSS_NPC_IDS | {BROOD_NPC_ID}
+    config["trackedActorEventFilters"] = []
+    if options["broodReviewEnabled"]:
+        config["trackedActorEventFilters"].append("source.id = 270898 or target.id = 270898")
+        config["fetchInterrupts"] = True
+        config["fetchKeys"].add("interrupts")
+    if any(options[k] for k in ("broodReviewEnabled", "feastReviewEnabled", "earlyDeathReviewEnabled", "venomDeathReviewEnabled")):
+        config["trackedActorEventFilters"].append('type = "resurrect"')
+    # With no custom filter the generic runtime would fetch every tracked NPC.
+    if not config["trackedActorEventFilters"]:
+        config["trackedActorGameIDs"] = set()
     tab_enabled = {"survival": True, "venom": options["venomReviewEnabled"] or options["feastReviewEnabled"],
-                   "globules": options["globulesReviewEnabled"], "mythic": any(options.values())}
+                   "globules": options["globulesReviewEnabled"], "feast": options["feastReviewEnabled"], "brood": options["broodReviewEnabled"],
+                   "venomDeaths": options["venomDeathReviewEnabled"], "stone": options["stoneReviewEnabled"], "earlyDeaths": options["earlyDeathReviewEnabled"]}
     config["tabs"] = [row for row in config["tabs"] if tab_enabled[row[0]]]
-    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]]
     result = _build(config, analyze_mechanics, report_ids, options)
+    for pull in result.get("data", {}).get("page1_wipeAnalysis", []):
+        if not pull.get("isKill") and pull.get("durationMs", 30000) < 30000:
+            pull.update(shortPull=True, fightPhase="误开怪 / ADD处理", wipePhase="误开怪 / ADD处理",
+                        wipeReason="战斗不足30秒，按误开怪/ADD处理保留明细，不计整夜机制统计")
     result["data"]["mechanicOverview"] = _mechanic_overview(
-        result.get("data", {}).get("page1_wipeAnalysis") or []
+        result.get("data", {}).get("page1_wipeAnalysis") or [], options
     )
-    if not options["waveReviewEnabled"]:
-        result["data"]["mechanicOverview"] = {"title": "部分机制未分析", "subtitle": "、".join(config["skippedAnalyses"]), "metrics": []}
     return result
 
 
