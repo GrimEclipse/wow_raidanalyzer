@@ -79,7 +79,7 @@ BOSS_CONFIG = {
         ["feast", "盛宴分摊"], ["brood", "蛇头打断"],
         ["venomDeaths", "带毒死亡"], ["stone", "裂石击"], ["earlyDeaths", "提前死亡"],
     ],
-    "mechanicVersion": "twinfangs-mythic-assignments-tank-cutoff-2026-09-20",
+    "mechanicVersion": "twinfangs-venom-rounds-immunity-timing-2026-09-20",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -344,6 +344,88 @@ def _immunity_state(raw, pid, timestamp, hits=()):
             "hitTypes": sorted({h.get("hitType") for h in hits if h.get("hitType") is not None})}
 
 
+def _immunity_usage_review(fight, actor_map, players, raw, rounds):
+    """Review observed usage separately from missed-soak responsibility."""
+    start, end = int(fight["startTime"]), int(fight["endTime"])
+    casts = [e for e in _unique_events(raw.get("friendlyCasts", []))
+             if ability_id(e) in IMMUNITY_NAMES and event_type(e) == "cast"
+             and e.get("sourceID") in players and start <= int(e["timestamp"]) <= end]
+    applications = [e for e in _unique_events(raw.get("friendlyBuffs", []))
+                    if ability_id(e) in IMMUNITY_NAMES and event_type(e) == "applybuff"
+                    and e.get("targetID") in players and start <= int(e["timestamp"]) <= end]
+    # One activation may have both a cast and an aura application. Prefer the
+    # aura's actual recipient (especially external Blessing of Protection).
+    used_applications, activations = set(), []
+    for cast in casts:
+        sid, ts = ability_id(cast), int(cast["timestamp"])
+        matches = [(i, e) for i, e in enumerate(applications) if i not in used_applications
+                   and ability_id(e) == sid and e.get("sourceID") == cast.get("sourceID")
+                   and (sid != 1022 or cast.get("targetID") not in players or e.get("targetID") == cast.get("targetID"))
+                   and abs(int(e["timestamp"]) - ts) <= 1000]
+        match = min(matches, key=lambda item: abs(int(item[1]["timestamp"]) - ts), default=None)
+        if match:
+            used_applications.add(match[0])
+        aura = match[1] if match else None
+        target = aura["targetID"] if aura else cast.get("targetID") if sid == 1022 else cast["sourceID"]
+        activations.append((ts, sid, cast["sourceID"], target, aura))
+    activations.extend((int(e["timestamp"]), ability_id(e), e.get("sourceID"), e["targetID"], e)
+                       for i, e in enumerate(applications) if i not in used_applications)
+    rows = []
+    for ts, sid, source, target, aura in sorted(activations, key=lambda item: item[0]):
+        _immunity_state(raw, target, ts)
+        intervals = raw.get("_twinImmunityIntervals", {}).get(target, [])
+        interval = next((item for item in intervals if item[0] == sid and aura is not None
+                         and item[1] == int(aura["timestamp"])), None)
+        aura_end = interval[2] if interval and interval[2] < 10**18 else None
+        coverage = []
+        for round_row in rounds:
+            strikes = [s for s in round_row["strikes"] if s["index"] in ({1, 2, 3} if sid == 1022 else {2, 3})]
+            covered = [s["index"] for s in strikes if interval
+                       and interval[1] <= start + s["timeMs"] < interval[2]]
+            if covered:
+                coverage.append({"round": round_row["index"], "strikeIndices": covered})
+        next_round = next((r for r in rounds if start + r["timeMs"] + 4250 >= ts
+                           and any(p["playerID"] == target for p in r["assigned"])), None)
+        upcoming = next_round or next((r for r in rounds if start + r["timeMs"] + 4250 >= ts), None)
+        near_round = next((r for r in rounds if start + r["timeMs"] - 10000 <= ts <= start + r["timeMs"] + 4250), None)
+        status, abnormal = "覆盖盛宴", False
+        if not coverage:
+            if not rounds:
+                status = "未见盛宴记录，无法核对使用时机"
+            elif near_round and interval is None:
+                status = "盛宴附近施法，缺少光环覆盖证据"
+            elif near_round and near_round["incomplete"]:
+                status = "盛宴伤害段记录不完整，覆盖待核对"
+            else:
+                status, abnormal = "非盛宴时段使用，需复核用途", True
+        # A successful immunity for an earlier round (including a substitute)
+        # is not an off-timing use merely because a later assignment exists.
+        if next_round and aura_end is not None and (not coverage or any(c["round"] == next_round["index"] for c in coverage)):
+            required = [s for s in next_round["strikes"] if s["index"] in ({1, 2, 3} if sid == 1022 else {2, 3})]
+            missing = [s for s in required if aura_end <= start + s["timeMs"]]
+            if missing:
+                status = "免疫已结束，未覆盖已安排的第 " + str(next_round["index"]) + " 轮第 " + "、".join(str(s["index"]) for s in missing) + " 段"
+                abnormal = True
+        replacements = []
+        if next_round:
+            for strike in next_round["strikes"]:
+                if strike["index"] not in {2, 3} or any(p["playerID"] == target for p in strike["participants"]):
+                    continue
+                extras = [p for p in strike["participants"] if p["immunity"]["protectedHit"]
+                          and p["playerID"] not in {a["playerID"] for a in next_round["assigned"]}]
+                if extras:
+                    replacements.append({"strikeIndex": strike["index"], "players": extras})
+        rows.append({"timeMs": ts - start, "time": fmt_ms(ts - start), "spellID": sid, "spell": IMMUNITY_NAMES[sid],
+                     "caster": player_ref(players, actor_map, source), "target": player_ref(players, actor_map, target),
+                     "endTime": fmt_ms(aura_end - start) if aura_end is not None else None,
+                     "coverage": coverage, "abnormal": abnormal, "status": status,
+                     "nextRound": upcoming["index"] if upcoming else None,
+                     "secondsBefore": round((start + upcoming["timeMs"] - ts) / 1000, 2) if upcoming else None,
+                     "assigned": next_round is not None, "replacements": replacements})
+    return {"events": rows, "abnormalCount": sum(row["abnormal"] for row in rows),
+            "evidenceNote": "列出保护、无敌、冰箱、龟壳的实际使用；非盛宴时段或已结束未覆盖安排标为待复核，补位成功也保留。盛宴前10秒至第三段附近视为准备窗口；窗口外仍实际覆盖盛宴的使用不标异常。日志不能证明乱按、剩余冷却或补位的因果关系，本表不追加个人分摊失误。"}
+
+
 def _feast_review(fight, actor_map, players, raw, options):
     if int(fight.get("difficulty") or 0) != 5:
         return {"enabled": False, "reason": "英雄消层检查见永恒毒液页", "rounds": []}
@@ -440,6 +522,7 @@ def _feast_review(fight, actor_map, players, raw, options):
         round_row["failures"] = list(failures.values())
         rounds.append(round_row)
     return {"enabled": True, "strategy": options["feastStrategy"], "rounds": rounds,
+            "immunityUsage": _immunity_usage_review(fight, actor_map, players, raw, rounds) if options["feastStrategy"] == "immunity" else None,
             "evidenceNote": "每次盛宴分三段；首段全团，免疫打法只核对后两段。命中包含 immune、偏转及零伤害，按玩家去重；延迟超过200ms的同ID全团溅射单列，不算分摊参与者。每人每轮最多计一次失误；缺失整段记录不凭空归责。"}
 
 
@@ -604,6 +687,38 @@ def _venom_stack_at(events, player_id, timestamp):
             current = 0
     return current
 
+def _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds):
+    """Use the existing Corrosive Deluge pickup windows, including zero pickups."""
+    history_by_id = {p["playerID"]: p["events"] for p in histories}
+    damage = _unique_events(raw.get("damage", []))
+    output = []
+    for round_row in globule_rounds:
+        begin, end = round_row["timeMs"], round_row["endTimeMs"]
+        eaten = {p["playerID"]: p["count"] for p in round_row["eaten"]}
+        abnormal_hits = Counter(e["targetID"] for e in damage
+                                if e.get("targetID") in players and ability_id(e) in VENOM_ABNORMAL_DAMAGE
+                                and begin <= int(e["timestamp"]) - fight["startTime"] < end
+                                and event_type(e) == "damage" and e.get("hitType") != 10
+                                and float(e.get("amount") or 0) + float(e.get("absorbed") or 0) > 0)
+        rows = []
+        for pid in players:
+            gains = [e for e in history_by_id.get(pid, []) if begin <= e["timeMs"] < end and e["delta"] > 0]
+            orb = sum(e["delta"] for e in gains if e["sourceID"] == 1289201)
+            abnormal = sum(e["delta"] for e in gains if e["category"] == "abnormal")
+            other = sum(e["delta"] for e in gains if e["sourceID"] != 1289201 and e["category"] != "abnormal")
+            rows.append({**player_ref(players, actor_map, pid), "orbStacks": orb, "orbCount": eaten.get(pid, 0),
+                         "abnormalHitCount": abnormal_hits[pid], "abnormalStacks": abnormal,
+                         "otherStacks": other, "unknownStacks": sum(e["delta"] for e in gains if e["category"] == "unknown"),
+                         "totalGains": orb + abnormal + other,
+                         "aliveAtStart": _life_at(raw, pid, fight["startTime"] + begin),
+                         "aliveAtEnd": _life_at(raw, pid, fight["startTime"] + end)})
+        rows.sort(key=lambda p: (p["orbCount"], p["orbStacks"], p["playerID"]))
+        output.append({"index": round_row["index"], "time": round_row["time"], "endTime": round_row["endTime"],
+                       "players": rows, "zeroPickupCount": sum(p["orbCount"] == 0 for p in rows),
+                       "hitCount": round_row["hitCount"]})
+    return output
+
+
 def analyze_twinfangs(fight, actor_map, players, raw):
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     if not any(options[key] for key in REVIEW_KEYS):
@@ -613,7 +728,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
     )
     venom_events = [event for event in debuffs if int(ability_id(event) or 0) == 1290336]
     histories = []
-    for player_id in (players if options["venomReviewEnabled"] else []):
+    for player_id in (players if options["venomReviewEnabled"] or options["globulesReviewEnabled"] else []):
         current, peak, rows = 0, 0, []
         for event in sorted((item for item in venom_events if item.get("targetID") == player_id), key=lambda item: int(item.get("timestamp") or 0)):
             kind, before = event_type(event), current
@@ -730,7 +845,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
     emergences = sorted(int(event["timestamp"]) for event in casts if int(ability_id(event) or 0) == 1291404 and event_type(event) == "begincast")
     death_times = {player_id: min((int(event["timestamp"]) for event in raw["deaths"] if event.get("targetID") == player_id), default=10**18) for player_id in players}
     globule_rounds = []
-    for index, cast in enumerate(deluges if options["globulesReviewEnabled"] else [], start=1):
+    for index, cast in enumerate(deluges if options["globulesReviewEnabled"] or options["venomReviewEnabled"] else [], start=1):
         start = int(cast["timestamp"])
         end = next((timestamp for timestamp in emergences if timestamp > start), int(fight["endTime"]))
         hits = _events_between(damage, start, end, {1289201})
@@ -753,7 +868,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
             eaten_rows.append({**player_ref(players, actor_map, player_id), "count": count, "abnormal": count > 1})
         missed_rows = [player_ref(players, actor_map, player_id) for player_id in alive if player_id not in eaten_counts]
         globule_rounds.append({"index": index, "timeMs": start - fight["startTime"], "time": fmt_ms(start - fight["startTime"]),
-                               "endTime": fmt_ms(end - fight["startTime"]), "participantCount": len(participants),
+                               "endTime": fmt_ms(end - fight["startTime"]), "endTimeMs": end - fight["startTime"], "participantCount": len(participants),
                                "participants": [player_ref(players, actor_map, player_id) for player_id in participants],
                                "hitCount": len(hits), "exploded": bool(explosions), "explosionTime": fmt_ms(explosion_ts - fight["startTime"]) if explosion_ts else None,
                                "nonParticipants": missing,
@@ -797,9 +912,13 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                                   "target": player_ref(players, actor_map, cast.get("targetID")),
                                   "bulwarks": [{"actorID": e.get("sourceID"), "instance": e.get("sourceInstance", 1),
                                                 "x": e.get("x"), "y": e.get("y"), "time": fmt_ms(int(e["timestamp"]) - fight["startTime"])} for e in cover]})
+    venom_rounds = _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds)
     return {
-        "eternalVenom": {"players": histories, "feastChecks": feast_checks, "abnormalGains": abnormal_gains},
-        "globules": {"rounds": globule_rounds},
+        "eternalVenom": {"players": histories if options["venomReviewEnabled"] else [], "feastChecks": feast_checks,
+                         "abnormalGains": abnormal_gains if options["venomReviewEnabled"] else [],
+                         "rounds": venom_rounds if options["venomReviewEnabled"] else []},
+        "globules": {"rounds": globule_rounds if options["globulesReviewEnabled"] else [],
+                     "venomRounds": venom_rounds if options["globulesReviewEnabled"] else []},
         "waveHits": {"spellID": 1289994, "players": wave_hits},
         "isMythic": mythic,
         "tankGlobules": {"enabled": mythic and options["globulesReviewEnabled"], "rounds": tank_globules},
