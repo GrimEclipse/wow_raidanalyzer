@@ -339,3 +339,11 @@ location /images/ {
 **解决方式（已实测两次：分支 + main 镜像）**：整行取上游版，然后把 `sszorak/mechanics.js` 的版本串改回
 `20260918`（或当天日期）。判据是合并后回读线上 HTML，四个版本串都要对；只看「合并成功」会漏。
 上游哪天自己升了 sszorak 那一串，本补丁即可删除。
+
+## 后续（2026-09-20 晚，上游 78663b0 + e0ea3d1 同步时）
+
+本次上游同样自带 `report.html` 脚本清单升级（`twinfangs/mechanics.js?v=20260920-venom-rounds`、
+新增 `twinfangs/mechanics.css?v=20260920-venom-rounds`、`report.js?v=20260920`），冲突行与上轮相同，
+按同一方式解决：整行取上游 + sszorak 保留 `?v=20260918`。两分支 `report.html` 已核对完全一致、
+冲突标记清零。⚠ 这次解决时手工替换把一行 `=======` 残留进了 main，靠「逐文件 grep 冲突标记」
+抓到并单独提交修复（`11ddf82` / `b9d169f`）——**合并后除了 diff 还要 grep 三种标记**。
