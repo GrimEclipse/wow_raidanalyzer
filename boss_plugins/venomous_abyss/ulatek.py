@@ -112,6 +112,11 @@ WAVE_DEATH_WINDOW_MS = 1_000
 BASELINE_P3_SHRIEKERS = {1: 0, 2: 0, 3: 1, 4: 2}
 HEALTHSTONE_IDS = {6262, 452930, 387636}
 HEALING_POTION_IDS = {1234768, 1295247}
+BURST_POTIONS = {1236616: "圣光潜力", 1236994: "鲁莽药水", 1295132: "液态光泽"}
+P25_COIL_CAST_ID = 1299010
+P25_COIL_DAMAGE_ID = 1287265
+P25_COIL_COUNT = 6
+P25_EGG_SETTLE_MS = 250
 
 BOSS_CONFIG = {
     "key": "ulatek",
@@ -132,7 +137,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-p3-eggs-bites-fang-batches-2026-09-14-v6",
+    "mechanicVersion": "ulatek-p25-egg-review-2026-09-20-v8",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -141,6 +146,12 @@ COURT_PROFILE = {
     "phaseModel": "cast_and_aura_timeline",
     "phaseRule": "P1/P2/P3 以被缚之怒结束点切分；最终碎场轮次以盘绕猎物施法切分。",
     "rules": [
+        {
+            "key": "p25_egg_remaining", "label": "P2.5 连续分摊结束仍携蛋", "mode": "direct",
+            "spellIDs": [1299010, 1287265, 1295360],
+            "requiredEvidence": ["第二次被缚之怒结束", "六次幽魂盘卷完成", "结算后存活且携蛋光环仍生效"],
+            "defaultCountEnabled": True, "severityUnits": 1,
+        },
         {
             "key": "caustic_wave_hit",
             "label": "命中腐蚀浪潮",
@@ -455,6 +466,72 @@ def _position_sample(position_index, actor_id, timestamp):
         "sampleOffsetMs": int(sample.get("sampleOffsetMs") or 0),
         "reliable": bool(sample.get("reliable")),
     }
+
+
+def _analyze_p25_eggs(fight, actor_map, players, raw):
+    result = {"enabled": True, "started": False, "completed": False, "expectedSoakCount": P25_COIL_COUNT,
+              "completedSoakCount": 0, "deaths": [], "remaining": [], "deathCount": 0, "mistakeCount": 0,
+              "evidenceNote": "P2.5 按第二次被缚之怒结束后的六次幽魂盘卷界定。阶段内带蛋死亡单独统计；第六次结算后仍存活且携蛋记一次玩家失误。预留250毫秒处理同帧光环移除；日志不足或分摊未完成时不判残留。"}
+    rage = _rage_windows(fight, raw)
+    if len(rage) < 2 or rage[1].get("openEnded"):
+        result["reason"] = "尚未确认第二次被缚之怒结束"
+        return result
+    after_rage = rage[1]["end"]
+    unique = {_event_identity(e): e for e in raw.get("casts", [])}
+    casts = sorted(unique.values(), key=lambda e: int(e["timestamp"]))
+    phase_limit = min([int(fight["endTime"])] + [int(e["timestamp"]) for e in casts
+                     if int(e["timestamp"]) > after_rage and ability_id(e) in {1295905, 1315341}
+                     and event_type(e) in {"begincast", "cast"}])
+    coils = [e for e in casts if ability_id(e) == P25_COIL_CAST_ID
+             and after_rage <= int(e["timestamp"]) < phase_limit and event_type(e) in {"begincast", "cast"}]
+    if not coils:
+        result["reason"] = "尚未观测到 P2.5 连续幽魂盘卷"
+        return result
+    stage_start = min(int(e["timestamp"]) for e in coils)
+    finishes = [e for e in coils if event_type(e) == "cast"]
+    result.update(started=True, startTime=fmt_ms(stage_start - fight["startTime"]), completedSoakCount=len(finishes))
+    completed = len(finishes) >= P25_COIL_COUNT
+    checkpoint = None
+    if completed:
+        last = finishes[P25_COIL_COUNT - 1]
+        last_ts = int(last["timestamp"])
+        hits = [int(e["timestamp"]) for e in raw.get("damage", []) if ability_id(e) == P25_COIL_DAMAGE_ID
+                and e.get("sourceID") == last.get("sourceID")
+                and e.get("sourceInstance", 1) == last.get("sourceInstance", 1)
+                and last_ts <= int(e["timestamp"]) <= last_ts + 1000]
+        settlement = max([last_ts] + hits)
+        checkpoint = settlement + P25_EGG_SETTLE_MS
+        completed = checkpoint < int(fight["endTime"])
+        result["lastSoakTime"] = fmt_ms(settlement - fight["startTime"])
+    stage_end = checkpoint if completed else phase_limit
+    result.update(completed=completed, endTime=fmt_ms(stage_end - fight["startTime"]))
+    if not completed:
+        result["reason"] = "连续分摊未完整结束或日志未覆盖结算后时刻，不判残留携蛋"
+    deaths = sorted({_event_identity(e): e for e in raw.get("deaths", []) if event_type(e) == "death"
+                     and e.get("targetID") in players}.values(), key=lambda e: int(e["timestamp"]))
+    carries = _aura_intervals(raw.get("debuffs", []), EGG_CARRY_ID, fight["endTime"])
+    for aura in carries:
+        aura["end"] = min([aura["end"]] + [int(e["timestamp"]) for e in deaths
+                          if e.get("targetID") == aura["playerID"] and aura["start"] <= int(e["timestamp"]) <= aura["end"]])
+    for death in deaths:
+        pid, ts = death["targetID"], int(death["timestamp"])
+        carry = next((a for a in carries if a["playerID"] == pid and a["start"] < ts <= a["end"]), None)
+        if stage_start <= ts <= stage_end and carry:
+            sid = int(death.get("killingAbilityGameID") or ability_id(death) or 0)
+            result["deaths"].append({**player_ref(players, actor_map, pid), "time": fmt_ms(ts - fight["startTime"]),
+                                     "carryStartTime": fmt_ms(carry["start"] - fight["startTime"]),
+                                     "abilityID": sid, "ability": spell_name(sid, GUIDE_SPELLS), "isPlayerMistake": False})
+    if completed:
+        living = _living_player_ids(players, raw, checkpoint)
+        for pid in sorted(living):
+            carry = next((a for a in carries if a["playerID"] == pid and a["start"] <= checkpoint and a["end"] > checkpoint), None)
+            if carry:
+                result["remaining"].append({**player_ref(players, actor_map, pid), "time": fmt_ms(checkpoint - fight["startTime"]),
+                                            "carryStartTime": fmt_ms(carry["start"] - fight["startTime"]),
+                                            "spellID": EGG_CARRY_ID, "isPlayerMistake": True,
+                                            "reason": "P2.5 六次幽魂盘卷结束后仍携带蛇卵"})
+    result["deathCount"], result["mistakeCount"] = len(result["deaths"]), len(result["remaining"])
+    return result
 
 
 def _analyze_serpent_bites(fight, actor_map, players, raw):
@@ -777,8 +854,90 @@ def _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows):
     }
 
 
+def _burst_potion_intervals(fight, raw):
+    """Use aura lifetimes, never cast timestamps or a fixed pre-window grace."""
+    active, seen, intervals = {}, set(), []
+    events = list(raw.get("friendlyBuffs") or []) + [e for e in raw.get("deaths", []) if event_type(e) == "death"]
+
+    def close(key, end, open_ended=False):
+        begin, unknown_start = active.pop(key)
+        end = min([end] + [int(e["timestamp"]) for e in raw.get("deaths", [])
+                           if event_type(e) == "death" and e.get("targetID") == key[0]
+                           and begin <= int(e["timestamp"]) < end])
+        if end > begin:
+            intervals.append({"playerID": key[0], "spellID": key[1], "start": begin, "end": end,
+                              "unknownStart": unknown_start, "openEnded": open_ended})
+
+    for e in sorted(events, key=lambda e: int(e.get("timestamp") or 0)):
+        ts, pid, kind = int(e.get("timestamp") or 0), e.get("targetID"), event_type(e)
+        if ts > fight["endTime"]:
+            continue
+        if kind == "death":
+            for key in list(active):
+                if key[0] == pid:
+                    close(key, ts)
+            continue
+        sid = int(ability_id(e) or 0)
+        if sid not in BURST_POTIONS:
+            continue
+        key = (pid, sid)
+        if kind in {"applybuff", "refreshbuff"}:
+            active.setdefault(key, (ts, False))
+            seen.add(key)
+        elif kind == "removebuff":
+            # An initial removal proves an aura carried into the recorded fight.
+            if key not in seen:
+                active[key] = (int(fight["startTime"]), True)
+            if key in active:
+                close(key, ts)
+            seen.add(key)
+    for key in list(active):
+        close(key, int(fight["endTime"]), True)
+    return intervals
+
+
+def _rage_potions(fight, actor_map, players, raw, window, intervals):
+    start, end = window["start"], window["end"]
+    living = _living_player_ids(players, raw, start)
+    rows = []
+    for pid, p in players.items():
+        role = str(p.get("role") or "")
+        if not (role.endswith("tank") or role.endswith("dps")):
+            continue
+        effects, spans = [], []
+        for aura in intervals:
+            left, right = max(start, aura["start"]), min(end, aura["end"])
+            if aura["playerID"] != pid or right <= left:
+                continue
+            spans.append((left, right))
+            effects.append({"spellID": aura["spellID"], "spell": BURST_POTIONS[aura["spellID"]],
+                            "startTime": None if aura["unknownStart"] else fmt_ms(aura["start"] - fight["startTime"]),
+                            "endTime": fmt_ms(aura["end"] - fight["startTime"]),
+                            "openEnded": aura["openEnded"], "unknownStart": aura["unknownStart"],
+                            "overlapStart": fmt_ms(left - fight["startTime"]), "overlapEnd": fmt_ms(right - fight["startTime"]),
+                            "overlapMs": right - left})
+        merged = []
+        for left, right in sorted(spans):
+            if merged and left <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], right)
+            else:
+                merged.append([left, right])
+        overlap_ms = sum(right - left for left, right in merged)
+        available = raw.get("friendlyBuffs") is not None
+        rows.append({**player_ref(players, actor_map, pid), "potionUsed": bool(effects) if available else None,
+                     "aliveAtStart": pid in living, "coverageMs": overlap_ms,
+                     "coveragePercent": round(100 * overlap_ms / (end - start), 1) if end > start else 0,
+                     "effects": effects})
+    rows.sort(key=lambda row: (row["potionUsed"] is True, row["playerID"]))
+    return {"players": rows, "playerCount": len(rows), "usedCount": sum(r["potionUsed"] is True for r in rows),
+            "missingCount": sum(r["potionUsed"] is False for r in rows),
+            "unknownCount": sum(r["potionUsed"] is None for r in rows),
+            "evidenceNote": "检查所有坦克和输出，包括零伤害及已死亡玩家；药水光环与易伤窗口有实际重叠即算已吃药，提前激活也计入。只统计爆发药水，不计治疗药水。覆盖时长按光环生效区间计算，死亡时截止。"}
+
+
 def _analyze_rage(fight, actor_map, players, raw, rage_windows):
     rounds = []
+    potion_intervals = _burst_potion_intervals(fight, raw)
     target_game_ids = raw.get("trackedDamageTargetGameIDByActorID") or {}
     for index, window in enumerate(rage_windows, start=1):
         start, end = window["start"], window["end"]
@@ -847,6 +1006,7 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
             "time": fmt_ms(start - fight["startTime"]),
             "endTime": fmt_ms(end - fight["startTime"]),
             "durationSec": round((end - start) / 1000, 2),
+            "potions": _rage_potions(fight, actor_map, players, raw, window, potion_intervals),
             "heartDamage": sum(_amount(event) for event in heart_damage),
             "bossDamage": sum(_amount(event) for event in boss_damage),
             "totalDamage": sum(_amount(event) for event in window_damage),
@@ -1361,6 +1521,7 @@ def _analyze_critical(fight, actor_map, players, raw):
         "platformTransitions": transitions,
         "platform2To3": focus,
         "serpentBites": _analyze_serpent_bites(fight, actor_map, players, raw),
+        "p25Eggs": _analyze_p25_eggs(fight, actor_map, players, raw),
         "coiledPreyDeaths": {
             "spellID": 1301510,
             "deathCount": len(coiled_prey_deaths),
@@ -1397,8 +1558,16 @@ def _mechanic_overview(rendered):
     melee_events = []
     melee_damage = 0
     mother_wrath_failures = []
+    p25_egg_deaths, p25_egg_remaining = [], []
     for pull in rendered:
         mechanics = pull.get(BOSS_CONFIG["key"]) or {}
+        egg_review = (mechanics.get("critical") or {}).get("p25Eggs") or {}
+        for key, target, label in (("deaths", p25_egg_deaths, "P2.5 连续分摊期间带蛋死亡"),
+                                   ("remaining", p25_egg_remaining, "P2.5 分摊结束仍携蛋（玩家失误）")):
+            for row in egg_review.get(key, []):
+                target.append(nightly_detail(pull, row["time"], f"{row['player']}：{label}",
+                                             player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"),
+                                             spellID=EGG_CARRY_ID, isPlayerMistake=key == "remaining"))
         for row in (mechanics.get("wavesAndEggs") or {}).get("hits") or []:
             event = nightly_detail(
                 pull,
@@ -1493,6 +1662,11 @@ def _mechanic_overview(rendered):
         "title": "整夜机制统计",
         "subtitle": "按全部乌拉特克 Pull 汇总腐蚀浪潮、P1/P3 中波死亡、带蛋、拉线、盘绕猎物、蛇母之怒 A 团、平台减伤与非坦克近战证据。",
         "metrics": [
+            {"key": "p25EggDeaths", "label": "P2.5 带蛋死亡", "value": len(p25_egg_deaths), "unit": "人次",
+             "tone": "warning", "players": nightly_player_totals(p25_egg_deaths), "events": p25_egg_deaths},
+            {"key": "p25EggRemaining", "label": "P2.5 分摊结束仍携蛋", "value": len(p25_egg_remaining), "unit": "次",
+             "tone": "danger", "description": "六次连续分摊结束后仍存活且携蛋，每名玩家每场计一次失误。",
+             "players": nightly_player_totals(p25_egg_remaining), "events": p25_egg_remaining},
             {
                 "key": "waveHits",
                 "label": "中波施加/刷新次数",
@@ -1608,6 +1782,7 @@ def build_aggregated_json(report_ids, options=None):
         result.get("data", {}).get("page1_wipeAnalysis") or []
     )
     metric_options = {
+        "p25EggDeaths": "criticalReviewEnabled", "p25EggRemaining": "criticalReviewEnabled",
         "waveHits": "wavesReviewEnabled", "p1WaveDeaths": "wavesReviewEnabled", "p3WaveDeaths": "wavesReviewEnabled", "eggCarrierWaveHits": "wavesReviewEnabled",
         "wrongFangBreaks": "fangsReviewEnabled", "platform2To3Defensives": "criticalReviewEnabled",
         "coiledPreyDeaths": "criticalReviewEnabled", "nonTankMelee": "criticalReviewEnabled", "motherWrathRaidwide": "criticalReviewEnabled",
