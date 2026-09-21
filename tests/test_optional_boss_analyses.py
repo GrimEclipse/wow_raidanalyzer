@@ -48,8 +48,8 @@ def test_survival_only_skips_mechanic_requests_and_preserves_shared_defaults(mod
     options = {row['key']:False for row in module.CONFIG_SCHEMA if row['type'] == 'boolean'}
     with patch('boss_plugins.venomous_abyss.runtime.WclClient',return_value=client):
         result = module.build_aggregated_json('A'*16,options)
-    assert {kind for kind,_ in client.requests} == {'Casts','Deaths','CombatantInfo'}
-    assert len(client.requests) == 3
+    assert {kind for kind,_ in client.requests} == ({'Casts','Deaths','CombatantInfo','All'} if module is ulatek else {'Casts','Deaths','CombatantInfo'})
+    assert len(client.requests) == (4 if module is ulatek else 3)
     assert result['meta']['tabDefinitions'] == [{'key':'survival','label':'全场存活情况'}]
     assert result['meta']['analysisConfig'] == resolve_analysis_options(module.CONFIG_SCHEMA, options)
     assert result['meta']['skippedAnalyses']

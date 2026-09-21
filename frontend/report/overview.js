@@ -7,20 +7,21 @@ function difficultyKey(pull){return pull.difficultyKey||({3:"normal",4:"heroic",
 function difficultyName(pull){return pull.difficultyName||({3:"普通",4:"英雄",5:"史诗"}[Number(pull.difficulty)]||"未知难度")}
 function orderedRows(){return state.pulls.map((pull,index)=>({pull,index})).filter(row=>(state.filter!=="wipes"||!row.pull.isKill)&&(state.difficulty==="all"||difficultyKey(row.pull)===state.difficulty)).sort((a,b)=>String(a.pull.startTimeIso||`${a.pull.date}-${a.pull.fightID}`).localeCompare(String(b.pull.startTimeIso||`${b.pull.date}-${b.pull.fightID}`))*(state.sortAsc?1:-1))}
 function phaseKey(pull){return pull.isKill?"击杀":pull.wipePhase||pull.fightPhase||"未分类"}function phaseRank(key){if(key.includes("击杀"))return-1;if(/P1|阶段一|一阶段|第一/i.test(key))return 10;if(/转场|间歇|仪式|静滞/i.test(key))return 20;if(/P2|阶段二|二阶段|第二/i.test(key))return 30;if(/P3|阶段三|三阶段|第三/i.test(key))return 40;if(/狂暴|最终/i.test(key))return 90;return 50}
+function pullPhaseRank(pull){return pull.isKill?-1:pull.phaseOrder??phaseRank(phaseKey(pull))}
+function completionProgress(pull){
+  if(pull.isKill)return 100;
+  const remaining=pull.fightPercentage??pull.bossPercentage;
+  if(remaining===undefined||remaining===null||remaining==='')return 0;
+  const value=Number(remaining);
+  return Number.isFinite(value)?Math.max(0,Math.min(100,100-value)):0;
+}
 function phaseColor(pull){
-  if(pull.isKill)return"#55dd8a";
-  if(pull.shortPull)return"#777777";
-  const key=phaseKey(pull);
-  if(/狂暴|最终|P3/i.test(key))return"#ff6578";
-  if(/P2|阶段二|二阶段|第二/i.test(key))return"#a98bff";
-  if(/转场|静滞|仪式|间歇/i.test(key))return"#e6a244";
-  const health=Number(pull.bossPercentage);
-  if(!Number.isFinite(health))return"#777777";
-  return health>75?"#999999":health>50?"#1eff00":health>25?"#0070dd":health>5?"#a335ee":"#ff8000";
+  const progress=completionProgress(pull);
+  return progress>=99?'#e268a8':progress>=95?'#ff8000':progress>=75?'#a335ee':progress>=50?'#0070ff':progress>=25?'#1eff00':'#999999';
 }
 function totalTime(rows){const total=Math.round(rows.reduce((sum,row)=>sum+Number(row.pull.durationMs||0),0)/1000);return`${Math.floor(total/60)}:${String(total%60).padStart(2,"0")}`}
-function pullTile(row){const pull=row.pull,progress=pull.isKill?100:Math.max(4,100-Number(pull.bossPercentage||0));return`<button class="pull-tile ${pull.isKill?"kill-tile":""}" style="--progress:${progress}%;--phase-color:${phaseColor(pull)}" data-pull="${row.index}" type="button"><div class="pull-percent">${pull.isKill?"KILL":`${Number(pull.bossPercentage||0).toFixed(0)}%`}<small>${esc(pull.isKill?"完成":phaseKey(pull))}</small></div><div class="pull-copy"><b>Pull ${esc(pull.fightID??pull.id??row.index+1)}，${esc(pull.duration||"")}</b><small>${esc(difficultyName(pull))}，${esc(pull.startClock||pull.date||"")}</small></div></button>`}
-function groupRows(items){const rank={normal:0,heroic:1,mythic:2,unknown:3};if(!state.separate){if(state.difficulty!=="all")return[["全部 Pull",items]];return[...new Set(items.map(row=>difficultyKey(row.pull)))].sort((a,b)=>(rank[a]??9)-(rank[b]??9)).map(key=>[`${difficultyName(items.find(row=>difficultyKey(row.pull)===key).pull)}，全部 Pull`,items.filter(row=>difficultyKey(row.pull)===key)])}const keyOf=row=>`${difficultyKey(row.pull)}::${phaseKey(row.pull)}`;return[...new Set(items.map(keyOf))].sort((a,b)=>{const[da,pa]=a.split("::"),[db,pb]=b.split("::");return(rank[da]??9)-(rank[db]??9)||phaseRank(pa)-phaseRank(pb)}).map(key=>{const[diff,phase]=key.split("::"),sample=items.find(row=>difficultyKey(row.pull)===diff);return[`${difficultyName(sample.pull)}，${phase}`,items.filter(row=>keyOf(row)===key)]})}
+function pullTile(row){const pull=row.pull,progress=completionProgress(pull);return`<button class="pull-tile ${pull.isKill?"kill-tile":""}" style="--progress:${progress}%;--phase-color:${phaseColor(pull)}" data-pull="${row.index}" type="button"><div class="pull-percent">${pull.isKill?"KILL":`${Number(pull.bossPercentage||0).toFixed(0)}%`}<small>${esc(pull.isKill?"完成":phaseKey(pull))}</small></div><div class="pull-copy"><b>Pull ${esc(pull.fightID??pull.id??row.index+1)}，${esc(pull.duration||"")}</b><small>${esc(difficultyName(pull))}，${esc(pull.startClock||pull.date||"")}</small></div></button>`}
+function groupRows(items){const rank={normal:0,heroic:1,mythic:2,unknown:3};if(!state.separate){if(state.difficulty!=="all")return[["全部 Pull",items]];return[...new Set(items.map(row=>difficultyKey(row.pull)))].sort((a,b)=>(rank[a]??9)-(rank[b]??9)).map(key=>[`${difficultyName(items.find(row=>difficultyKey(row.pull)===key).pull)}，全部 Pull`,items.filter(row=>difficultyKey(row.pull)===key)])}const keyOf=row=>`${difficultyKey(row.pull)}::${phaseKey(row.pull)}`;return[...new Set(items.map(keyOf))].sort((a,b)=>{const[da,pa]=a.split("::"),[db,pb]=b.split("::");return(rank[da]??9)-(rank[db]??9)||pullPhaseRank(items.find(row=>keyOf(row)===a).pull)-pullPhaseRank(items.find(row=>keyOf(row)===b).pull)}).map(key=>{const[diff,phase]=key.split("::"),sample=items.find(row=>difficultyKey(row.pull)===diff);return[`${difficultyName(sample.pull)}，${phase}`,items.filter(row=>keyOf(row)===key)]})}
 function openPull(index){const pull=state.pulls[index];if(!pull||!state.descriptor)return;location.href=window.MythicReportRuntime.detailUrl(state.descriptor,state.sourcePath,pull.fightID??pull.id??index+1);}
 function renderPlayerSummary(metric, players) {
   if (!players.length) return '<div class="metric-empty">暂无可确认玩家。</div>';
