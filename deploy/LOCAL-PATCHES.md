@@ -347,3 +347,16 @@ location /images/ {
 按同一方式解决：整行取上游 + sszorak 保留 `?v=20260918`。两分支 `report.html` 已核对完全一致、
 冲突标记清零。⚠ 这次解决时手工替换把一行 `=======` 残留进了 main，靠「逐文件 grep 冲突标记」
 抓到并单独提交修复（`11ddf82` / `b9d169f`）——**合并后除了 diff 还要 grep 三种标记**。
+
+## 后续（2026-09-21，上游 73a10a5 同步时）
+
+`fix: refine raid night reviews and report library access`（50 文件，含后端 5 插件 + server.py + config/wcl_paths）：
+- `report.html` 冲突照旧整行取上游 + sszorak 保留 `?v=20260918`；上游这轮自升
+  `report-plugin-runtime.js?v=20260921-recent-reports`、`twinfangs/mechanics.js?v=20260921-generic-immunity`。
+- **新冲突点**：`frontend/tools/mythic-dungeon/app.js` 的 S2 `skillSelection` 提示文案与上游改写的
+  season-notice 逻辑撞在同一函数——本地 S2 试点是超集，**保留本地版**，上游文案改动不取。
+- ⚠ `server.py` 这轮给 `/api/data-files`、`/api/data/list` 加了 `canModify` 编辑权限校验：
+  未登录/只读账号调用会拿 403「需要编辑权限才能检索服务器报告」。本机 admin 是 admin 角色不受影响，
+  但**任何用只读账号拉数据文件列表的脚本/外部工具从这版起会 403**。
+- 合并后 grep 三种冲突标记照旧抓到 `report.html` 一行 `=======` 残留（同样只在 main 侧出现），
+  已单独提交修净（`00121b9` / `24e5453`）。
