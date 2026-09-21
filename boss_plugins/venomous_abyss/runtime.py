@@ -150,6 +150,7 @@ def render_fight(config, analyzer, report_id, report_start, actor_map, actor_typ
         "isKill": bool(fight.get("kill")),
         "kill": bool(fight.get("kill")),
         "bossPercentage": float(fight.get("bossPercentage") or 0),
+        "fightPercentage": fight.get("fightPercentage"),
         "durationMs": duration_ms,
         "duration": fmt_ms(duration_ms),
         "fightPhase": "单阶段",

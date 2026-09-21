@@ -154,7 +154,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-egg-duty-counts-2026-09-21-v9",
+    "mechanicVersion": "ulatek-progression-phases-2026-09-21-v10",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -246,6 +246,52 @@ def _phase_at(timestamp, rage_windows):
     if len(rage_windows) == 1 or timestamp < rage_windows[1]["end"]:
         return "P2"
     return "P3"
+
+
+def _progression_fields(phase):
+    return {"fightPhase": phase, "wipePhase": phase,
+            "phaseOrder": {"P1": 10, "P2": 20, "P2.5": 25, "P3": 30}.get(phase, 99)}
+
+
+def _progression_phase(fight, raw):
+    events = raw.get("enemyBuffs", []) + raw.get("casts", []) + raw.get("trackedActorEvents", [])
+    events = list({_event_identity(e): e for e in events}.values())
+    rage = _rage_windows(fight, {"enemyBuffs": events})
+    finished = [r for r in rage if not r.get("openEnded") and r["end"] < fight["endTime"]]
+    phase = "P1" if not finished else "P2"
+    if len(finished) >= 2:
+        phase = "P2.5"
+        after = finished[1]["end"]
+        coils = sorted(int(e["timestamp"]) for e in events if ability_id(e) == P25_COIL_CAST_ID
+                       and event_type(e) == "cast" and after <= int(e["timestamp"]) <= fight["endTime"])
+        p3_seen = any(ability_id(e) in {1295905, 1315341} and event_type(e) in {"begincast", "cast"}
+                      and after < int(e["timestamp"]) <= fight["endTime"] for e in events)
+        if p3_seen or (len(coils) >= P25_COIL_COUNT and coils[P25_COIL_COUNT - 1] + P25_EGG_SETTLE_MS < fight["endTime"]):
+            phase = "P3"
+    return _progression_fields(phase)
+
+
+def restore_progression(pull):
+    """Fill overview fields from full-fight evidence, never the nightly cutoff."""
+    mechanics = pull.get("ulatek") or {}
+    summary = mechanics.get("progression")
+    if summary is None:
+        # Existing exported reports contain the same phase evidence in these reviews.
+        rage_review = mechanics.get("rage") or {}
+        rounds = rage_review.get("rounds")
+        if rounds is None:
+            summary = _progression_fields("阶段证据不足")
+        else:
+            finished = [r for r in rounds if r.get("endTime") != pull.get("duration")]
+            phase = "P1" if not finished else "P2"
+            if len(finished) >= 2:
+                eggs = (mechanics.get("critical") or {}).get("p25Eggs") or {}
+                phase = "P3" if eggs.get("completed") else "P2.5"
+            summary = _progression_fields(phase)
+        mechanics["progression"] = summary
+    pull.update(summary)
+    if pull.get("isKill"):
+        pull["wipePhase"] = "击杀"
 
 
 def _active_interval(intervals, player_id, timestamp, *, removal_grace_ms=0):
@@ -1596,6 +1642,7 @@ def analyze_ulatek(fight, actor_map, players, raw):
     if waves:
         waves["p3Eggs"] = _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows)
     result = {
+        "progression": _progression_phase(fight, raw),
         "wavesAndEggs": waves,
         "rage": _analyze_rage(fight, actor_map, players, raw, rage_windows) if options["rageReviewEnabled"] else {},
         "fangs": _analyze_fangs(fight, actor_map, players, raw) if options["fangsReviewEnabled"] else {},
@@ -1884,9 +1931,15 @@ def build_aggregated_json(report_ids, options=None):
     config["trackedActorEventFilters"] = ['type = "resurrect"'] if has_analysis else []
     if options["wavesReviewEnabled"]:
         config["trackedActorEventFilters"].append(f"source.id = {BLIGHTSCALE_SHRIEKER_GAME_ID}")
+    if not {"casts", "enemyBuffs"}.issubset(config["fetchKeys"]):
+        config["trackedActorEventFilters"].append(
+            '(ability.id = 1286860 OR ability.id = 1299010 OR ability.id = 1295905 OR ability.id = 1315341) '
+            'AND (type = "applybuff" OR type = "removebuff" OR type = "cast" OR type = "begincast")')
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
     config["tabs"] = [row for row in config["tabs"] if row[0] == "survival" or options[{"waves":"wavesReviewEnabled", "heart":"rageReviewEnabled", "fangs":"fangsReviewEnabled", "critical":"criticalReviewEnabled"}[row[0]]]]
     result = _build(config, analyze_mechanics, report_ids, options)
+    for pull in result.get("data", {}).get("page1_wipeAnalysis") or []:
+        restore_progression(pull)
     result["meta"]["courtProfile"] = COURT_PROFILE
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []

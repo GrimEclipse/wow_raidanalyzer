@@ -19,7 +19,7 @@
   function renderStats() {
     const pull = current(), survival = pull?.survival || {};
     $("title").textContent = `乌拉特克，Fight ${pull?.fightID || "-"}`;
-    $("meta").textContent = `${pull?.difficultyName || "未知难度"}，${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`}，${pull?.date || ""} ${pull?.startClock || ""}`;
+    $("meta").textContent = `${pull?.difficultyName || "未知难度"}，${pull?.fightPhase || "阶段未记录"}，${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`}，${pull?.date || ""} ${pull?.startClock || ""}`;
     if(state.payload?.meta?.skippedAnalyses?.length){$("meta").textContent += "，未分析：" + state.payload.meta.skippedAnalyses.join("、");}$("wclLink").href = pull?.wclDeepLink || "#";
     const rows = [["战斗时长", pull?.duration || "—"], ["结果", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`], ["难度", pull?.difficultyName || "未知"], ["阵亡", survival.deathCount || 0], ["战复", survival.combatResCount || 0], ["结束存活", `${survival.survivorCount || 0}/${survival.rosterCount || 0}`]];
     $("stats").innerHTML = rows.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join("");
@@ -126,7 +126,7 @@
     const index = state.pulls.findIndex(row => Number(row.fightID) === requestedFight);
     state.pull = index >= 0 ? index : 0;
     state.tab = (payload.meta?.tabDefinitions || [])[0]?.key || "survival";
-    $("pullSelect").innerHTML = state.pulls.map((row,index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage || 0).toFixed(2)}%`}，${esc(row.duration || "")}</option>`).join("");
+    $("pullSelect").innerHTML = state.pulls.map((row,index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${esc(row.fightPhase || "阶段未记录")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage || 0).toFixed(2)}%`}，${esc(row.duration || "")}</option>`).join("");
     $("pullSelect").value = String(state.pull);
     $("error").textContent = state.pulls.length ? "" : "分析结果中没有乌拉特克战斗。";
     render();
