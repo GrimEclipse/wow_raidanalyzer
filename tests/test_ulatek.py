@@ -54,6 +54,24 @@ class UlatekTests(unittest.TestCase):
         suppressed = next(row for row in result["rounds"][0]["breaks"] if row["playerID"] == 3)
         self.assertEqual(suppressed["adjudication"], "not_attributed_after_first_violation")
 
+    def test_egg_duty_counts_only_p1_and_p25_and_includes_zero_duty_players(self):
+        raw = {k: [] for k in ['casts','debuffs','damage','deaths','friendlyCasts','enemyBuffs']}
+        for start,end in [(10000,20000),(50000,60000)]:
+            raw['enemyBuffs'] += [self.event(start,'applybuff',u.RAGE_ID,99),self.event(end,'removebuff',u.RAGE_ID,99)]
+        raw['casts'] = [self.event(t,'cast',u.P25_COIL_CAST_ID,-1) for t in [65000,68000,71000,74000,77000,80000]]
+        for start,end,pid in [(1000,5000,1),(6000,9000,1),(30000,35000,2),(62000,72000,3),(90000,95000,4)]:
+            raw['debuffs'] += [self.event(start,'applydebuff',u.EGG_CARRY_ID,pid),self.event(start+10,'refreshdebuff',u.EGG_CARRY_ID,pid),self.event(end,'removedebuff',u.EGG_CARRY_ID,pid)]
+        raw['debuffs'] += [self.event(t,'applydebuff',u.WAVE_ID,pid) for t,pid in [(2000,1),(32000,2),(66000,3),(92000,4)]]
+        waves=u._analyze_waves_and_eggs(self.fight,self.actors,self.players,raw,u._rage_windows(self.fight,raw))
+        self.assertEqual([(r['playerID'],r['phase']) for r in waves['dutyCarries']],[(1,'P1'),(1,'P1'),(3,'P2.5')])
+        self.assertEqual([r['playerID'] for r in waves['dutyWaveHits']],[1,3])
+        metric=next(m for m in u._mechanic_overview([{'fightID':1,'ulatek':{'wavesAndEggs':waves}}])['metrics'] if m['key']=='eggCarrierWaveHits')
+        self.assertEqual((metric['carryCount'],metric['value']),(3,2))
+        rows={r['player']:r for r in metric['players']}
+        self.assertEqual((rows['P1']['carryCount'],rows['P1']['waveHitCount']),(2,1))
+        self.assertEqual(rows['P6']['carryCount'],0)
+        self.assertEqual(rows['P4']['waveHitCount'],0)
+
     def test_wave_counts_aura_mutations_and_one_second_death_once(self):
         apply = self.event(1000, "applydebuff", u.WAVE_ID, 1)
         raw = {

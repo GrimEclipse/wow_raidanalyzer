@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>高级单场选择 · V1.3.2</title>
+  <title>高级单场选择，V1.3.2</title>
   <style>
     :root{color-scheme:dark;--bg:#060a12;--panel:#101827;--line:#27364a;--ink:#edf3fa;--muted:#91a0b5;--cyan:#22d3ee;--green:#34d399;--amber:#fbbf24;--red:#fb7185}
     *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(900px 520px at 12% -10%,#123255 0,transparent 62%),radial-gradient(700px 500px at 90% 10%,#17255455 0,transparent 65%),var(--bg);color:var(--ink);font:14px/1.55 system-ui,"Microsoft YaHei",sans-serif}
@@ -21,7 +21,7 @@
 
   <section class="grid">
     <aside class="panel">
-      <div class="panel-head"><div class="split"><h2>1 · 获取开荒日</h2><span id="guildLabel" class="muted">工会…</span></div></div>
+      <div class="panel-head"><div class="split"><h2>1，获取开荒日</h2><span id="guildLabel" class="muted">工会…</span></div></div>
       <div class="panel-body stack">
         <label class="stack"><span class="muted">我的工会</span><select id="guildSelect" aria-label="选择工会"><option value="">正在读取工会…</option></select></label>
         <div class="controls"><input id="dateInput" type="date"><button id="loadReports" class="primary">获取数据</button></div>
@@ -33,7 +33,7 @@
 
     <section class="stack">
       <article class="panel">
-        <div class="panel-head"><div class="split"><h2>2 · 选择本日 Pull</h2><span id="reportTitle" class="muted">未选择 report</span></div></div>
+        <div class="panel-head"><div class="split"><h2>2，选择本日 Pull</h2><span id="reportTitle" class="muted">未选择 report</span></div></div>
         <div class="panel-body">
           <div id="fightEmpty" class="empty">先从左侧选择一份 report。系统只保留时长 ≥ 20 秒且有 Encounter ID 的 Boss 战。</div>
           <div id="fightList" class="fight-list"></div>
@@ -41,7 +41,7 @@
       </article>
 
       <article class="panel">
-        <div class="panel-head"><div class="split"><h2>3 · 生成当场结论</h2><button id="analyze" class="primary" disabled>分析所选 Fight</button></div></div>
+        <div class="panel-head"><div class="split"><h2>3，生成当场结论</h2><button id="analyze" class="primary" disabled>分析所选 Fight</button></div></div>
         <div class="panel-body">
           <div id="statusText" class="note">等待选择一场可分析的 Pull。完成后会直接打开 Boss 专属单场报告。</div>
           <details id="analysisConfig" class="hidden" open><summary>本场分析项目（取消勾选会跳过对应取证与计算）</summary><div id="configFields" class="stack"></div></details>
@@ -54,7 +54,7 @@
   <div class="wait-card">
     <div class="wait-title"><span class="spinner" aria-hidden="true"></span><div><h2 id="waitTitle">正在准备单场分析</h2><p id="waitFight" class="muted"></p></div></div>
     <div class="wait-progress"><i id="progressBar"></i></div>
-    <div class="wait-status"><span id="waitStatus">正在创建任务</span><span><b id="percentText">1%</b> · <span id="elapsedText">0 秒</span></span></div>
+    <div class="wait-status"><span id="waitStatus">正在创建任务</span><span><b id="percentText">1%</b>，<span id="elapsedText">0 秒</span></span></div>
     <div id="waitLog" class="wait-log"></div>
     <div class="wait-actions"><button id="closeWait" class="hidden">返回选择</button></div>
   </div>
@@ -104,7 +104,7 @@
   function renderReports(){
     $("reportList").innerHTML=state.reports.length?state.reports.map(report=>`<button class="report" data-report="${escapeHtml(report.code)}">
       <strong>${escapeHtml(report.title)}</strong><div class="meta"><span>${escapeHtml(report.code)}</span><span>${report.fightCount} 场</span><span>${report.supportedFightCount} 场可分析</span>${(report.raidNightDates||[]).map(date=>`<span class="tag">${date}</span>`).join("")}</div>
-      ${report.lastFight?`<div class="meta"><span class="tag ok">当日末场 · ${escapeHtml(report.lastFight.name)} · Fight ${report.lastFight.id}</span></div>`:""}
+      ${report.lastFight?`<div class="meta"><span class="tag ok">当日末场，${escapeHtml(report.lastFight.name)}，Fight ${report.lastFight.id}</span></div>`:""}
     </button>`).join(""):'<div class="empty">所选开荒日没有匹配的 Boss Pull；可换日期或直接输入 report ID。</div>';
     document.querySelectorAll("[data-report]").forEach(button=>button.addEventListener("click",()=>openReport(button.dataset.report)));
   }
@@ -138,9 +138,9 @@
     const lastId=rows.length?rows[0].id:-1;
     $("fightEmpty").classList.toggle("hidden",Boolean(rows.length));
     $("fightList").innerHTML=rows.map((fight,index)=>`<button class="fight" data-fight="${fight.id}">
-      <div class="split"><strong>${escapeHtml(fight.analysisIdentity?.bossName||fight.name)} · Fight ${fight.id}</strong><span>${formatDuration(fight.durationMs)}</span></div>
+      <div class="split"><strong>${escapeHtml(fight.analysisIdentity?.bossName||fight.name)}，Fight ${fight.id}</strong><span>${formatDuration(fight.durationMs)}</span></div>
       <div class="meta"><span>${new Date(fight.absoluteStartTime).toLocaleTimeString("zh-CN",{hour12:false})}</span><span class="tag">${escapeHtml(fight.difficultyName)}</span>${fight.kill?'<span class="tag kill">击杀</span>':''}${fight.supported?'<span class="tag ok">可分析</span>':`<span class="tag no">规则未接入</span>`}${fight.id===lastId?'<span class="tag ok">本日最后一场</span>':''}</div>
-      <div class="roster">${(fight.roster||[]).map(player=>`<span class="player ${escapeHtml(player.class)}">${escapeHtml(player.name)} · ${escapeHtml(player.spec)}</span>`).join("")}</div>
+      <div class="roster">${(fight.roster||[]).map(player=>`<span class="player ${escapeHtml(player.class)}">${escapeHtml(player.name)}，${escapeHtml(player.spec)}</span>`).join("")}</div>
     </button>`).join("");
     document.querySelectorAll("[data-fight]").forEach(button=>button.addEventListener("click",()=>selectFight(Number(button.dataset.fight))));
   }
@@ -153,11 +153,11 @@
     const schema=state.fight?.configSchema||[];
     configForm.setSchema(schema,[identity.version,identity.raidKey,identity.bossKey].join('/'));
     $("analysisConfig").classList.toggle("hidden",!state.fight?.supported||!schema.length);
-    $("statusText").textContent=state.fight?.supported?`已选择 ${state.fight.analysisIdentity?.bossName||state.fight.name} · Fight ${id}`:(state.fight?.disabledReason||"该 Boss 尚未接入分析规则");
+    $("statusText").textContent=state.fight?.supported?`已选择 ${state.fight.analysisIdentity?.bossName||state.fight.name}，Fight ${id}`:(state.fight?.disabledReason||"该 Boss 尚未接入分析规则");
   }
 
   let waitStarted=0,elapsedTimer=null;
-  function openWait(){waitStarted=Date.now();$("waitTitle").textContent="正在准备单场分析";$("waitScreen").classList.remove("hidden");$("closeWait").classList.add("hidden");$("waitLog").innerHTML="";$("progressBar").style.width="1%";$("percentText").textContent="1%";$("waitStatus").textContent="正在创建单场任务";$("waitFight").textContent=`${state.fight.analysisIdentity?.bossName||state.fight.name} · Fight ${state.fight.id}`;clearInterval(elapsedTimer);elapsedTimer=setInterval(()=>{$("elapsedText").textContent=`${Math.floor((Date.now()-waitStarted)/1000)} 秒`},1000)}
+  function openWait(){waitStarted=Date.now();$("waitTitle").textContent="正在准备单场分析";$("waitScreen").classList.remove("hidden");$("closeWait").classList.add("hidden");$("waitLog").innerHTML="";$("progressBar").style.width="1%";$("percentText").textContent="1%";$("waitStatus").textContent="正在创建单场任务";$("waitFight").textContent=`${state.fight.analysisIdentity?.bossName||state.fight.name}，Fight ${state.fight.id}`;clearInterval(elapsedTimer);elapsedTimer=setInterval(()=>{$("elapsedText").textContent=`${Math.floor((Date.now()-waitStarted)/1000)} 秒`},1000)}
   function closeWait(){clearInterval(elapsedTimer);$("waitScreen").classList.add("hidden")}
   function waitEvent(data){const percent=Number(data.percent||0),message=data.message||data.status||"处理中";$("progressBar").style.width=`${Math.max(1,percent)}%`;$("percentText").textContent=`${percent}%`;$("waitStatus").textContent=message;const previous=$("waitLog").querySelector(".current");if(previous)previous.classList.remove("current");if(!$("waitLog").lastElementChild||$("waitLog").lastElementChild.textContent!==message){const row=document.createElement("div");row.className="current";row.textContent=message;$("waitLog").appendChild(row);$("waitLog").scrollTop=$("waitLog").scrollHeight}else $("waitLog").lastElementChild.classList.add("current")}
 

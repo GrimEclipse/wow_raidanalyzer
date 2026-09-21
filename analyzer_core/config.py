@@ -85,7 +85,7 @@ def _as_number(value: Any, field: dict) -> Any:
     return number
 
 
-def _as_list(value: Any) -> list:
+def _as_list(value: Any, preserve_duplicates=False) -> list:
     if value is None:
         return []
     if isinstance(value, str):
@@ -98,7 +98,7 @@ def _as_list(value: Any) -> list:
     seen = set()
     for item in values:
         normalized = str(item).strip()
-        if normalized and normalized not in seen:
+        if normalized and (preserve_duplicates or normalized not in seen):
             seen.add(normalized)
             result.append(normalized)
     return result
@@ -139,7 +139,7 @@ def _coerce_field(field: dict, value: Any) -> Any:
         if unknown:
             raise ValueError(f"配置 {key} 包含未知分组：{', '.join(sorted(unknown))}")
         return {
-            group_key: _as_list(value.get(group_key))
+            group_key: _as_list(value.get(group_key), field.get("preserveDuplicates", False))
             for group_key in group_keys
         }
     raise ValueError(f"配置 {key} 使用了不支持的类型：{field_type}")

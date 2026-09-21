@@ -137,7 +137,7 @@
                                 <div class="px-4 py-3 border-b border-gray-800 flex justify-between gap-3">
                                     <div>
                                         <div class="text-xs text-gray-400 font-mono">{{ fight.reportID.slice(0,8) }} / Fight {{ fight.fightID }}</div>
-                                        <div class="text-xs text-gray-500 mt-1">开始：{{ fight.startDateTime || fight.date || '-' }} · 时长：{{ fight.duration }}</div>
+                                        <div class="text-xs text-gray-500 mt-1">开始：{{ fight.startDateTime || fight.date || '-' }}，时长：{{ fight.duration }}</div>
                                     </div>
                                     <div class="flex flex-col items-end gap-1">
                                         <a v-if="fight.wclDeepLink" :href="fight.wclDeepLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200 whitespace-nowrap">查看 WCL</a>
@@ -291,7 +291,7 @@
                     </table>
                 </div>
                 <div v-if="courtDetailPlayer" class="p-5 border-t border-sky-900/70 bg-gray-950">
-                    <div class="flex justify-between items-center gap-3 mb-4"><h3 class="font-black text-sky-200">{{ courtDetailPlayer }} · 全部判定明细</h3><button @click="courtDetailPlayer=''" class="text-xs text-gray-400 hover:text-white">关闭</button></div>
+                    <div class="flex justify-between items-center gap-3 mb-4"><h3 class="font-black text-sky-200">{{ courtDetailPlayer }}，全部判定明细</h3><button @click="courtDetailPlayer=''" class="text-xs text-gray-400 hover:text-white">关闭</button></div>
                     <div class="flex flex-wrap gap-2 mb-4">
                         <span v-for="stat in courtPlayerDetailSummary()" :key="stat.key" class="px-3 py-1.5 rounded border border-sky-900 bg-sky-950/40 text-xs text-sky-100">
                             <template v-if="stat.hitStatOnly">{{ stat.label }} {{ stat.hitCount }}次（永不计数）</template>
@@ -301,7 +301,7 @@
                     </div>
                     <div v-if="courtPlayerDetailRuleCards().length" class="mb-4 space-y-2">
                         <details v-for="card in courtPlayerDetailRuleCards()" :key="'rule-'+card.key" class="rounded-lg border border-amber-900/50 bg-amber-950/15 px-3 py-2 text-xs">
-                            <summary class="cursor-pointer font-bold text-amber-200 select-none">{{ card.label }} · 判定 / 豁免逻辑</summary>
+                            <summary class="cursor-pointer font-bold text-amber-200 select-none">{{ card.label }}，判定 / 豁免逻辑</summary>
                             <div class="mt-2 space-y-1.5 leading-5">
                                 <p class="text-gray-300"><span class="text-red-300 font-bold mr-1">计数</span>{{ card.count }}</p>
                                 <p class="text-gray-300"><span class="text-emerald-300 font-bold mr-1">豁免 / 不计数</span>{{ card.exempt }}</p>
@@ -325,7 +325,7 @@
 
             <div v-if="showMistakeTracker && avoidableTab === 'p15AvoidableDeaths'" class="space-y-4">
                 <div class="px-1">
-                    <h2 class="text-lg font-black text-purple-100">转阶段死亡 · 开庭统计</h2>
+                    <h2 class="text-lg font-black text-purple-100">转阶段死亡，开庭统计</h2>
                     <p class="text-xs text-gray-500 mt-1">仅统计确认发生于 P1.5 / P2.5 的死亡；P2.5 窗口团队死亡达到 8 人时只展示、不计数。</p>
                 </div>
                 <div class="bg-gray-900 border border-purple-900/70 rounded-lg overflow-hidden">
@@ -363,7 +363,7 @@
                         <button @click="courtCountFilter='counted'" class="px-4 py-2" :class="courtCountFilter === 'counted' ? 'bg-red-800 text-white' : 'bg-gray-950 text-gray-400'">计数</button>
                         <button @click="courtCountFilter='uncounted'" class="px-4 py-2 border-l border-gray-700" :class="courtCountFilter === 'uncounted' ? 'bg-emerald-800 text-white' : 'bg-gray-950 text-gray-400'">不计数</button>
                     </div>
-                    <div v-else class="text-[11px] text-slate-400 px-3 py-1.5 rounded border border-slate-700 bg-slate-950/60">仅统计展示 · 不进入终审</div>
+                    <div v-else class="text-[11px] text-slate-400 px-3 py-1.5 rounded border border-slate-700 bg-slate-950/60">仅统计展示，不进入终审</div>
                 </div>
                 <div>
                     <div class="text-[11px] text-gray-500 mb-2">扣分项目</div>
@@ -424,13 +424,13 @@
                     </div>
                     <div v-if="displayOnlyDetailPlayer" class="rounded border border-sky-900 bg-gray-950 p-4 space-y-3">
                         <div class="flex justify-between gap-3">
-                            <h3 class="font-bold text-sky-200">{{ displayOnlyDetailPlayer }} · {{ activeAvoidableLabel }}明细</h3>
+                            <h3 class="font-bold text-sky-200">{{ displayOnlyDetailPlayer }}，{{ activeAvoidableLabel }}明细</h3>
                             <button @click="displayOnlyDetailPlayer=''" class="text-xs text-gray-400 hover:text-white">关闭</button>
                         </div>
                         <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[36rem] overflow-y-auto no-scrollbar">
                             <article v-for="row in displayOnlyDetailRows" :key="row.key" class="rounded-lg border border-slate-700 bg-slate-950/30 p-3">
                                 <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                    <span class="font-mono text-xs text-gray-500">Fight{{ row.fightID }} · #{{ row.group || '-' }}</span>
+                                    <span class="font-mono text-xs text-gray-500">Fight{{ row.fightID }}，#{{ row.group || '-' }}</span>
                                     <span class="text-xs font-black text-slate-300">仅统计</span>
                                 </div>
                                 <p class="text-xs text-gray-300 leading-5">{{ row.text }}</p>
@@ -460,7 +460,7 @@
                     </div>
                     <div class="grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[42rem] overflow-y-auto no-scrollbar">
                         <article v-for="row in filteredCourtAnalysisRows()" :key="row.key" class="rounded-lg border p-3" :class="row.counted ? 'border-red-900 bg-red-950/20' : 'border-emerald-900 bg-emerald-950/15'">
-                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><span class="font-mono text-xs text-gray-500">Fight{{ row.fightID }} · #{{ row.group || '-' }}</span><span class="text-xs font-black" :class="row.counted ? 'text-red-300' : 'text-emerald-300'">{{ row.counted ? '计数' : '不计数' }}</span></div>
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-2"><span class="font-mono text-xs text-gray-500">Fight{{ row.fightID }}，#{{ row.group || '-' }}</span><span class="text-xs font-black" :class="row.counted ? 'text-red-300' : 'text-emerald-300'">{{ row.counted ? '计数' : '不计数' }}</span></div>
                             <p class="text-xs text-gray-300 leading-5">{{ row.text }}</p>
                             <a v-if="row.link" :href="row.link" target="_blank" class="inline-block mt-2 px-2 py-1 rounded border border-purple-700 bg-purple-950/60 text-purple-200 text-xs">定位 Tag</a>
                         </article>
@@ -502,7 +502,7 @@
                     <header class="px-4 py-3 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <div class="text-xs text-gray-500 font-mono">{{ fight.reportID?.slice(0, 8) }} / Fight {{ fight.fightID }}</div>
-                            <div class="text-sm font-bold text-white">{{ fight.fightName || 'Crown of the Cosmos' }} · {{ fight.duration }} · {{ fight.fightStatus === 'kill' ? '击杀' : fight.wipePhase }}</div>
+                            <div class="text-sm font-bold text-white">{{ fight.fightName || 'Crown of the Cosmos' }}，{{ fight.duration }}，{{ fight.fightStatus === 'kill' ? '击杀' : fight.wipePhase }}</div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <a v-for="phase in auditPhaseLinks(fight)" :key="phase" :href="fightAuditLink(fight, phase)" target="_blank" class="text-xs px-2 py-1 rounded border border-purple-700 bg-purple-950/70 text-purple-100 hover:bg-purple-900">查看 {{ phase }} 场地</a>
@@ -521,7 +521,7 @@
                                 <div v-for="row in section.rows" :key="'ray-' + row.index + '-' + row.player" class="rounded border border-gray-800 bg-gray-950 p-3">
                                     <div class="flex flex-wrap justify-between gap-2 text-xs">
                                         <div><span class="text-gray-500">{{ row.phase }}</span> <span class="text-blue-300 font-bold">{{ row.player }}</span> <span class="text-gray-400">{{ row.fireTime }}</span></div>
-                                        <div class="text-gray-400">幻影 {{ row.phantomHits || 0 }} · 误伤玩家 <span :class="row.playerHits ? 'text-red-300 font-bold' : 'text-green-400'">{{ row.playerHits || 0 }}</span> · 置信度 {{ row.state?.confidence || 'unknown' }}</div>
+                                        <div class="text-gray-400">幻影 {{ row.phantomHits || 0 }}，误伤玩家 <span :class="row.playerHits ? 'text-red-300 font-bold' : 'text-green-400'">{{ row.playerHits || 0 }}</span>，置信度 {{ row.state?.confidence || 'unknown' }}</div>
                                     </div>
                                     <div class="mt-2 h-56 rounded border border-gray-800 bg-black overflow-hidden">
                                         <svg class="w-full h-full" viewBox="-10500 -10500 21000 21000" preserveAspectRatio="xMidYMid meet">
@@ -568,7 +568,7 @@
 
                             <div v-else-if="section.type === 'interference_shock'" class="space-y-2 text-xs text-gray-300">
                                 <div v-for="(row, idx) in section.rows" :key="'shock-' + idx" class="rounded border border-gray-800 bg-gray-950 p-2">
-                                    <div class="text-amber-200 font-bold">{{ row.time }} {{ row.source }} · {{ row.interruptedCount }} 人</div>
+                                    <div class="text-amber-200 font-bold">{{ row.time }} {{ row.source }}，{{ row.interruptedCount }} 人</div>
                                     <div v-for="cast in row.interrupted" :key="cast.playerID + '-' + cast.spellID" class="mt-1 text-gray-400">
                                         <span class="text-blue-300">{{ cast.player }}</span>：{{ cast.spell }}（{{ cast.spellID }}），{{ cast.castStart }} 开始读条
                                     </div>
@@ -646,7 +646,7 @@
                     </div>
 
                     <div v-if="courtDetailPlayer" class="order-3 lg:col-span-2 mt-4 rounded border border-sky-900 bg-gray-950 p-4">
-                        <div class="flex justify-between gap-3 mb-3"><h3 class="font-bold text-sky-200">{{ courtDetailPlayer }} · {{ activeAvoidableLabel }}明细</h3><button @click="courtDetailPlayer=''" class="text-xs text-gray-400">关闭</button></div>
+                        <div class="flex justify-between gap-3 mb-3"><h3 class="font-bold text-sky-200">{{ courtDetailPlayer }}，{{ activeAvoidableLabel }}明细</h3><button @click="courtDetailPlayer=''" class="text-xs text-gray-400">关闭</button></div>
                         <div class="space-y-2">
                             <div v-for="(row,index) in courtPlayerDetailRows()" :key="row.key" class="flex flex-wrap items-center gap-2 text-xs border-l-2 border-sky-800 pl-3 py-1">
                                 <span class="font-mono text-gray-500">{{ index+1 }}. Fight{{ row.fightID }} #{{ row.group || '-' }}</span>
@@ -782,7 +782,7 @@
                 <div class="px-4 py-3 border-b border-gray-800 flex justify-between gap-3">
                     <div>
                         <div class="text-sm font-bold text-white">{{ fight.reportID?.slice(0, 8) }} / Fight {{ fight.fightID }}</div>
-                        <div class="text-xs text-gray-500 mt-1">{{ fight.startDateTime || '-' }} · {{ fight.duration || '-' }} · {{ fight.issueCount }} 条记录</div>
+                        <div class="text-xs text-gray-500 mt-1">{{ fight.startDateTime || '-' }}，{{ fight.duration || '-' }}，{{ fight.issueCount }} 条记录</div>
                     </div>
                     <a v-if="fight.wclDispelsLink" :href="fight.wclDispelsLink" target="_blank" class="text-xs text-blue-300 hover:text-blue-200 whitespace-nowrap">查看 Dispels</a>
                 </div>
@@ -2014,7 +2014,7 @@ createApp({
                             : '';
                         const timeText = events.map(event => event.time).filter(Boolean).join('、');
                         const text = scrubExcludedNamesFromText(
-                            `Fight${fightID} ${player.name}（坦克）· 龌勒卢斯腐化精华完整 faded`
+                            `Fight${fightID} ${player.name}（坦克），龌勒卢斯腐化精华完整 faded`
                             + (stackText ? `（断时约 ${stackText}）` : '')
                             + (timeText ? ` @ ${timeText}` : '')
                             + (events.length > 1 ? `；同场共 ${events.length} 次 fade，仅计 1 次` : '')
@@ -2181,7 +2181,7 @@ createApp({
                         hitStatOnly: false,
                         counted: sameFight.some(item => item.counted !== false),
                         text: scrubExcludedNamesFromText(
-                            `Fight${event.fightID} · 龌勒卢斯腐化精华完整 faded`
+                            `Fight${event.fightID}，龌勒卢斯腐化精华完整 faded`
                             + (stacks.length ? `（${stacks.map(stack => `${stack}层`).join('、')}）` : '')
                             + (sameFight.length > 1 ? `；同场共 ${sameFight.length} 次 fade，仅计 1 次` : '')
                         ),

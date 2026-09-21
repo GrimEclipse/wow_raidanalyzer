@@ -16,22 +16,26 @@ CONFIG_SCHEMA = [
     {"key": "venomDeathReviewEnabled", "type": "boolean", "label": "史诗带毒死亡与后续爆球", "default": True},
     {"key": "stoneReviewEnabled", "type": "boolean", "label": "裂石击接圈与全团伤害", "default": True},
     {"key": "earlyDeathReviewEnabled", "type": "boolean", "label": "提前死亡与死亡伤害明细", "default": True},
-    {"key": "feastStrategy", "type": "select", "label": "史诗贪婪盛宴打法", "default": "normal",
+    {"key": "feastStrategy", "type": "select", "label": "史诗贪婪盛宴打法", "default": "immunity",
      "options": [{"value": "normal", "label": "非免疫分摊"}, {"value": "immunity", "label": "首段全团、后两段免疫组"}],
      "visibleWhen": {"field": "feastReviewEnabled", "equals": True}},
-    {"key": "feastGroups", "type": "interruptGroups", "label": "免疫分摊名单（每轮四人）", "default": {},
+    {"key": "feastGroups", "type": "interruptGroups", "label": "免疫分摊名单（每轮四人，含受保护玩家）", "default": {}, "placeholder": "例如：三坑不二 那个猎刃 小心胡大海 Toccata",
      "description": "填写玩家名或本报告 Actor ID。每轮对应一次盛宴的后两段；第五轮以后须补充安排，不自动循环。未配置或名单无法唯一匹配时只显示证据，不计个人失误。",
-     "groups": [{"key": "round1", "label": "第一轮：三法师＋猎人"}, {"key": "round2", "label": "第二轮：两战士保护＋两防骑无敌"},
-                {"key": "round3", "label": "第三轮：三法师＋猎人"}, {"key": "round4", "label": "第四轮：两冰法＋奶骑无敌＋战士保护"}],
+     "groups": [{"key": "round1", "label": "第一轮免疫组"}, {"key": "round2", "label": "第二轮免疫组"},
+                {"key": "round3", "label": "第三轮免疫组"}, {"key": "round4", "label": "第四轮免疫组"}],
      "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
-    {"key": "protectionPairs", "type": "interruptGroups", "label": "保护责任人（依次填写施法者、受保护战士）", "default": {},
-     "groups": [{"key": "round2a", "label": "第二轮第一组保护"}, {"key": "round2b", "label": "第二轮第二组保护"}, {"key": "round4", "label": "第四轮奶骑保护"}],
+    {"key": "protectionPairs", "type": "interruptGroups", "label": "保护配对：施法者 受保护玩家", "default": {}, "preserveDuplicates": True,
+     "description": "每两个名字为一对，可填写多对，例如：黑心貓 染小战 丶花落冬陽 雷横。不限制受保护者职业，按本轮名单逐一核对实际保护目标。",
+     "placeholder": "例如：黑心貓 染小战 丶花落冬陽 雷横",
+     "groups": [{"key": "round1", "label": "第一轮保护配对"}, {"key": "round2", "label": "第二轮保护配对", "migrateFrom": ["round2a", "round2b"]},
+                {"key": "round3", "label": "第三轮保护配对"}, {"key": "round4", "label": "第四轮保护配对"},
+                {"key": "round2a", "label": "旧版第二轮配对一", "hidden": True}, {"key": "round2b", "label": "旧版第二轮配对二", "hidden": True}],
      "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
-    {"key": "broodGroups", "type": "interruptGroups", "label": "蛇头打断名单", "default": {},
+    {"key": "broodGroups", "type": "interruptGroups", "label": "蛇头打断名单", "default": {}, "placeholder": "例如：Kaminadeko（每个主断槽位填一名角色）",
      "description": "每侧远程按每次召唤中远点蛇头首次出现顺序分配，非固定点位号。近点 1、2 号由当前接该侧 Boss 的坦克主断，近战为补断。每个远程槽位填写一人。",
-     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个"} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 4)]
-               + [{"key": "leftBackup", "label": "左侧近战补断"}, {"key": "rightBackup", "label": "右侧近战补断"},
-                  {"key": "leftRangedBackup", "label": "左侧远程第四个及以后补断（可选）"}, {"key": "rightRangedBackup", "label": "右侧远程第四个及以后补断（可选）"}],
+     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个", "placeholder": "例如：" + (["Kaminadeko", "三坑不二", "小楚唯"] if side == "left" else ["丶若叶睦", "那个猎刃", "小心胡大海"])[i-1]} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 4)]
+               + [{"key": "leftBackup", "label": "左侧近战补断", "placeholder": "例如：染小战（填写实际安排的近战）"}, {"key": "rightBackup", "label": "右侧近战补断", "placeholder": "例如：雷横（填写实际安排的近战）"},
+                  {"key": "leftRangedBackup", "label": "左侧远程第四个及以后补断（可选）", "placeholder": "例如：Toccata"}, {"key": "rightRangedBackup", "label": "右侧远程第四个及以后补断（可选）", "placeholder": "例如：Superhunter"}],
      "visibleWhen": {"field": "broodReviewEnabled", "equals": True}},
     {"key": "earlyDeathGapSeconds", "type": "number", "label": "提前死亡与后续死亡间隔（秒）", "default": 8, "min": 3, "max": 60,
      "visibleWhen": {"field": "earlyDeathReviewEnabled", "equals": True}},
@@ -61,10 +65,13 @@ from boss_plugins.venomous_abyss.shared import (
 
 GUIDE_SPELLS = load_confirmed_spell_names()
 GUIDE_SPELLS.update({1306876: "血色风暴", 1294976: "剧毒烟气", 1295107: "浓缩唾液",
-                     1292348: "永恒毒液", 1310105: "污秽爆发"})
+                     1292348: "永恒毒液", 1310105: "污秽爆发", 1308386: "脏腑爆裂",
+                     1308122: "剧毒涌现", 1307363: "倒刺壁垒"})
 DEATH_MECHANIC_NOTES = {1306876: "可躲避伤害：地板红色AOE", 1294976: "环境AOE",
                         1295107: "浓缩唾液", 1292348: "永恒毒液",
-                        1310105: "吸圈未处理产生的全团爆发"}
+                        1310105: "吸圈未处理产生的全团爆发", 1308386: "蛇头漏断产生的全团伤害",
+                        1307363: "可躲避伤害：倒刺壁垒"}
+AVOIDABLE_DEATH_DAMAGE_IDS = {1306876, 1307363}
 
 BOSS_CONFIG = {
     "key": "twinfangs",
@@ -426,6 +433,28 @@ def _immunity_usage_review(fight, actor_map, players, raw, rounds):
             "evidenceNote": "列出保护、无敌、冰箱、龟壳的实际使用；非盛宴时段或已结束未覆盖安排标为待复核，补位成功也保留。盛宴前10秒至第三段附近视为准备窗口；窗口外仍实际覆盖盛宴的使用不标异常。日志不能证明乱按、剩余冷却或补位的因果关系，本表不追加个人分摊失误。"}
 
 
+def _protection_pairs(options, index, players):
+    pairs, warnings = [], []
+    for key, names in options["protectionPairs"].items():
+        if key not in {"round" + str(index), "round" + str(index) + "a", "round" + str(index) + "b"} or not names:
+            continue
+        if key != "round" + str(index) and options["protectionPairs"].get("round" + str(index)):
+            continue
+        if len(names) % 2:
+            warnings.append("保护配对需按施法者、受保护玩家成对填写")
+            continue
+        for offset in range(0, len(names), 2):
+            matches = [_match_names([name], players) for name in names[offset:offset+2]]
+            if any(errors or len(ids) != 1 for ids, errors in matches):
+                warnings.append("保护配对无法唯一匹配：" + "、".join(names[offset:offset+2]))
+            else:
+                pairs.append([ids[0] for ids, _ in matches])
+    repeated = {target for _, target in pairs if len({source for source, t in pairs if t == target}) > 1}
+    if repeated:
+        warnings.append("同一受保护玩家配置了多个施法者，该配对不作个人归责")
+    return [p for p in pairs if p[1] not in repeated], warnings
+
+
 def _feast_review(fight, actor_map, players, raw, options):
     if int(fight.get("difficulty") or 0) != 5:
         return {"enabled": False, "reason": "英雄消层检查见永恒毒液页", "rounds": []}
@@ -449,6 +478,8 @@ def _feast_review(fight, actor_map, players, raw, options):
         round_row = {"index": index, "time": fmt_ms(ts - start), "timeMs": ts - start, "strikes": [], "failures": [],
                      "assigned": [player_ref(players, actor_map, pid) for pid in ids], "unresolvedNames": unresolved,
                      "assignmentValid": configured, "configurationNote": "" if configured else "本轮需配置四名可唯一识别的免疫玩家，当前只展示实测证据"}
+        protection_pairs, pair_warnings = _protection_pairs(options, index, players)
+        round_row["protectionWarnings"] = pair_warnings
         failures = {}
         for strike_index, group in groups:
             hit_time = min(int(e["timestamp"]) for e in group)
@@ -465,7 +496,7 @@ def _feast_review(fight, actor_map, players, raw, options):
                 participants.append({**player_ref(players, actor_map, pid), "damage": sum(int(e.get("amount") or 0) for e in events),
                                      "immunity": immunity, "result": "免疫" if immunity["immuneHit"] else "偏转/免疫覆盖的零伤害" if immunity["protectedHit"] else "实际命中"})
             strike = {"index": strike_index, "time": fmt_ms(hit_time - start), "timeMs": hit_time - start,
-                      "participants": participants, "participantCount": len(by_player), "minimum": 4,
+                      "participants": participants, "displayParticipants": [p for p in participants if p["playerID"] in ids or p["immunity"]["protectedHit"]] if options["feastStrategy"] == "immunity" else participants, "participantCount": len(by_player), "minimum": 4,
                       "underfilled": len(by_player) < 4, "assignmentChecks": [],
                       "secondaryRaidDamage": [{**player_ref(players, actor_map, e["targetID"]), "damage": int(e.get("amount") or 0),
                                                "delayMs": int(e["timestamp"]) - hit_time} for e in spill]}
@@ -494,24 +525,28 @@ def _feast_review(fight, actor_map, players, raw, options):
                     strike["assignmentChecks"].append(check)
                     if reason:
                         # Explicit external-protection assignment attributes a missing
-                        # protection to its provider, while an absent warrior remains
-                        # the warrior's missed-soak record.
+                        # protection to its provider; a protected but absent player
+                        # retains responsibility for missing the soak.
                         responsible = pid
-                        if players[pid].get("specID") in {71, 72, 73}:
-                            for key, pair in options["protectionPairs"].items():
-                                pair_ids, errors = _match_names(pair, players)
-                                if key.startswith("round" + str(index)) and len(pair_ids) == 2 and not errors and pair_ids[1] == pid:
-                                    first_hits = buckets.get(1, [])
-                                    first_time = min((int(e["timestamp"]) for e in first_hits), default=ts)
-                                    pre = _immunity_state(raw, pid, first_time, [e for e in first_hits if e.get("targetID") == pid])
-                                    pre_protection = any(a["spellID"] == 1022 for a in pre["auras"])
-                                    current_protection = any(a["spellID"] == 1022 for a in immunity["auras"])
-                                    if not pre_protection or not current_protection:
-                                        responsible = pair_ids[0]
-                                        reason = ("未在首段击飞前施加保护，影响 " if not pre_protection else "保护未覆盖 ") + str(players[pid].get("name")) + " 的分摊"
-                                    check["status"] = reason
-                                    check["responsiblePlayer"] = player_ref(players, actor_map, responsible)
-                                    break
+                        for provider, recipient in protection_pairs:
+                            if recipient == pid:
+                                first_hits = buckets.get(1, [])
+                                first_time = min((int(e["timestamp"]) for e in first_hits), default=ts)
+                                pre = _immunity_state(raw, pid, first_time, [e for e in first_hits if e.get("targetID") == pid])
+                                pre_protection = any(a["spellID"] == 1022 for a in pre["auras"])
+                                current_protection = any(a["spellID"] == 1022 for a in immunity["auras"])
+                                if not pre_protection or not current_protection:
+                                    responsible = provider
+                                    reason = ("未在首段击飞前施加保护，影响 " if not pre_protection else "保护未覆盖 ") + str(players[pid].get("name")) + " 的分摊"
+                                if responsible == provider:
+                                    wrong = [e for e in raw.get("friendlyBuffs", []) if ability_id(e) == 1022 and event_type(e) == "applybuff"
+                                             and e.get("sourceID") == provider and e.get("targetID") in players and e.get("targetID") != pid
+                                             and first_time - 15000 <= int(e["timestamp"]) <= hit_time]
+                                    if wrong:
+                                        reason += "；实际保护给了 " + "、".join(sorted({players[e["targetID"]]["name"] for e in wrong}))
+                                check["status"] = reason
+                                check["responsiblePlayer"] = player_ref(players, actor_map, responsible)
+                                break
                         failure = failures.setdefault(responsible, {**player_ref(players, actor_map, responsible), "strikeIndices": [], "reasons": []})
                         failure["strikeIndices"].append(strike_index)
                         if reason not in failure["reasons"]:
@@ -592,10 +627,12 @@ def _death_reviews(fight, actor_map, players, raw, options):
         killer = int(death.get("killingAbilityGameID") or 0)
         row = {**player_ref(players, actor_map, pid), "time": fmt_ms(ts - start), "timeMs": ts - start,
                "killingSpellID": killer, "killingSpell": spell_name(killer, GUIDE_SPELLS),
-               "mechanicNote": DEATH_MECHANIC_NOTES.get(killer, ""), "avoidable": killer == 1306876,
+               "mechanicNote": DEATH_MECHANIC_NOTES.get(killer, ""), "avoidable": killer in AVOIDABLE_DEATH_DAMAGE_IDS,
                "venomStacks": _venom_death_stack(venom, pid, ts), "early": False,
                "precedingDamage": [{"time": fmt_ms(int(e["timestamp"]) - start), "spellID": ability_id(e),
                                     "spell": spell_name(ability_id(e), GUIDE_SPELLS), "source": actor_map.get(e.get("sourceID"), "未知"),
+                                    "avoidable": ability_id(e) in AVOIDABLE_DEATH_DAMAGE_IDS,
+                                    "mechanicNote": DEATH_MECHANIC_NOTES.get(ability_id(e), ""),
                                     "amount": int(e.get("amount") or 0), "absorbed": int(e.get("absorbed") or 0),
                                     "overkill": int(e.get("overkill") or 0), "hitType": e.get("hitType")} for e in incoming]}
         all_rows.append(row)

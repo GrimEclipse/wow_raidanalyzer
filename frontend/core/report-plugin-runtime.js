@@ -168,20 +168,21 @@
       let request;
       try { request = operation(store); }
       catch (error) { database.close(); reject(error); return; }
-      request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error || new Error("本地报告操作失败。"));
-      transaction.oncomplete = () => database.close();
+      transaction.oncomplete = () => { database.close(); resolve(request.result); };
       transaction.onerror = () => { database.close(); reject(transaction.error); };
+      transaction.onabort = () => { database.close(); reject(transaction.error || new Error("本地报告保存已取消。")); };
     }));
   }
 
   async function storePayload(payload, options = {}) {
-    const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const key = options.key || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const identity = identityOf(payload);
     const record = {
       key,
       payload,
       savedAt: Date.now(),
+      originalSource: options.originalSource || "",
       label: String(options.label || identity.bossName || "本地分析报告"),
       identity,
       approximateBytes: new Blob([JSON.stringify(payload)]).size
@@ -192,6 +193,7 @@
     } catch (_) {
       const sessionKey = `mythicReportPayload.${key}`;
       global.sessionStorage.setItem(sessionKey, JSON.stringify(payload));
+      global.sessionStorage.setItem(`${sessionKey}.metadata`, JSON.stringify({savedAt: record.savedAt, label: record.label}));
       return `session:${sessionKey}`;
     }
   }
@@ -201,23 +203,44 @@
       const key = String(sourcePath).slice("idb:".length);
       const record = await databaseRequest("readonly", store => store.get(key));
       if (!record?.payload) throw new Error("本地报告已被清除，请重新选择 JSON。");
+      record.savedAt = Date.now();
+      try { await databaseRequest("readwrite", store => store.put(record)); } catch (_) {}
       return record.payload;
     }
     if (String(sourcePath || "").startsWith("session:")) {
       const key = String(sourcePath).slice("session:".length);
       const value = global.sessionStorage.getItem(key);
       if (!value) throw new Error("临时导入数据已失效，请重新选择 JSON。");
+      const metadata = JSON.parse(global.sessionStorage.getItem(`${key}.metadata`) || '{}');
+      global.sessionStorage.setItem(`${key}.metadata`, JSON.stringify({...metadata, savedAt: Date.now()}));
       return JSON.parse(value);
     }
     const response = await global.fetch(sourcePath, { cache: "no-store" });
     if (!response.ok) throw new Error(`读取失败：HTTP ${response.status}`);
-    return response.json();
+    const payload = await response.json();
+    if (payload?.meta && Array.isArray(payload?.data?.page1_wipeAnalysis)) {
+      const url = new URL(sourcePath, global.document.baseURI);
+      url.searchParams.delete("download");
+      const identity = identityOf(payload), pulls = payload.data.page1_wipeAnalysis;
+      const date = payload.meta.progressDate || pulls.find(row => row.date)?.date;
+      const label = [identity.bossName, date, `${pulls.length} 场`].filter(Boolean).join('，');
+      try { await storePayload(payload, {key: `server:${url.href}`, originalSource: url.href, label}); }
+      catch (error) { console.warn('无法保存最近打开的报告：', error); }
+    }
+    return payload;
+  }
+
+  async function readLocalFile(file) {
+    const payload = JSON.parse(await file.text());
+    await storePayload(payload, {label: file.name});
+    return payload;
   }
 
   async function listLocalPayloads() {
+    let localRows = [];
     try {
       const rows = await databaseRequest("readonly", store => store.getAll());
-      return (rows || []).sort((a, b) => Number(b.savedAt || 0) - Number(a.savedAt || 0)).map(row => ({
+      localRows = (rows || []).map(row => ({
         key: row.key,
         sourcePath: `idb:${row.key}`,
         savedAt: row.savedAt,
@@ -225,12 +248,28 @@
         identity: row.identity,
         approximateBytes: row.approximateBytes || 0
       }));
-    } catch (_) {
-      return [];
-    }
+    } catch (_) {}
+    try {
+      for (let i = 0; i < global.sessionStorage.length; i++) {
+        const key = global.sessionStorage.key(i);
+        if (!key.startsWith('mythicReportPayload.') || key.endsWith('.metadata')) continue;
+        try {
+          const payload = JSON.parse(global.sessionStorage.getItem(key));
+          const metadata = JSON.parse(global.sessionStorage.getItem(`${key}.metadata`) || '{}');
+          localRows.push({sourcePath: `session:${key}`, identity: identityOf(payload), ...metadata});
+        } catch (_) {}
+      }
+    } catch (_) {}
+    return localRows.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0));
   }
 
   async function deleteLocalPayload(sourcePath) {
+    if (String(sourcePath).startsWith('session:')) {
+      const sessionKey = String(sourcePath).slice(8);
+      global.sessionStorage.removeItem(sessionKey);
+      global.sessionStorage.removeItem(`${sessionKey}.metadata`);
+      return;
+    }
     const key = String(sourcePath || "").replace(/^idb:/, "");
     if (!key) return;
     await databaseRequest("readwrite", store => store.delete(key));
@@ -244,6 +283,7 @@
     overviewUrl,
     detailUrl,
     storePayload,
+    readLocalFile,
     loadPayload,
     listLocalPayloads,
     deleteLocalPayload

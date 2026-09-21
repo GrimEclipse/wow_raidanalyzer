@@ -266,9 +266,9 @@
         const article = fragment.querySelector('article');
         const cooldownTimeline = processedTimeline(match);
         const visibleTimeline = displayTimeline(match);
-        article.querySelector('.result-title').textContent = `样本 ${index + 1} · ${match.fightName}`;
+        article.querySelector('.result-title').textContent = `样本 ${index + 1}，${match.fightName}`;
         article.querySelector('.result-meta').textContent =
-            `${clock(match.durationMs)} · ${match.reportID} / 战斗 ${match.fightID} · ${cooldownTimeline.length}/${match.timeline.length} 次团队技能 · ${
+            `${clock(match.durationMs)}，${match.reportID} / 战斗 ${match.fightID}，${cooldownTimeline.length}/${match.timeline.length} 次团队技能，${
                 ({wcl:'WCL 实际阶段',ptr_reference:'PTR 实测阶段',ptr_reference_scaled:'PTR 参考阶段（按战斗时长校准）',single_phase:'单阶段'})[match.phases?.source] || '阶段待确认'
             }`;
         article.querySelector('.result-wcl').href = match.wclUrl;
@@ -276,16 +276,16 @@
         article.querySelector('.result-healers').innerHTML = playerAssignments(match).map(({player:row, key, slot}) => {
             const color = classColor(row.class);
             const replacement = state.renameMaps.get(match)?.[key];
-            return `<span class="rounded-full border px-3 py-1 text-xs" style="color:${color};border-color:${color}55;background:${color}12">${escapeHtml(row.name)}${replacement ? ` → ${escapeHtml(replacement)}` : ''} · ${escapeHtml(row.specLabel)} · 槽位 ${slot}</span>`;
+            return `<span class="rounded-full border px-3 py-1 text-xs" style="color:${color};border-color:${color}55;background:${color}12">${escapeHtml(row.name)}${replacement ? ` → ${escapeHtml(replacement)}` : ''}，${escapeHtml(row.specLabel)}，槽位 ${slot}</span>`;
         }
         ).join('');
         article.querySelector('.result-phases').innerHTML = (match.phases?.segments || []).map(row =>
-            `<span class="phase-chip">${escapeHtml(row.phaseLabel)} · ${escapeHtml(row.phaseName)} · ${clock(row.startTimeMs)}</span>`
+            `<span class="phase-chip">${escapeHtml(row.phaseLabel)}，${escapeHtml(row.phaseName)}，${clock(row.startTimeMs)}</span>`
         ).join('');
         article.querySelector('.result-timeline').innerHTML = visibleTimeline.length
             ? visibleTimeline.map(row => row.eventType === 'phase_transition' ? `
                 <tr class="phase-transition-row">
-                    <td colspan="5"><strong>阶段转换</strong>${escapeHtml(row.phaseLabel)} · ${escapeHtml(row.phaseName)} · ${clock(row.timeMs)}</td>
+                    <td colspan="5"><strong>阶段转换</strong>${escapeHtml(row.phaseLabel)}，${escapeHtml(row.phaseName)}，${clock(row.timeMs)}</td>
                 </tr>
             ` : `
                 <tr class="hover:bg-slate-800/45">
@@ -331,7 +331,7 @@
                     finally { textarea.remove(); focused?.focus({preventScroll:true}); }
                 }
                 if (!copied) throw new Error('clipboard unavailable');
-                feedback.textContent = `已复制到剪贴板 · ${copiedType.toUpperCase()} 完整内容`;
+                feedback.textContent = `已复制到剪贴板，${copiedType.toUpperCase()} 完整内容`;
             } catch (_) {
                 feedback.textContent = '自动复制失败，请选中内容后按 Ctrl+C（Mac：⌘C）复制。';
             } finally {
@@ -362,7 +362,7 @@
         panel.hidden = assignments.length === 0;
         const fields = article.querySelector('.rename-fields');
         fields.innerHTML = assignments.map(({player, classKey, slot, key}) => `
-            <label class="text-xs" style="color:${classColor(classKey)}">${escapeHtml(playerClassLabels[classKey] || classKey)} · ${escapeHtml(player.specLabel || '')} · ${escapeHtml(player.name)}（槽位 ${slot}）
+            <label class="text-xs" style="color:${classColor(classKey)}">${escapeHtml(playerClassLabels[classKey] || classKey)}，${escapeHtml(player.specLabel || '')}，${escapeHtml(player.name)}（槽位 ${slot}）
                 <input data-slot="${escapeHtml(key)}" value="${escapeHtml(state.renameMaps.get(match)?.[key] || '')}" placeholder="团内角色 ID（玩家名）"
                     class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
             </label>`).join('');
@@ -391,7 +391,7 @@
             {timeMs:224000,phaseIndex:3,phaseLabel:'P2',phaseName:'第二阶段',phaseTimeMs:85000,player:'青禾',class:'Druid',specLabel:'恢复 德鲁伊',spell:'宁静',spellID:740,categoryLabel:'治疗大技能'},
         ];
         const sample = {
-            fightName:'宇宙之冕 · 阶段化导出演示',reportID:'LOCAL-DEMO',fightID:1,durationMs:260000,wclUrl:'#',
+            fightName:'宇宙之冕，阶段化导出演示',reportID:'LOCAL-DEMO',fightID:1,durationMs:260000,wclUrl:'#',
             healers:[{name:'云岚',class:'Priest',specLabel:'戒律 牧师'},{name:'星野',class:'Shaman',specLabel:'恢复 萨满祭司'},{name:'月白',class:'Paladin',specLabel:'神圣 圣骑士'},{name:'青禾',class:'Druid',specLabel:'恢复 德鲁伊'}],
             phases:{source:'wcl',confidence:'exact',segments:[
                 {phaseIndex:1,phaseLabel:'P1',phaseName:'第一阶段',startTimeMs:0},
@@ -418,13 +418,13 @@
         const button = el('search');
         button.disabled = true;
         const startedAt = Date.now();
-        button.textContent = '查询中 · 0.0 秒';
+        button.textContent = '查询中，0.0 秒';
         results.innerHTML = '';
         showStatus('正在从速度榜前列开始核对治疗构成，已等待 0.0 秒。');
         clearInterval(state.timer);
         state.timer = setInterval(() => {
             const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
-            button.textContent = `查询中 · ${seconds} 秒`;
+            button.textContent = `查询中，${seconds} 秒`;
             showStatus(`正在从速度榜前列逐页核对治疗构成，已等待 ${seconds} 秒。`);
         }, 250);
         try {

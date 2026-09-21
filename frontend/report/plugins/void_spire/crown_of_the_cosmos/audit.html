@@ -494,7 +494,7 @@
       holder.innerHTML = cards.map(card => `
         <button type="button" class="phase-card${state.phaseFocus === card.phase ? ' active' : ''}" data-phase="${escapeHtml(card.phase)}">
           <strong>${escapeHtml(card.phase)}</strong>
-          <span>${card.count} 个关键事件 · ${card.start}${card.end !== card.start ? ` — ${card.end}` : ''}</span>
+          <span>${card.count} 个关键事件，${card.start}${card.end !== card.start ? ` — ${card.end}` : ''}</span>
         </button>
       `).join('');
       holder.querySelectorAll('button[data-phase]').forEach(button => {
@@ -538,10 +538,10 @@
           : isGravity ? `P3 重力坍缩 ${event.displayTime}`
           : `${event.phase} ${event.eventType === 'portal' ? '宇宙传送门' : '噬灭宇宙'} ${event.displayTime}`;
         const sub = isBow
-          ? `${event.phase === 'P2' ? `幻影 ${event.activePhantomCount} 个` : ''}${miss.length ? ` · 未射中：${escapeHtml(miss.join('、'))}` : ''}`
-          : isWater ? `本轮 ${event.drops.length} 人${outliers.length ? ` · 偏离：${escapeHtml(outliers.join('、'))}` : ''}`
-          : isArrow ? (event.phase === 'P1' ? `实际命中 ${event.actualHits?.length || 0}` : `点名来源 ${event.sourceAssignments?.length || 0} · ${event.bossEnergyDrained ? '已消能' : '未消能'}`)
-          : isGravity ? `违规 ${event.violations?.length || 0} · 死亡 ${event.deathCount || 0}`
+          ? `${event.phase === 'P2' ? `幻影 ${event.activePhantomCount} 个` : ''}${miss.length ? `，未射中：${escapeHtml(miss.join('、'))}` : ''}`
+          : isWater ? `本轮 ${event.drops.length} 人${outliers.length ? `，偏离：${escapeHtml(outliers.join('、'))}` : ''}`
+          : isArrow ? (event.phase === 'P1' ? `实际命中 ${event.actualHits?.length || 0}` : `点名来源 ${event.sourceAssignments?.length || 0}，${event.bossEnergyDrained ? '已消能' : '未消能'}`)
+          : isGravity ? `违规 ${event.violations?.length || 0}，死亡 ${event.deathCount || 0}`
           : `Boss 能量 ${event.bossEnergy?.amount ?? '未知'}`;
         return `<button id="${eventAnchorId(event.key)}" class="${cls}" data-id="${event.key}">
           <div class="event-title"><span>${title}</span><span>#${event.index}</span></div>
@@ -711,7 +711,7 @@
             ${vitals.hitPoints != null && vitals.maxHitPoints != null ? `<div class="tooltip-vitals-row"><span>当前 / 最大</span><span>${Number(vitals.hitPoints).toLocaleString()} / ${Number(vitals.maxHitPoints).toLocaleString()}</span></div>` : ''}
             <div class="tooltip-vitals-row"><span>护盾</span><span>${vitals.absorb == null ? 'WCL 无当前值' : Number(vitals.absorb).toLocaleString()}</span></div>
             <div class="tooltip-vitals-row"><span>治疗吸收</span><span>${vitals.healAbsorb == null ? '未配置取证' : `${Number(vitals.healAbsorb).toLocaleString()}${vitals.healAbsorbSource === 'derived' ? '（推算）' : ''}`}</span></div>
-            ${vitals.sampleDeltaMs != null ? `<div class="tooltip-id">生命采样偏移 ${escapeHtml(vitals.sampleDeltaMs)}ms · ${escapeHtml(vitals.confidence || 'unknown')}</div>` : ''}
+            ${vitals.sampleDeltaMs != null ? `<div class="tooltip-id">生命采样偏移 ${escapeHtml(vitals.sampleDeltaMs)}ms，${escapeHtml(vitals.confidence || 'unknown')}</div>` : ''}
           </div>` : `
           <div class="tooltip-vitals">
             <div class="tooltip-id">当前 JSON 未包含生命值 / 护盾快照</div>
@@ -863,7 +863,7 @@
         return `<span title="${escapeHtml(row.phase)} ${escapeHtml(row.time)} ${escapeHtml(row.player)}" style="position:absolute;left:${x}%;top:${y}%;width:10px;height:10px;margin:-5px;border-radius:50%;background:${row.status === '偏散' ? '#fb7185' : '#f0abfc'};box-shadow:0 0 8px currentColor"></span>`;
       }).join('');
       const sectionHtml = sections.map(([title, rows]) => `<section class="panel"><h2>${title} <span class="muted">${rows.length} 条</span></h2>${rows.length ? `<div style="overflow:auto"><table><tbody>${rows.map(row => `<tr><td class="mono">${escapeHtml(row.time || row.fireTime || '-')}</td><td>${escapeHtml(row.text || JSON.stringify(row))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">本场无记录</div>'}</section>`).join('');
-      document.getElementById('app').innerHTML = `<header><div><h1>宇宙之冕 · Fight ${fight.fightID} 明细断案</h1><div class="muted">${escapeHtml(fight.startDateTime)} · ${escapeHtml(fight.duration)} · ${escapeHtml(fight.fightStatus)}</div></div><a href="https://cn.warcraftlogs.com/reports/${encodeURIComponent(fight.reportID)}#fight=${fight.fightID}&view=replay" target="_blank">打开 WCL Replay</a></header><main><section class="panel"><h2>场地快照（已获取放水坐标）</h2><div style="position:relative;max-width:873px;aspect-ratio:873/794;margin:auto;background:url('./assets/crown_of_cosmos_arena.png') center/100% 100%;border:1px solid #334155;border-radius:8px;overflow:hidden">${dotHtml}</div><div class="muted" style="margin-top:8px">亮紫点为放水坐标，红点为 15 码离组判定。完整技能快照数据列于下方。</div></section><section class="grid">${sectionHtml}</section></main>`;
+      document.getElementById('app').innerHTML = `<header><div><h1>宇宙之冕，Fight ${fight.fightID} 明细断案</h1><div class="muted">${escapeHtml(fight.startDateTime)}，${escapeHtml(fight.duration)}，${escapeHtml(fight.fightStatus)}</div></div><a href="https://cn.warcraftlogs.com/reports/${encodeURIComponent(fight.reportID)}#fight=${fight.fightID}&view=replay" target="_blank">打开 WCL Replay</a></header><main><section class="panel"><h2>场地快照（已获取放水坐标）</h2><div style="position:relative;max-width:873px;aspect-ratio:873/794;margin:auto;background:url('./assets/crown_of_cosmos_arena.png') center/100% 100%;border:1px solid #334155;border-radius:8px;overflow:hidden">${dotHtml}</div><div class="muted" style="margin-top:8px">亮紫点为放水坐标，红点为 15 码离组判定。完整技能快照数据列于下方。</div></section><section class="grid">${sectionHtml}</section></main>`;
     }
 
     function drawPolygon(svg, points, color, opacity) {
@@ -909,7 +909,7 @@
         const startAt = drop.roundTimeMs ?? drop.timeMs;
         const fullAt = drop.maturesAtMs ?? nextWater?.timeMs ?? (startAt + 25_000);
         const growth = Math.max(0, Math.min(1, (eventMs - startAt) / Math.max(1, fullAt - startAt)));
-        drawCircle(svg, drop.position, 25 * growth * pxPerYard, '#06b6d4', 0.13, '', `${drop.player} 放水 ${drop.time} · ${(growth * 100).toFixed(0)}%`);
+        drawCircle(svg, drop.position, 25 * growth * pxPerYard, '#06b6d4', 0.13, '', `${drop.player} 放水 ${drop.time}，${(growth * 100).toFixed(0)}%`);
       }
 
       if (event.phase === 'P3') {
@@ -932,7 +932,7 @@
 
       for (const marked of event.markedPlayerPositions || []) {
         if (!marked.position) continue;
-        drawCircle(svg, marked.position, 8, '#d946ef', 0.98, '', `${marked.player} · 银锋箭射出位置`);
+        drawCircle(svg, marked.position, 8, '#d946ef', 0.98, '', `${marked.player}，银锋箭射出位置`);
       }
 
       const icons = state.data.icons || {};
@@ -973,7 +973,7 @@
         if (event.eventType === 'water') {
           for (const drop of event.drops || []) {
             if (!drop.position) continue;
-            drawCircle(svg, drop.position, 8, '#d946ef', 1, '', `${drop.player} · 本轮放水落点（下一轮才形成污染圈）`);
+            drawCircle(svg, drop.position, 8, '#d946ef', 1, '', `${drop.player}，本轮放水落点（下一轮才形成污染圈）`);
           }
         }
         return;
@@ -1015,14 +1015,14 @@
         </tr>`).join('');
         const collapseText = group.collapseTrigger
           ? (group.deathTriggeredCollapse || group.collapseTrigger.deathTriggered
-            ? ` · 由 ${escapeHtml(group.collapseTrigger.player)} 死亡直接触发（不归责）`
-            : ` · 团血崩于 ${escapeHtml(group.collapseTrigger.player)} 拉断`)
+            ? `，由 ${escapeHtml(group.collapseTrigger.player)} 死亡直接触发（不归责）`
+            : `，团血崩于 ${escapeHtml(group.collapseTrigger.player)} 拉断`)
           : '';
         const casualtyText = group.compensationCount
-          ? `实际死亡 ${group.deathCount || 0} 人 · 代偿 ${group.compensationCount} 次（按有效减员计）`
+          ? `实际死亡 ${group.deathCount || 0} 人，代偿 ${group.compensationCount} 次（按有效减员计）`
           : `死亡 ${group.deathCount || 0} 人`;
         holder.innerHTML = `<section class="card"><h3>P3 重力坍缩 #${group.index} ${group.applyTime}</h3>
-          <div class="muted">点名：${escapeHtml((group.targets || []).join(' / '))} · ${casualtyText}${collapseText}</div>
+          <div class="muted">点名：${escapeHtml((group.targets || []).join(' / '))}，${casualtyText}${collapseText}</div>
           <table><thead><tr><th>棒次</th><th>玩家</th><th>拉断时间</th><th>间隔</th><th>规则</th><th>判定</th></tr></thead><tbody>${breaks}</tbody></table>
         </section>`;
         return;
@@ -1044,7 +1044,7 @@
         holder.innerHTML = `
           <section class="card">
             <h3>${group.phase} ${group.phase === 'P2' ? '银锋弹射' : '银锋箭'} #${group.index} ${group.time}</h3>
-            <div class="muted">点名：${escapeHtml((group.markedPlayers || []).join(' / '))}${group.phase === 'P2' ? ` · ${group.bossEnergyDrained ? '成功消能' : '未消能'}` : ''}</div>
+            <div class="muted">点名：${escapeHtml((group.markedPlayers || []).join(' / '))}${group.phase === 'P2' ? `，${group.bossEnergyDrained ? '成功消能' : '未消能'}` : ''}</div>
             ${group.phase === 'P1' ? `<div class="muted">射中小Boss判定：${bossAttribution || '两人均未命中（问题）'}</div><table><thead><tr><th>实际命中对象</th><th>伤害</th></tr></thead><tbody>${hits || '<tr><td colspan="2">无命中记录</td></tr>'}</tbody></table>` : `<table><thead><tr><th>点名来源</th><th>点名玩家A</th><th>点名玩家B</th><th>是否消能</th></tr></thead><tbody>${ricochetRows}</tbody></table>`}
           </section>
           <section class="card"><h3>当时 Boss 坐标</h3><table><tbody>${actors}</tbody></table></section>`;
@@ -1064,7 +1064,7 @@
           <section class="card">
             <h3>${group.phase} 放水 #${group.index} ${group.time}</h3>
             <div class="muted">只展示本阶段已发生的污染，转阶段后重置。</div>
-            ${group.remoteStackCheck?.exempt ? '<div class="muted">本轮为 P2 首轮，远程集中度豁免。</div>' : group.remoteStackCheck?.eligible ? `<div class="muted">远程集中度：${group.remoteStackCheck.stacked ? '集中' : '不集中'} · 最远离质心 ${group.remoteStackCheck.maxDistanceFromCentroidYards ?? '-'} 码 · 阈值 15 码${group.remoteStackCheck.outliers?.length ? ` · 离群：${group.remoteStackCheck.outliers.map(item => `${escapeHtml(item.player)} ${item.distanceYards}码`).join('、')}` : ''}</div>` : ''}
+            ${group.remoteStackCheck?.exempt ? '<div class="muted">本轮为 P2 首轮，远程集中度豁免。</div>' : group.remoteStackCheck?.eligible ? `<div class="muted">远程集中度：${group.remoteStackCheck.stacked ? '集中' : '不集中'}，最远离质心 ${group.remoteStackCheck.maxDistanceFromCentroidYards ?? '-'} 码，阈值 15 码${group.remoteStackCheck.outliers?.length ? `，离群：${group.remoteStackCheck.outliers.map(item => `${escapeHtml(item.player)} ${item.distanceYards}码`).join('、')}` : ''}</div>` : ''}
             <table><thead><tr><th>玩家</th><th>时间</th><th>坐标</th><th>离组距离</th><th>过偏</th></tr></thead><tbody>${drops}</tbody></table>
           </section>
           <section class="card">
@@ -1154,8 +1154,8 @@
           : '-';
         const attribution = row.collapseTrigger
           ? (row.deathTriggeredCollapse || row.collapseTrigger.deathTriggered
-            ? ` · ${escapeHtml(row.collapseTrigger.player)}死亡触发（不归责）`
-            : ` · ${escapeHtml(row.collapseTrigger.player)}`)
+            ? `，${escapeHtml(row.collapseTrigger.player)}死亡触发（不归责）`
+            : `，${escapeHtml(row.collapseTrigger.player)}`)
           : '';
         return `<tr><td>#${row.index} ${row.applyTime}</td><td>${escapeHtml((row.targets || []).join(' / '))}</td>
           <td>${breakText(breaks[0])}</td>

@@ -39,7 +39,12 @@ window.AnalysisConfigForm = {
         if (field.type === 'boolean') {
           control = `<label><input data-config-input type="checkbox" ${value ? 'checked' : ''}> ${label}</label>${help}`;
         } else if (field.type === 'interruptGroups') {
-          control = `<strong>${label}</strong>${help}` + (field.groups || []).map(group => `<label class="stack">${esc(group.label)}<input data-group="${esc(group.key)}" value="${esc((value[group.key] || []).join(' '))}" placeholder="玩家名，以空格分隔"></label>`).join('');
+          for (const group of field.groups || []) {
+            if (!group.migrateFrom) continue;
+            if (!value[group.key]?.length) value[group.key] = group.migrateFrom.flatMap(key => value[key] || []);
+            group.migrateFrom.forEach(key => {value[key] = [];});
+          }
+          control = `<strong>${label}</strong>${help}` + (field.groups || []).map(group => `<label class="stack" ${group.hidden ? 'hidden' : ''}>${esc(group.label)}<input data-group="${esc(group.key)}" value="${esc((value[group.key] || []).join(' '))}" placeholder="${esc(group.placeholder || field.placeholder || '玩家名，以空格分隔')}"></label>`).join('');
         } else {
           let input;
           if (field.type === 'select') {

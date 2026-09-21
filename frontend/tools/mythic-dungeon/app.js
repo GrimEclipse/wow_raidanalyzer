@@ -87,21 +87,21 @@ function setDocument(document) {
 function renderRun() {
   const { dungeon, team, source, pulls } = state.document;
   $("#season-notice").textContent = state.document.skillSelection?.status === "needs-review"
-    ? `S${dungeon.season || 2} 正式服样本 · ${team.map(member => `${member.spec}${member.className}`).join("、")}。当前展示实际施法候选，Boss 与小怪的关键技能筛选尚待确认。`
-    : dungeon.season ? `S${dungeon.season} 样本 · 已配置技能时间轴。` : "S1 历史样本 · 已配置技能时间轴。";
+    ? `S${dungeon.season || 2} 正式服样本，${team.map(member => `${member.spec}${member.className}`).join("、")}。当前展示实际施法候选，Boss 与小怪的关键技能筛选尚待确认。`
+    : dungeon.season ? `S${dungeon.season} 样本，已配置技能时间轴。` : "S1 历史样本，已配置技能时间轴。";
   $("#dungeon-name").textContent = dungeon.nameZh || dungeon.name;
   $("#key-level").textContent = `+${dungeon.keystoneLevel}`;
-  $("#run-meta").textContent = `${dungeon.completed ? "限时完成" : "未完成"} · ${dungeon.keystoneTime || dungeon.duration} · ${source.reportCode} / Fight ${source.fightId}`;
+  $("#run-meta").textContent = `${dungeon.completed ? "限时完成" : "未完成"}，${dungeon.keystoneTime || dungeon.duration}，${source.reportCode} / Fight ${source.fightId}`;
   $("#pull-count").textContent = `${pulls.length} 段`;
   $("#wcl-link").href = source.reportUrl;
   $("#team").innerHTML = team.map((member) => `
     <div class="member" style="--class-color:${CLASS_COLORS[member.class] || "#94a3b8"}">
       <strong>${escapeHtml(member.name)}</strong>
-      <span>${escapeHtml(member.spec)} ${escapeHtml(member.className)} · ${escapeHtml(member.role)}</span>
+      <span>${escapeHtml(member.spec)} ${escapeHtml(member.className)}，${escapeHtml(member.role)}</span>
     </div>
   `).join("");
   $("#related-player").innerHTML = '<option value="">全部玩家事件</option>' + team.map((member) =>
-    `<option value="${member.id}">${escapeHtml(member.name)} · ${escapeHtml(member.role)}</option>`
+    `<option value="${member.id}">${escapeHtml(member.name)}，${escapeHtml(member.role)}</option>`
   ).join("");
 }
 
@@ -135,8 +135,8 @@ async function loadManifest() {
     state.manifest = manifest;
     const selector = $("#sample-select");
     const seasons = [...new Set(manifest.samples.map(sample => sample.season || 1))].sort((a,b) => b-a);
-    selector.innerHTML = seasons.map(season => `<optgroup label="S${season}${season === 1 ? ' · 历史样本' : ' · 正式服样本'}">${manifest.samples.filter(sample => (sample.season || 1) === season).map(sample =>
-      `<option value="${escapeHtml(sample.key)}">S${season} · ${escapeHtml(sample.nameZh)} +${sample.keystoneLevel} · ${escapeHtml(sample.duration)}</option>`
+    selector.innerHTML = seasons.map(season => `<optgroup label="S${season}${season === 1 ? '，历史样本' : '，正式服样本'}">${manifest.samples.filter(sample => (sample.season || 1) === season).map(sample =>
+      `<option value="${escapeHtml(sample.key)}">S${season}，${escapeHtml(sample.nameZh)} +${sample.keystoneLevel}，${escapeHtml(sample.duration)}</option>`
     ).join('')}</optgroup>`).join('');
     const selected = manifest.samples.find((sample) => sample.key === manifest.defaultSampleKey)
       || manifest.samples.find((sample) => sample.key === DEFAULT_SAMPLE_KEY) || manifest.samples[0];
@@ -171,10 +171,10 @@ function selectPull(index) {
 
 function renderPull() {
   const pull = state.document.pulls[state.pullIndex];
-  $("#pull-kicker").textContent = pull.type === "boss" ? `BOSS · Encounter ${pull.encounterId}` : `PULL ${pull.ordinal}`;
+  $("#pull-kicker").textContent = pull.type === "boss" ? `BOSS，Encounter ${pull.encounterId}` : `PULL ${pull.ordinal}`;
   $("#pull-title").textContent = pull.name;
   const eventLabel = state.document.skillSelection?.status === "needs-review" ? "候选事件" : "关键事件";
-  $("#pull-meta").textContent = `全局 ${pull.dungeonTime} 开始 · 战斗 ${pull.duration} · ${pull.enemies.length} 个敌方实例 · ${pull.timeline.length} 条${eventLabel}`;
+  $("#pull-meta").textContent = `全局 ${pull.dungeonTime} 开始，战斗 ${pull.duration}，${pull.enemies.length} 个敌方实例，${pull.timeline.length} 条${eventLabel}`;
   $("#enemy-summary").innerHTML = pull.enemySummary.map((row) => `<span class="enemy-pill">${escapeHtml(row.name)}<strong>×${row.count}</strong></span>`).join("");
   $("#opener-body").innerHTML = pull.enemies.map((enemy) => {
     const opener = enemy.opener;
@@ -193,7 +193,7 @@ function renderPull() {
 
 function openerEvidence(opener) {
   const labels = { cast: "首次施法", damage: "首次伤害", enemyTarget: "敌方首次点名" };
-  const spell = opener.abilityName ? ` · ${escapeHtml(opener.abilityName)}` : "";
+  const spell = opener.abilityName ? `，${escapeHtml(opener.abilityName)}` : "";
   return `<span class="event-badge">${labels[opener.evidence] || opener.evidence}${spell}</span>`;
 }
 
@@ -216,11 +216,11 @@ function renderTimeline() {
       || event.scope === "party";
   });
   $("#timeline-body").innerHTML = events.map((event) => {
-    const duration = event.duration ? ` · 持续 ${escapeHtml(event.duration)}` : "";
+    const duration = event.duration ? `，持续 ${escapeHtml(event.duration)}` : "";
     const roundEvidence = event.roundIncomplete
-      ? `${event.roundLabel} · WCL记录 ${event.roundCastCount}/${event.expectedRoundCastCount}`
+      ? `${event.roundLabel}，WCL记录 ${event.roundCastCount}/${event.expectedRoundCastCount}`
       : event.roundLabel;
-    const round = roundEvidence ? ` · ${escapeHtml(roundEvidence)}` : "";
+    const round = roundEvidence ? `，${escapeHtml(roundEvidence)}` : "";
     const evidence = event.synthetic
       ? `<span class="event-badge synthetic">${escapeHtml(event.syntheticEvidence || "日志事件重建")}${duration}</span>`
       : `<span class="event-badge">${escapeHtml(event.eventType || (event.kind === "enemyBeginCast" ? "begincast" : "cast"))}${round}</span>`;
