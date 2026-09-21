@@ -57,5 +57,17 @@ def test_nightly_melee_breakdown_groups_creature_names_and_egg_columns_are_struc
     player = metrics['nonTankMelee']['players'][0]
     assert player['count'] == 3
     assert player['countBreakdown'] == [{'label': '乌拉特克', 'count': 2}, {'label': '尖啸者', 'count': 1}]
-    assert [c['label'] for c in metrics['eggCarrierWaveHits']['summaryColumns']] == ['搬蛋次数', '期间中波次数']
+    assert [c['label'] for c in metrics['eggCarrierWaveHits']['summaryColumns']] == ['搬蛋次数', '总中波次数', '期间中波次数']
     assert all('countLabel' not in p for p in metrics['eggCarrierWaveHits']['players'])
+
+
+def test_low_egg_duty_filter_only_includes_damage_roles():
+    fight, players, raw = fixture()
+    players[1]['role'] = 'tank'
+    players[2]['role'] = 'range-healer'
+    players[3]['role'] = 'melee-healer'
+    players[4]['role'] = 'unknown'
+    result = boss.analyze_ulatek(fight, {}, players, raw)
+    metric = next(m for m in boss._mechanic_overview([{'fightID': 1, 'ulatek': result}])['metrics'] if m['key'] == 'eggCarrierWaveHits')
+    eligible = {p['playerID'] for p in metric['players'] if p['dutyFilterEligible']}
+    assert eligible == set(range(5, 11))
