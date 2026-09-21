@@ -1789,10 +1789,13 @@ def _mechanic_overview(rendered):
             ))
     carry_totals = {row["player"]: row["count"] for row in nightly_player_totals(egg_duties)}
     hit_totals = {row["player"]: row["count"] for row in nightly_player_totals(egg_hits)}
+    all_wave_totals = {row["player"]: row["count"] for row in nightly_player_totals(wave_hits)}
     egg_players = []
     for name, player in egg_roster.items():
         carries, hits = carry_totals.get(name, 0), hit_totals.get(name, 0)
-        egg_players.append({**player, "count": hits, "carryCount": carries, "waveHitCount": hits})
+        egg_players.append({**player, "count": hits, "carryCount": carries, "waveHitCount": hits,
+                            "totalWaveHitCount": all_wave_totals.get(name, 0),
+                            "dutyFilterEligible": player.get("role") in {"melee-dps", "range-dps", "ranged-dps", "dps"}})
     egg_players.sort(key=lambda row: (-row["carryCount"], -row["waveHitCount"], row["player"]))
     melee_players = nightly_player_totals(melee_events)
     for player in melee_players:
@@ -1842,7 +1845,10 @@ def _mechanic_overview(rendered):
                 "tone": "danger",
                 "description": f"今晚共带蛋 {len(egg_duties)} 次。只统计 P1 与 P2.5；每次独立获取带蛋光环计一次，刷新不重复计数。包含零带蛋玩家，中波次数为实际命中次数。",
                 "carryCount": len(egg_duties),
-                "summaryColumns": [{"key": "carryCount", "label": "搬蛋次数"}, {"key": "waveHitCount", "label": "期间中波次数"}],
+                "summaryColumns": [{"key": "carryCount", "label": "搬蛋次数"}, {"key": "totalWaveHitCount", "label": "总中波次数"}, {"key": "waveHitCount", "label": "期间中波次数"}],
+                "summaryFilter": {"key": "carryCount", "label": "仅显示搬蛋次数少于", "defaultThreshold": 10,
+                                  "totalKey": "totalWaveHitCount", "totalLabel": "总中波次数",
+                                  "eligibilityKey": "dutyFilterEligible", "description": "仅统计输出玩家，排除治疗和坦克。"},
                 "players": egg_players,
                 "events": egg_hits + egg_duties,
             },
