@@ -22,7 +22,7 @@
   <section><h2>逐场灭团分析</h2><div id="pulls" class="grid" style="margin-top:12px"></div></section>
   <section><h2>可躲避伤害</h2><div id="boards" class="grid" style="margin-top:12px"></div></section>
 </main>
-<script src="frontend/core/report-plugin-runtime.js?v=1.1.0-20260825b"></script>
+<script src="frontend/core/report-plugin-runtime.js?v=20260921-recent-reports"></script>
 <script>
   const esc=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
   const num=value=>Number(value||0).toLocaleString("zh-CN");
@@ -40,13 +40,13 @@
   function render(payload){
     const meta=payload.meta||{},data=payload.data||{};
     document.getElementById("title").textContent=meta.bossName||meta.bossKey||"通用战斗报告";
-    document.getElementById("subtitle").textContent=`${meta.version||""} · ${meta.raidName||meta.raidKey||""} · ${meta.analyzedReports?.join(", ")||""}`;
+    document.getElementById("subtitle").textContent=`${meta.version||""}，${meta.raidName||meta.raidKey||""}，${meta.analyzedReports?.join(", ")||""}`;
     const allPulls=pullsOf(data);
     const pulls=selectedFight?allPulls.filter(fight=>Number(fight.fightID??fight.id)===selectedFight):allPulls;
     document.getElementById("pulls").innerHTML=pulls.length?pulls.map(fight=>`
       <article class="card">
-        <div class="pull-head"><h3>Fight ${esc(fight.fightID??fight.id??"-")}</h3><span class="badge ${fight.isKill||fight.kill?"kill":"wipe"}">${fight.isKill||fight.kill?"击杀":"灭团"} · ${esc(fight.duration||"")}</span></div>
-        <p><strong>${esc(fight.wipePhase||fight.fightPhase||"未知阶段")}</strong> · ${esc(fight.wipeReason||fight.reason||"未归因")}</p>
+        <div class="pull-head"><h3>Fight ${esc(fight.fightID??fight.id??"-")}</h3><span class="badge ${fight.isKill||fight.kill?"kill":"wipe"}">${fight.isKill||fight.kill?"击杀":"灭团"}，${esc(fight.duration||"")}</span></div>
+        <p><strong>${esc(fight.wipePhase||fight.fightPhase||"未知阶段")}</strong>，${esc(fight.wipeReason||fight.reason||"未归因")}</p>
         <div class="muted">${esc(fight.investigation||fight.summary||"暂无进一步归因")}</div>
         ${fight.wclDeepLink?`<p><a href="${esc(fight.wclDeepLink)}" target="_blank" rel="noreferrer">查看 WCL 证据</a></p>`:""}
       </article>`).join(""):'<div class="empty">该插件没有输出逐场灭团数据。</div>';

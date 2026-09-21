@@ -8,6 +8,23 @@ import math
 from analyzer_core.config import resolve_analysis_options
 
 CONFIG_SCHEMA = [{'key': 'wavesReviewEnabled', 'type': 'boolean', 'label': '腐蚀浪潮与带蛋', 'description': '', 'default': True}, {'key': 'rageReviewEnabled', 'type': 'boolean', 'label': '被缚之怒', 'description': '', 'default': True}, {'key': 'fangsReviewEnabled', 'type': 'boolean', 'label': '攫取毒牙', 'description': '', 'default': True}, {'key': 'criticalReviewEnabled', 'type': 'boolean', 'label': '关键流程与蛇母之怒', 'description': '', 'default': True}]
+CRITICAL_FIELDS = {
+    "maliceReviewEnabled": ("malice", "恶意打断"),
+    "meleeReviewEnabled": ("nonTankMelee", "非坦克近战伤害"),
+    "motherWrathReviewEnabled": ("motherWrath", "蛇母之怒承接与全团伤害"),
+    "platformReviewEnabled": ("platformTransitions", "碎场流程与减伤"),
+    "serpentBitesReviewEnabled": ("serpentBites", "毒蛇之咬分摊与位置"),
+    "p25EggsReviewEnabled": ("p25Eggs", "P2.5 带蛋死亡与残留"),
+    "coiledPreyReviewEnabled": ("coiledPreyDeaths", "盘绕猎物死亡"),
+}
+CONFIG_SCHEMA += [{"key": key, "type": "boolean", "label": label, "default": True,
+                   "visibleWhen": {"field": "criticalReviewEnabled", "equals": True}}
+                  for key, (_, label) in CRITICAL_FIELDS.items()]
+
+
+def _critical_enabled(options, key):
+    return options["criticalReviewEnabled"] and options[key]
+
 
 from collections import Counter, defaultdict
 
@@ -137,7 +154,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-p25-egg-review-2026-09-20-v8",
+    "mechanicVersion": "ulatek-egg-duty-counts-2026-09-21-v9",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -295,7 +312,7 @@ def _living_player_ids(players, raw, timestamp):
     ]
     changes.extend(
         (int(event.get("timestamp") or 0), "resurrect", event.get("targetID"))
-        for event in raw.get("friendlyCasts") or []
+        for event in (raw.get("friendlyCasts") or []) + (raw.get("trackedActorEvents") or [])
         if event_type(event) == "resurrect"
     )
     for event_time, kind, player_id in sorted(changes):
@@ -310,6 +327,20 @@ def _living_player_ids(players, raw, timestamp):
 
 def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
     egg_intervals = _aura_intervals(raw["debuffs"], EGG_CARRY_ID, fight["endTime"])
+    p25 = _analyze_p25_eggs(fight, actor_map, players, {**raw, "enemyBuffs": raw.get("enemyBuffs", [])})
+    def duty_phase(timestamp):
+        if _phase_at(timestamp, rage_windows) == "P1":
+            return "P1"
+        if p25.get("started") and p25["dutyStartMs"] <= timestamp < p25["dutyEndMs"]:
+            return "P2.5"
+        return None
+    duty_carries = []
+    for interval in egg_intervals:
+        phase = duty_phase(interval["start"])
+        if phase and interval["playerID"] in players:
+            duty_carries.append({**player_ref(players, actor_map, interval["playerID"]), "phase": phase,
+                                 "time": fmt_ms(interval["start"] - fight["startTime"]),
+                                 "timeMs": interval["start"] - fight["startTime"]})
     hatch_changes = _raid_aura_changes(raw["debuffs"], 1301268)
     wave_applies = [
         event for event in raw["debuffs"]
@@ -447,6 +478,9 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
             "events": wave_deaths,
         },
         "carries": carries,
+        "dutyCarries": duty_carries,
+        "dutyWaveHits": [row for row in hits if row["eggCarrier"] and duty_phase(fight["startTime"] + row["timeMs"])],
+        "dutyPlayers": [player_ref(players, actor_map, pid) for pid in players],
     }
 
 
@@ -504,6 +538,7 @@ def _analyze_p25_eggs(fight, actor_map, players, raw):
         completed = checkpoint < int(fight["endTime"])
         result["lastSoakTime"] = fmt_ms(settlement - fight["startTime"])
     stage_end = checkpoint if completed else phase_limit
+    result.update(dutyStartMs=after_rage, dutyEndMs=stage_end)
     result.update(completed=completed, endTime=fmt_ms(stage_end - fight["startTime"]))
     if not completed:
         result["reason"] = "连续分摊未完整结束或日志未覆盖结算后时刻，不判残留携蛋"
@@ -1376,7 +1411,7 @@ def _death_row(fight, actor_map, players, raw, event):
     }
 
 
-def _analyze_critical(fight, actor_map, players, raw):
+def _critical_melee(fight, actor_map, players, raw):
     melee_by_player = defaultdict(list)
     for event in raw["damage"]:
         player_id = event.get("targetID")
@@ -1408,6 +1443,10 @@ def _analyze_critical(fight, actor_map, players, raw):
         })
     melee_players.sort(key=lambda row: (row["totalDamage"], row["hitCount"]), reverse=True)
 
+    return {"hitCount": sum(r["hitCount"] for r in melee_players), "totalDamage": sum(r["totalDamage"] for r in melee_players), "players": melee_players}
+
+
+def _critical_wrath(fight, actor_map, players, raw):
     wrath_casts = sorted(completed_casts(raw["casts"], 1298367), key=lambda row: int(row["timestamp"]))
     wrath_damage = [
         event for event in raw["damage"]
@@ -1468,6 +1507,10 @@ def _analyze_critical(fight, actor_map, players, raw):
             "damageSpellIDs": sorted({int(ability_id(row) or 0) for row in damage_events}),
         })
 
+    return {"castCount": len(wrath_casts), "raidWideFailureCount": len(mother_wrath_failures), "raidWideTargetThreshold": 3, "failures": mother_wrath_failures}
+
+
+def _critical_platform(fight, actor_map, players, raw):
     shatters = completed_casts(raw["casts"], 1315341)
     bites = completed_casts(raw["casts"], 1295905)
     transitions = []
@@ -1500,34 +1543,50 @@ def _analyze_critical(fight, actor_map, players, raw):
         })
         previous_end = shatter_time
     focus = transitions[1] if len(transitions) >= 2 else None
+    return {"platformTransitions": transitions, "platform2To3": focus}
+
+
+def _critical_prey(fight, actor_map, players, raw):
     coiled_prey_deaths = [
         _death_row(fight, actor_map, players, raw, event)
         for event in raw.get("deaths") or []
         if int(event.get("killingAbilityGameID") or ability_id(event) or 0) == 1301510
     ]
-    return {
-        "malice": _analyze_malice(fight, actor_map, raw),
-        "nonTankMelee": {
-            "hitCount": sum(row["hitCount"] for row in melee_players),
-            "totalDamage": sum(row["totalDamage"] for row in melee_players),
-            "players": melee_players,
-        },
-        "motherWrath": {
-            "castCount": len(wrath_casts),
-            "raidWideFailureCount": len(mother_wrath_failures),
-            "raidWideTargetThreshold": 3,
-            "failures": mother_wrath_failures,
-        },
-        "platformTransitions": transitions,
-        "platform2To3": focus,
-        "serpentBites": _analyze_serpent_bites(fight, actor_map, players, raw),
-        "p25Eggs": _analyze_p25_eggs(fight, actor_map, players, raw),
-        "coiledPreyDeaths": {
-            "spellID": 1301510,
-            "deathCount": len(coiled_prey_deaths),
-            "deaths": coiled_prey_deaths,
-        },
-    }
+    return {"spellID": 1301510, "deathCount": len(coiled_prey_deaths), "deaths": coiled_prey_deaths}
+
+
+def _analyze_critical(fight, actor_map, players, raw):
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
+    functions = {"maliceReviewEnabled": lambda: _analyze_malice(fight, actor_map, raw),
+                 "meleeReviewEnabled": lambda: _critical_melee(fight, actor_map, players, raw),
+                 "motherWrathReviewEnabled": lambda: _critical_wrath(fight, actor_map, players, raw),
+                 "serpentBitesReviewEnabled": lambda: _analyze_serpent_bites(fight, actor_map, players, raw),
+                 "p25EggsReviewEnabled": lambda: _analyze_p25_eggs(fight, actor_map, players, raw),
+                 "coiledPreyReviewEnabled": lambda: _critical_prey(fight, actor_map, players, raw)}
+    result = {"enabledItems": {name: _critical_enabled(options, key) for key, (name, _) in CRITICAL_FIELDS.items()}}
+    for key, fn in functions.items():
+        if _critical_enabled(options, key):
+            result[CRITICAL_FIELDS[key][0]] = fn()
+    if _critical_enabled(options, "platformReviewEnabled"):
+        result.update(_critical_platform(fight, actor_map, players, raw))
+    return result
+
+
+def _nightly_collapse(fight, players, raw):
+    changes = [e for e in raw.get("deaths", []) if event_type(e) == "death"]
+    changes += [e for e in raw.get("friendlyCasts", []) + raw.get("trackedActorEvents", []) if event_type(e) == "resurrect"]
+    dead = set()
+    for e in sorted(changes, key=lambda e: int(e["timestamp"])):
+        pid = e.get("targetID")
+        if pid not in players:
+            continue
+        if event_type(e) == "death":
+            dead.add(pid)
+        else:
+            dead.discard(pid)
+        if len(dead) >= 8:
+            return int(e["timestamp"])
+    return None
 
 
 def analyze_ulatek(fight, actor_map, players, raw):
@@ -1536,12 +1595,25 @@ def analyze_ulatek(fight, actor_map, players, raw):
     waves = _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows) if options["wavesReviewEnabled"] else {}
     if waves:
         waves["p3Eggs"] = _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows)
-    return {
+    result = {
         "wavesAndEggs": waves,
         "rage": _analyze_rage(fight, actor_map, players, raw, rage_windows) if options["rageReviewEnabled"] else {},
         "fangs": _analyze_fangs(fight, actor_map, players, raw) if options["fangsReviewEnabled"] else {},
         "critical": _analyze_critical(fight, actor_map, players, raw) if options["criticalReviewEnabled"] else {},
     }
+
+    if not raw.get("_nightlyPass"):
+        cutoff = _nightly_collapse(fight, players, raw)
+        result["nightlyExemption"] = {"threshold": 8, "active": cutoff is not None,
+                                     "timeMs": cutoff - fight["startTime"] if cutoff is not None else None,
+                                     "time": fmt_ms(cutoff - fight["startTime"]) if cutoff is not None else None,
+                                     "reason": "本场死亡人数首次达到8人，此时及之后的记录不计整晚统计；单场保留供复盘，战复后不恢复本场计数。"}
+        if cutoff is not None:
+            limited = {key: [e for e in value if not isinstance(e, dict) or "timestamp" not in e or int(e["timestamp"]) < cutoff]
+                       if isinstance(value, list) else value for key, value in raw.items()}
+            limited["_nightlyPass"] = True
+            result["nightlyReview"] = analyze_ulatek({**fight, "endTime": cutoff, "kill": False}, actor_map, players, limited)
+    return result
 
 
 analyze_mechanics = analyze_ulatek
@@ -1550,6 +1622,7 @@ analyze_mechanics = analyze_ulatek
 def _mechanic_overview(rendered):
     wave_hits = []
     egg_hits = []
+    egg_duties, egg_roster = [], {}
     p1_wave_deaths = []
     p3_wave_deaths = []
     wrong_breaks = []
@@ -1560,7 +1633,17 @@ def _mechanic_overview(rendered):
     mother_wrath_failures = []
     p25_egg_deaths, p25_egg_remaining = [], []
     for pull in rendered:
-        mechanics = pull.get(BOSS_CONFIG["key"]) or {}
+        full_mechanics = pull.get(BOSS_CONFIG["key"]) or {}
+        mechanics = full_mechanics.get("nightlyReview") or full_mechanics
+        waves = mechanics.get("wavesAndEggs") or {}
+        for player in waves.get("dutyPlayers", []):
+            egg_roster[player["player"]] = player
+        for row in waves.get("dutyCarries", []):
+            egg_duties.append(nightly_detail(pull, row["time"], f"{row['player']}：{row['phase']} 领取蛇卵", player=row["player"],
+                                             playerID=row["playerID"], classColor=row.get("classColor"), phase=row["phase"], spellID=EGG_CARRY_ID))
+        for row in waves.get("dutyWaveHits", []):
+            egg_hits.append(nightly_detail(pull, row["time"], f"{row['player']}：携带蛇卵命中腐蚀浪潮（P1/P2.5）",
+                                           player=row["player"], classColor=row.get("classColor"), spellID=WAVE_ID))
         egg_review = (mechanics.get("critical") or {}).get("p25Eggs") or {}
         for key, target, label in (("deaths", p25_egg_deaths, "P2.5 连续分摊期间带蛋死亡"),
                                    ("remaining", p25_egg_remaining, "P2.5 分摊结束仍携蛋（玩家失误）")):
@@ -1578,8 +1661,6 @@ def _mechanic_overview(rendered):
                 spellID=WAVE_ID,
             )
             wave_hits.append(event)
-            if row.get("eggCarrier"):
-                egg_hits.append({**event, "text": f"{row.get('player')} 携带蛇卵命中腐蚀浪潮"})
         for row in (((mechanics.get("wavesAndEggs") or {}).get("waveDeaths") or {}).get("events") or []):
             event = nightly_detail(
                 pull,
@@ -1642,6 +1723,7 @@ def _mechanic_overview(rendered):
                     classColor=player_row.get("classColor"),
                     spellID=1,
                     amount=event.get("amount"),
+                    source=event.get("source") or "未知生物",
                 ))
         wrath = (mechanics.get("critical") or {}).get("motherWrath") or {}
         for row in wrath.get("failures") or []:
@@ -1658,6 +1740,17 @@ def _mechanic_overview(rendered):
                 totalDamage=row.get("totalDamage"),
                 receiverEvidence=row.get("receiverEvidence"),
             ))
+    carry_totals = {row["player"]: row["count"] for row in nightly_player_totals(egg_duties)}
+    hit_totals = {row["player"]: row["count"] for row in nightly_player_totals(egg_hits)}
+    egg_players = []
+    for name, player in egg_roster.items():
+        carries, hits = carry_totals.get(name, 0), hit_totals.get(name, 0)
+        egg_players.append({**player, "count": hits, "carryCount": carries, "waveHitCount": hits})
+    egg_players.sort(key=lambda row: (-row["carryCount"], -row["waveHitCount"], row["player"]))
+    melee_players = nightly_player_totals(melee_events)
+    for player in melee_players:
+        sources = Counter(e["source"] for e in melee_events if e.get("player") == player["player"])
+        player["countBreakdown"] = [{"label": source, "count": count} for source, count in sources.most_common()]
     return {
         "title": "整夜机制统计",
         "subtitle": "按全部乌拉特克 Pull 汇总腐蚀浪潮、P1/P3 中波死亡、带蛋、拉线、盘绕猎物、蛇母之怒 A 团、平台减伤与非坦克近战证据。",
@@ -1696,12 +1789,15 @@ def _mechanic_overview(rendered):
             },
             {
                 "key": "eggCarrierWaveHits",
-                "label": "带蛋中波次数",
+                "label": "带蛋任务与中波（P1 / P2.5）",
                 "value": len(egg_hits),
                 "unit": "次",
                 "tone": "danger",
-                "players": nightly_player_totals(egg_hits),
-                "events": egg_hits,
+                "description": f"今晚共带蛋 {len(egg_duties)} 次。只统计 P1 与 P2.5；每次独立获取带蛋光环计一次，刷新不重复计数。包含零带蛋玩家，中波次数为实际命中次数。",
+                "carryCount": len(egg_duties),
+                "summaryColumns": [{"key": "carryCount", "label": "搬蛋次数"}, {"key": "waveHitCount", "label": "期间中波次数"}],
+                "players": egg_players,
+                "events": egg_hits + egg_duties,
             },
             {
                 "key": "wrongFangBreaks",
@@ -1737,7 +1833,8 @@ def _mechanic_overview(rendered):
                 "unit": "次",
                 "tone": "danger",
                 "totalDamage": melee_damage,
-                "players": nightly_player_totals(melee_events),
+                "players": melee_players,
+                "countBreakdownLabel": "攻击生物与次数",
                 "events": melee_events,
             },
             {
@@ -1762,18 +1859,31 @@ def build_aggregated_json(report_ids, options=None):
     if options["wavesReviewEnabled"]:
         config["trackedDamageTargetGameIDs"].add(DEVOURERS_SPAWN_GAME_ID)
     config["trackedActorGameIDs"] = {BLIGHTSCALE_SHRIEKER_GAME_ID} if options["wavesReviewEnabled"] else set()
-    config["fetchPositionResources"] = bool(
-        options["wavesReviewEnabled"]
-        or options["criticalReviewEnabled"]
-        or options["fangsReviewEnabled"]
-    )
-    if not any(options.values()):
-        config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
-        config["fetchPositionResources"] = False
-        config["trackedActorGameIDs"] = set()
-        config["trackedActorEventFilters"] = []
-        config["trackedDamageTargetGameIDs"] = set()
-        config["tabs"] = [row for row in config["tabs"] if row[0] == "survival"]
+    critical = lambda key: _critical_enabled(options, key)
+    spatial = options["wavesReviewEnabled"] or options["fangsReviewEnabled"] or critical("serpentBitesReviewEnabled")
+    config["fetchPositionResources"] = spatial
+    config["fetchEventResources"] = spatial
+    config["fetchCastResources"] = spatial
+    config["fetchTrackedActorResources"] = spatial
+    config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
+    if options["wavesReviewEnabled"] or options["rageReviewEnabled"]:
+        config["fetchKeys"].update({"casts", "damage", "debuffs", "enemyBuffs"})
+    if options["rageReviewEnabled"]:
+        config["fetchKeys"].add("friendlyBuffs")
+    if options["fangsReviewEnabled"]:
+        config["fetchKeys"].update({"casts", "debuffs"})
+    for key, streams in {
+        "maliceReviewEnabled": {"casts"}, "meleeReviewEnabled": {"damage"},
+        "motherWrathReviewEnabled": {"casts", "damage"}, "platformReviewEnabled": {"casts"},
+        "serpentBitesReviewEnabled": {"casts", "debuffs"},
+        "p25EggsReviewEnabled": {"casts", "debuffs", "enemyBuffs", "damage"},
+    }.items():
+        if critical(key):
+            config["fetchKeys"].update(streams)
+    has_analysis = any(options[k] for k in ("wavesReviewEnabled", "rageReviewEnabled", "fangsReviewEnabled")) or any(critical(k) for k in CRITICAL_FIELDS)
+    config["trackedActorEventFilters"] = ['type = "resurrect"'] if has_analysis else []
+    if options["wavesReviewEnabled"]:
+        config["trackedActorEventFilters"].append(f"source.id = {BLIGHTSCALE_SHRIEKER_GAME_ID}")
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
     config["tabs"] = [row for row in config["tabs"] if row[0] == "survival" or options[{"waves":"wavesReviewEnabled", "heart":"rageReviewEnabled", "fangs":"fangsReviewEnabled", "critical":"criticalReviewEnabled"}[row[0]]]]
     result = _build(config, analyze_mechanics, report_ids, options)
@@ -1782,13 +1892,13 @@ def build_aggregated_json(report_ids, options=None):
         result.get("data", {}).get("page1_wipeAnalysis") or []
     )
     metric_options = {
-        "p25EggDeaths": "criticalReviewEnabled", "p25EggRemaining": "criticalReviewEnabled",
+        "p25EggDeaths": "p25EggsReviewEnabled", "p25EggRemaining": "p25EggsReviewEnabled",
         "waveHits": "wavesReviewEnabled", "p1WaveDeaths": "wavesReviewEnabled", "p3WaveDeaths": "wavesReviewEnabled", "eggCarrierWaveHits": "wavesReviewEnabled",
-        "wrongFangBreaks": "fangsReviewEnabled", "platform2To3Defensives": "criticalReviewEnabled",
-        "coiledPreyDeaths": "criticalReviewEnabled", "nonTankMelee": "criticalReviewEnabled", "motherWrathRaidwide": "criticalReviewEnabled",
+        "wrongFangBreaks": "fangsReviewEnabled", "platform2To3Defensives": "platformReviewEnabled",
+        "coiledPreyDeaths": "coiledPreyReviewEnabled", "nonTankMelee": "meleeReviewEnabled", "motherWrathRaidwide": "motherWrathReviewEnabled",
     }
     result["data"]["mechanicOverview"]["metrics"] = [
-        row for row in result["data"]["mechanicOverview"]["metrics"] if options[metric_options[row["key"]]]
+        row for row in result["data"]["mechanicOverview"]["metrics"] if (_critical_enabled(options, metric_options[row["key"]]) if metric_options[row["key"]] in CRITICAL_FIELDS else options[metric_options[row["key"]]])
     ]
     return result
 

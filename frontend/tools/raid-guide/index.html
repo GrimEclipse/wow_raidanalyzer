@@ -427,8 +427,8 @@
         }
         .timeline-combo > summary::-webkit-details-marker { display: none; }
         .timeline-combo > summary .timeline-event { border: 0; border-radius: 0; background: transparent; }
-        .timeline-combo > summary .event-kind::before { content: "展开 · "; color: #a88b4e; }
-        .timeline-combo[open] > summary .event-kind::before { content: "收起 · "; }
+        .timeline-combo > summary .event-kind::before { content: "展开，"; color: #a88b4e; }
+        .timeline-combo[open] > summary .event-kind::before { content: "收起，"; }
         .combo-children { display: grid; gap: 4px; padding: 0 9px 9px 67px; }
         .combo-child {
             display: grid;
@@ -818,8 +818,8 @@
             <a class="spell-icon-link" href="${escapeHtml(spell.wowheadUrl)}"
                 data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small"
                 target="_blank" rel="noreferrer"
-                aria-label="${escapeHtml(`${label} · ID: ${spellID}`)}"
-                title="${escapeHtml(`${label} · ID: ${spellID}`)}">
+                aria-label="${escapeHtml(`${label}，ID: ${spellID}`)}"
+                title="${escapeHtml(`${label}，ID: ${spellID}`)}">
                 <span class="spell-icon-fallback">?</span>
             </a>
             <div class="spell-copy">
@@ -902,7 +902,7 @@
         });
         const icons = relatedSpells.map(spell => {
             const label = spell.nameZh || spell.nameEn || `Spell ${spell.spellID}`;
-            const tooltip = `${label} · ${spellCategoryLabel(spell)} · ID: ${spell.spellID}`;
+            const tooltip = `${label}，${spellCategoryLabel(spell)}，ID: ${spell.spellID}`;
             return `<a class="spell-icon-link" href="${escapeHtml(spell.wowheadUrl)}"
                 data-wowhead="domain=cn&amp;dd=15" data-wh-icon-size="small"
                 target="_blank" rel="noreferrer"
@@ -911,7 +911,7 @@
             </a>`;
         }).join("");
         return `<div class="mechanic-spell-cluster">
-            <span class="mechanic-icon-label">主要技能 · ${escapeHtml(spellCategoryLabel(primary))}</span>
+            <span class="mechanic-icon-label">主要技能，${escapeHtml(spellCategoryLabel(primary))}</span>
             <div class="mechanic-primary-spell">${leaderSpellLink(boss, primary.spellID, "", true)}</div>
             ${relatedSpells.length ? `<div class="mechanic-related">
                 <span class="mechanic-icon-label">附属效果</span>
@@ -941,7 +941,7 @@
 
     function renderHero(boss) {
         $("hero").style.backgroundImage = boss.image ? `url("${boss.image}")` : "";
-        $("bossEyebrow").textContent = `${boss.raidNameZh || "12.1"} · Encounter ${String(boss.order).padStart(2, "0")}`;
+        $("bossEyebrow").textContent = `${boss.raidNameZh || "12.1"}，Encounter ${String(boss.order).padStart(2, "0")}`;
         $("bossName").textContent = boss.nameZh;
         $("bossEnglish").textContent = boss.nameEn;
         $("bossSummary").textContent = boss.summary;
@@ -959,7 +959,7 @@
         const title = boss.energy.title || `${boss.energy.resource}规则`;
         const description = boss.energy.description || "资源达到上限前必须完成的战斗目标。";
         const gaugeLabel = boss.energy.gaugeLabel || "资源上限 / 狂暴";
-        const gaugeNote = boss.energy.gaugeNote || `0 → ${boss.energy.maximum} · 时间轴只会向失败终点推进`;
+        const gaugeNote = boss.energy.gaugeNote || `0 → ${boss.energy.maximum}，时间轴只会向失败终点推进`;
         if (boss.energy.displayMode === "rules") {
             section.innerHTML = `
                 <div class="section-heading"><div><h3>${escapeHtml(title)}</h3><p>${escapeHtml(description)}</p></div></div>
@@ -1039,7 +1039,7 @@
             const left = Math.max(0, Math.min(100, event.timeMs / duration * 100));
             const color = sourceColor(event.sourceName);
             return `<i class="event-tick" style="left:${left.toFixed(3)}%;${color ? `--source-color:${color}` : ""}"
-                title="${escapeHtml(`${formatTime(event.timeMs)} · ${event.label}`)}"></i>`;
+                title="${escapeHtml(`${formatTime(event.timeMs)}，${event.label}`)}"></i>`;
         }).join("");
         const kindLabels = {
             raid: "团队",
@@ -1225,7 +1225,7 @@
         renderTimeline(boss);
         renderMechanics(boss);
         renderSpells(boss);
-        document.title = `${boss.nameZh} · 团本手册`;
+        document.title = `${boss.nameZh}，团本手册`;
         refreshWowhead();
     }
 

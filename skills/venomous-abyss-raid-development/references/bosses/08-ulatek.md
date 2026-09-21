@@ -1,5 +1,7 @@
 # Boss 8 · Ula'tek
 
+Nightly egg-duty participation and carried-egg wave contacts are restricted to P1 and P2.5. Count distinct carry-aura intervals by application time; refreshes are not additional assignments. Use the confirmed second Bound Fury ending through the six-soak settlement as P2.5, bounded by the next platform transition when incomplete. Show carry and contact counts together, including zero-duty roster players. Keep P2/P3 out of this comparison.
+
 Ula'tek is the final Boss. Live Normal and Heroic evidence now exists in WCL
 Zone 53 (encounter 3492).
 
@@ -20,3 +22,7 @@ and the corresponding `1311609` transition; the Heroic safe cap is three stacks.
 During each `1286860` Bound Fury window, damage to both Ula'tek (`257758`) and
 the Venomous Heart (`267460`) is effective. Return the separate target totals
 and their sum; attribute pet and guardian damage to the owning player.
+
+Critical analysis has seven independent, default-on suboptions. Disabled sections must skip their event streams and spatial calculations where no other selected section needs them.
+
+Nightly mechanics stop permanently at the first timestamp with eight simultaneously dead players. Include actual resurrect events when counting deaths before this threshold. Keep full single-fight evidence and show the cutoff notice; aggregate only the pre-cutoff review for every nightly metric, including egg duty counts.

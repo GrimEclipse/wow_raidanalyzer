@@ -69,7 +69,7 @@
     const date = meta.progressDate || firstFightDate(payload);
     const boss = meta.bossName || meta.bossKey;
     const parts = [boss, reports, date].filter(Boolean);
-    return parts.length ? parts.join(' · ') : (file?.name || '已缓存 JSON');
+    return parts.length ? parts.join('，') : (file?.name || '已缓存 JSON');
   }
 
   function openDatabase() {

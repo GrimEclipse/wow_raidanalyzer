@@ -751,7 +751,7 @@ def build_passage_cliff_board(fight, deaths, markers, death_timeline, player_rol
                 f"{phase} 非转阶段窗口莫名坠崖，且不在密集跳崖放弃波内、死亡仍在第"
                 f"{GLOBAL_DEATH_EXEMPT_THRESHOLD}次内，按过场失误计数"
             ),
-            "text": f"Fight{fight.get('id')} {name} 于 {time_text}（{phase}）死于坠崖 · 过场失误",
+            "text": f"Fight{fight.get('id')} {name} 于 {time_text}（{phase}）死于坠崖，过场失误",
         })
     return sorted(board.values(), key=lambda row: row.get("deathCount", 0), reverse=True)
 
@@ -938,7 +938,7 @@ def build_voreluth_vulnerability_board(fight, actor_map, actor_game_id, debuffs,
             "firstFadeTime": summary.get("firstFadeTime"),
             "firstFadeStack": summary.get("firstFadeStack"),
             "text": (
-                f"Fight{fight.get('id')} {name}（坦克）· 龌勒卢斯第一次被施加腐化精华时间为 {summary.get('applyTime') or '-'}，"
+                f"Fight{fight.get('id')} {name}（坦克），龌勒卢斯第一次被施加腐化精华时间为 {summary.get('applyTime') or '-'}，"
                 f"第一次消失时间为 {summary.get('firstFadeTime') or '-'}，断时约 {summary.get('firstFadeStack') or 0}层。"
                 + (f"（同场fade {stack_text}）仅计1次" if stack_text else "仅计1次")
             ),

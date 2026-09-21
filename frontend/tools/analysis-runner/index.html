@@ -289,14 +289,19 @@ function renderConfig() {
                 </label>
             `;
         } else if (field.type === 'interruptGroups') {
+            for (const group of field.groups || []) {
+                if (!group.migrateFrom) continue;
+                if (!value[group.key]?.length) value[group.key] = group.migrateFrom.flatMap(key => value[key] || []);
+                group.migrateFrom.forEach(key => {value[key] = [];});
+            }
             control = `
                 <div class="text-sm font-semibold text-gray-200">${label}</div>
                 ${description}
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
                     ${(field.groups || []).map(group => `
-                        <label class="block rounded border border-gray-800 bg-gray-950 p-3">
+                        <label ${group.hidden ? 'hidden' : ''} class="${group.hidden ? 'hidden' : 'block'} rounded border border-gray-800 bg-gray-950 p-3">
                             <span class="text-xs font-bold text-gray-400">${escapeHtml(group.label)}</span>
-                            <input data-group="${escapeHtml(group.key)}" value="${escapeHtml((value?.[group.key] || []).join(' '))}" class="${inputClass}" placeholder="玩家A 玩家B 玩家C">
+                            <input data-group="${escapeHtml(group.key)}" value="${escapeHtml((value?.[group.key] || []).join(' '))}" class="${inputClass}" placeholder="${escapeHtml(group.placeholder || field.placeholder || '填写分配到该任务的角色名')}">
                         </label>
                     `).join('')}
                 </div>

@@ -86,7 +86,7 @@ def fetch_payload(
                     "All",
                     fight,
                     filter_expression=filter_expression,
-                    include_resources=True,
+                    include_resources=bool(config.get("fetchTrackedActorResources", True)),
                 )
             )
     else:
@@ -97,7 +97,7 @@ def fetch_payload(
                     "All",
                     fight,
                     source_id=actor_id,
-                    include_resources=True,
+                    include_resources=bool(config.get("fetchTrackedActorResources", True)),
                 )
             )
     if config.get("fetchPositionResources"):

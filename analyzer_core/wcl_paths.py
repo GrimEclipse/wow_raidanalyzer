@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional, Union
@@ -151,26 +152,41 @@ def _file_label(path: Path) -> str:
         stem = stem[: match.start()]
     if stem.startswith("wcl_multi_"):
         boss = stem[len("wcl_multi_"):]
-        label = f"多日志 · {boss}"
+        label = f"多日志，{boss}"
     elif stem.startswith("wcl_"):
         body = stem[4:]
         report_id, sep, boss = body.partition("_")
-        label = f"{report_id} · {boss}" if sep else body
+        label = f"{report_id}，{boss}" if sep else body
     else:
         label = stem
     if date:
-        label = f"{label} · {date[:4]}-{date[4:6]}-{date[6:]}"
+        label = f"{label}，{date[:4]}-{date[4:6]}-{date[6:]}"
     return label
+
+
+@lru_cache(maxsize=128)
+def _is_analysis_report(path: str, modified: int, size: int) -> bool:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+        return (isinstance(payload, dict) and isinstance(payload.get("meta"), dict)
+                and bool(payload["meta"].get("bossKey"))
+                and isinstance(payload.get("data"), dict)
+                and isinstance(payload["data"].get("page1_wipeAnalysis"), list))
+    except (OSError, ValueError):
+        return False
 
 
 def iter_wcl_json_files() -> Iterable[Path]:
     if LEGACY_WCL_JSON.is_file():
         yield LEGACY_WCL_JSON
     if DATA_DIR.is_dir():
-        for path in sorted(DATA_DIR.glob("wcl_*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        for path in sorted(DATA_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
             if path.name.lower() == "manifest.json":
                 continue
-            if WCL_NAME_RE.match(path.name):
+            if not path.is_file() or path.resolve().parent != DATA_DIR.resolve():
+                continue
+            stat = path.stat()
+            if WCL_NAME_RE.match(path.name) or _is_analysis_report(str(path), stat.st_mtime_ns, stat.st_size):
                 yield path
 
 

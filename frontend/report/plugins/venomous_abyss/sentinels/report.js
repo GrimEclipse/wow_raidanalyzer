@@ -52,7 +52,7 @@ function renderSummary() {
 
 function renderSurvival() {
   const survival = current()?.survival || {};
-  $("content").innerHTML = `<section class="panel"><h2>死亡 / 战复时间线</h2><p class="muted">阵亡 ${survival.deathCount || 0} 次 · 战复 ${survival.combatResCount || 0} 次 · 战斗结束存活 ${survival.survivorCount || 0}/${survival.rosterCount || 0}</p>${simpleTable(["时间", "类型", "玩家", "原因 / 技能"], (survival.timeline || []).map(event => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', coloredPlayer(event.player, event.playerID), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${spellLink(event.abilityID, event.ability)}` : spellLink(event.abilityID, event.ability)]))}</section>`;
+  $("content").innerHTML = `<section class="panel"><h2>死亡 / 战复时间线</h2><p class="muted">阵亡 ${survival.deathCount || 0} 次，战复 ${survival.combatResCount || 0} 次，战斗结束存活 ${survival.survivorCount || 0}/${survival.rosterCount || 0}</p>${simpleTable(["时间", "类型", "玩家", "原因 / 技能"], (survival.timeline || []).map(event => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', coloredPlayer(event.player, event.playerID), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${spellLink(event.abilityID, event.ability)}` : spellLink(event.abilityID, event.ability)]))}</section>`;
 }
 
 function spellHeading(spellID, label) {
@@ -74,13 +74,13 @@ function enterPull(index) {
 
 function collisionDetail(collision) {
   const evidence = collision.pairingEvidence === "coordinates"
-    ? `<span class="collision-evidence ${collision.positionConfidence === "reference" ? "reference" : ""}">${collision.positionConfidence === "reference" ? "坐标参考配对" : "坐标配对"}${collision.distanceYards == null ? "" : ` · ${collision.distanceYards}码`}</span>`
+    ? `<span class="collision-evidence ${collision.positionConfidence === "reference" ? "reference" : ""}">${collision.positionConfidence === "reference" ? "坐标参考配对" : "坐标配对"}${collision.distanceYards == null ? "" : `，${collision.distanceYards}码`}</span>`
     : "";
   const header = `<div class="collision-main"><time>${esc(collision.time || "—")}</time><div class="collision-players">${coloredPlayers(collision.players, collision.playerIDs)}</div>`;
   if (collision.kind === "wrong-collision") {
     const movers = (collision.largeMovers || []).map(row => `<div class="movement-warning">${esc(row.player)}在最后一秒进行了大范围的移动（${row.movementYards}码）</div>`).join("");
     const movement = collision.movementEvidence;
-    const movementPlayers = (movement?.players || []).map(row => `${coloredPlayer(row.player, row.playerID)} ${row.movementYards}码`).join(" · ");
+    const movementPlayers = (movement?.players || []).map(row => `${coloredPlayer(row.player, row.playerID)} ${row.movementYards}码`).join("，");
     const pairDistance = movement?.pairDistanceBeforeYards == null || movement?.pairDistanceAtCollisionYards == null
       ? ""
       : `；两人间距 ${movement.pairDistanceBeforeYards}→${movement.pairDistanceAtCollisionYards}码`;
@@ -98,7 +98,7 @@ function roundMechanicCells(round) {
   for (const collision of round.collisions || []) {
     if (collision.kind === "safe-clear") {
       const evidence = collision.pairingEvidence === "coordinates"
-        ? `<span class="collision-evidence ${collision.positionConfidence === "reference" ? "reference" : ""}">${collision.positionConfidence === "reference" ? "坐标参考配对" : "坐标配对"}${collision.distanceYards == null ? "" : ` · ${collision.distanceYards}码`}</span>`
+        ? `<span class="collision-evidence ${collision.positionConfidence === "reference" ? "reference" : ""}">${collision.positionConfidence === "reference" ? "坐标参考配对" : "坐标配对"}${collision.distanceYards == null ? "" : `，${collision.distanceYards}码`}</span>`
         : "";
       cells.push(`<div class="mechanic-cell safe-cell"><div class="collision-main"><time>${esc(collision.time || "—")}</time><div class="collision-players">${coloredPlayers(collision.players, collision.playerIDs)}</div><span class="badge good">安全消除</span></div>${evidence}</div>`);
       continue;
@@ -126,7 +126,7 @@ function roundMechanicCells(round) {
 
 function renderHelical() {
   const helical = current()?.sentinels?.helicalToxins || {};
-  $("content").innerHTML = `<section class="panel notice"><p>${esc(helical.explanation || "")}</p></section><div class="round-list">${(helical.rounds || []).map(round => `<details class="round panel ${round.success ? "safe" : "fail"}" ${round.success ? "" : "open"}><summary><span class="round-title">第 ${round.index} 轮 <small>${esc(round.startTime)}–${esc(round.deadlineTime)} · ${round.initialPlayerCount} 人</small></span><span class="badge ${round.success ? "good" : "bad"}">${round.success ? "安全处理" : `错误 ${round.wrongCollisionCount}`}</span></summary><div class="round-content-grid">${roundMechanicCells(round)}</div></details>`).join("") || '<div class="empty">没有螺旋毒素轮次。</div>'}</div>`;
+  $("content").innerHTML = `<section class="panel notice"><p>${esc(helical.explanation || "")}</p></section><div class="round-list">${(helical.rounds || []).map(round => `<details class="round panel ${round.success ? "safe" : "fail"}" ${round.success ? "" : "open"}><summary><span class="round-title">第 ${round.index} 轮 <small>${esc(round.startTime)}–${esc(round.deadlineTime)}，${round.initialPlayerCount} 人</small></span><span class="badge ${round.success ? "good" : "bad"}">${round.success ? "安全处理" : `错误 ${round.wrongCollisionCount}`}</span></summary><div class="round-content-grid">${roundMechanicCells(round)}</div></details>`).join("") || '<div class="empty">没有螺旋毒素轮次。</div>'}</div>`;
 }
 
 function specLabel(player) {
@@ -138,7 +138,7 @@ function renderMarks() {
   const marks = current()?.sentinels?.marks || {}, players = marks.players || [];
   if (state.playerID == null && players.length) state.playerID = players[0].id;
   const selected = players.find(player => String(player.id) === String(state.playerID)) || players[0];
-  $("content").innerHTML = `<section class="panel"><h2>全员印记概览</h2>${simpleTable(["玩家", "专精", "酸液层数最高", "鲜血层数最高", "同时获得buff的次数", "最高总层数"], players.map(player => [`<span style="color:${player.classColor || "#fff"}">${esc(player.name)}</span>`, esc(specLabel(player)), `<span class="acid">${player.maxAcidStack}</span>`, `<span class="blood">${player.maxBloodStack}</span>`, player.simultaneousBuffCount, player.highestTotalStack]))}</section><section class="panel"><h2>单人分场查询</h2><div class="filters"><label>选择玩家 <select id="playerSelect">${players.map(player => `<option value="${player.id}" ${String(player.id) === String(selected?.id) ? "selected" : ""}>${esc(player.name)} · ${esc(specLabel(player))}</option>`).join("")}</select></label></div>${selected ? simpleTable(["分场", "时间", "酸液（入场→峰值 / 增层）", "鲜血（入场→峰值 / 增层）", "同时获得", "最高总层数"], selected.cycles.map(cycle => [`#${cycle.index}`, `${esc(cycle.startTime)}–${esc(cycle.endTime)}`, `<span class="acid">${cycle.acid.startStack}→${cycle.acid.peak} / ${cycle.acid.gainCount}</span>`, `<span class="blood">${cycle.blood.startStack}→${cycle.blood.peak} / ${cycle.blood.gainCount}</span>`, cycle.simultaneousBuffCount, cycle.highestTotalStack])) : ""}</section>`;
+  $("content").innerHTML = `<section class="panel"><h2>全员印记概览</h2>${simpleTable(["玩家", "专精", "酸液层数最高", "鲜血层数最高", "同时获得buff的次数", "最高总层数"], players.map(player => [`<span style="color:${player.classColor || "#fff"}">${esc(player.name)}</span>`, esc(specLabel(player)), `<span class="acid">${player.maxAcidStack}</span>`, `<span class="blood">${player.maxBloodStack}</span>`, player.simultaneousBuffCount, player.highestTotalStack]))}</section><section class="panel"><h2>单人分场查询</h2><div class="filters"><label>选择玩家 <select id="playerSelect">${players.map(player => `<option value="${player.id}" ${String(player.id) === String(selected?.id) ? "selected" : ""}>${esc(player.name)}，${esc(specLabel(player))}</option>`).join("")}</select></label></div>${selected ? simpleTable(["分场", "时间", "酸液（入场→峰值 / 增层）", "鲜血（入场→峰值 / 增层）", "同时获得", "最高总层数"], selected.cycles.map(cycle => [`#${cycle.index}`, `${esc(cycle.startTime)}–${esc(cycle.endTime)}`, `<span class="acid">${cycle.acid.startStack}→${cycle.acid.peak} / ${cycle.acid.gainCount}</span>`, `<span class="blood">${cycle.blood.startStack}→${cycle.blood.peak} / ${cycle.blood.gainCount}</span>`, cycle.simultaneousBuffCount, cycle.highestTotalStack])) : ""}</section>`;
   const select = $("playerSelect");
   if (select) select.onchange = event => { state.playerID = event.target.value; renderMarks(); };
 }
@@ -156,7 +156,7 @@ function renderField() {
     if (!mythic) return "集中放置";
     const geometry = round.rowAlignment || {};
     if (geometry.aligned == null) return '<span class="badge warn">坐标不足</span>';
-    return `${geometry.aligned ? '<span class="badge good">已成排</span>' : '<span class="badge bad">存在偏离</span>'} · 方向 ${geometry.angleDegrees}° · 跨度 ${geometry.spanYards} 码`;
+    return `${geometry.aligned ? '<span class="badge good">已成排</span>' : '<span class="badge bad">存在偏离</span>'}，方向 ${geometry.angleDegrees}°，跨度 ${geometry.spanYards} 码`;
   };
   $("content").innerHTML = `<section class="panel notice"><p>${esc(water.explanation || "")}</p></section><section class="panel"><h2>${mythic ? "史诗横排放水" : "分摊参与与附着幽暗离散"}</h2>${simpleTable(["轮次", "分摊时间", "附着幽暗人数", "鲜血>酸液但未参与分摊", "队形", placementHeader], (water.rounds || []).map(round => [`#${round.index}`, esc(round.soakTime), round.carrierCount, playerList(round.missingBloodSidePlayers || [], row => coloredPlayer(row.player, row.playerID)), geometryCell(round), placementCell(round)]))}</section>`;
 }
@@ -171,7 +171,7 @@ function noHitText(players) {
 
 function renderAvoidable() {
   const sentinels = current()?.sentinels || {}, living = sentinels.livingVenom || {}, droplets = sentinels.toxicDroplets || {};
-  $("content").innerHTML = `<section class="panel"><h2>${spellHeading(1284209, "活体毒液 · 可躲避伤害")}</h2>${simpleTable(["玩家", "命中", "总伤害", "最大单次", "致死", "时间"], (living.players || []).map(player => [coloredPlayer(player.player, player.playerID), player.hitCount, num(player.totalDamage), num(player.maxHit), player.deathCount, esc((player.events || []).map(event => event.time).join("、"))]))}</section><section class="panel"><h2>${spellHeading(1284434, "剧毒水滴 / 绿球")}</h2>${simpleTable(["轮次", "施法时间", "踩球命中", "不同踩球者", "重复踩球", "本轮未受踩球伤害", "漏球爆炸"], (droplets.rounds || []).map(round => [`#${round.index}`, esc(round.castTime), round.soakHitCount, round.uniqueSoakerCount, playerList(round.repeatSoakers || [], row => `${coloredPlayer(row.player, row.playerID)}×${row.count}`), noHitText(round.noHitPlayers || []), round.missed ? `<span class="badge bad result-badge">${round.blastVictimCount} 人受伤</span>` : '<span class="badge good result-badge">未见爆炸</span>']))}</section>`;
+  $("content").innerHTML = `<section class="panel"><h2>${spellHeading(1284209, "活体毒液，可躲避伤害")}</h2>${simpleTable(["玩家", "命中", "总伤害", "最大单次", "致死", "时间"], (living.players || []).map(player => [coloredPlayer(player.player, player.playerID), player.hitCount, num(player.totalDamage), num(player.maxHit), player.deathCount, esc((player.events || []).map(event => event.time).join("、"))]))}</section><section class="panel"><h2>${spellHeading(1284434, "剧毒水滴 / 绿球")}</h2>${simpleTable(["轮次", "施法时间", "踩球命中", "不同踩球者", "重复踩球", "本轮未受踩球伤害", "漏球爆炸"], (droplets.rounds || []).map(round => [`#${round.index}`, esc(round.castTime), round.soakHitCount, round.uniqueSoakerCount, playerList(round.repeatSoakers || [], row => `${coloredPlayer(row.player, row.playerID)}×${row.count}`), noHitText(round.noHitPlayers || []), round.missed ? `<span class="badge bad result-badge">${round.blastVictimCount} 人受伤</span>` : '<span class="badge good result-badge">未见爆炸</span>']))}</section>`;
   refreshWowhead();
 }
 
@@ -200,7 +200,7 @@ function renderProtovenom() {
 
 function render() {
   renderSummary();
-  $("pageTitle").textContent = `陵寝哨兵${current()?.difficultyName ? `（${current().difficultyName}）` : ""} · Fight ${current()?.fightID || "-"} 技能分析`;
+  $("pageTitle").textContent = `陵寝哨兵${current()?.difficultyName ? `（${current().difficultyName}）` : ""}，Fight ${current()?.fightID || "-"} 技能分析`;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === state.tab));
   ({ survival: renderSurvival, helical: renderHelical, marks: renderMarks, field: renderField, protovenom: renderProtovenom, avoidable: renderAvoidable }[state.tab] || renderHelical)();
 }
@@ -211,7 +211,7 @@ function load(payload) {
   const selectedIndex = selectedFight ? state.pulls.findIndex(pull => Number(pull.fightID) === selectedFight) : -1;
   state.pull = selectedIndex >= 0 ? selectedIndex : 0;
   state.tab = "helical";
-  $("pullSelect").innerHTML = state.pulls.map((pull, index) => `<option value="${index}">Fight ${pull.fightID} · ${esc(pull.difficultyName || "未知难度")} · ${pull.isKill ? "KILL" : `${Number(pull.bossPercentage).toFixed(2)}%`} · ${esc(pull.duration)}</option>`).join("");
+  $("pullSelect").innerHTML = state.pulls.map((pull, index) => `<option value="${index}">Fight ${pull.fightID}，${esc(pull.difficultyName || "未知难度")}，${pull.isKill ? "KILL" : `${Number(pull.bossPercentage).toFixed(2)}%`}，${esc(pull.duration)}</option>`).join("");
   $("pullSelect").value = String(state.pull);
   $("error").textContent = state.pulls.length ? "" : "分析结果中没有陵寝哨兵战斗。";
   render();
@@ -222,7 +222,7 @@ async function loadPath(path) {
 }
 
 $("pullSelect")?.addEventListener("change", event => enterPull(Number(event.target.value)));
-$("fileInput").onchange = async event => { try { load(JSON.parse(await event.target.files[0].text())); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
+$("fileInput").onchange = async event => { try { load(await window.MythicReportRuntime.readLocalFile(event.target.files[0])); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
 document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => { state.tab = button.dataset.tab; render(); });
 const path = new URLSearchParams(location.search).get("json");
 state.sourcePath = path || "";

@@ -67,7 +67,7 @@ function posLabel(position, arena) {
   const scale = Number(arena?.wclCoordScale || 100);
   return `${(position.x / scale).toFixed(1)}, ${(position.y / scale).toFixed(1)}`;
 }
-function renderStats() { const pull = current(), survival = pull?.survival || {}; $("title").textContent = `盘卷祭坛 · Fight ${pull?.fightID || "-"}`; $("meta").textContent = `${pull?.difficultyName || "未知难度"} · ${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`} · ${pull?.date || ""} ${pull?.startClock || ""}`; if(state.payload?.meta?.skippedAnalyses?.length){$("meta").textContent += " · 未分析：" + state.payload.meta.skippedAnalyses.join("、");}$("wclLink").href = pull?.wclDeepLink || "#"; const items = [["战斗时长", pull?.duration || "—"], ["结果", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`], ["难度", pull?.difficultyName || "未知"], ["阵亡", survival.deathCount || 0], ["战复", survival.combatResCount || 0], ["结束存活", `${survival.survivorCount || 0}/${survival.rosterCount || 0}`]]; $("stats").innerHTML = items.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join(""); }
+function renderStats() { const pull = current(), survival = pull?.survival || {}; $("title").textContent = `盘卷祭坛，Fight ${pull?.fightID || "-"}`; $("meta").textContent = `${pull?.difficultyName || "未知难度"}，${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`}，${pull?.date || ""} ${pull?.startClock || ""}`; if(state.payload?.meta?.skippedAnalyses?.length){$("meta").textContent += "，未分析：" + state.payload.meta.skippedAnalyses.join("、");}$("wclLink").href = pull?.wclDeepLink || "#"; const items = [["战斗时长", pull?.duration || "—"], ["结果", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`], ["难度", pull?.difficultyName || "未知"], ["阵亡", survival.deathCount || 0], ["战复", survival.combatResCount || 0], ["结束存活", `${survival.survivorCount || 0}/${survival.rosterCount || 0}`]]; $("stats").innerHTML = items.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join(""); }
 function renderTabs() { const defs = state.payload?.meta?.tabDefinitions || [{ key: "survival", label: "全场存活情况" }]; if (!defs.some((row) => row.key === state.tab)) state.tab = defs[0].key; $("tabs").innerHTML = defs.map((row) => `<button data-tab="${esc(row.key)}" class="${row.key === state.tab ? "active" : ""}">${esc(row.label)}</button>`).join(""); document.querySelectorAll("[data-tab]").forEach((button) => (button.onclick = () => { state.tab = button.dataset.tab; renderContent(); renderTabs(); })); }
 function renderSurvival() { const s = current()?.survival || {}; return `<section class="panel"><h2>死亡原因 / 战复时间线</h2>${table(["时间", "类型", "玩家", "原因 / 技能"], (s.timeline || []).map((event) => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', player(event), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${esc(event.ability)}` : event.deathCause === "fall" ? "跌落" : spellLink(event.abilityID, event.ability)]))}</section><section class="panel"><h2>阶段时间线</h2>${table(["阶段", "时间"], (boss().phaseTimeline || []).map((row) => [esc(row.label), esc(fmtPhase(row.timeMs))]))}</section>`; }
 function fmtPhase(ms) { const s = Math.max(0, Number(ms || 0)) / 1000; return `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`; }
@@ -120,8 +120,8 @@ function venomRoundsForPhase(rounds, phase) {
   });
 }
 function renderToxicDeluge(rounds) {
-  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index} · ${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(["玩家", "拾起", "掉落", "持有时长", "落点"], (round.carriers || []).map((row) => [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)]))}</article>`).join("");
-  return `<section class="panel" data-analysis-option="toxicDelugeReviewEnabled"><h2>剧毒洪流 · 凝结毒液搬运</h2><div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
+  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index}，${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(["玩家", "拾起", "掉落", "持有时长", "落点"], (round.carriers || []).map((row) => [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)]))}</article>`).join("");
+  return `<section class="panel" data-analysis-option="toxicDelugeReviewEnabled"><h2>剧毒洪流，凝结毒液搬运</h2><div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
 }
 function renderManifestations(fixations) {
   return `<section class="panel" data-analysis-option="manifestationsReviewEnabled"><h2>恐惧具象 / 凝视</h2><p class="muted">具象坐标为恐惧具象 NPC；玩家坐标为被凝视者。</p>${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section>`;
@@ -163,7 +163,7 @@ function renderIntermission() {
   const potionBadge = (row) => row.potionUsed
     ? `<span class="badge good">${esc(row.potionName)}</span>`
     : '<span class="badge warn">未使用</span>';
-  return `<section class="panel"><h2>被夺取的容器</h2><p class="muted">开始 ${esc(data.startTime)} · 持续 ${esc(data.duration)} · 漏掉灵魂 <b>${leakCount}</b>（收回精华 1287718） · 踩片 <b>${stepCount}</b></p><p class="muted">${esc(data.evidenceNote || "漏掉的灵魂=残片抵达祖尔加时的收回精华次数。灵魂抹除按全团脉冲合并，列出触发的友方。")}</p><h3>漏掉的灵魂（收回精华）</h3>${(data.leakedFragments || []).length ? table(["时间", "来源", "治疗量"], (data.leakedFragments || []).map((row) => [esc(row.time), esc(row.source || row.target || "—"), row.amount == null ? "—" : Number(row.amount).toLocaleString()])) : '<div class="empty">本场转阶段没有记录到收回精华，漏片为 0。</div>'}<h3>踩片（灵魂抹除）</h3>${(data.spiritErasureSteps || []).length ? table(["时间", "踩片玩家", "全团命中"], (data.spiritErasureSteps || []).map((row) => [esc(row.time), stepPlayer(row), row.hitCount ?? "—"])) : '<div class="empty">本场转阶段没有灵魂抹除脉冲。</div>'}<h3>爆发药水与对祖尔加伤害</h3><p class="muted">转阶段开始时存活的非治疗（含战复） ${data.survivorCount ?? (data.survivors || []).length} 人 · 已用爆发药水 ${data.potionUsedCount ?? 0} · 对祖尔加合计 ${num(data.zuljanDamageTotal)}</p>${table(["玩家", "爆发药水", "使用时间", "对祖尔加伤害", "占比"], (data.survivors || []).filter((row) => !String(row.role || "").includes("healer")).map((row) => [player(row), potionBadge(row), esc(row.potionTime || "—"), num(row.zuljanDamage), row.zuljanPercent == null ? "—" : `${row.zuljanPercent}%`]))}</section>`;
+  return `<section class="panel"><h2>被夺取的容器</h2><p class="muted">开始 ${esc(data.startTime)}，持续 ${esc(data.duration)}，漏掉灵魂 <b>${leakCount}</b>（收回精华 1287718），踩片 <b>${stepCount}</b></p><p class="muted">${esc(data.evidenceNote || "漏掉的灵魂=残片抵达祖尔加时的收回精华次数。灵魂抹除按全团脉冲合并，列出触发的友方。")}</p><h3>漏掉的灵魂（收回精华）</h3>${(data.leakedFragments || []).length ? table(["时间", "来源", "治疗量"], (data.leakedFragments || []).map((row) => [esc(row.time), esc(row.source || row.target || "—"), row.amount == null ? "—" : Number(row.amount).toLocaleString()])) : '<div class="empty">本场转阶段没有记录到收回精华，漏片为 0。</div>'}<h3>踩片（灵魂抹除）</h3>${(data.spiritErasureSteps || []).length ? table(["时间", "踩片玩家", "全团命中"], (data.spiritErasureSteps || []).map((row) => [esc(row.time), stepPlayer(row), row.hitCount ?? "—"])) : '<div class="empty">本场转阶段没有灵魂抹除脉冲。</div>'}<h3>爆发药水与对祖尔加伤害</h3><p class="muted">转阶段开始时存活的非治疗（含战复） ${data.survivorCount ?? (data.survivors || []).length} 人，已用爆发药水 ${data.potionUsedCount ?? 0}，对祖尔加合计 ${num(data.zuljanDamageTotal)}</p>${table(["玩家", "爆发药水", "使用时间", "对祖尔加伤害", "占比"], (data.survivors || []).filter((row) => !String(row.role || "").includes("healer")).map((row) => [player(row), potionBadge(row), esc(row.potionTime || "—"), num(row.zuljanDamage), row.zuljanPercent == null ? "—" : `${row.zuljanPercent}%`]))}</section>`;
 }
 function renderP3() { const data = boss(); return `<section class="panel" data-analysis-option="blightedSeverReviewEnabled"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (data.blightedSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p3"))}${renderManifestations(phaseRows(data.manifestations?.fixations, "p3"))}${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p3"))}`; }
 function diagramHasContent(diagram) {
@@ -250,7 +250,7 @@ function assetFace(url, alt) {
 }
 function bossMarker(p, diagram, extraTitle) {
   const name = bossIconName(diagram);
-  const title = extraTitle ? `${name} · ${extraTitle}` : name;
+  const title = extraTitle ? `${name}，${extraTitle}` : name;
   const url = bossIconUrl(diagram);
   const img = url ? `<img src="${encodeURI(url)}" alt="${esc(name)}">` : "";
   return `<span class="boss-center" title="${esc(title)}" style="left:${p.left}%;top:${p.top}%">${img}</span>`;
@@ -267,15 +267,15 @@ function playerHoverCard(row, extra) {
   const spec = specLabel(row);
   const role = roleLabel(row?.role);
   const bits = [spec, role].filter(Boolean);
-  return `<span class="player-tip"><b style="color:${color}">${esc(row?.player || "未知玩家")}</b>${bits.length ? `<span>${esc(bits.join(" · "))}</span>` : ""}${extra ? `<span>${esc(extra)}</span>` : ""}</span>`;
+  return `<span class="player-tip"><b style="color:${color}">${esc(row?.player || "未知玩家")}</b>${bits.length ? `<span>${esc(bits.join("，"))}</span>` : ""}${extra ? `<span>${esc(extra)}</span>` : ""}</span>`;
 }
 function playerTokenExtra(cls, row) {
   if (cls === "manifest-target") {
-    return row.uncleared === false ? "被恐惧具象点名" : "被恐惧具象点名 · 凝视未消掉";
+    return row.uncleared === false ? "被恐惧具象点名" : "被恐惧具象点名，凝视未消掉";
   }
   if (cls === "bomb") return "幽暗炸弹点名";
   if (cls === "bomb-splash" || cls === "bomb-nearby") {
-    const dist = row.distanceYards != null ? ` · ${row.distanceYards} 码` : "";
+    const dist = row.distanceYards != null ? `，${row.distanceYards} 码` : "";
     return `幽暗炸弹误伤墓缚${dist}`;
   }
   if (cls === "share" || cls === "guillotine-share") return "处斩分摊";
@@ -338,9 +338,9 @@ function fieldMap(data, diagram) {
                     ? "venom"
                     : "venom";
     const label = row.kind === "manifestation"
-      ? `恐惧具象 · ${row.player || ""}`
+      ? `恐惧具象，${row.player || ""}`
       : row.kind === "manifest-target"
-        ? `被点名 · ${row.player || ""}`
+        ? `被点名，${row.player || ""}`
         : (row.player || row.carrier || row.kind || "");
     return fieldMarker(row, p, cls, label);
   }).join("");
@@ -353,7 +353,7 @@ function fieldMap(data, diagram) {
   const nearbyActors = diagram.kind === "spread" ? (diagram.nearbyPlayers || []).filter((row) => row.receivedGravebound !== false).map((row) => {
     const p = pct(row.position, arena);
     if (!p) return "";
-    return fieldMarker(row, p, "bomb-splash", `误伤墓缚 · ${row.player || ""}`);
+    return fieldMarker(row, p, "bomb-splash", `误伤墓缚，${row.player || ""}`);
   }).join("") : "";
   const runout = diagram.kind === "runout" && diagram.origin
     ? rangeCircle(diagram.origin, diagram.dangerRadiusYards || 40, arena, "runout-range", `${diagram.dangerRadiusYards || 40} 码跑离圈`)
@@ -401,7 +401,7 @@ function renderField() {
     const open = Boolean(state.fieldOpen[group.key]);
     const items = group.items.map(({ row, index }) => {
       const active = index === state.diagram;
-      return `<article class="field-diagram-item ${active ? "active" : ""}"><button type="button" class="round-button ${active ? "active" : ""}" data-diagram="${index}"><b>#${row.roundIndex}</b><div>${esc(row.time)} · ${esc(row.phase)}</div></button>${active && open ? `<div class="field-diagram-map">${fieldMap(data, row)}</div>` : ""}</article>`;
+      return `<article class="field-diagram-item ${active ? "active" : ""}"><button type="button" class="round-button ${active ? "active" : ""}" data-diagram="${index}"><b>#${row.roundIndex}</b><div>${esc(row.time)}，${esc(row.phase)}</div></button>${active && open ? `<div class="field-diagram-map">${fieldMap(data, row)}</div>` : ""}</article>`;
     }).join("");
     return `<details class="field-mechanic-panel" data-mechanic="${esc(group.key)}"${open ? " open" : ""}><summary><span class="field-mechanic-title">${esc(group.mechanic)}</span><span class="muted">${group.items.length} 轮</span></summary><div class="field-diagram-list">${items}</div></details>`;
   }).join("");
@@ -429,7 +429,7 @@ function renderContent() { let html = ""; if (state.tab === "survival") html = r
   section.replaceChildren(...(heading ? [heading, note] : [note]));
 }); refreshWowhead(); }
 function render() { renderStats(); renderTabs(); renderContent(); }
-function load(payload) { state.payload = payload; state.pulls = [...(payload.data?.page1_wipeAnalysis || [])].sort((a, b) => String(b.startTimeIso || `${b.date || ""}${b.fightID || ""}`).localeCompare(String(a.startTimeIso || `${a.date || ""}${a.fightID || ""}`))); const fight = Number(new URLSearchParams(location.search).get("fight")); const index = state.pulls.findIndex((row) => Number(row.fightID) === fight); state.pull = index >= 0 ? index : 0; state.tab = (payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); $("pullSelect").innerHTML = state.pulls.map((row, index) => `<option value="${index}">Fight ${row.fightID} · ${esc(row.date || "")} ${esc(row.startClock || "")} · ${esc(row.difficultyName || "未知")} · ${row.isKill ? "KILL" : `${Number(row.bossPercentage).toFixed(2)}%`} · ${esc(row.duration)}</option>`).join(""); $("pullSelect").value = String(state.pull); $("error").textContent = state.pulls.length ? "" : "分析结果中没有该 Boss 战斗。"; render(); }
+function load(payload) { state.payload = payload; state.pulls = [...(payload.data?.page1_wipeAnalysis || [])].sort((a, b) => String(b.startTimeIso || `${b.date || ""}${b.fightID || ""}`).localeCompare(String(a.startTimeIso || `${a.date || ""}${a.fightID || ""}`))); const fight = Number(new URLSearchParams(location.search).get("fight")); const index = state.pulls.findIndex((row) => Number(row.fightID) === fight); state.pull = index >= 0 ? index : 0; state.tab = (payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); $("pullSelect").innerHTML = state.pulls.map((row, index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage).toFixed(2)}%`}，${esc(row.duration)}</option>`).join(""); $("pullSelect").value = String(state.pull); $("error").textContent = state.pulls.length ? "" : "分析结果中没有该 Boss 战斗。"; render(); }
 $("pullSelect").onchange = (event) => { state.pull = Number(event.target.value); state.tab = (state.payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); render(); };
-$("fileInput").onchange = async (event) => { try { load(JSON.parse(await event.target.files[0].text())); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
+$("fileInput").onchange = async (event) => { try { load(await window.MythicReportRuntime.readLocalFile(event.target.files[0])); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
 const path = new URLSearchParams(location.search).get("json"); state.sourcePath = path || ""; if (path) $("overviewLink").href = `/frontend/report/overview.html?json=${encodeURIComponent(path)}`; if (path) window.MythicReportRuntime.loadPayload(path).then(load).catch((error) => ($("error").textContent = error.message)); else $("error").textContent = "请从全场概览进入，或导入分析 JSON。";

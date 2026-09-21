@@ -152,7 +152,7 @@ function renderActions() {
   $("#addAllocation").disabled = !canModify();
   const source = documentState?.catalog?.source;
   const summary = documentState?.catalog?.summary;
-  $("#catalogSource").textContent = source ? `${source.build} · ${source.locale} · ${summary?.itemCount || 0} 条官方客户端掉落` : "";
+  $("#catalogSource").textContent = source ? `${source.build}，${source.locale}，${summary?.itemCount || 0} 条官方客户端掉落` : "";
 }
 
 function renderCalendar() {
@@ -247,7 +247,7 @@ function renderRaidOptions() {
 function renderDay() {
   const date = new Date(`${selectedDate}T12:00:00`);
   const weekday = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][date.getDay()];
-  $("#selectedDateTitle").textContent = `${date.getMonth() + 1} 月 ${date.getDate()} 日 · ${weekday}`;
+  $("#selectedDateTitle").textContent = `${date.getMonth() + 1} 月 ${date.getDate()} 日，${weekday}`;
   const day = currentDayRecord(false);
   const isProgression = new Set(documentState?.calendar?.progressionDates || []).has(selectedDate);
   const progressionToggle = $("#progressionToggle");
@@ -321,7 +321,7 @@ function renderRecipientOptions() {
     const warnParts = [];
     if (markedToday.has(player.id) && player.id !== current) warnParts.push("⚫已黑");
     if (entry && !entry.needEligible) warnParts.push("⚠无需求权");
-    return `<option value="${escapeHtml(player.id)}" style="color:${color}">${warnParts.length ? `${warnParts.join("·")} ` : ""}${escapeHtml(displayName(player))} · ${escapeHtml(player.className || "未设置职业")}</option>`;
+    return `<option value="${escapeHtml(player.id)}" style="color:${color}">${warnParts.length ? `${warnParts.join("·")} ` : ""}${escapeHtml(displayName(player))}，${escapeHtml(player.className || "未设置职业")}</option>`;
   }).join("") || `<option value="">请先维护团队成员</option>`;
   if ([...$("#recipientSelect").options].some(option => option.value === current)) $("#recipientSelect").value = current;
   applyRecipientColor();
@@ -371,7 +371,7 @@ function renderItemOptions() {
   $("#itemSelect").innerHTML = items.length ? items.map(item => {
     const armorLabel = ARMOR_NAMES[item.armorType];
     const armorText = item.lootType === "装备" && armorLabel && !["accessory", "weapon", "other"].includes(item.armorType) ? `${armorLabel}` : "";
-    return `<option value="${item.id}">${escapeHtml(item.nameZh)}${armorText ? ` · ${escapeHtml(armorText)}` : ""} · ${escapeHtml(item.lootType)} / ${escapeHtml(item.slot)}</option>`;
+    return `<option value="${item.id}">${escapeHtml(item.nameZh)}${armorText ? `，${escapeHtml(armorText)}` : ""}，${escapeHtml(item.lootType)} / ${escapeHtml(item.slot)}</option>`;
   }).join("") : `<option value="">没有符合条件的掉落</option>`;
   if (items.some(item => String(item.id) === current)) $("#itemSelect").value = current;
 }
@@ -387,12 +387,12 @@ function renderAllocations() {
   $("#allocationList").classList.toggle("empty", !rows.length);
   $("#allocationList").innerHTML = rows.length ? rows.map(row => {
     const boss = allBosses.find(item => item.key === row.bossKey);
-    const requests = (row.requests || []).map(request => `<span class="class-colored" style="${classStyle(request.playerId)}">${escapeHtml(playerName(request.playerId))}</span>：${MODE_NAMES[request.mode]}`).join(" · ");
+    const requests = (row.requests || []).map(request => `<span class="class-colored" style="${classStyle(request.playerId)}">${escapeHtml(playerName(request.playerId))}</span>：${MODE_NAMES[request.mode]}`).join("，");
     const itemName = row.itemNameZh || row.itemName;
     const itemTitle = /^\d+$/.test(String(row.itemId || ""))
       ? `<a class="item-link" href="https://www.wowhead.com/cn/item=${encodeURIComponent(row.itemId)}" data-wowhead="domain=cn" target="_blank" rel="noreferrer">${escapeHtml(itemName)}</a>`
       : escapeHtml(itemName);
-    return `<article class="allocation-card"><div><h4>${itemTitle}</h4><div class="allocation-meta"><span>${row.sourceType === "boe" ? "装绑物品" : escapeHtml(boss?.name || row.bossKey)}</span><span>${DIFFICULTY_NAMES[row.difficulty]}</span><span><span class="class-colored" style="${classStyle(row.recipientId)}">${escapeHtml(playerName(row.recipientId))}</span> · ${MODE_NAMES[row.awardType]}</span></div>${requests ? `<div class="allocation-note">需求详情：${requests}</div>` : ""}${row.notes ? `<div class="allocation-note">${escapeHtml(row.notes)}</div>` : ""}</div><button class="button danger delete-allocation" data-id="${escapeHtml(row.id)}">删除</button></article>`;
+    return `<article class="allocation-card"><div><h4>${itemTitle}</h4><div class="allocation-meta"><span>${row.sourceType === "boe" ? "装绑物品" : escapeHtml(boss?.name || row.bossKey)}</span><span>${DIFFICULTY_NAMES[row.difficulty]}</span><span><span class="class-colored" style="${classStyle(row.recipientId)}">${escapeHtml(playerName(row.recipientId))}</span>，${MODE_NAMES[row.awardType]}</span></div>${requests ? `<div class="allocation-note">需求详情：${requests}</div>` : ""}${row.notes ? `<div class="allocation-note">${escapeHtml(row.notes)}</div>` : ""}</div><button class="button danger delete-allocation" data-id="${escapeHtml(row.id)}">删除</button></article>`;
   }).join("") : "当天还没有分配记录";
   $("#allocationList").querySelectorAll(".delete-allocation").forEach(button => button.addEventListener("click", () => deleteAllocation(button.dataset.id)));
   refreshWowheadTooltips();
@@ -412,7 +412,7 @@ let blackmarkEditing = null;
 
 function populateBlackmarkForm({ raidKey, difficulty, playerId, verdict, notes }) {
   const select = $("#blackPlayer");
-  const options = roster().filter(row => row.active).map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))} · ${escapeHtml(row.className || "未设置职业")}</option>`).join("");
+  const options = roster().filter(row => row.active).map(row => `<option value="${escapeHtml(row.id)}" style="color:${CLASS_COLORS[row.classKey] || "#edf2f7"}">${escapeHtml(displayName(row))}，${escapeHtml(row.className || "未设置职业")}</option>`).join("");
   select.innerHTML = `<option value="">未标记（当天不黑）</option>${options}`;
   const raidSelect = $("#blackRaid");
   const dayRaidKey = (currentDayRecord(false) || {}).raidKey || raids()[0]?.key || "";
@@ -436,8 +436,8 @@ function openBlackmarkEditor(row) {
   blackmarkEditing = row ? { raidKey: row.raidKey, difficulty: row.difficulty } : null;
   $("#blackmarkEditorTitle").textContent = row ? "编辑黑本记录" : "添加黑本记录";
   $("#blackmarkEditorCopy").textContent = row
-    ? `${selectedDate} · ${raidName(row.raidKey)} · ${DIFFICULTY_NAMES[row.difficulty]}`
-    : `日期：${selectedDate} · 默认为当日团队副本`;
+    ? `${selectedDate}，${raidName(row.raidKey)}，${DIFFICULTY_NAMES[row.difficulty]}`
+    : `日期：${selectedDate}，默认为当日团队副本`;
   populateBlackmarkForm({
     raidKey: row?.raidKey,
     difficulty: row?.difficulty,
@@ -587,7 +587,7 @@ function renderBlackHistory() {
   }).join("") : "还没有任何黑本记录";
   const pagination = $("#blackHistoryPagination");
   pagination.hidden = rows.length <= BLACK_HISTORY_PAGE_SIZE;
-  $("#blackHistoryPageInfo").textContent = `第 ${blackHistoryPage} / ${pageCount} 页 · ${rows.length} 条`;
+  $("#blackHistoryPageInfo").textContent = `第 ${blackHistoryPage} / ${pageCount} 页，${rows.length} 条`;
   $("#blackHistoryPrev").disabled = blackHistoryPage <= 1;
   $("#blackHistoryNext").disabled = blackHistoryPage >= pageCount;
   list.querySelectorAll(".bm-delete").forEach(button => button.addEventListener("click", async () => {
@@ -840,12 +840,12 @@ $("#blackRaid").addEventListener("change", () => {
   const raidSelect = $("#blackRaid");
   if (blackmarkEditing) { blackmarkEditing.raidKey = raidSelect.value; }
   const copy = $("#blackmarkEditorCopy");
-  copy.textContent = `${selectedDate} · ${raidName(raidSelect.value)} · ${DIFFICULTY_NAMES[$("#blackDifficulty").value]}`;
+  copy.textContent = `${selectedDate}，${raidName(raidSelect.value)}，${DIFFICULTY_NAMES[$("#blackDifficulty").value]}`;
 });
 $("#blackDifficulty").addEventListener("change", () => {
   if (blackmarkEditing) { blackmarkEditing.difficulty = $("#blackDifficulty").value; }
   const copy = $("#blackmarkEditorCopy");
-  copy.textContent = `${selectedDate} · ${raidName($("#blackRaid").value)} · ${DIFFICULTY_NAMES[$("#blackDifficulty").value]}`;
+  copy.textContent = `${selectedDate}，${raidName($("#blackRaid").value)}，${DIFFICULTY_NAMES[$("#blackDifficulty").value]}`;
 });
 $("#blackPlayer").addEventListener("change", () => applySelectColor($("#blackPlayer")));
 $("#saveBlackmark").addEventListener("click", saveBlackmark);

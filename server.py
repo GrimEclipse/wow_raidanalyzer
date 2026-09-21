@@ -771,6 +771,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         if path in {"/api/data/list", "/api/data-files"}:
+            if not user.get("canModify"):
+                return self.json_error("需要编辑权限才能检索服务器报告。", HTTPStatus.FORBIDDEN)
             files = list_wcl_data_files()
             write_data_manifest()
             if path == "/api/data-files":
