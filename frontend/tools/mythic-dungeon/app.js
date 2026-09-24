@@ -281,3 +281,39 @@ $("#related-player").addEventListener("change", (event) => {
 });
 
 loadManifest();
+
+fetch("/api/mythic-dungeon/options", {cache:"no-store"}).then(async response => {
+  if (!response.ok) return;
+  const data = await response.json();
+  $("#dungeon-rule").insertAdjacentHTML("beforeend", (data.dungeons || []).map(row =>
+    `<option value="${escapeHtml(row.key)}">${escapeHtml(row.name)} · 已配置规则</option>`).join(""));
+}).catch(() => {});
+
+$("#wcl-run-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = $("#analyze-run");
+  const message = $("#wcl-run-message");
+  button.disabled = true;
+  message.textContent = "正在读取 WCL 全程事件，这可能需要几分钟…";
+  try {
+    const response = await fetch("/api/mythic-dungeon/analyze", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(Object.fromEntries(new FormData(form))),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    setDocument(data);
+    $("#sample-select").selectedIndex = -1;
+    message.textContent = "分析完成，已显示这份大秘境日志。";
+  } catch (error) {
+    message.innerHTML = responseMessage(error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+function responseMessage(message) {
+  return escapeHtml(message) + (message.includes("登录") || message.includes("凭据")
+    ? ' <a href="/account">前往账号设置</a>' : "");
+}

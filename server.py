@@ -6,6 +6,7 @@ import mimetypes
 import os
 import queue
 import re
+import tempfile
 import threading
 import time
 import uuid
@@ -659,7 +660,7 @@ def safe_redirect_target(value, default="/online"):
 
 
 class AnalyzerHandler(BaseHTTPRequestHandler):
-    server_version = "MythicAnalyzer/1.3.2"
+    server_version = "MythicAnalyzer/1.4.0"
 
     def do_GET(self):
         path = self.request_path()
@@ -668,15 +669,21 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.redirect_resource(wowhead_asset)
         if path == "/favicon.ico":
             return self.send_response_body(HTTPStatus.OK, "image/gif", FAVICON_PATH.read_bytes())
-        if path == "/login":
+        if path in {"/login", "/frontend/auth/login.html"}:
+            query = parse_qs(urlparse(self.path).query)
+            next_path = safe_redirect_target((query.get("next") or [""])[0], default="/")
             if self.current_user():
-                return self.redirect("/online")
-            return self.handle_static(path, public=True)
+                return self.redirect(next_path)
+            mode = "register" if (query.get("mode") or [""])[0] == "register" else "login"
+            return self.redirect(f"/?{urlencode({'auth': '1', 'mode': mode, 'next': next_path})}")
 
         if path == "/api/auth/config":
             return self.send_response_body(*json_bytes({
                 "registrationRequiresInvite": bool(INVITE_CODE),
             }))
+
+        if self.is_public_page(path):
+            return self.handle_static(path, public=True)
 
         wowhead_data = local_wowhead_data(path)
         if wowhead_data is not None:
@@ -694,6 +701,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         user = self.require_user(path)
         if not user:
             return None
+        if path in {"/raid-calendar", "/loot"} or path.startswith("/frontend/tools/raid-calendar/"):
+            if not user["canModify"]:
+                return self.json_error("仅工会管理员可访问运营页面。", HTTPStatus.FORBIDDEN)
+        if path == "/admin/accounts" or path.startswith("/frontend/auth/admin"):
+            if not user["isAdmin"]:
+                return self.json_error("仅 admin 可管理账号。", HTTPStatus.FORBIDDEN)
         if path == "/api/auth/me":
             return self.send_response_body(*json_bytes({
                 "user": user,
@@ -754,6 +767,13 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             from analyzer_core.raid_cooldowns import options_document
 
             return self.send_response_body(*json_bytes(options_document()))
+        if path == "/api/mythic-dungeon/options":
+            from analyzer_core.mythic_dungeon_configs import DUNGEON_CONFIGS
+
+            return self.send_response_body(*json_bytes({"dungeons": [
+                {"key": key, "name": value.get("officialNameZh") or value.get("name") or key}
+                for key, value in DUNGEON_CONFIGS.items()
+            ]}))
         if path.startswith("/api/jobs/") and path.endswith("/events"):
             return self.handle_events(path, user)
         if path.startswith("/api/jobs/") and path.endswith("/status"):
@@ -761,12 +781,14 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/jobs/") and path.endswith("/result"):
             return self.handle_result(path, user)
         if path in {"/api/raid-calendar", "/api/loot"}:
+            if not user["canModify"]:
+                return self.json_error("仅工会管理员可查看运营数据。", HTTPStatus.FORBIDDEN)
             query = parse_qs(urlparse(self.path).query)
             selected_date = (query.get("date") or [None])[0]
             difficulty = (query.get("difficulty") or ["heroic"])[0]
             try:
                 document = raid_calendar_store.load_document(selected_date, difficulty)
-                document["permissions"] = {"isAdmin": user["isAdmin"], "canModify": user["canModify"]}
+                document["permissions"] = {"isAdmin": user["canModify"], "canModify": user["canModify"]}
                 return self.send_response_body(*json_bytes(document))
             except ValueError as error:
                 return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
@@ -779,6 +801,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.send_response_body(*json_bytes({"schemaVersion": 1, "files": files}))
             return self.send_response_body(*json_bytes(files))
         if path == "/api/data/latest":
+            if not user["canModify"]:
+                return self.json_error("仅工会管理员可查看服务器报告。", HTTPStatus.FORBIDDEN)
             files = list(iter_wcl_json_files())
             if not files:
                 return self.json_error("no data json", HTTPStatus.NOT_FOUND)
@@ -787,6 +811,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes(data))
         data_file = re.fullmatch(r"/api/data/([^/]+\.json)", path)
         if data_file:
+            if not user["canModify"]:
+                return self.json_error("仅工会管理员可查看服务器报告。", HTTPStatus.FORBIDDEN)
             path_obj = DATA_DIR / data_file.group(1)
             if not path_obj.is_file():
                 path_obj = ROOT / data_file.group(1)
@@ -870,7 +896,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if admin_delete_match:
             return self.handle_admin_delete(user, int(admin_delete_match.group(1)))
         if not user["canModify"]:
-            return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
+            return self.json_error("仅工会管理员可修改运营数据。", HTTPStatus.FORBIDDEN)
         allocation_match = re.fullmatch(r"/api/(?:raid-calendar|loot)/allocations/([A-Za-z0-9_-]+)", path)
         if allocation_match:
             try:
@@ -921,7 +947,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             self.json_error("请先登录。", HTTPStatus.UNAUTHORIZED)
         else:
             next_path = path if path.startswith("/") and not path.startswith("//") else "/"
-            self.redirect(f"/login?{urlencode({'next': next_path})}")
+            self.redirect(f"/?{urlencode({'auth': '1', 'next': next_path})}")
         return None
 
     def valid_origin(self):
@@ -1171,9 +1197,37 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
     def handle_write(self, path, user):
-        if not user["canModify"]:
-            return self.json_error("当前账号只有只读权限。", HTTPStatus.FORBIDDEN)
+        calendar_paths = {"/api/raid-calendar/setup", "/api/loot/setup",
+                          "/api/raid-calendar/settings", "/api/loot/settings",
+                          "/api/raid-calendar/allocations", "/api/loot/allocations",
+                          "/api/raid-calendar/blackmarks", "/api/loot/blackmarks"}
+        if path in calendar_paths and not user["canModify"]:
+            return self.json_error("仅工会管理员可修改运营数据。", HTTPStatus.FORBIDDEN)
         try:
+            if path == "/api/mythic-dungeon/analyze":
+                from analyzer_core.mythic_dungeon_configs import DUNGEON_CONFIGS
+                from analyzer_core.mythic_dungeon_export import export
+
+                credentials = self.require_wcl_credentials(user)
+                if not credentials:
+                    return None
+                payload = self.read_json_body()
+                report_code = normalize_wcl_report_ids(str(payload.get("reportCode") or ""))
+                fight_id = int(payload.get("fightID") or 0)
+                dungeon_key = str(payload.get("dungeonKey") or "").strip()
+                if not re.fullmatch(r"[A-Za-z0-9]+", report_code) or fight_id <= 0:
+                    raise ValueError("请输入有效的 WCL Report 与大秘境 Fight ID。")
+                if dungeon_key and dungeon_key not in DUNGEON_CONFIGS:
+                    raise ValueError("请选择有效的副本配置。")
+                with tempfile.TemporaryDirectory(prefix="mythic-run-") as temp_dir:
+                    with use_wcl_credentials(credentials):
+                        document = export(
+                            report_code, fight_id, Path(temp_dir) / "run.json",
+                            dungeon_key or "observed",
+                            config=None if dungeon_key else {"key": "observed", "officialNameZh": "大秘境"},
+                            observed_skills=not bool(dungeon_key),
+                        )
+                return self.send_response_body(*json_bytes(document))
             if path == "/api/single-fight/latest":
                 credentials = self.require_wcl_credentials(user)
                 if not credentials:
@@ -1202,8 +1256,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             if path in {"/api/raid-calendar/setup", "/api/loot/setup"}:
                 return self.send_response_body(*json_bytes(raid_calendar_store.save_setup(self.read_json_body())))
             if path in {"/api/raid-calendar/settings", "/api/loot/settings"}:
-                if not user["isAdmin"]:
-                    return self.json_error("仅管理员可以修改史诗难度刷新设置。", HTTPStatus.FORBIDDEN)
+                if not user["canModify"]:
+                    return self.json_error("仅工会管理员可以修改史诗难度刷新设置。", HTTPStatus.FORBIDDEN)
                 return self.send_response_body(*json_bytes(raid_calendar_store.save_settings(self.read_json_body())))
             if path in {"/api/raid-calendar/allocations", "/api/loot/allocations"}:
                 return self.send_response_body(*json_bytes(raid_calendar_store.add_allocation(self.read_json_body())))
@@ -1422,12 +1476,22 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    @staticmethod
+    def is_public_page(path):
+        return path in {"/", "/index.html", "/raid-guide", "/frontend/tools/raid-guide",
+                        "/frontend/tools/raid-guide/index.html",
+                        "/frontend/core/design-system.css", "/frontend/core/cosmic-background.js",
+                        "/frontend/core/auth-dialog.css", "/frontend/core/auth-dialog.js",
+                        "/frontend/core/report-plugin-runtime.js", "/frontend/core/home-button.js",
+                        "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"}
+
     def handle_static(self, path, public=False):
         path = normalize_static_request_path(path)
         route_map = {
             "/": "/index.html",
             "/login": "/frontend/auth/login.html",
             "/account": "/frontend/auth/account.html",
+            "/admin/accounts": "/frontend/auth/admin.html",
             "/online": "/frontend/tools/analysis-runner/index.html",
             "/single-fight": "/frontend/tools/single-fight/index.html",
             "/spec-compare": "/frontend/tools/spec-comparison/index.html",
@@ -1442,6 +1506,9 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/LuraJudgement.html": "/frontend/report/index.html",
         }
         path = route_map.get(path, path)
+        if path.startswith("/data/") and (Path(path).suffix.lower() != ".json"
+                                             or not (self.current_user() or {}).get("canModify")):
+            return self.send_error(HTTPStatus.FORBIDDEN)
         allowed = (
             path in {"/index.html", "/boss_catalog.json", "/spec_catalog.json"}
             or path.startswith("/assets/")
@@ -1452,7 +1519,12 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             or path.startswith("/frontend/")
             or path.startswith("/data/")
         )
-        if public and path != "/frontend/auth/login.html":
+        if public and path not in {"/frontend/auth/login.html", "/index.html",
+                                "/frontend/tools/raid-guide/index.html",
+                                "/frontend/core/design-system.css", "/frontend/core/cosmic-background.js",
+                                "/frontend/core/auth-dialog.css", "/frontend/core/auth-dialog.js",
+                                "/frontend/core/report-plugin-runtime.js", "/frontend/core/home-button.js",
+                                "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"}:
             allowed = False
         if not allowed or any(part.startswith(".") for part in Path(path).parts):
             return self.send_error(HTTPStatus.NOT_FOUND)

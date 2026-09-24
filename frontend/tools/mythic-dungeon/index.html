@@ -23,6 +23,14 @@
   </header>
 
   <main>
+    <form id="wcl-run-form" class="wcl-run-form">
+      <div><strong>分析自己的大秘境日志</strong><p>登录并绑定 WCL Client 凭据后，输入 Report 与大秘境 Fight ID。未配置的副本可先查看公开完成日志的实际施法预览。</p></div>
+      <label>Report 链接或编号<input name="reportCode" required placeholder="WCL Report 链接或编号"></label>
+      <label>Fight ID<input name="fightID" type="number" min="1" required placeholder="例如 13"></label>
+      <label>副本规则<select name="dungeonKey" id="dungeon-rule"><option value="">实际施法预览（公开完成日志）</option></select></label>
+      <button type="submit" id="analyze-run">开始分析</button>
+      <span id="wcl-run-message" role="status"></span>
+    </form>
     <p id="season-notice" class="season-notice">正在读取赛季样本……</p>
     <section class="run-header">
       <div>
