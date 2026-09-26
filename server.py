@@ -53,6 +53,7 @@ JOB_DIR = ROOT / ".analysis_jobs"
 JOB_DIR.mkdir(exist_ok=True)
 SINGLE_FIGHT_CACHE_DIR = ROOT / ".single_fight_cache"
 DATA_DIR = ROOT / "data"
+PUBLIC_THEME_PREFIXES = ("/frontend/assets/theme/", "/frontend/assets/fonts/", "/frontend/assets/music/")
 DATA_DIR.mkdir(exist_ok=True)
 EXPORT_DIR = DATA_DIR / "exports"
 _DESKTOP = Path.home() / "Desktop"
@@ -187,7 +188,7 @@ def user_guilds(user_id: int) -> list[dict]:
         AUTH.upsert_guild(
             user_id,
             int(fallback["id"]),
-            str(fallback.get("name") or f"工会 {fallback['id']}"),
+            str(fallback.get("name") or f"公会 {fallback['id']}"),
             is_default=True,
         )
     return AUTH.list_guilds(user_id)
@@ -196,15 +197,15 @@ def user_guilds(user_id: int) -> list[dict]:
 def selected_user_guild(user_id: int, requested_id=None) -> dict:
     guilds = user_guilds(user_id)
     if not guilds:
-        raise AuthError("请先在账号设置中添加一个 WCL 工会。")
+        raise AuthError("请先在账号设置中添加一个 WCL 公会。")
     if requested_id not in (None, ""):
         try:
             selected_id = int(requested_id)
         except (TypeError, ValueError) as error:
-            raise AuthError("WCL 工会 ID 必须是正整数。") from error
+            raise AuthError("WCL 公会 ID 必须是正整数。") from error
         selected = next((guild for guild in guilds if guild["id"] == selected_id), None)
         if not selected:
-            raise AuthError("所选工会不在当前账号的工会列表中。")
+            raise AuthError("所选公会不在当前账号的公会列表中。")
         return selected
     return next((guild for guild in guilds if guild["isDefault"]), guilds[0])
 
@@ -466,7 +467,7 @@ def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredent
 
         acquire_job_slot(job)
         acquired = True
-        set_job_progress(job, status="running", percent=3, message="查找工会最新 Boss 战", stage="discovery", force=True)
+        set_job_progress(job, status="running", percent=3, message="查找公会最新 Boss 战", stage="discovery", force=True)
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with use_wcl_credentials(credentials):
@@ -676,6 +677,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.redirect(next_path)
             mode = "register" if (query.get("mode") or [""])[0] == "register" else "login"
             return self.redirect(f"/?{urlencode({'auth': '1', 'mode': mode, 'next': next_path})}")
+            return self.handle_static(path, public=True)
+        if path.startswith(PUBLIC_THEME_PREFIXES):
+            # 登录页在未登录状态下也需要主题图与字体（只读静态资源，无用户数据）
+            return self.handle_static(path, public=True)
 
         if path == "/api/auth/config":
             return self.send_response_body(*json_bytes({
@@ -1086,11 +1091,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             payload = self.read_json_body()
             guild_id = int(payload.get("guildId") or payload.get("id") or 0)
             if guild_id <= 0:
-                raise AuthError("WCL 工会 ID 必须是正整数。")
+                raise AuthError("WCL 公会 ID 必须是正整数。")
             credentials = AUTH.get_wcl_credentials(user["id"])
             if not credentials:
                 return self.json_error(
-                    "请先保存 WCL Client ID 与 Client Secret，再添加工会。",
+                    "请先保存 WCL Client ID 与 Client Secret，再添加公会。",
                     HTTPStatus.BAD_REQUEST,
                 )
             from analyzer_core.wcl_api import WclClient
@@ -1102,11 +1107,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 )
             resolved = (data.get("guildData") or {}).get("guild") or {}
             if not resolved:
-                raise AuthError("WCL 未找到该工会，请检查工会 ID。")
+                raise AuthError("WCL 未找到该公会，请检查公会 ID。")
             guild = AUTH.upsert_guild(
                 user["id"],
                 int(resolved.get("id") or guild_id),
-                str(resolved.get("name") or f"工会 {guild_id}"),
+                str(resolved.get("name") or f"公会 {guild_id}"),
                 is_default=bool(payload.get("isDefault")),
             )
             return self.send_response_body(*json_bytes({
@@ -1115,7 +1120,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         except (AuthError, ValueError, json.JSONDecodeError) as error:
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         except Exception as error:
-            return self.json_error(f"无法验证工会：{error}", HTTPStatus.BAD_REQUEST)
+            return self.json_error(f"无法验证公会：{error}", HTTPStatus.BAD_REQUEST)
 
     def handle_wcl_credentials_test(self, user):
         try:
@@ -1483,6 +1488,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                         "/frontend/core/design-system.css", "/frontend/core/cosmic-background.js",
                         "/frontend/core/auth-dialog.css", "/frontend/core/auth-dialog.js",
                         "/frontend/core/report-plugin-runtime.js", "/frontend/core/home-button.js",
+                        "/frontend/core/azeroth-shell.js", "/frontend/core/azeroth-skin.css",
+                        "/frontend/core/azeroth-music.js",
                         "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"}
 
     def handle_static(self, path, public=False):
@@ -1524,7 +1531,10 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                                 "/frontend/core/design-system.css", "/frontend/core/cosmic-background.js",
                                 "/frontend/core/auth-dialog.css", "/frontend/core/auth-dialog.js",
                                 "/frontend/core/report-plugin-runtime.js", "/frontend/core/home-button.js",
-                                "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"}:
+                                "/frontend/core/azeroth-shell.js", "/frontend/core/azeroth-skin.css",
+                                "/frontend/core/azeroth-music.js",
+                                "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"} \
+                and not path.startswith(PUBLIC_THEME_PREFIXES):
             allowed = False
         if not allowed or any(part.startswith(".") for part in Path(path).parts):
             return self.send_error(HTTPStatus.NOT_FOUND)

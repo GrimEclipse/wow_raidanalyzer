@@ -9,7 +9,7 @@
     <style>
         body{background:
             radial-gradient(circle at 12% 8%,rgba(34,211,238,.12),transparent 28rem),
-            radial-gradient(circle at 88% 16%,rgba(168,85,247,.11),transparent 30rem),#020617}
+            radial-gradient(circle at 88% 16%,rgba(168,85,247,.11),transparent 30rem),#100c09}
         .phase-chip{display:inline-flex;align-items:center;gap:.4rem;border:1px solid rgba(103,232,249,.18);border-radius:999px;background:rgba(8,47,73,.45);padding:.3rem .65rem;color:#a5f3fc;font-size:.72rem}
         .phase-chip::before{content:"";width:.38rem;height:.38rem;border-radius:50%;background:#22d3ee;box-shadow:0 0 12px #22d3ee}
         .phase-transition-row td{padding:.55rem 1rem;background:linear-gradient(90deg,rgba(126,34,206,.2),rgba(8,47,73,.16));color:#e9d5ff;font-size:.75rem;font-weight:700;letter-spacing:.02em}
@@ -152,7 +152,7 @@
         const seconds = Math.floor(Math.max(0, Number(ms) || 0) / 1000);
         return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     };
-    const classColor = name => classColors[String(name || '').toLowerCase()] || '#cbd5e1';
+    const classColor = name => classColors[String(name || '').toLowerCase()] || '#e9e3dd';
     const playerClassLabels = {deathknight:'死亡骑士',demonhunter:'恶魔猎手',druid:'德鲁伊',evoker:'唤魔师',hunter:'猎人',mage:'法师',monk:'武僧',paladin:'圣骑士',priest:'牧师',rogue:'潜行者',shaman:'萨满祭司',warlock:'术士',warrior:'战士'};
     const samePlayer = (player, row) => row.sourceID != null && player.id != null
         ? String(row.sourceID) === String(player.id)
@@ -497,5 +497,5 @@
     el('demo').addEventListener('click', renderDemo);
 })();
 </script>
-<script src="/frontend/core/home-button.js?v=1"></script></body>
+<script src="/frontend/core/home-button.js?v=1"></script><script src="frontend/core/azeroth-shell.js?v=6"></script></body>
 </html>

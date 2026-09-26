@@ -21,7 +21,7 @@
     .side,.side.ours,.side.peer{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
     .side.ours{border-left:3px solid var(--ours-strong)}
     .side.peer{border-left:3px solid var(--peer-strong)}
-    .legend-chip.ours{background:#202a2e;border:1px solid #315266;color:var(--ours-strong)}
+    .legend-chip.ours{background:#2d2721;border:1px solid #624c35;color:var(--ours-strong)}
     .legend-chip.peer{background:#2c2820;border:1px solid #5e492d;color:var(--peer-strong)}
     .continuity-card,.continuity-card.ours,.continuity-card.peer{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
     .continuity-card.ours{border-left:3px solid var(--ours-strong)}
@@ -79,5 +79,5 @@
   document.getElementById("downloadHtml").addEventListener("click",()=>{if(!documentData)return;const clone=document.documentElement.cloneNode(true);clone.querySelector("#embedded-data").textContent=JSON.stringify(documentData).replace(/<\//g,"<\\/");const blob=new Blob(["<!doctype html>\n"+clone.outerHTML],{type:"text/html;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${documentData.identity.specName}-${documentData.encounter.name}-对标.html`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)});
   load();
 </script>
-</body>
+<script src="/frontend/core/azeroth-shell.js?v=6"></script></body>
 </html>

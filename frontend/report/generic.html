@@ -6,13 +6,13 @@
   <base href="../../">
   <title>通用战斗报告</title>
   <style>
-    :root{color-scheme:dark;--bg:#060a12;--panel:#111827;--panel2:#0b1220;--line:#28364a;--muted:#94a3b8;--ink:#e5e7eb;--blue:#60a5fa;--red:#fb7185;--green:#34d399}
+    :root{color-scheme:dark;--bg:#110c07;--panel:#251c13;--panel2:#1e160d;--line:#47392b;--muted:#c0b1a0;--ink:#f2f0ee;--blue:#60a5fa;--red:#fb7185;--green:#34d399}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 system-ui,"Microsoft YaHei",sans-serif}a{color:var(--blue);text-decoration:none}
     main{max-width:1400px;margin:auto;padding:28px 20px}header{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:end;border-bottom:1px solid var(--line);padding-bottom:18px}
-    h1,h2,h3{margin:0}.muted{color:var(--muted)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.button,input{border:1px solid #3b4b63;background:#0b1220;color:var(--ink);border-radius:7px;padding:8px 11px}
+    h1,h2,h3{margin:0}.muted{color:var(--muted)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.button,input{border:1px solid #604f3e;background:#1e160d;color:var(--ink);border-radius:7px;padding:8px 11px}
     section{margin-top:20px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:15px}
-    .pull-head{display:flex;justify-content:space-between;gap:12px}.badge{display:inline-block;border:1px solid #475569;border-radius:999px;padding:2px 8px;font-size:11px}.wipe{color:var(--red)}.kill{color:var(--green)}
-    table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;padding:8px;border-bottom:1px solid #223047}th{color:#cbd5e1}.board{overflow:auto}.empty{padding:26px;border:1px dashed #334155;border-radius:10px;color:var(--muted)}
+    .pull-head{display:flex;justify-content:space-between;gap:12px}.badge{display:inline-block;border:1px solid #66584a;border-radius:999px;padding:2px 8px;font-size:11px}.wipe{color:var(--red)}.kill{color:var(--green)}
+    table{width:100%;border-collapse:collapse;margin-top:10px}th,td{text-align:left;padding:8px;border-bottom:1px solid #443425}th{color:#e9e3dd}.board{overflow:auto}.empty{padding:26px;border:1px dashed #524436;border-radius:10px;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -71,5 +71,5 @@
   if(path)loadPath(path).catch(error=>document.getElementById("error").textContent=error.message);
   else document.getElementById("error").textContent="请从报告入口选择分析文件，或导入本地 JSON。";
 </script>
-<script src="/frontend/core/home-button.js?v=1"></script></body>
+<script src="/frontend/core/home-button.js?v=1"></script><script src="frontend/core/azeroth-shell.js?v=6"></script></body>
 </html>
