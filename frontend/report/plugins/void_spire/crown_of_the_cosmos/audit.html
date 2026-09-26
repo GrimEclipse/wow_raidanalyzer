@@ -8,11 +8,11 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #080b12;
-      --panel: #101622;
-      --line: #263244;
-      --muted: #94a3b8;
-      --text: #e5e7eb;
+      --bg: #110d09;
+      --panel: #211911;
+      --line: #423528;
+      --muted: #c0b1a0;
+      --text: #f2f0ee;
       --amber: #f59e0b;
       --red: #ef4444;
       --blue: #60a5fa;
@@ -29,7 +29,7 @@
     header {
       padding: 16px 20px;
       border-bottom: 1px solid var(--line);
-      background: #0c111b;
+      background: #1a140d;
       display: flex;
       justify-content: space-between;
       gap: 16px;
@@ -66,13 +66,13 @@
       display: block;
       text-align: left;
       border: 0;
-      border-bottom: 1px solid #1e293b;
+      border-bottom: 1px solid #392c20;
       background: transparent;
       color: var(--text);
       padding: 10px 12px;
       cursor: pointer;
     }
-    button.event:hover, button.event.active { background: #172033; }
+    button.event:hover, button.event.active { background: #312519; }
     button.event.active {
       box-shadow: inset 3px 0 0 var(--amber);
     }
@@ -81,7 +81,7 @@
     }
     @keyframes anchor-pulse {
       0% { background: rgba(245, 158, 11, .34); }
-      100% { background: #172033; }
+      100% { background: #312519; }
     }
     .event-title { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13px; }
     .event-sub { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
@@ -96,12 +96,12 @@
       padding: 11px 12px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: linear-gradient(145deg, #121a28, #0a0f18);
+      background: linear-gradient(145deg, #261d14, #17110b);
       color: var(--text);
       text-align: left;
       cursor: pointer;
     }
-    .phase-card:hover { border-color: #64748b; }
+    .phase-card:hover { border-color: #93806a; }
     .phase-card.active {
       border-color: var(--amber);
       box-shadow: inset 0 0 0 1px rgba(245, 158, 11, .24);
@@ -118,7 +118,7 @@
       margin: 0 auto;
       position: relative;
       aspect-ratio: 873 / 794;
-      background: #05070b;
+      background: #0b0805;
       border: 1px solid var(--line);
       border-radius: 8px;
       overflow: hidden;
@@ -142,22 +142,22 @@
       padding: 5px;
       border: 1px solid rgba(148, 163, 184, .32);
       border-radius: 7px;
-      background: rgba(2, 6, 23, .82);
+      background: rgba(16,12,9,.82);
       backdrop-filter: blur(5px);
     }
     .map-controls button {
       min-width: 30px;
       height: 28px;
       padding: 0 8px;
-      border: 1px solid #334155;
+      border: 1px solid #524436;
       border-radius: 5px;
-      background: #111827;
-      color: #e2e8f0;
+      background: #251c13;
+      color: #f3f0ec;
       cursor: pointer;
       font-weight: 700;
     }
-    .map-controls button:hover { border-color: #94a3b8; }
-    .map-zoom-value { min-width: 46px; color: #cbd5e1; font: 11px/28px ui-monospace, monospace; text-align: center; }
+    .map-controls button:hover { border-color: #c0b1a0; }
+    .map-zoom-value { min-width: 46px; color: #e9e3dd; font: 11px/28px ui-monospace, monospace; text-align: center; }
     .player-tooltip {
       position: absolute;
       z-index: 12;
@@ -168,22 +168,22 @@
       padding: 10px 12px;
       border: 1px solid var(--tooltip-color, #f59e0b);
       border-radius: 5px;
-      background: linear-gradient(160deg, rgba(5, 10, 20, .98), rgba(11, 18, 32, .98));
+      background: linear-gradient(160deg, rgba(16,12,9,.98), rgba(30,22,13,.98));
       box-shadow: 0 12px 28px rgba(0, 0, 0, .62), inset 0 0 18px rgba(255, 255, 255, .025);
-      color: #e5e7eb;
+      color: #f2f0ee;
       pointer-events: none;
       font-size: 12px;
       line-height: 1.5;
     }
     .player-tooltip.visible { display: block; }
-    .tooltip-head { display: flex; align-items: center; gap: 9px; padding-bottom: 7px; border-bottom: 1px solid #273244; }
+    .tooltip-head { display: flex; align-items: center; gap: 9px; padding-bottom: 7px; border-bottom: 1px solid #423629; }
     .tooltip-head img { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--tooltip-color, #f59e0b); }
     .tooltip-name { color: var(--tooltip-color, #fff); font-weight: 800; font-size: 13px; }
-    .tooltip-id { color: #94a3b8; font-family: ui-monospace, monospace; }
-    .tooltip-body { padding-top: 7px; color: #cbd5e1; }
-    .tooltip-vitals { margin-top: 7px; padding-top: 7px; border-top: 1px solid #273244; }
+    .tooltip-id { color: #c0b1a0; font-family: ui-monospace, monospace; }
+    .tooltip-body { padding-top: 7px; color: #e9e3dd; }
+    .tooltip-vitals { margin-top: 7px; padding-top: 7px; border-top: 1px solid #423629; }
     .tooltip-vitals-row { display: flex; justify-content: space-between; gap: 12px; }
-    .tooltip-health-track { height: 5px; margin: 5px 0 6px; overflow: hidden; border-radius: 999px; background: #1e293b; }
+    .tooltip-health-track { height: 5px; margin: 5px 0 6px; overflow: hidden; border-radius: 999px; background: #392c20; }
     .tooltip-health-fill { height: 100%; background: var(--tooltip-color, #22c55e); box-shadow: 0 0 8px var(--tooltip-color, #22c55e); }
     .legend {
       display: flex;
@@ -196,11 +196,11 @@
       border: 1px solid var(--line);
       border-radius: 999px;
       padding: 3px 8px;
-      background: #0b1220;
+      background: #1e160d;
     }
     .skill-focus { display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px 4px; }
-    .skill-focus button { border:1px solid var(--line); background:#0b1220; color:var(--muted); border-radius:999px; padding:4px 10px; font-size:12px; cursor:pointer; }
-    .skill-focus button.active { border-color:var(--amber); color:#fde68a; background:#1a2333; font-weight:700; }
+    .skill-focus button { border:1px solid var(--line); background:#1e160d; color:var(--muted); border-radius:999px; padding:4px 10px; font-size:12px; cursor:pointer; }
+    .skill-focus button.active { border-color:var(--amber); color:#fde68a; background:#31271c; font-weight:700; }
     .details {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -208,14 +208,14 @@
     }
     .card {
       border: 1px solid var(--line);
-      background: #0c1220;
+      background: #1e160e;
       border-radius: 8px;
       padding: 10px;
     }
     .card h3 { margin: 0 0 8px; font-size: 13px; color: #fde68a; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { border-bottom: 1px solid #1e293b; padding: 7px 6px; text-align: left; vertical-align: top; }
-    th { color: #cbd5e1; font-weight: 700; }
+    th, td { border-bottom: 1px solid #392c20; padding: 7px 6px; text-align: left; vertical-align: top; }
+    th { color: #e9e3dd; font-weight: 700; }
     .stats {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -226,7 +226,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 10px;
-      background: #0c1220;
+      background: #1e160e;
     }
     .stat strong { display: block; font-size: 20px; }
     .footer-grid {
@@ -252,8 +252,8 @@
       font-weight: 700;
     }
     .detail-tabs button.active {
-      border-color: #475569;
-      background: #172033;
+      border-color: #66584a;
+      background: #312519;
       color: #f8fafc;
     }
     [hidden] { display: none !important; }
@@ -588,7 +588,7 @@
       if (label) drawText(svg, p.x, p.y + radius + 12, label, color, 'middle');
     }
 
-    function drawText(svg, x, y, text, color = '#e5e7eb', anchor = 'start') {
+    function drawText(svg, x, y, text, color = '#f2f0ee', anchor = 'start') {
       const node = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       node.setAttribute('x', x);
       node.setAttribute('y', y);
@@ -596,7 +596,7 @@
       node.setAttribute('font-size', '11');
       node.setAttribute('text-anchor', anchor);
       node.setAttribute('paint-order', 'stroke');
-      node.setAttribute('stroke', '#020617');
+      node.setAttribute('stroke', '#100c09');
       node.setAttribute('stroke-width', '3');
       node.style.pointerEvents = 'none';
       node.textContent = text;
@@ -756,7 +756,7 @@
       ring.setAttribute('cx', 0);
       ring.setAttribute('cy', 0);
       ring.setAttribute('r', spec?.icon ? PLAYER_ICON_SIZE / 2 + 1.5 : 4.5);
-      ring.setAttribute('fill', spec?.icon ? '#020617' : '#f8ff4a');
+      ring.setAttribute('fill', spec?.icon ? '#100c09' : '#f8ff4a');
       ring.setAttribute('stroke', color);
       ring.setAttribute('stroke-width', spec?.icon ? 2 : 1);
       ring.addEventListener('mouseover', event => showPlayerTooltip(event, player, spec));
@@ -786,7 +786,7 @@
       label.setAttribute('font-weight', 700);
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('paint-order', 'stroke');
-      label.setAttribute('stroke', '#020617');
+      label.setAttribute('stroke', '#100c09');
       label.setAttribute('stroke-width', 3);
       label.style.pointerEvents = 'none';
       label.textContent = name;
@@ -863,7 +863,7 @@
         return `<span title="${escapeHtml(row.phase)} ${escapeHtml(row.time)} ${escapeHtml(row.player)}" style="position:absolute;left:${x}%;top:${y}%;width:10px;height:10px;margin:-5px;border-radius:50%;background:${row.status === '偏散' ? '#fb7185' : '#f0abfc'};box-shadow:0 0 8px currentColor"></span>`;
       }).join('');
       const sectionHtml = sections.map(([title, rows]) => `<section class="panel"><h2>${title} <span class="muted">${rows.length} 条</span></h2>${rows.length ? `<div style="overflow:auto"><table><tbody>${rows.map(row => `<tr><td class="mono">${escapeHtml(row.time || row.fireTime || '-')}</td><td>${escapeHtml(row.text || JSON.stringify(row))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">本场无记录</div>'}</section>`).join('');
-      document.getElementById('app').innerHTML = `<header><div><h1>宇宙之冕，Fight ${fight.fightID} 明细断案</h1><div class="muted">${escapeHtml(fight.startDateTime)}，${escapeHtml(fight.duration)}，${escapeHtml(fight.fightStatus)}</div></div><a href="https://cn.warcraftlogs.com/reports/${encodeURIComponent(fight.reportID)}#fight=${fight.fightID}&view=replay" target="_blank">打开 WCL Replay</a></header><main><section class="panel"><h2>场地快照（已获取放水坐标）</h2><div style="position:relative;max-width:873px;aspect-ratio:873/794;margin:auto;background:url('./assets/crown_of_cosmos_arena.png') center/100% 100%;border:1px solid #334155;border-radius:8px;overflow:hidden">${dotHtml}</div><div class="muted" style="margin-top:8px">亮紫点为放水坐标，红点为 15 码离组判定。完整技能快照数据列于下方。</div></section><section class="grid">${sectionHtml}</section></main>`;
+      document.getElementById('app').innerHTML = `<header><div><h1>宇宙之冕，Fight ${fight.fightID} 明细断案</h1><div class="muted">${escapeHtml(fight.startDateTime)}，${escapeHtml(fight.duration)}，${escapeHtml(fight.fightStatus)}</div></div><a href="https://cn.warcraftlogs.com/reports/${encodeURIComponent(fight.reportID)}#fight=${fight.fightID}&view=replay" target="_blank">打开 WCL Replay</a></header><main><section class="panel"><h2>场地快照（已获取放水坐标）</h2><div style="position:relative;max-width:873px;aspect-ratio:873/794;margin:auto;background:url('./assets/crown_of_cosmos_arena.png') center/100% 100%;border:1px solid #524436;border-radius:8px;overflow:hidden">${dotHtml}</div><div class="muted" style="margin-top:8px">亮紫点为放水坐标，红点为 15 码离组判定。完整技能快照数据列于下方。</div></section><section class="grid">${sectionHtml}</section></main>`;
     }
 
     function drawPolygon(svg, points, color, opacity) {
@@ -1304,5 +1304,5 @@
         document.getElementById('app').innerHTML = `<div class="panel" style="margin:16px;padding:16px;color:#fecaca">读取 ${DATA_URL} 失败：${escapeHtml(error.message)}。</div>`;
       });
   </script>
-<script src="/frontend/core/home-button.js?v=1"></script></body>
+<script src="/frontend/core/home-button.js?v=1"></script><script src="frontend/core/azeroth-shell.js?v=6"></script></body>
 </html>

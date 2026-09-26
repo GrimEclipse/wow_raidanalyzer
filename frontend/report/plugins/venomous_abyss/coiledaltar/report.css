@@ -49,9 +49,9 @@
   gap: 10px;
 }
 .field-mechanic-panel {
-  border: 1px solid #355156;
+  border: 1px solid #544637;
   border-radius: 10px;
-  background: #0b1517;
+  background: #16110c;
   padding: 0 10px 10px;
 }
 .field-mechanic-panel > summary {
@@ -67,7 +67,7 @@
 .field-mechanic-panel > summary::marker { display: none; }
 .field-mechanic-panel > summary::after {
   content: "展开";
-  color: #9fb0b8;
+  color: #c1b7ab;
   font-size: 12px;
 }
 .field-mechanic-panel[open] > summary::after { content: "收起"; }
@@ -114,7 +114,7 @@
   height: 22px;
   border-radius: 50%;
   border: 2px solid var(--color, #fff);
-  background: #071013;
+  background: #120d08;
   overflow: visible;
   z-index: 5;
   box-shadow: 0 0 0 1px #000a;
@@ -125,7 +125,7 @@
   height: 100%;
   border-radius: 50%;
   overflow: hidden;
-  background: #071013;
+  background: #120d08;
 }
 .marker.spec-token .spec-face img {
   display: block;
@@ -156,8 +156,8 @@
   padding: 6px 8px;
   border-radius: 6px;
   background: #0c1418f2;
-  border: 1px solid #334155;
-  color: #e2e8f0;
+  border: 1px solid #524436;
+  color: #f3f0ec;
   font-size: 12px;
   line-height: 1.35;
   white-space: nowrap;
@@ -166,7 +166,7 @@
   z-index: 8;
 }
 .player-tip b { display: block; font-size: 13px; }
-.player-tip span { display: block; color: #94a3b8; }
+.player-tip span { display: block; color: #c0b1a0; }
 .marker.spec-token:hover,
 .marker.manifest-target:hover { z-index: 9; }
 .marker.spec-token:hover .player-tip,
@@ -185,7 +185,7 @@
   width: 22px;
   height: 22px;
   border: 2px solid var(--color, #fff);
-  background: #071013;
+  background: #120d08;
 }
 .marker.spec-token.bomb-splash,
 .marker.spec-token.bomb-nearby,
@@ -211,6 +211,6 @@
 .legend {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #9fb0b8;
+  color: #c1b7ab;
 }
 .legend.warn { color: #edbd63; }

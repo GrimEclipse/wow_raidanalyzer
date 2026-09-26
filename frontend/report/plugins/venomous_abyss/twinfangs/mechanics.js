@@ -54,12 +54,12 @@ function twinBroodMap(arena, rows) {
   const y = value => 30+(maxY-value)/(maxY-minY)*300;
   const dots = ['left','right'].map(side => arena[side].map((point,i) => {
     const events = rows.filter(r=>r.position?.arena===arena.key && r.position.side===side && r.position.slot===i+1);
-    const color = events.some(r=>r.successfulCasts) ? '#fb7185' : events.some(r=>r.interrupts.length) ? '#34d399' : '#64748b';
+    const color = events.some(r=>r.successfulCasts) ? '#fb7185' : events.some(r=>r.interrupts.length) ? '#34d399' : '#93806a';
     const label = `${side==='left'?'左':'右'}${i+1}`;
     return `<g><title>${esc(label)}，${point[0]}, ${point[1]}，${events.length} 个蛇头</title><circle cx="${x(point[0])}" cy="${y(point[1])}" r="10" fill="${color}"/><text x="${x(point[0])+14}" y="${y(point[1])+5}" fill="white" font-size="13">${esc(label)}</text></g>`;
   }).join('')).join('');
   const bosses = ['left','right'].map(side=>{const p=arena.bosses[side];return `<text x="${x(p[0])}" y="${y(p[1])-18}" text-anchor="middle" fill="#fbbf24" font-size="12">${side==='left'?'左侧Boss':'右侧Boss'}</text>`;}).join('');
-  return `<figure style="margin:0;max-width:580px"><figcaption>${esc(arena.label)}，红色漏断 / 绿色已打断 / 灰色未观测</figcaption><svg role="img" aria-label="${esc(arena.label)}蛇头固定点位" viewBox="0 0 560 380" style="width:100%;background:#0b1220;border-radius:12px">${dots}${bosses}</svg></figure>`;
+  return `<figure style="margin:0;max-width:580px"><figcaption>${esc(arena.label)}，红色漏断 / 绿色已打断 / 灰色未观测</figcaption><svg role="img" aria-label="${esc(arena.label)}蛇头固定点位" viewBox="0 0 560 380" style="width:100%;background:#1c160f;border-radius:12px">${dots}${bosses}</svg></figure>`;
 }
 function renderTwin(tab) {
   const data = boss();

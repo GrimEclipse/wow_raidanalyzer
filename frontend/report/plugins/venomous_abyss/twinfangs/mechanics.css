@@ -2,14 +2,14 @@
 .twin-venom-legend span { padding:3px 9px; border-radius:4px; }
 .twin-orb { background:#facc15; color:#27220a; }
 .twin-abnormal { background:#fb923c; color:#311506; }
-.twin-other { background:#38bdf8; color:#082330; }
+.twin-other { background:#38bdf8; color:#241c14; }
 .twin-venom-round { margin:12px 0; border:1px solid var(--line); border-radius:9px; padding:12px 16px; }
 .twin-venom-round summary { cursor:pointer; line-height:1.7; }
 .twin-venom-chart { margin-top:16px; }
 .twin-venom-row { display:grid; grid-template-columns:160px minmax(100px,1fr) 140px; align-items:center; gap:14px; padding:9px 6px; border-top:1px solid var(--line); }
 .twin-zero-pickup { background:rgba(250,204,21,.04); }
 .twin-venom-player { min-width:0; overflow-wrap:anywhere; }
-.twin-venom-row small { display:block; font-size:11px; color:var(--muted,#9ca3af); margin-top:3px; }
+.twin-venom-row small { display:block; font-size:11px; color:var(--muted,#b8b0a7); margin-top:3px; }
 .twin-venom-track { display:flex; height:28px; background:rgba(255,255,255,.04); border-radius:4px; overflow:hidden; }
 .twin-venom-segment { display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:700; font-size:12px; overflow:hidden; }
 .twin-venom-total { font-size:12px; text-align:right; }
