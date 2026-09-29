@@ -8,7 +8,7 @@ from statistics import median
 from analyzer_core.config import resolve_analysis_options
 
 CONFIG_SCHEMA = [
-    {"key": "spitReviewEnabled", "type": "boolean", "label": "蛇头射线方向与误伤", "default": True},
+    {"key": "spitReviewEnabled", "type": "boolean", "label": "蛇头射线方向与误伤", "default": False},
     {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
     {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
     {"key": "globulesReviewEnabled", "type": "boolean", "label": "每轮吃球与漏吃", "default": True},

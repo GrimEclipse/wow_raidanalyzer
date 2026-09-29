@@ -72,7 +72,7 @@ class CheckpointTests(unittest.TestCase):
         pull = dict(fightID=1, twinfangs=dict(eternalVenom=dict(checkpoints=checkpoint),
             spit=dict(events=[dict(counted=True, time='00:42', target=dict(player='P2', playerID=2),
                                   headID=99, headInstance=1, reasons=['后射'], collateral=[dict(player='P1')])])))
-        metrics = {m['key']: m for m in t._mechanic_overview([pull])['metrics']}
+        metrics = {m['key']: m for m in t._mechanic_overview([pull], {'spitReviewEnabled': True})['metrics']}
         self.assertIn('吃球 +6', metrics['venomOverExpected']['events'][0]['text'])
         self.assertIn('责任玩家：P2', metrics['spitDirection']['events'][0]['text'])
         self.assertIn('额外受击：P1', metrics['spitDirection']['events'][0]['text'])
