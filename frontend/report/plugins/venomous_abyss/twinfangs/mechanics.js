@@ -61,9 +61,32 @@ function twinBroodMap(arena, rows) {
   const bosses = ['left','right'].map(side=>{const p=arena.bosses[side];return `<text x="${x(p[0])}" y="${y(p[1])-18}" text-anchor="middle" fill="#fbbf24" font-size="12">${side==='left'?'左侧Boss':'右侧Boss'}</text>`;}).join('');
   return `<figure style="margin:0;max-width:580px"><figcaption>${esc(arena.label)}，红色漏断 / 绿色已打断 / 灰色未观测</figcaption><svg role="img" aria-label="${esc(arena.label)}蛇头固定点位" viewBox="0 0 560 380" style="width:100%;background:#0b1220;border-radius:12px">${dots}${bosses}</svg></figure>`;
 }
+function twinCheckpoints(checkpoints) {
+  if (!checkpoints?.length) return '<section class="panel"><h2>层数超过预期</h2><p class="muted">未观测到完整转圈结束，未生成层数检查点。</p></section>';
+  return `<section class="panel"><h2>层数超过预期</h2><p class="muted">按转圈实际结束检查，第一轮最多4层、第二轮最多7层，每人每个检查点最多计一次；检查前任何玩家阵亡则全团该次检查豁免，战复不取消。来源表为此前累计增加，扣除移除层数得到当前层数；不推测被消掉的具体来源。</p>${checkpoints.map(c=>`<article class="card"><h3>第 ${c.index} 次，${esc(c.time)}，上限 ${c.limit} 层，计数 ${c.count} 人${c.exempt?'（已豁免）':''}</h3>${c.exemption?`<p class="muted">${esc(c.exemption.time)} ${player(c.exemption)} 阵亡；${esc(c.exemption.reason)}</p>`:''}<p class="muted">${esc(c.evidence)}</p>${c.players.map(p=>`<details ${p.exceeded?'open':''}><summary>${player(p)}：${p.stacks} 层 ${p.exceeded?(p.exempt?'<span class="badge warn">超限但豁免，不计数</span>':'<span class="badge bad">超过预期 +1</span>'):''}${!p.alive?'（已死亡）':''}</summary><p>${p.gainsBySource.map(s=>`${esc(s.source)} +${s.stacks}`).join('；')||'无新增记录'}；共移除 ${p.removedStacks} 层</p>${table(['时间','来源','变化','结果'],p.history.map(e=>[esc(e.time),esc(e.source),`${e.delta>0?'+':''}${e.delta}`,`${e.fromStack} → ${e.toStack}`]))}</details>`).join('')}</article>`).join('')}</section>`;
+}
+function twinSpitMap(row) {
+  if(!row.origin||!row.targetPosition||!row.meleePolygon)return '';
+  const o=row.origin,t=row.targetPosition,polygon=row.meleePolygon;
+  const d=[t[0]-o[0],t[1]-o[1]],length=Math.hypot(...d);
+  if(!length)return '';
+  const end=[o[0]+d[0]/length*10000,o[1]+d[1]/length*10000];
+  const side=row.spawnLineDirection,line=row.spawnLine||[];
+  const cone=(row.forbiddenDirections||[]).map(v=>[o[0]+v[0]/Math.hypot(...v)*10000,o[1]+v[1]/Math.hypot(...v)*10000]);
+  const heads=Object.entries(row.headPositions||{}),bosses=Object.entries(row.bossPositions||{});
+  const points=[o,t,end,...polygon,...line,...cone,...heads.map(([,p])=>p),...bosses.map(([,p])=>p)],minX=Math.min(...points.map(p=>p[0]))-300,maxX=Math.max(...points.map(p=>p[0]))+300,minY=Math.min(...points.map(p=>p[1]))-300,maxY=Math.max(...points.map(p=>p[1]))+300;
+  const scale=Math.min(500/(maxX-minX),330/(maxY-minY));
+  const x=p=>30+(p[0]-minX)*scale,y=p=>30+(maxY-p[1])*scale;
+  const anchors=heads.map(([side,p])=>`<circle cx="${x(p)}" cy="${y(p)}" r="4" fill="#a78bfa"/><text x="${x(p)}" y="${y(p)+16}" text-anchor="middle" fill="#c4b5fd" font-size="10">${({left:'左蛇',middle:'中蛇',right:'右蛇'})[side]}</text>`).join('')+bosses.map(([side,p])=>`<circle cx="${x(p)}" cy="${y(p)}" r="5" fill="#fbbf24"/><text x="${x(p)}" y="${y(p)-12}" text-anchor="middle" fill="#fbbf24" font-size="11">${side==='left'?'左 Boss':'右 Boss'}</text>`).join('');
+  return `<figure style="max-width:580px"><svg viewBox="0 0 560 390" role="img" aria-label="蛇头射线与固定禁射方向" style="width:100%;background:#0b1220;border-radius:12px">${cone.length===2?`<polygon points="${[o,...cone].map(p=>`${x(p)},${y(p)}`).join(' ')}" fill="#ef444433" stroke="#ef4444" stroke-dasharray="5 4"/>`:''}<polygon points="${polygon.map(p=>`${x(p)},${y(p)}`).join(' ')}" fill="#f59e0b33" stroke="#f59e0b" stroke-dasharray="5 4"/>${line.length?`<line x1="${x(line[0])}" y1="${y(line[0])}" x2="${x(line[1])}" y2="${y(line[1])}" stroke="#94a3b8" stroke-dasharray="4 4"/>`:''}<line x1="${x(o)}" y1="${y(o)}" x2="${x(end)}" y2="${y(end)}" stroke="${row.counted?'#fb7185':'#38bdf8'}" stroke-width="3"/>${anchors}<circle cx="${x(o)}" cy="${y(o)}" r="6" fill="#a78bfa"/><circle cx="${x(t)}" cy="${y(t)}" r="5" fill="#fff"/><text x="${x(t)+8}" y="${y(t)}" fill="white" font-size="12">${esc(row.target?.player||'未知')}</text></svg><figcaption>紫点：当前蛇头；白点：点名目标；灰线：左右蛇头生成线；橙框：左右蛇头与对应 Boss 四点；红色扇区：此蛇头禁射方向夹角。</figcaption></figure>`;
+}
 function renderTwin(tab) {
   const data = boss();
-  if (tab === 'venom') return twinVenomRounds(data.eternalVenom?.rounds) + renderTwinLegacy(tab);
+  if (tab === 'venom') return twinCheckpoints(data.eternalVenom?.checkpoints) + twinVenomRounds(data.eternalVenom?.rounds) + renderTwinLegacy(tab);
+  if (tab === 'spit') {
+    const section=data.spit;if(!section?.enabled)return twinEmpty(section);
+    return `<section class="panel"><h2>蛇头射线：方向错误 ${section.count} 次，额外受击 ${section.collateralCount} 人次</h2><p class="muted">${esc(section.evidenceNote)}</p><details><summary>原场地图与转场规则</summary><p class="muted">两只 Boss 从上方三角顶点两侧开始；转圈结束后进入另一顶点两侧。下图每条射线按当前场地固定左右 Boss 站位计算禁射夹角，转阶段的中间位置不作边界。</p><img src="assets/raids/venomous_abyss/06-twinfangs.jpg" alt="双子毒牙三角场地图：上方、左下与右下三个场地" style="width:100%;max-width:760px;height:auto"></details>${section.events.map(r=>`<details ${r.counted||r.collateral.length?'open':''}><summary>${esc(r.time)}，蛇头 ${r.headID} / ${r.headInstance} → ${r.target?player(r.target):'目标未确认'}，${esc(r.status)}${r.collateral.length?`，额外受击 ${r.collateral.length} 人`:''}</summary><p>${esc(r.reasons.join('；'))}</p>${twinSpitMap(r)}<p class="muted">${esc(r.arenaLabel||'场地未定位')}；目标坐标距完成 ${r.positionAgeMs??'未知'} ms。额外受击者对应此蛇头的射线，是否由点名者错误引导应结合方向结论。</p>${table(['受击玩家','身份','命中时间','伤害'],r.victims.map(v=>[player(v),v.isTarget?'点名目标':'额外受击',esc(v.hitTime),v.damage]))}</details>`).join('')||'<div class="empty">没有蛇头完成射线读条。</div>'}</section>`;
+  }
   if (tab === 'feast') {
     const section = data.feast;
     if (!section?.enabled) return twinEmpty(section);
@@ -83,7 +106,7 @@ function renderTwin(tab) {
     const rounds=[...new Set((section.events||[]).map(r=>r.round))];
     return `<section class="panel"><h2>蛇头打断，${section.successfulCastCount} 次首漏断</h2><p class="muted">${esc(section.positionNote)} 未定位 ${section.unresolvedCount} 个。</p>
       ${rounds.map(no=>{const rows=section.events.filter(r=>r.round===no);const arenas=(section.arenas||[]).filter(a=>rows.some(r=>r.position?.arena===a.key));return `<article class="card"><h3>召唤第 ${no||'未知'} 轮</h3>${arenas.map(a=>twinBroodMap(a,rows)).join('')}
-      ${table(['首次漏断时间','点位','组别 / 序号','主断','补断','实际打断','结果 / 证据'],rows.map(r=>[esc(r.time),esc(r.position?`${r.position.arenaLabel} ${r.position.label}`:'坐标未确认'),esc(r.groupLabel||'')+' '+(r.groupOrder||'—'),players(r.assigned),players(r.backup),(r.interrupts||[]).map(e=>`${esc(e.time)} ${player(e.player)} ${spellLink(e.spellID)}`).join('<br>')||'—',`${esc(r.leakLabel||r.status)}${r.successfulCasts?` ×${r.successfulCasts}`:''}<br><small>${esc(r.assignmentNote)}</small>${r.tankEvidence?`<br><small>${esc(r.tankEvidence.reason)}，${Math.round((r.tankEvidence.ageMs||0)/100)/10}s 前</small>`:''}`]))}</article>`;}).join('')||'<div class="empty">本场未见脏腑爆裂成功施法。</div>'}</section>`;
+      ${table(['首次漏断时间','点位','组别 / 序号','主断','补断','实际打断','结果 / 证据'],rows.map(r=>[esc(r.time),esc(r.position?`${r.position.arenaLabel} ${r.position.label}`:'坐标未确认'),esc(r.groupLabel||'')+' '+(r.groupOrder||'—'),players(r.assigned)+(r.unresolvedNames?.length?`<br><small>名单待匹配：${esc(r.unresolvedNames.join('、'))}</small>`:''),players(r.backup),(r.interrupts||[]).map(e=>`${esc(e.time)} ${player(e.player)} ${spellLink(e.spellID)}`).join('<br>')||'—',`${esc(r.leakLabel||r.status)}${r.successfulCasts?` ×${r.successfulCasts}`:''}<br><small>${esc(r.assignmentNote)}</small>${r.tankEvidence?`<br><small>${esc(r.tankEvidence.reason)}，${Math.round((r.tankEvidence.ageMs||0)/100)/10}s 前</small>`:''}`]))}</article>`;}).join('')||'<div class="empty">本场未见脏腑爆裂成功施法。</div>'}</section>`;
   }
   if (tab === 'stone') {
     const section=data.stone;if(!section?.enabled)return twinEmpty(section);

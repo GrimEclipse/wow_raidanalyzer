@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from math import hypot
+from math import atan2, degrees, hypot
 from statistics import median
 from analyzer_core.config import resolve_analysis_options
 
 CONFIG_SCHEMA = [
+    {"key": "spitReviewEnabled", "type": "boolean", "label": "蛇头射线方向与误伤", "default": True},
     {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
     {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
     {"key": "globulesReviewEnabled", "type": "boolean", "label": "每轮吃球与漏吃", "default": True},
@@ -20,22 +21,24 @@ CONFIG_SCHEMA = [
      "options": [{"value": "normal", "label": "非免疫分摊"}, {"value": "immunity", "label": "首段全团、后两段免疫组"}],
      "visibleWhen": {"field": "feastReviewEnabled", "equals": True}},
     {"key": "feastGroups", "type": "interruptGroups", "label": "免疫分摊名单（每轮四人，含受保护玩家）", "default": {}, "placeholder": "例如：三坑不二 那个猎刃 小心胡大海 Toccata",
-     "description": "填写玩家名或本报告 Actor ID。每轮对应一次盛宴的后两段；第五轮以后须补充安排，不自动循环。未配置或名单无法唯一匹配时只显示证据，不计个人失误。",
+     "description": "填写玩家名或本报告 Actor ID。每轮对应一次盛宴的后两段；六轮分别配置，不自动循环。未配置或名单无法唯一匹配时只显示证据，不计个人失误。",
      "groups": [{"key": "round1", "label": "第一轮免疫组"}, {"key": "round2", "label": "第二轮免疫组"},
-                {"key": "round3", "label": "第三轮免疫组"}, {"key": "round4", "label": "第四轮免疫组"}],
+                {"key": "round3", "label": "第三轮免疫组"}, {"key": "round4", "label": "第四轮免疫组"},
+                {"key": "round5", "label": "第五轮免疫组"}, {"key": "round6", "label": "第六轮免疫组"}],
      "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
     {"key": "protectionPairs", "type": "interruptGroups", "label": "保护配对：施法者 受保护玩家", "default": {}, "preserveDuplicates": True,
      "description": "每两个名字为一对，可填写多对，例如：黑心貓 染小战 丶花落冬陽 雷横。不限制受保护者职业，按本轮名单逐一核对实际保护目标。",
      "placeholder": "例如：黑心貓 染小战 丶花落冬陽 雷横",
      "groups": [{"key": "round1", "label": "第一轮保护配对"}, {"key": "round2", "label": "第二轮保护配对", "migrateFrom": ["round2a", "round2b"]},
                 {"key": "round3", "label": "第三轮保护配对"}, {"key": "round4", "label": "第四轮保护配对"},
+                {"key": "round5", "label": "第五轮保护配对"}, {"key": "round6", "label": "第六轮保护配对"},
                 {"key": "round2a", "label": "旧版第二轮配对一", "hidden": True}, {"key": "round2b", "label": "旧版第二轮配对二", "hidden": True}],
      "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
     {"key": "broodGroups", "type": "interruptGroups", "label": "蛇头打断名单", "default": {}, "placeholder": "例如：Kaminadeko（每个主断槽位填一名角色）",
      "description": "每侧远程按每次召唤中远点蛇头首次出现顺序分配，非固定点位号。近点 1、2 号由当前接该侧 Boss 的坦克主断，近战为补断。每个远程槽位填写一人。",
-     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个", "placeholder": "例如：" + (["Kaminadeko", "三坑不二", "小楚唯"] if side == "left" else ["丶若叶睦", "那个猎刃", "小心胡大海"])[i-1]} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 4)]
+     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个", "placeholder": "例如：" + (["神jo", "三坑不二", "小楚唯", "马老师", "飞天小喷菇"] if side == "left" else ["搓背", "那个猎刃", "小心胡大海", "软软", "茶喵"])[i-1]} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 6)]
                + [{"key": "leftBackup", "label": "左侧近战补断", "placeholder": "例如：染小战（填写实际安排的近战）"}, {"key": "rightBackup", "label": "右侧近战补断", "placeholder": "例如：雷横（填写实际安排的近战）"},
-                  {"key": "leftRangedBackup", "label": "左侧远程第四个及以后补断（可选）", "placeholder": "例如：Toccata"}, {"key": "rightRangedBackup", "label": "右侧远程第四个及以后补断（可选）", "placeholder": "例如：Superhunter"}],
+                  {"key": "leftRangedBackup", "label": "左侧远程未安排序号补断（可选）", "placeholder": "例如：Toccata"}, {"key": "rightRangedBackup", "label": "右侧远程未安排序号补断（可选）", "placeholder": "例如：Superhunter"}],
      "visibleWhen": {"field": "broodReviewEnabled", "equals": True}},
     {"key": "earlyDeathGapSeconds", "type": "number", "label": "提前死亡与后续死亡间隔（秒）", "default": 8, "min": 3, "max": 60,
      "visibleWhen": {"field": "earlyDeathReviewEnabled", "equals": True}},
@@ -83,10 +86,10 @@ BOSS_CONFIG = {
         ["survival", "全场存活情况"],
         ["venom", "永恒毒液"],
         ["globules", "地板炸圈"],
-        ["feast", "盛宴分摊"], ["brood", "蛇头打断"],
+        ["feast", "盛宴分摊"], ["spit", "蛇头射线"], ["brood", "蛇头打断"],
         ["venomDeaths", "带毒死亡"], ["stone", "裂石击"], ["earlyDeaths", "提前死亡"],
     ],
-    "mechanicVersion": "twinfangs-venom-rounds-immunity-timing-2026-09-20",
+    "mechanicVersion": "twinfangs-checkpoint-death-exempt-five-kicks-2026-09-27",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -113,6 +116,11 @@ FEAST_IDS = {1290516, 1290654, 1290662, 1310211}
 
 # WCL coordinates are hundredths of a yard. Centers calibrated from three live
 # Mythic kills and vgdPJBnLNmzt13Qk; keep all encounter geometry in this module.
+# The triangular field is assets/raids/venomous_abyss/06-twinfangs.jpg.
+# Bosses start beside the top vertex. After each central rotation they occupy
+# the two fixed sides of another vertex; central transition positions are never
+# boundary anchors. Resolve the active vertex from the actual spit-head origin,
+# since the next vertex can differ between pulls.
 BROOD_ARENAS = (
     {"key": "north", "label": "上方场地", "bosses": {"left": (-1616, 69157), "right": (1586, 69132)},
      "left": [(-608, 69221), (-2621, 68385), (-3066, 67684), (-3259, 66245), (-3733, 65496)],
@@ -282,14 +290,16 @@ def _brood_review(fight, actor_map, players, raw, options):
             row["rangedOrder"] = order
             names = options["broodGroups"].get(side + str(order), [])
             assigned, unresolved = _match_names(names, players)
-            if order > 3:
+            row["assignmentNames"] = list(names)
+            row["unresolvedNames"] = unresolved
+            if order > 5 or (order > 3 and not names):
                 assigned = []
                 backup, _ = _match_names(options["broodGroups"].get(side + "RangedBackup", []), players)
                 row["backup"] = [player_ref(players, actor_map, pid) for pid in backup]
-                row["assignmentNote"] = "远程第四个及以后交补断，不重新轮转到第一人"
+                row["assignmentNote"] = "远程序号未配置或超过五人安排，交补断，不重新轮转到第一人"
             elif len(assigned) != 1 or unresolved:
                 assigned = []
-                row["assignmentNote"] = "远程槽位未配置、重名或出现顺序超出三人安排，不计个人失误"
+                row["assignmentNote"] = "远程槽位未配置或名字未唯一匹配，不计个人失误"
             else:
                 row["assignmentNote"] = "按本轮该侧远点蛇头出现顺序分配"
         row["assigned"] = [player_ref(players, actor_map, pid) for pid in assigned]
@@ -756,6 +766,155 @@ def _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds):
     return output
 
 
+def _venom_checkpoints(fight, actor_map, players, raw, histories):
+    """Only completed rotations count; never substitute a wall-clock timer."""
+    evidence = _unique_events(raw.get("trackedActorEvents", []) + raw.get("enemyBuffs", []))
+    starts = [e for e in evidence if ability_id(e) == 1294293
+              and event_type(e) == "applybuff" and e.get("sourceID") == e.get("targetID")]
+    checkpoints = []
+    by_player = {p["playerID"]: p["events"] for p in histories}
+    for index, start in enumerate(starts[:2], 1):
+        begin = int(start["timestamp"])
+        end = next((e for e in evidence if ability_id(e) == 1294293 and event_type(e) == "removebuff"
+                    and e.get("sourceID") == start.get("sourceID") == e.get("targetID")
+                    and begin < int(e["timestamp"]) <= begin + 30000), None)
+        # An early remove on a wipe is not a completed 14-second rotation.
+        if not end or int(end["timestamp"]) - begin < 13500:
+            continue
+        ts = int(end["timestamp"])
+        if ts > fight["endTime"]:
+            continue
+        prior_deaths = [e for e in _unique_events(raw.get("deaths", []))
+                        if e.get("targetID") in players and event_type(e) == "death"
+                        and fight["startTime"] <= int(e["timestamp"]) < ts]
+        exemption = None
+        if prior_deaths:
+            first = min(prior_deaths, key=lambda e: int(e["timestamp"]))
+            exemption = {**player_ref(players, actor_map, first["targetID"]),
+                         "time": fmt_ms(int(first["timestamp"]) - fight["startTime"]),
+                         "reason": "检查点前已有玩家阵亡，全团该次层数检查豁免；战复不取消豁免"}
+        limit = (4, 7)[index - 1]
+        rows = []
+        for pid in players:
+            history = [dict(e) for e in by_player.get(pid, []) if e["timeMs"] <= ts - fight["startTime"]]
+            stack = history[-1]["toStack"] if history else 0
+            sources = Counter()
+            for e in history:
+                if e["delta"] > 0:
+                    sources[e["source"]] += e["delta"]
+            rows.append({**player_ref(players, actor_map, pid), "stacks": stack,
+                         "alive": _life_at(raw, pid, ts), "exceeded": stack > limit,
+                         "count": int(stack > limit and exemption is None), "exempt": exemption is not None, "history": history,
+                         "gainsBySource": [{"source": name, "stacks": n} for name, n in sources.items()],
+                         "removedStacks": -sum(e["delta"] for e in history if e["delta"] < 0)})
+        checkpoints.append({"index": index, "timeMs": ts - fight["startTime"],
+                            "time": fmt_ms(ts - fight["startTime"]), "limit": limit,
+                            "players": rows, "count": sum(p["count"] for p in rows),
+                            "exempt": exemption is not None, "exemption": exemption,
+                            "evidence": "涌动自身光环完整结束（1294293 removebuff）"})
+    return checkpoints
+
+
+def _spit_position(event, actor_id):
+    """Resource coordinates belong to one actor, never silently to both."""
+    owner = event.get("sourceID") if event.get("resourceActor") == 1 else event.get("targetID") if event.get("resourceActor") == 2 else None
+    if owner != actor_id or event.get("x") is None or event.get("y") is None:
+        return None
+    return (float(event["x"]), float(event["y"]))
+
+
+# Fixed Corrosive Spit heads, distinct from the interruptible broodlings.
+# Median NPC-owned completion coordinates across all ten 2026-09-26 pulls.
+SPIT_HEAD_POSITIONS = {
+    "north": {"left": (-624, 63384), "middle": (22, 63613), "right": (710, 63312)},
+    "southeast": {"left": (1872, 60910), "middle": (1637, 60034), "right": (994, 59374)},
+    "southwest": {"left": (-1198, 59437), "middle": (-1718, 60067), "right": (-2014, 60888)},
+}
+
+
+def _spit_direction(origin, target):
+    arena, slot, offset = min(
+        ((arena, slot, hypot(origin[0] - point[0], origin[1] - point[1]))
+         for arena in BROOD_ARENAS
+         for slot, point in SPIT_HEAD_POSITIONS[arena["key"]].items()), key=lambda r: r[2])
+    if offset > 400:
+        return {"status": "蛇头偏离固定点超过4码，方向待复核", "reasons": [], "counted": False}
+    heads = SPIT_HEAD_POSITIONS[arena["key"]]
+    left, right = heads["left"], heads["right"]
+    length = hypot(right[0] - left[0], right[1] - left[1])
+    lateral = ((right[0] - left[0]) / length, (right[1] - left[1]) / length)
+    forward = (-lateral[1], lateral[0])
+    center = tuple((arena["bosses"]["left"][i] + arena["bosses"]["right"][i]) / 2 for i in (0, 1))
+    if sum((center[i] - left[i]) * forward[i] for i in (0, 1)) < 0:
+        forward = tuple(-v for v in forward)
+    angle = lambda vector: degrees(atan2(sum(vector[i] * lateral[i] for i in (0, 1)),
+                                         sum(vector[i] * forward[i] for i in (0, 1))))
+    boundaries = [tuple(arena["bosses"][side][i] - heads[side][i] for i in (0, 1))
+                  for side in ("left", "right")]
+    low, high = sorted(angle(v) for v in boundaries)
+    direction = tuple(target[i] - origin[i] for i in (0, 1))
+    heading = angle(direction)
+    result = {"arena": arena["key"], "arenaLabel": arena["label"], "headSlot": slot,
+              "headOffsetYards": round(offset / 100, 2), "headPositions": heads,
+              "bossPositions": arena["bosses"], "spawnLine": [left, right],
+              "spawnLineDirection": lateral, "forward": forward,
+              "meleePolygon": [left, arena["bosses"]["left"], arena["bosses"]["right"], right],
+              "forbiddenDirections": boundaries, "meleeGeometry": "fixed-head-boss-direction-cone",
+              "directionDegrees": round(heading, 3), "forbiddenDegrees": [round(low, 3), round(high, 3)],
+              "counted": False, "reasons": [], "status": "方向正常"}
+    if hypot(*direction) < 1:
+        result["status"] = "目标与蛇头坐标重合，方向待复核"
+        return result
+    if sum(direction[i] * forward[i] for i in (0, 1)) < -1e-9:
+        result["reasons"].append("向蛇头生成线后方射击")
+    if low - 1e-9 <= heading <= high + 1e-9:
+        result["reasons"].append("射入左蛇头→左Boss、右蛇头→右Boss构成的禁射方向夹角")
+    result["counted"] = bool(result["reasons"])
+    if result["counted"]:
+        result["status"] = "后射" if abs(heading) > 90 else "射入禁射夹角"
+    return result
+
+
+def _spit_review(fight, actor_map, players, raw):
+    # Prefer the filtered resource-bearing records over generic no-resource ones.
+    events = _unique_events(raw.get("trackedActorEvents", []) + raw.get("casts", []) + raw.get("damage", []))
+    casts = [e for e in events if ability_id(e) == 1291478 and event_type(e) == "cast"]
+    hits = [e for e in events if ability_id(e) == 1293295 and event_type(e) == "damage"
+            and e.get("targetID") in players and e.get("hitType") != 10
+            and float(e.get("amount") or 0) + float(e.get("absorbed") or 0) > 0]
+    output = []
+    for cast in casts:
+        ts, source, instance = int(cast["timestamp"]), cast.get("sourceID"), cast.get("sourceInstance", 1)
+        pid = cast.get("targetID")
+        same_head = lambda e: e.get("sourceID") == source and e.get("sourceInstance", 1) == instance
+        next_cast = min((int(e["timestamp"]) for e in casts if same_head(e) and int(e["timestamp"]) > ts), default=ts + 750)
+        matched = [e for e in hits if same_head(e) and ts <= int(e["timestamp"]) < min(ts + 750, next_cast)]
+        victims = []
+        for target in sorted({e["targetID"] for e in matched}):
+            damage = [e for e in matched if e["targetID"] == target]
+            victims.append({**player_ref(players, actor_map, target), "isTarget": target == pid,
+                            "damage": sum(float(e.get("amount") or 0) for e in damage),
+                            "hitTime": fmt_ms(int(damage[0]["timestamp"]) - fight["startTime"])})
+        origin = _spit_position(cast, source)
+        samples = [(abs(int(e["timestamp"]) - ts), e, _spit_position(e, pid)) for e in events
+                   if pid in players and abs(int(e["timestamp"]) - ts) <= 250]
+        samples = [s for s in samples if s[2] is not None]
+        sample = min(samples, key=lambda s: s[0], default=None)
+        target = sample[2] if sample else None
+        row = {"timeMs": ts - fight["startTime"], "time": fmt_ms(ts - fight["startTime"]),
+               "headID": source, "headInstance": instance, "target": player_ref(players, actor_map, pid) if pid in players else None,
+               "origin": origin, "targetPosition": target, "positionAgeMs": sample[0] if sample else None,
+               "victims": victims, "collateral": [v for v in victims if not v["isTarget"]],
+               "counted": False, "reasons": [], "status": "坐标不足，方向待复核"}
+        if origin and target:
+            row.update(_spit_direction(origin, target))
+            row["counted"] = row["counted"] and pid in players
+        output.append(row)
+    return {"enabled": True, "events": output, "count": sum(r["counted"] for r in output),
+            "collateralCount": sum(len(r["collateral"]) for r in output),
+            "evidenceNote": "取完成读条时的目标；坐标样本距完成不超过250ms。三只蛇头共用左蛇头→左Boss、右蛇头→右Boss两条固定边界的禁射方向夹角（含边界）；同时禁止朝生成线背离Boss一侧射击。每条完成射线最多计一次。误伤按同一蛇头实例、完成后750ms内实际伤害对应；额外受击不单独证明点名玩家走错。"}
+
+
 def analyze_twinfangs(fight, actor_map, players, raw):
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     if not any(options[key] for key in REVIEW_KEYS):
@@ -952,6 +1111,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
     venom_rounds = _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds)
     return {
         "eternalVenom": {"players": histories if options["venomReviewEnabled"] else [], "feastChecks": feast_checks,
+                         "checkpoints": _venom_checkpoints(fight, actor_map, players, raw, histories) if options["venomReviewEnabled"] else [],
                          "abnormalGains": abnormal_gains if options["venomReviewEnabled"] else [],
                          "rounds": venom_rounds if options["venomReviewEnabled"] else []},
         "globules": {"rounds": globule_rounds if options["globulesReviewEnabled"] else [],
@@ -961,6 +1121,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
         "tankGlobules": {"enabled": mythic and options["globulesReviewEnabled"], "rounds": tank_globules},
         "feast": _feast_review(fight, actor_map, players, raw, options) if options["feastReviewEnabled"] else {"enabled": False},
         "brood": _brood_review(fight, actor_map, players, raw, options) if options["broodReviewEnabled"] else {"enabled": False},
+        "spit": _spit_review(fight, actor_map, players, raw) if options["spitReviewEnabled"] else {"enabled": False},
         "stone": _stone_review(fight, actor_map, players, raw) if options["stoneReviewEnabled"] else {"enabled": False},
         "earlyDeaths": early if options["earlyDeathReviewEnabled"] else {"enabled": False},
         "venomDeaths": venom_deaths if options["venomDeathReviewEnabled"] else {"enabled": False},
@@ -995,6 +1156,37 @@ def _mechanic_overview(rendered, options=None):
     }
     if not options["waveReviewEnabled"]:
         result["metrics"] = []
+    for option, key, label in (("venomReviewEnabled", "venomOverExpected", "层数超过预期"),
+                               ("spitReviewEnabled", "spitDirection", "蛇头")):
+        if not options[option]:
+            continue
+        details = []
+        for pull in rendered:
+            if pull.get("shortPull"):
+                continue
+            data = pull.get(BOSS_CONFIG["key"]) or {}
+            if key == "venomOverExpected":
+                for checkpoint in (data.get("eternalVenom") or {}).get("checkpoints", []):
+                    for p in checkpoint["players"]:
+                        if p["exceeded"]:
+                            details.append(nightly_detail(pull, checkpoint["time"],
+                                (f"【已豁免：{checkpoint['exemption']['time']} {checkpoint['exemption']['player']} 已阵亡】" if checkpoint.get("exempt") else "")
+                                + f"{p['player']}：第{checkpoint['index']}次转圈结束 {p['stacks']} 层，预期最多 {checkpoint['limit']} 层；构成："
+                                + "、".join(f"{s['source']} +{s['stacks']}" for s in p["gainsBySource"])
+                                + f"；累计移除 {p['removedStacks']} 层 = 当前 {p['stacks']} 层",
+                                **p, checkpoint=checkpoint["index"], limit=checkpoint["limit"]))
+            else:
+                for row in (data.get("spit") or {}).get("events", []):
+                    if row["counted"]:
+                        details.append(nightly_detail(pull, row["time"],
+                            f"责任玩家：{row['target']['player']}；蛇头 {row['headID']}/{row['headInstance']}；" + "；".join(row["reasons"])
+                            + "；额外受击：" + ("、".join(v["player"] for v in row["collateral"]) or "无"),
+                            **row["target"], count=1, headID=row["headID"], headInstance=row["headInstance"],
+                            collateral=row["collateral"]))
+        result["metrics"].append({"key": key, "label": label, "value": sum(r.get("count", 1) for r in details), "unit": "次", "tone": "warning",
+            "description": "每人每次转圈结束超限计一次，展示增减层构成；检查前任何玩家曾阵亡则全团该次检查豁免，战复不取消。" if key == "venomOverExpected" else "射入固定边界禁射夹角或向生成线后方射击，每条完成射线计一次；附点名玩家和额外受击者。",
+            "players": nightly_player_totals([r for r in details if r.get("count", 1) > 0]), "events": details,
+            "exemptCount": sum(r.get("count") == 0 for r in details)})
     specs = [
         ("broodReviewEnabled", "broodLeaks", "脏腑爆裂首漏断", "每场仅统计首次成功施法；按责任槽位和已配置玩家汇总，未配置时保留左右侧及组内序号。"),
         ("feastReviewEnabled", "feastFailures", "免疫分摊失误", "仅免疫打法且四人名单有效时计数，每人每轮最多一次；保护责任按配置施法者归属。"),
@@ -1069,9 +1261,13 @@ def build_aggregated_json(report_ids, options=None):
         config["fetchKeys"].update({"casts", "damage"})
     if options["earlyDeathReviewEnabled"] or options["venomDeathReviewEnabled"]:
         config["fetchKeys"].update({"damage", "debuffs"})
-    config["fetchCastResources"] = options["broodReviewEnabled"] or options["globulesReviewEnabled"]
+    config["fetchCastResources"] = options["broodReviewEnabled"] or options["globulesReviewEnabled"] or options["spitReviewEnabled"]
     config["trackedActorGameIDs"] = BOSS_NPC_IDS | {BROOD_NPC_ID}
     config["trackedActorEventFilters"] = []
+    if options["venomReviewEnabled"]:
+        config["trackedActorEventFilters"].append("ability.id = 1294293")
+    if options["spitReviewEnabled"]:
+        config["trackedActorEventFilters"].append("ability.id in (1291478, 1293295, 1293979)")
     if options["broodReviewEnabled"]:
         config["trackedActorEventFilters"].append("source.id = 270898 or target.id = 270898")
         config["fetchInterrupts"] = True
@@ -1082,7 +1278,7 @@ def build_aggregated_json(report_ids, options=None):
     if not config["trackedActorEventFilters"]:
         config["trackedActorGameIDs"] = set()
     tab_enabled = {"survival": True, "venom": options["venomReviewEnabled"] or options["feastReviewEnabled"],
-                   "globules": options["globulesReviewEnabled"], "feast": options["feastReviewEnabled"], "brood": options["broodReviewEnabled"],
+                   "globules": options["globulesReviewEnabled"], "feast": options["feastReviewEnabled"], "brood": options["broodReviewEnabled"], "spit": options["spitReviewEnabled"],
                    "venomDeaths": options["venomDeathReviewEnabled"], "stone": options["stoneReviewEnabled"], "earlyDeaths": options["earlyDeathReviewEnabled"]}
     config["tabs"] = [row for row in config["tabs"] if tab_enabled[row[0]]]
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]]

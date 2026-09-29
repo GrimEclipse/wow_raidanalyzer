@@ -301,3 +301,19 @@ def test_short_pull_retains_deaths_but_is_excluded_from_nightly_metrics():
         result=boss.build_aggregated_json('a'*16)
     assert pull['shortPull'] and pull['wipePhase']=='误开怪 / ADD处理'
     assert all(m['value']==0 for m in result['data']['mechanicOverview']['metrics'])
+
+
+def test_five_ranged_slots_and_no_wrap_after_fifth():
+    for order in (4, 5, 6):
+        f,am,players,raw=fixture()
+        raw['casts']=[event(10000,1308356,sourceID=90)]
+        raw['casts'] += [event(11000+i*1000,1308385,'begincast',sourceID=99,sourceInstance=i+1,
+                              resourceActor=1,x=-3733,y=65496) for i in range(order)]
+        raw['casts'] += [event(20000,1308385,sourceID=99,sourceInstance=order,resourceActor=1,x=-3733,y=65496)]
+        opt=options(broodGroups={**{f'left{i}':[f'P{i}'] for i in range(1,6)},'leftRangedBackup':['P1']})
+        row=boss._brood_review(f,am,players,raw,opt)['events'][0]
+        assert row['groupOrder']==order
+        if order <= 5:
+            assert row['assigned'][0]['playerID']==order
+        else:
+            assert not row['assigned'] and row['backup'][0]['playerID']==1
