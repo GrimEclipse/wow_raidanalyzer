@@ -602,6 +602,7 @@ def _stone_review(fight, actor_map, players, raw):
                      "tank": player_ref(players, actor_map, pid) if pid in tank_ids else None,
                      "targetIsTank": players.get(pid, {}).get("role", "").endswith("tank"),
                      "raidDamageCount": len(matched), "raidDamage": bool(matched),
+                     "firstDamageTimeMs": min(int(group[0]["timestamp"]) for _, group in matched) - start if matched else None,
                      "victims": [player_ref(players, actor_map, pid) for pid in sorted({e["targetID"] for e in damage})],
                      "totalDamage": sum(int(e.get("amount") or 0) for e in damage),
                      "evidence": target_evidence + ("；全团伤害由独立爆发伤害确认" if matched else "；未见全团爆发伤害")})
@@ -611,11 +612,41 @@ def _stone_review(fight, actor_map, players, raw):
             if ts >= cutoff:
                 continue
             rows.append({"index": None, "time": fmt_ms(ts - start), "timeMs": ts - start, "tank": None,
-                         "targetIsTank": False, "raidDamageCount": 1, "raidDamage": True,
+                         "targetIsTank": False, "raidDamageCount": 1, "raidDamage": True, "firstDamageTimeMs": ts - start,
                          "victims": [player_ref(players, actor_map, pid) for pid in sorted({e["targetID"] for e in group})],
                          "totalDamage": sum(int(e.get("amount") or 0) for e in group), "evidence": "全团伤害已确认，缺少对应点名目标"})
+    first_burst_ts = min(int(group[0]["timestamp"]) for group in bursts) if bursts else None
+    prior_ball_ts = min((int(e["timestamp"]) for e in raw.get("damage", [])
+                         if ability_id(e) == 1290338 and e.get("targetID") in players
+                         and first_burst_ts is not None and int(e["timestamp"]) < first_burst_ts), default=None)
+    prior_dead_ids = {e["targetID"] for e in raw.get("deaths", [])
+                      if event_type(e) == "death" and e.get("targetID") in players
+                      and first_burst_ts is not None and int(e["timestamp"]) < first_burst_ts}
+    first_damage_row = None
+    for row in sorted(rows, key=lambda r: r["firstDamageTimeMs"] if r["firstDamageTimeMs"] is not None else float("inf")):
+        if row["raidDamage"]:
+            first_damage_row = row
+            break
+    for row in rows:
+        observed_count = row["raidDamageCount"]
+        row["observedRaidDamageCount"] = observed_count
+        row["priorDeathCount"] = len(prior_dead_ids) if row is first_damage_row else None
+        row["priorBallExplosionTimeMs"] = prior_ball_ts - start if row is first_damage_row and prior_ball_ts is not None else None
+        reasons = []
+        if observed_count:
+            if row is not first_damage_row:
+                reasons.append("本场首次裂石击全团伤害之后的伤害不重复统计")
+            else:
+                if prior_ball_ts is not None:
+                    reasons.append("此前已发生腐蚀液滴爆裂（炸球）")
+                if len(prior_dead_ids) > 3:
+                    reasons.append(f"此前已有 {len(prior_dead_ids)} 名玩家死亡，超过 3 人")
+        row["exemptionReasons"] = reasons
+        row["raidDamageCount"] = 1 if observed_count and not reasons else 0
+        row["counted"] = bool(row["raidDamageCount"])
     return {"enabled": True, "events": sorted(rows, key=lambda r: r["timeMs"]),
             "raidDamageCount": sum(r["raidDamageCount"] for r in rows),
+            "observedRaidDamageCount": len(bursts),
             "tankDeathCutoffMs": cutoff - start if tank_deaths else None}
 
 
@@ -1190,7 +1221,7 @@ def _mechanic_overview(rendered, options=None):
     specs = [
         ("broodReviewEnabled", "broodLeaks", "脏腑爆裂首漏断", "每场仅统计首次成功施法；按责任槽位和已配置玩家汇总，未配置时保留左右侧及组内序号。"),
         ("feastReviewEnabled", "feastFailures", "免疫分摊失误", "仅免疫打法且四人名单有效时计数，每人每轮最多一次；保护责任按配置施法者归属。"),
-        ("stoneReviewEnabled", "stoneRaidDamage", "裂石击全团伤害", "按爆发次数统计，附接圈坦克；从本场首次倒坦起停止统计，不把非坦克接怪当作接圈责任。"),
+        ("stoneReviewEnabled", "stoneRaidDamage", "裂石击全团伤害", "每场仅首次全团伤害可计数；此前炸球或已有超过 3 名玩家死亡则豁免，首次倒坦后停止统计。附接圈坦克及豁免证据。"),
         ("earlyDeathReviewEnabled", "earlyDeaths", "提前死亡", "首批明显早于后续死亡的玩家，按配置间隔筛选；完整死亡伤害仍保留。"),
     ]
     for option, key, label, description in specs:
@@ -1222,7 +1253,7 @@ def _mechanic_overview(rendered, options=None):
                         details.append(nightly_detail(pull, row["time"], p["player"] + "：第" + str(row["index"]) + "轮，第" + "、".join(map(str, sorted(set(p["strikeIndices"])))) + "段，" + "；".join(p["reasons"]), **p, round=row["index"], spellID=1290516))
             elif key == "stoneRaidDamage":
                 for row in (data.get("stone") or {}).get("events", []):
-                    if row["raidDamage"]:
+                    if row["raidDamageCount"]:
                         value += row["raidDamageCount"]
                         tank = row.get("tank") or {}
                         details.append(nightly_detail(pull, row["time"], "裂石击产生全团伤害；当前处理坦克：" + str(tank.get("player") or "未确认") + "；坦克ID：" + str(tank.get("playerID") or "未确认"), **tank, tankID=tank.get("playerID"), spellID=STONE_RAID_DAMAGE_ID))
@@ -1236,6 +1267,12 @@ def _mechanic_overview(rendered, options=None):
                                                   player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"), spellID=row["killingSpellID"], venomStacks=row["venomStacks"]))
         result["metrics"].append({"key": key, "label": label, "value": value, "unit": "次", "tone": "warning",
                                    "description": description, "players": nightly_player_totals([r for r in details if r.get("player")]), "events": details})
+        if key == "stoneRaidDamage":
+            result["metrics"][-1]["exemptCount"] = sum(
+                bool(row["raidDamage"] and not row["raidDamageCount"])
+                for pull in rendered if not pull.get("shortPull")
+                for row in ((pull.get(BOSS_CONFIG["key"]) or {}).get("stone") or {}).get("events", [])
+            )
         if key == "broodLeaks":
             result["metrics"][-1]["summaryViews"] = [
                 {"key": "slots", "label": "责任位置", "rows": nightly_player_totals([{**r, "player": r["responsibilitySlot"], "classColor": None} for r in details])},

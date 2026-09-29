@@ -111,7 +111,7 @@ function renderTwin(tab) {
   if (tab === 'stone') {
     const section=data.stone;if(!section?.enabled)return twinEmpty(section);
     const cutoffNote=section.tankDeathCutoffMs!=null?`本场首次倒坦在 ${(section.tankDeathCutoffMs/1000).toFixed(1)} 秒，之后不再统计。`:'本场未观测到坦克死亡。';
-    return `<section class="panel"><h2>裂石击，${section.raidDamageCount} 次全团伤害</h2><p>${esc(cutoffNote)}</p><p class="muted">优先使用实际接圈目标，其次参考同组三连击目标或读条时仇恨，并展示依据。一次爆发命中多人仍只计一次。</p>${table(['时间','接圈玩家 / 依据','结果','总伤害','受击玩家'],(section.events||[]).map(r=>[esc(r.time),`${r.tank?player(r.tank):'未确认'}<br><small>${esc(r.evidence)}</small>`,r.raidDamage?'<span class="badge bad">产生全团伤害</span>':'未见全团爆发',r.totalDamage,players(r.victims)]))}</section>`;
+    return `<section class="panel"><h2>裂石击，${section.raidDamageCount} 次计入</h2><p>${esc(cutoffNote)}</p><p class="muted">优先使用实际接圈目标，其次参考同组三连击目标或读条时仇恨，并展示依据。每场只计首次全团伤害；此前炸球或已死亡超过 3 人则豁免，后续伤害保留明细。</p>${table(['时间','接圈玩家 / 依据','结果','总伤害','受击玩家'],(section.events||[]).map(r=>[esc(r.time),`${r.tank?player(r.tank):'未确认'}<br><small>${esc(r.evidence)}</small>`,r.raidDamage?(r.counted?'<span class="badge bad">全团伤害，计入</span>':`<span class="badge">全团伤害，豁免</span><br><small>${esc((r.exemptionReasons||[]).join('；'))}</small>`):'未见全团爆发',r.totalDamage,players(r.victims)]))}</section>`;
   }
   if (tab === 'earlyDeaths' || tab === 'venomDeaths') {
     const section=data[tab];if(!section?.enabled)return twinEmpty(section);

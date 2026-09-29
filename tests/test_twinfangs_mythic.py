@@ -230,6 +230,45 @@ def test_stone_raid_explosion_count_is_not_victim_count():
     assert len(out['events'][0]['victims'])==5
 
 
+def test_stone_counts_only_first_raid_damage_in_a_fight():
+    f,am,players,raw=fixture();players[2]['role']='tank'
+    raw['casts']=[event(ts,1289092,sourceID=90,targetID=2) for ts in (10000,13000)]
+    raw['damage']=[event(ts,1289153,'damage',sourceID=90,targetID=1,amount=100) for ts in (10010,13010)]
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==1 and out['observedRaidDamageCount']==2
+    assert [row['raidDamageCount'] for row in out['events']]==[1,0]
+    assert out['events'][1]['raidDamage'] and out['events'][1]['exemptionReasons']
+
+
+def test_stone_prior_ball_explosion_exempts_first_damage_but_later_ball_does_not():
+    f,am,players,raw=fixture();players[2]['role']='tank'
+    raw['casts']=[event(10000,1289092,sourceID=90,targetID=2)]
+    raw['damage']=[event(9000,1290338,'damage',targetID=1,amount=100),
+                   event(10010,1289153,'damage',sourceID=90,targetID=1,amount=100)]
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==0
+    assert out['events'][0]['priorBallExplosionTimeMs']==9000
+    assert '炸球' in out['events'][0]['exemptionReasons'][0]
+    raw['casts'].append(event(13000,1289092,sourceID=90,targetID=2))
+    raw['damage'].append(event(13010,1289153,'damage',sourceID=90,targetID=1,amount=100))
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==0 and '之后' in out['events'][1]['exemptionReasons'][0]
+    raw['damage'][0]['timestamp']=11000
+    assert boss._stone_review(f,am,players,raw)['raidDamageCount']==1
+
+
+def test_stone_exempts_only_when_more_than_three_players_died_before_damage():
+    f,am,players,raw=fixture();players[2]['role']='tank'
+    raw['casts']=[event(10000,1289092,sourceID=90,targetID=2)]
+    raw['damage']=[event(10010,1289153,'damage',sourceID=90,targetID=1,amount=100)]
+    raw['deaths']=[event(9000,0,'death',targetID=i) for i in (1,3,4)]
+    assert boss._stone_review(f,am,players,raw)['raidDamageCount']==1
+    raw['deaths'].append(event(9500,0,'death',targetID=5))
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==0 and out['events'][0]['priorDeathCount']==4
+    assert '超过 3 人' in out['events'][0]['exemptionReasons'][0]
+
+
 def test_stone_stops_at_first_tank_death_and_never_blames_non_tank():
     f,am,players,raw=fixture();players[2]['role']='tank'
     raw['deaths']=[event(11000,0,'death',targetID=2)]
