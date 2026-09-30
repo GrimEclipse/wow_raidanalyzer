@@ -1035,6 +1035,46 @@
           "攫取毒牙的六人点名分别在 03:10.2 与 03:11.4 施加，但属于同一轮机制，时间轴按首次施加合并为 03:10.2。",
           "P3 的盘绕猎物和易爆清除均按伤害首次生效时间标记；其他有稳定读条的技能按 begincast 标记。"
         ]
+      },
+      "mythic": {
+        "zoneID": 53,
+        "reportID": "fvqyDzgPW8xZQmwR",
+        "fightID": 61,
+        "kill": true,
+        "durationMs": 589880,
+        "stats": [
+          {"label": "史诗击杀", "timeMs": 589880},
+          {"label": "疫鳞大怪腐败爆发", "value": "6 次读条"},
+          {"label": "P3 毒蛇之咬", "value": "3 次"}
+        ],
+        "phaseMarkers": [
+          {"phase": "p1", "label": "P1 史诗毒蛇之母", "timeMs": 0, "source": "fightStart", "confidence": "observed"},
+          {"phase": "heart-1", "label": "第一次被缚之怒", "timeMs": 138900, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p2", "label": "P2 厄鳞之子", "timeMs": 174100, "spellID": 1306862, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "heart-2", "label": "第二次被缚之怒", "timeMs": 288000, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p2.5", "label": "P2.5 连续幽魂盘卷", "timeMs": 332600, "spellID": 1299010, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "p3", "label": "P3 最终 Rush", "timeMs": 377100, "spellID": 1300751, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "heart-3", "label": "第三次被缚之怒", "timeMs": 577100, "spellID": 1286860, "eventType": "begincast", "source": "wclCast", "confidence": "observed"},
+          {"phase": "kill", "label": "击杀", "timeMs": 589880, "source": "fightEnd", "confidence": "observed"}
+        ],
+        "eventSeries": [
+          {"spellID": 1299759, "label": "毒性孵化", "kind": "adds", "phase": "p1/p3", "sourceName": "Ula'tek", "timesMs": [7000, 76000, 435200]},
+          {"spellID": 1310763, "label": "腐败爆发（10 码内集合）", "kind": "raid", "phase": "p1/p3", "sourceName": "Blightscale Wretch", "timesMs": [35800, 69900, 103900, 138800, 463500, 497500]},
+          {"spellID": 1298367, "label": "蛇母之怒", "kind": "tank", "phase": "p1/p3", "sourceName": "Ula'tek", "timesMs": [21900, 91900, 382100, 467100, 535100]},
+          {"spellID": 1299010, "label": "幽魂盘卷", "kind": "soak", "phase": "p1/p2.5", "sourceName": "Spectral Coil", "timesMs": [36300, 39500, 130300, 133500, 332600, 335000, 338300, 340300, 344700, 346800, 348800, 350400]},
+          {"spellID": 1286860, "label": "被缚之怒", "kind": "raid", "phase": "transition", "sourceName": "Ula'tek", "timesMs": [138900, 288000, 577100]},
+          {"spellID": 1306862, "label": "孵化厄运", "kind": "adds", "phase": "p2", "sourceName": "Doomscale Egg", "timesMs": [174100]},
+          {"spellID": 1301117, "label": "攫取毒牙", "kind": "spread", "phase": "p2", "sourceName": "Doomscale Warden", "timesMs": [195500, 196000]},
+          {"spellID": 1300751, "label": "毒蛇呼唤", "kind": "adds", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [377100, 407100, 505100]},
+          {"spellID": 1295905, "label": "毒蛇之咬", "kind": "spread", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [397100, 461100, 565100]},
+          {"spellID": 1292211, "label": "腐蚀浪潮", "kind": "direction", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [422100, 477100, 527100, 571100]},
+          {"spellID": 1315341, "label": "盘绕猎物", "kind": "transition", "phase": "p3", "sourceName": "Ula'tek", "timesMs": [432100, 483100, 544100]}
+        ],
+        "cycleNotes": [
+          "WCL 史诗击杀样本：疫鳞大怪在 P1/P3 均有腐败爆发读条；读条完成后 10 码外会受到额外持续伤害，应提前进圈或在读条前击杀大怪。",
+          "P3 毒蛇之咬在约 06:37、07:41、09:25 出现三次；同一英雄击杀样本为四次，不可沿用 H 时间轴。",
+          "时间点取本场敌方 begincast，取整到 0.1 秒；它是单个样本，不代表所有团队每轮的固定秒数。"
+        ]
       }
     },
     "nymrissa_wavecaller": {

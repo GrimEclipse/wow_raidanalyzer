@@ -20,25 +20,25 @@ CONFIG_SCHEMA = [
     {"key": "feastStrategy", "type": "select", "label": "史诗贪婪盛宴打法", "default": "immunity",
      "options": [{"value": "normal", "label": "非免疫分摊"}, {"value": "immunity", "label": "首段全团、后两段免疫组"}],
      "visibleWhen": {"field": "feastReviewEnabled", "equals": True}},
-    {"key": "feastGroups", "type": "interruptGroups", "label": "免疫分摊名单（每轮四人，含受保护玩家）", "default": {}, "placeholder": "例如：三坑不二 那个猎刃 小心胡大海 Toccata",
-     "description": "填写玩家名或本报告 Actor ID。每轮对应一次盛宴的后两段；六轮分别配置，不自动循环。未配置或名单无法唯一匹配时只显示证据，不计个人失误。",
+    {"key": "feastGroups", "type": "interruptGroups", "label": "免疫分摊名单（每轮四人，含受保护玩家）", "default": {}, "placeholder": "从本场阵容选择，或输入四名玩家",
+     "description": "每轮填写四名玩家，可从本场阵容逐个加入或沿用上一轮后调整。六轮分别保存；未配置或名单无法唯一匹配时只显示证据，不计个人失误。", "copyPrevious": True,
      "groups": [{"key": "round1", "label": "第一轮免疫组"}, {"key": "round2", "label": "第二轮免疫组"},
                 {"key": "round3", "label": "第三轮免疫组"}, {"key": "round4", "label": "第四轮免疫组"},
                 {"key": "round5", "label": "第五轮免疫组"}, {"key": "round6", "label": "第六轮免疫组"}],
      "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
     {"key": "protectionPairs", "type": "interruptGroups", "label": "保护配对：施法者 受保护玩家", "default": {}, "preserveDuplicates": True,
-     "description": "每两个名字为一对，可填写多对，例如：黑心貓 染小战 丶花落冬陽 雷横。不限制受保护者职业，按本轮名单逐一核对实际保护目标。",
-     "placeholder": "例如：黑心貓 染小战 丶花落冬陽 雷横",
+     "description": "按“施法者 受保护玩家”顺序，每两名为一对；同轮可填多对，可沿用上一轮后调整。按实际保护目标逐人核对。", "copyPrevious": True,
+     "placeholder": "按施法者、受保护玩家的顺序填写",
      "groups": [{"key": "round1", "label": "第一轮保护配对"}, {"key": "round2", "label": "第二轮保护配对", "migrateFrom": ["round2a", "round2b"]},
                 {"key": "round3", "label": "第三轮保护配对"}, {"key": "round4", "label": "第四轮保护配对"},
                 {"key": "round5", "label": "第五轮保护配对"}, {"key": "round6", "label": "第六轮保护配对"},
                 {"key": "round2a", "label": "旧版第二轮配对一", "hidden": True}, {"key": "round2b", "label": "旧版第二轮配对二", "hidden": True}],
      "visibleWhen": {"field": "feastStrategy", "equals": "immunity"}},
-    {"key": "broodGroups", "type": "interruptGroups", "label": "蛇头打断名单", "default": {}, "placeholder": "例如：Kaminadeko（每个主断槽位填一名角色）",
+    {"key": "broodGroups", "type": "interruptGroups", "label": "蛇头打断名单", "default": {}, "placeholder": "从本场阵容选择主断玩家",
      "description": "每侧远程按每次召唤中远点蛇头首次出现顺序分配，非固定点位号。近点 1、2 号由当前接该侧 Boss 的坦克主断，近战为补断。每个远程槽位填写一人。",
-     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个", "placeholder": "例如：" + (["神jo", "三坑不二", "小楚唯", "马老师", "飞天小喷菇"] if side == "left" else ["搓背", "那个猎刃", "小心胡大海", "软软", "茶喵"])[i-1]} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 6)]
-               + [{"key": "leftBackup", "label": "左侧近战补断", "placeholder": "例如：染小战（填写实际安排的近战）"}, {"key": "rightBackup", "label": "右侧近战补断", "placeholder": "例如：雷横（填写实际安排的近战）"},
-                  {"key": "leftRangedBackup", "label": "左侧远程未安排序号补断（可选）", "placeholder": "例如：Toccata"}, {"key": "rightRangedBackup", "label": "右侧远程未安排序号补断（可选）", "placeholder": "例如：Superhunter"}],
+     "groups": [{"key": side + str(i), "label": label + "远程第" + str(i) + "个", "placeholder": "选择或填写这一顺序的主断玩家"} for side, label in [("left", "左侧"), ("right", "右侧")] for i in range(1, 6)]
+               + [{"key": "leftBackup", "label": "左侧近战补断", "placeholder": "选择或填写实际安排的近战"}, {"key": "rightBackup", "label": "右侧近战补断", "placeholder": "选择或填写实际安排的近战"},
+                  {"key": "leftRangedBackup", "label": "左侧远程未安排序号补断（可选）", "placeholder": "选择或填写补断玩家"}, {"key": "rightRangedBackup", "label": "右侧远程未安排序号补断（可选）", "placeholder": "选择或填写补断玩家"}],
      "visibleWhen": {"field": "broodReviewEnabled", "equals": True}},
     {"key": "earlyDeathGapSeconds", "type": "number", "label": "提前死亡与后续死亡间隔（秒）", "default": 8, "min": 3, "max": 60,
      "visibleWhen": {"field": "earlyDeathReviewEnabled", "equals": True}},
@@ -134,6 +134,7 @@ BROOD_ARENAS = (
 )
 BROOD_NPC_ID = 270898
 BOSS_NPC_IDS = {257361, 257368}
+BOSS_IDENTITY_BY_GAME_ID = {257361: "Vexhul", 257368: "Ithraz"}
 BROOD_CAST_ID = 1308385
 BROOD_SUMMON_ID = 1308356
 FEAST_HIT_ID = 1290662
@@ -906,6 +907,44 @@ def _spit_direction(origin, target):
     return result
 
 
+def _spit_boss_side_samples(raw):
+    """Locate each named Boss at the fixed arena corners using its own casts."""
+    game_ids = raw.get("trackedActorGameIDByActorID") or {}
+    samples = []
+    for event in raw.get("casts") or []:
+        actor_id = event.get("sourceID")
+        boss_key = BOSS_IDENTITY_BY_GAME_ID.get(game_ids.get(actor_id))
+        position = _spit_position(event, actor_id) if boss_key else None
+        if not position:
+            continue
+        distance, arena_key, side = min(
+            (hypot(position[0] - point[0], position[1] - point[1]), arena["key"], side)
+            for arena in BROOD_ARENAS for side, point in arena["bosses"].items()
+        )
+        if distance <= 400:
+            samples.append({"timeMs": int(event["timestamp"]), "arena": arena_key,
+                            "side": side, "boss": boss_key})
+    return samples
+
+
+def _spit_boss_sides(samples, arena_key, timestamp, swapped):
+    fallback = {"left": "Ithraz" if swapped else "Vexhul",
+                "right": "Vexhul" if swapped else "Ithraz"}
+    observed = {}
+    for side in ("left", "right"):
+        nearby = [sample for sample in samples if sample["arena"] == arena_key and sample["side"] == side
+                  and abs(sample["timeMs"] - timestamp) <= 45_000]
+        if nearby:
+            observed[side] = min(nearby, key=lambda sample: abs(sample["timeMs"] - timestamp))["boss"]
+    if len(observed) == 2 and observed["left"] != observed["right"]:
+        return observed, "WCL 两只 Boss 自身坐标"
+    if len(observed) == 1:
+        side, boss = next(iter(observed.items()))
+        return {side: boss, ("right" if side == "left" else "left"):
+                "Ithraz" if boss == "Vexhul" else "Vexhul"}, "WCL 单侧坐标，另一侧按双 Boss 补全"
+    return fallback, "按转场次数交替推断，缺少临近 Boss 坐标"
+
+
 def _spit_review(fight, actor_map, players, raw):
     # Prefer the filtered resource-bearing records over generic no-resource ones.
     events = _unique_events(raw.get("trackedActorEvents", []) + raw.get("casts", []) + raw.get("damage", []))
@@ -914,6 +953,7 @@ def _spit_review(fight, actor_map, players, raw):
             and e.get("targetID") in players and e.get("hitType") != 10
             and float(e.get("amount") or 0) + float(e.get("absorbed") or 0) > 0]
     output = []
+    boss_samples = _spit_boss_side_samples(raw)
     for cast in casts:
         ts, source, instance = int(cast["timestamp"]), cast.get("sourceID"), cast.get("sourceInstance", 1)
         pid = cast.get("targetID")
@@ -941,6 +981,17 @@ def _spit_review(fight, actor_map, players, raw):
             row.update(_spit_direction(origin, target))
             row["counted"] = row["counted"] and pid in players
         output.append(row)
+    active_arena, swapped = None, False
+    for row in output:
+        arena_key = row.get("arena")
+        if not arena_key:
+            continue
+        if active_arena and arena_key != active_arena:
+            swapped = not swapped
+        active_arena = arena_key
+        row["bossSides"], row["bossSideEvidence"] = _spit_boss_sides(
+            boss_samples, arena_key, fight["startTime"] + row["timeMs"], swapped)
+        swapped = row["bossSides"]["left"] == "Ithraz"
     return {"enabled": True, "events": output, "count": sum(r["counted"] for r in output),
             "collateralCount": sum(len(r["collateral"]) for r in output),
             "evidenceNote": "取完成读条时的目标；坐标样本距完成不超过250ms。三只蛇头共用左蛇头→左Boss、右蛇头→右Boss两条固定边界的禁射方向夹角（含边界）；同时禁止朝生成线背离Boss一侧射击。每条完成射线最多计一次。误伤按同一蛇头实例、完成后750ms内实际伤害对应；额外受击不单独证明点名玩家走错。"}
@@ -1304,6 +1355,7 @@ def build_aggregated_json(report_ids, options=None):
     if options["venomReviewEnabled"]:
         config["trackedActorEventFilters"].append("ability.id = 1294293")
     if options["spitReviewEnabled"]:
+        config["fetchKeys"].add("casts")
         config["trackedActorEventFilters"].append("ability.id in (1291478, 1293295, 1293979)")
     if options["broodReviewEnabled"]:
         config["trackedActorEventFilters"].append("source.id = 270898 or target.id = 270898")

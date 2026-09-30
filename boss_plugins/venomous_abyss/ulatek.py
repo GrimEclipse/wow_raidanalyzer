@@ -8,6 +8,7 @@ import math
 from analyzer_core.config import resolve_analysis_options
 
 CONFIG_SCHEMA = [{'key': 'wavesReviewEnabled', 'type': 'boolean', 'label': '腐蚀浪潮与带蛋', 'description': '', 'default': True}, {'key': 'rageReviewEnabled', 'type': 'boolean', 'label': '被缚之怒', 'description': '', 'default': True}, {'key': 'fangsReviewEnabled', 'type': 'boolean', 'label': '攫取毒牙', 'description': '', 'default': True}, {'key': 'criticalReviewEnabled', 'type': 'boolean', 'label': '关键流程与蛇母之怒', 'description': '', 'default': True}]
+CONFIG_SCHEMA.append({'key': 'fangSafeStacks', 'type': 'number', 'label': '攫取毒牙拉断安全层数', 'description': '拉断后凋萎静脉达到此层数以内视为安全；按团队战术填写。', 'default': 3, 'integer': True, 'min': 0, 'max': 20, 'step': 1, 'visibleWhen': {'field': 'fangsReviewEnabled', 'equals': True}})
 CRITICAL_FIELDS = {
     "maliceReviewEnabled": ("malice", "恶意打断"),
     "meleeReviewEnabled": ("nonTankMelee", "非坦克近战伤害"),
@@ -74,6 +75,7 @@ ULATEK_SPELL_NAMES = {
     1298418: "岩石剧毒",
     1299010: "幽魂盘卷",
     1299526: "烈毒之心",
+    1299759: "毒性孵化",
     1300312: "厄鳞外壳",
     1300751: "毒蛇呼唤",
     1300685: "灵魂绞杀者",
@@ -94,7 +96,10 @@ ULATEK_SPELL_NAMES = {
     1306119: "钙化尸骸",
     1306862: "孵化厄运",
     1307367: "被缚之怒",
+    1307617: "毒性甲壳",
+    1310763: "腐败爆发",
     1311609: "凋萎静脉",
+    1312150: "腐臭蛋黄",
     1311611: "攫取毒牙",
     1311612: "攫取毒牙",
     1312967: "易爆清除",
@@ -119,7 +124,6 @@ DEVOURERS_SPAWN_GAME_ID = 266085
 BLIGHTSCALE_SHRIEKER_GAME_ID = 273577
 FANG_AURA_ID = 1311611
 BLIGHT_VEIN_ID = 1311609
-FANG_BATCH_WINDOW_MS = 3_000
 DEVOURERS_SPAWN_SHELL_ID = 1290990
 SERPENT_BITE_TARGET_ID = 1288879
 INGESTED_VENOM_ID = 1313529
@@ -154,7 +158,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-progression-phases-2026-09-21-v10",
+    "mechanicVersion": "ulatek-mythic-stacks-2026-09-29-v11",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -189,10 +193,10 @@ COURT_PROFILE = {
         },
         {
             "key": "fangs_excess_stack",
-            "label": "违反攫取毒牙同场三秒、对场等消层的拉线逻辑",
+            "label": "攫取毒牙拉断后超过配置的凋萎静脉安全层数",
             "mode": "direct",
             "spellIDs": [1311611, 1311609],
-            "requiredEvidence": ["两名厄鳞守卫的施加时间与场侧", "攫取毒牙移除", "凋萎静脉全团消除"],
+            "requiredEvidence": ["攫取毒牙移除", "随后凋萎静脉全团层数变化", "团队配置的安全层数"],
             "defaultCountEnabled": True,
             "severityUnits": 1,
         },
@@ -508,6 +512,30 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
             "earlyHatchCount": sum(row["earlyHatchConfirmed"] for row in related_hits),
             "openEnded": bool(interval.get("openEnded")),
         })
+    possible_collision_hatches = []
+    if int(fight.get("difficulty") or 0) == 5:
+        for interval in egg_intervals:
+            if interval.get("openEnded") or interval["playerID"] not in players:
+                continue
+            timestamp = interval["end"]
+            if any(abs(fight["startTime"] + hit["timeMs"] - timestamp) <= 750
+                   for hit in hits):
+                continue
+            if any(abs(int(event.get("timestamp") or 0) - timestamp) <= 750
+                   for event in raw.get("damage") or []
+                   if int(ability_id(event) or 0) == P25_COIL_DAMAGE_ID):
+                continue
+            hatch = min((change for change in hatch_changes
+                         if abs(change["timestamp"] - timestamp) <= 750),
+                        key=lambda change: abs(change["timestamp"] - timestamp), default=None)
+            if hatch:
+                possible_collision_hatches.append({
+                    **player_ref(players, actor_map, interval["playerID"]),
+                    "time": fmt_ms(timestamp - fight["startTime"]),
+                    "phase": _phase_at(timestamp, rage_windows),
+                    "hatchTime": fmt_ms(hatch["timestamp"] - fight["startTime"]),
+                    "evidence": "携蛋光环移除与孵化同帧，未见浪潮或幽魂盘卷；需复核位置，不能单凭日志认定碰蛋",
+                })
     return {
         "spellID": WAVE_ID,
         "eggAuraID": EGG_CARRY_ID,
@@ -515,6 +543,7 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
         "applicationCount": len(hits),
         "eggCarrierHitCount": sum(row["eggCarrier"] for row in hits),
         "earlyHatchCount": sum(row["earlyHatchConfirmed"] for row in hits),
+        "possibleCollisionHatches": possible_collision_hatches,
         "hits": hits,
         "waveDeathWindowMs": WAVE_DEATH_WINDOW_MS,
         "waveDeaths": {
@@ -767,6 +796,7 @@ def _egg_assignment(clock_direction):
 
 
 def _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows):
+    mythic = int(fight.get("difficulty") or 0) == 5
     target_game_ids = raw.get("trackedDamageTargetGameIDByActorID") or {}
     spawn_actor_ids = {
         actor_id for actor_id, game_id in target_game_ids.items()
@@ -851,7 +881,9 @@ def _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows):
             if 4_000 <= row["time"] - timestamp <= 29_000
         ]
         baseline_shriekers = int(BASELINE_P3_SHRIEKERS.get(index, 0))
-        extra_shrieker_count = max(0, len(round_shriekers) - baseline_shriekers)
+        # The four-slot Heroic baseline cannot establish a failed egg on Mythic,
+        # where add composition differs. Keep observations without a verdict.
+        extra_shrieker_count = 0 if mythic else max(0, len(round_shriekers) - baseline_shriekers)
         eggs = []
         for event in group["events"]:
             instance = event.get("sourceInstance")
@@ -915,10 +947,11 @@ def _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows):
         rounds.append({
             "index": index,
             "time": fmt_ms(timestamp - fight["startTime"]),
-            "expectedEggCount": 4,
-            "expectedKillableEggCount": max(0, 4 - baseline_shriekers),
+            "expectedEggCount": None if mythic else 4,
+            "expectedKillableEggCount": None if mythic else max(0, 4 - baseline_shriekers),
             "observedEggCount": len(eggs),
-            "baselineShriekerCount": baseline_shriekers,
+            "baselineShriekerCount": None if mythic else baseline_shriekers,
+            "adjudicationAvailable": not mythic,
             "shriekerCount": len(round_shriekers),
             "extraShriekerCount": extra_shrieker_count,
             "failedEggCount": len(failed_eggs),
@@ -928,7 +961,8 @@ def _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows):
     return {
         "eggGameID": DEVOURERS_SPAWN_GAME_ID,
         "shriekerGameID": BLIGHTSCALE_SHRIEKER_GAME_ID,
-        "expectedEggsPerRound": 4,
+        "expectedEggsPerRound": None if mythic else 4,
+        "adjudicationAvailable": not mythic,
         "roundCount": len(rounds),
         "failedEggCount": sum(row["failedEggCount"] for row in rounds),
         "rounds": rounds,
@@ -1138,7 +1172,7 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
     }
 
 
-def _analyze_fangs(fight, actor_map, players, raw):
+def _analyze_fangs(fight, actor_map, players, raw, safe_stacks=3):
     applies = [
         event for event in raw["debuffs"]
         if int(ability_id(event) or 0) == FANG_AURA_ID
@@ -1152,7 +1186,7 @@ def _analyze_fangs(fight, actor_map, players, raw):
         and event_type(event) == "removedebuff"
     ]
     if not applies:
-        return {"batchWindowSec": 3, "rounds": [], "wrongBreakCount": 0, "maxBlightStack": 0}
+        return {"safeStacks": safe_stacks, "rounds": [], "wrongBreakCount": 0, "maxBlightStack": 0}
 
     start = min(int(event["timestamp"]) for event in applies)
     targets = {}
@@ -1277,65 +1311,21 @@ def _analyze_fangs(fight, actor_map, players, raw):
             if not active_blight:
                 clear_times.append(int(event.get("timestamp") or 0))
 
-    first_break = breaks[0] if breaks else None
-    first_side = first_break.get("side") if first_break else None
-    first_time = first_break.get("absoluteTime") if first_break else None
-    first_clear = next((timestamp for timestamp in clear_times if first_time is not None and timestamp > first_time), None)
-    opposite_sides = [group["side"] for group in apply_groups if group["side"] != first_side]
-    opposite_side = opposite_sides[0] if opposite_sides else None
-    opposite_after_clear = [
-        row for row in breaks
-        if row.get("side") == opposite_side
-        and first_clear is not None
-        and row["absoluteTime"] >= first_clear
-    ]
-    second_time = opposite_after_clear[0]["absoluteTime"] if opposite_after_clear else None
-
-    candidate_reasons = []
+    # Keep the assignment-side evidence in the single-fight report, but use only
+    # the observed raidwide stack transition to judge each tether removal.
     for row in breaks:
-        reasons = []
-        timestamp = row["absoluteTime"]
-        if row.get("side") == first_side and first_time is not None:
-            row["batch"] = 1
-            row["deltaFromBatchStartMs"] = timestamp - first_time
-            if timestamp - first_time > FANG_BATCH_WINDOW_MS:
-                reasons.append("同场未在首断后 3 秒内拉断")
-        elif row.get("side") == opposite_side:
-            row["batch"] = 2
-            if first_clear is None or timestamp < first_clear:
-                reasons.append("对场未等待凋萎静脉消除")
-                row["deltaFromBatchStartMs"] = None
-            elif second_time is not None:
-                row["deltaFromBatchStartMs"] = timestamp - second_time
-                if timestamp - second_time > FANG_BATCH_WINDOW_MS:
-                    reasons.append("同场未在首断后 3 秒内拉断")
-        else:
-            row["batch"] = None
-            row["deltaFromBatchStartMs"] = None
-            reasons.append("无法确认所属场侧")
-        row["blightClearedBeforeBreak"] = bool(first_clear is not None and timestamp >= first_clear)
-        candidate_reasons.append(reasons)
-
-    first_violation_index = next(
-        (index for index, reasons in enumerate(candidate_reasons) if reasons),
-        None,
-    )
-    for index, row in enumerate(breaks):
-        is_first_violation = index == first_violation_index
-        row["violationReasons"] = candidate_reasons[index] if is_first_violation else []
-        row["wrong"] = is_first_violation
-        row["adjudication"] = (
-            "first_violation"
-            if is_first_violation
-            else ("not_attributed_after_first_violation" if candidate_reasons[index] else "correct")
-        )
+        stack = row["toStack"]
+        row["safeStacks"] = safe_stacks
+        row["wrong"] = stack is not None and stack > safe_stacks
+        row["violationReasons"] = [f"拉断后凋萎静脉 {stack} 层，超过安全层数 {safe_stacks}"] if row["wrong"] else []
+        row["adjudication"] = "over_safe_stacks" if row["wrong"] else ("missing_stack_evidence" if stack is None else "correct")
 
     unresolved = [
         player_ref(players, actor_map, player_id)
         for player_id in targets
         if not any(row["playerID"] == player_id for row in breaks)
     ]
-    wrong_players = [breaks[first_violation_index]] if first_violation_index is not None else []
+    wrong_players = [row for row in breaks if row["wrong"]]
     rounds = [{
         "index": 1,
         "time": fmt_ms(start - fight["startTime"]),
@@ -1352,11 +1342,8 @@ def _analyze_fangs(fight, actor_map, players, raw):
             }
             for group in apply_groups
         ],
-        "firstBreakSide": first_side,
-        "firstBreakTime": fmt_ms(first_time - fight["startTime"]) if first_time is not None else None,
-        "blightClearTime": fmt_ms(first_clear - fight["startTime"]) if first_clear is not None else None,
-        "secondBreakSide": opposite_side,
-        "secondBreakTime": fmt_ms(second_time - fight["startTime"]) if second_time is not None else None,
+        "blightClearTimes": [fmt_ms(timestamp - fight["startTime"]) for timestamp in clear_times],
+        "safeStacks": safe_stacks,
         "breaks": breaks,
         "unresolved": unresolved,
         "violationPlayers": wrong_players,
@@ -1371,11 +1358,65 @@ def _analyze_fangs(fight, actor_map, players, raw):
         "wrongBreakCount": len(wrong_players),
     }]
     return {
-        "batchWindowSec": FANG_BATCH_WINDOW_MS // 1000,
+        "safeStacks": safe_stacks,
         "rounds": rounds,
         "wrongBreakCount": sum(row["wrongBreakCount"] for row in rounds),
         "maxBlightStack": max((row["maxBlightStack"] for row in rounds), default=0),
     }
+
+
+def _analyze_mythic_wretch(fight, actor_map, players, raw):
+    if int(fight.get("difficulty") or 0) != 5:
+        return {}
+    begins = sorted((event for event in raw.get("casts") or []
+                     if int(ability_id(event) or 0) == 1310763
+                     and event_type(event) == "begincast"),
+                    key=lambda event: int(event.get("timestamp") or 0))
+    completes = completed_casts(raw.get("casts") or [], 1310763)
+    position_index = build_position_index(raw.get("resources") or [])
+    rounds = []
+    for begin in begins:
+        start = int(begin["timestamp"])
+        complete = next((event for event in completes
+                         if event.get("sourceID") == begin.get("sourceID")
+                         and start <= int(event["timestamp"]) <= start + 10_000), None)
+        finish = int(complete["timestamp"]) if complete else None
+        hits = [event for event in raw.get("damage") or []
+                if finish is not None and int(ability_id(event) or 0) == 1310763
+                and event.get("targetID") in players
+                and finish - 250 <= int(event.get("timestamp") or 0) <= finish + 1_000]
+        inside, outside, unknown = [], [], []
+        if finish is not None:
+            for player_id in sorted(_living_player_ids(players, raw, finish)):
+                ref = player_ref(players, actor_map, player_id)
+                position = _position_sample(position_index, player_id, finish)
+                if not position or not position["reliable"] or complete.get("x") is None or complete.get("y") is None:
+                    unknown.append(ref)
+                    continue
+                distance = math.hypot(position["x"] - float(complete["x"]),
+                                      position["y"] - float(complete["y"])) / 100
+                row = {**ref, "distanceYards": round(distance, 1)}
+                death = next((event for event in raw.get("deaths") or []
+                              if event.get("targetID") == player_id
+                              and finish <= int(event.get("timestamp") or 0) <= finish + 12_000), None)
+                if death:
+                    row["deathTime"] = fmt_ms(int(death["timestamp"]) - fight["startTime"])
+                    row["deathAbilityID"] = int(death.get("killingAbilityGameID") or ability_id(death) or 0)
+                (outside if distance > 10 else inside).append(row)
+        rounds.append({
+            "time": fmt_ms(start - fight["startTime"]),
+            "castCompleted": complete is not None,
+            "completionTime": fmt_ms(finish - fight["startTime"]) if finish is not None else None,
+            "hitCount": len(hits),
+            "hits": [{**player_ref(players, actor_map, event["targetID"]),
+                      "amount": _amount(event)} for event in hits],
+            "inside": inside,
+            "outside": outside,
+            "positionUnknown": unknown,
+        })
+    return {"spellID": 1310763, "rounds": rounds, "castCount": len(rounds),
+            "completedCount": sum(row["castCompleted"] for row in rounds),
+            "positionVerdictAvailable": any(row["inside"] or row["outside"] for row in rounds)}
 
 
 def _analyze_malice(fight, actor_map, raw):
@@ -1644,8 +1685,9 @@ def analyze_ulatek(fight, actor_map, players, raw):
     result = {
         "progression": _progression_phase(fight, raw),
         "wavesAndEggs": waves,
+        "mythicWretch": _analyze_mythic_wretch(fight, actor_map, players, raw) if options["wavesReviewEnabled"] else {},
         "rage": _analyze_rage(fight, actor_map, players, raw, rage_windows) if options["rageReviewEnabled"] else {},
-        "fangs": _analyze_fangs(fight, actor_map, players, raw) if options["fangsReviewEnabled"] else {},
+        "fangs": _analyze_fangs(fight, actor_map, players, raw, options["fangSafeStacks"]) if options["fangsReviewEnabled"] else {},
         "critical": _analyze_critical(fight, actor_map, players, raw) if options["criticalReviewEnabled"] else {},
     }
 
@@ -1730,7 +1772,7 @@ def _mechanic_overview(rendered):
                 wrong_breaks.append(nightly_detail(
                     pull,
                     row.get("time"),
-                    f"{row.get('player')} 违反拉线逻辑：{'、'.join(row.get('violationReasons') or ['未知原因'])}",
+                    f"{row.get('player')} 拉断超出安全层数：{'、'.join(row.get('violationReasons') or ['未知原因'])}",
                     player=row.get("player"),
                     classColor=row.get("classColor"),
                     spellID=BLIGHT_VEIN_ID,
@@ -1854,7 +1896,7 @@ def _mechanic_overview(rendered):
             },
             {
                 "key": "wrongFangBreaks",
-                "label": "违反拉线逻辑",
+                "label": "拉断超出安全层数",
                 "value": len(wrong_breaks),
                 "unit": "次",
                 "tone": "danger",

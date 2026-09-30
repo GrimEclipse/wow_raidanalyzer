@@ -146,6 +146,18 @@ class SpitTests(unittest.TestCase):
         result = t._spit_direction((100000, 100000), (100000, 101000))
         self.assertFalse(result['counted'])
 
+    def test_boss_identity_uses_nearby_position_then_transition_parity(self):
+        samples = [
+            dict(timeMs=10000, arena='north', side='left', boss='Ithraz'),
+            dict(timeMs=10000, arena='north', side='right', boss='Vexhul'),
+        ]
+        sides, evidence = t._spit_boss_sides(samples, 'north', 10000, False)
+        self.assertEqual(sides, {'left': 'Ithraz', 'right': 'Vexhul'})
+        self.assertIn('WCL', evidence)
+        sides, evidence = t._spit_boss_sides(samples, 'southeast', 10000, True)
+        self.assertEqual(sides, {'left': 'Ithraz', 'right': 'Vexhul'})
+        self.assertIn('交替', evidence)
+
 
 if __name__ == '__main__':
     unittest.main()

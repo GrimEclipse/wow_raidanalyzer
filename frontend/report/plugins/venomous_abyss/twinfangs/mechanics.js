@@ -65,27 +65,74 @@ function twinCheckpoints(checkpoints) {
   if (!checkpoints?.length) return '<section class="panel"><h2>层数超过预期</h2><p class="muted">未观测到完整转圈结束，未生成层数检查点。</p></section>';
   return `<section class="panel"><h2>层数超过预期</h2><p class="muted">按转圈实际结束检查，第一轮最多4层、第二轮最多7层，每人每个检查点最多计一次；检查前任何玩家阵亡则全团该次检查豁免，战复不取消。来源表为此前累计增加，扣除移除层数得到当前层数；不推测被消掉的具体来源。</p>${checkpoints.map(c=>`<article class="card"><h3>第 ${c.index} 次，${esc(c.time)}，上限 ${c.limit} 层，计数 ${c.count} 人${c.exempt?'（已豁免）':''}</h3>${c.exemption?`<p class="muted">${esc(c.exemption.time)} ${player(c.exemption)} 阵亡；${esc(c.exemption.reason)}</p>`:''}<p class="muted">${esc(c.evidence)}</p>${c.players.map(p=>`<details ${p.exceeded?'open':''}><summary>${player(p)}：${p.stacks} 层 ${p.exceeded?(p.exempt?'<span class="badge warn">超限但豁免，不计数</span>':'<span class="badge bad">超过预期 +1</span>'):''}${!p.alive?'（已死亡）':''}</summary><p>${p.gainsBySource.map(s=>`${esc(s.source)} +${s.stacks}`).join('；')||'无新增记录'}；共移除 ${p.removedStacks} 层</p>${table(['时间','来源','变化','结果'],p.history.map(e=>[esc(e.time),esc(e.source),`${e.delta>0?'+':''}${e.delta}`,`${e.fromStack} → ${e.toStack}`]))}</details>`).join('')}</article>`).join('')}</section>`;
 }
-function twinSpitMap(row) {
-  if(!row.origin||!row.targetPosition||!row.meleePolygon)return '';
-  const o=row.origin,t=row.targetPosition,polygon=row.meleePolygon;
-  const d=[t[0]-o[0],t[1]-o[1]],length=Math.hypot(...d);
-  if(!length)return '';
-  const end=[o[0]+d[0]/length*10000,o[1]+d[1]/length*10000];
-  const side=row.spawnLineDirection,line=row.spawnLine||[];
-  const cone=(row.forbiddenDirections||[]).map(v=>[o[0]+v[0]/Math.hypot(...v)*10000,o[1]+v[1]/Math.hypot(...v)*10000]);
-  const heads=Object.entries(row.headPositions||{}),bosses=Object.entries(row.bossPositions||{});
-  const points=[o,t,end,...polygon,...line,...cone,...heads.map(([,p])=>p),...bosses.map(([,p])=>p)],minX=Math.min(...points.map(p=>p[0]))-300,maxX=Math.max(...points.map(p=>p[0]))+300,minY=Math.min(...points.map(p=>p[1]))-300,maxY=Math.max(...points.map(p=>p[1]))+300;
-  const scale=Math.min(500/(maxX-minX),330/(maxY-minY));
-  const x=p=>30+(p[0]-minX)*scale,y=p=>30+(maxY-p[1])*scale;
-  const anchors=heads.map(([side,p])=>`<circle cx="${x(p)}" cy="${y(p)}" r="4" fill="#a78bfa"/><text x="${x(p)}" y="${y(p)+16}" text-anchor="middle" fill="#c4b5fd" font-size="10">${({left:'左蛇',middle:'中蛇',right:'右蛇'})[side]}</text>`).join('')+bosses.map(([side,p])=>`<circle cx="${x(p)}" cy="${y(p)}" r="5" fill="#fbbf24"/><text x="${x(p)}" y="${y(p)-12}" text-anchor="middle" fill="#fbbf24" font-size="11">${side==='left'?'左 Boss':'右 Boss'}</text>`).join('');
-  return `<figure style="max-width:580px"><svg viewBox="0 0 560 390" role="img" aria-label="蛇头射线与固定禁射方向" style="width:100%;background:#0b1220;border-radius:12px">${cone.length===2?`<polygon points="${[o,...cone].map(p=>`${x(p)},${y(p)}`).join(' ')}" fill="#ef444433" stroke="#ef4444" stroke-dasharray="5 4"/>`:''}<polygon points="${polygon.map(p=>`${x(p)},${y(p)}`).join(' ')}" fill="#f59e0b33" stroke="#f59e0b" stroke-dasharray="5 4"/>${line.length?`<line x1="${x(line[0])}" y1="${y(line[0])}" x2="${x(line[1])}" y2="${y(line[1])}" stroke="#94a3b8" stroke-dasharray="4 4"/>`:''}<line x1="${x(o)}" y1="${y(o)}" x2="${x(end)}" y2="${y(end)}" stroke="${row.counted?'#fb7185':'#38bdf8'}" stroke-width="3"/>${anchors}<circle cx="${x(o)}" cy="${y(o)}" r="6" fill="#a78bfa"/><circle cx="${x(t)}" cy="${y(t)}" r="5" fill="#fff"/><text x="${x(t)+8}" y="${y(t)}" fill="white" font-size="12">${esc(row.target?.player||'未知')}</text></svg><figcaption>紫点：当前蛇头；白点：点名目标；灰线：左右蛇头生成线；橙框：左右蛇头与对应 Boss 四点；红色扇区：此蛇头禁射方向夹角。</figcaption></figure>`;
+// WCL positions are hundredths of a yard. The six fixed Boss positions align
+// with the three corners of the original 1997x1118 encounter image at this scale.
+const TWIN_ARENA_IMAGE = '/assets/raids/venomous_abyss/06-twinfangs.jpg';
+const TWIN_ARENA_MAP = {width:1997,height:1118,centerX:998.5,northY:69145,northPixelY:150,scale:.0625};
+// Calibrated to the five marked positions on the original map. A single
+// world-to-image scale puts the bosses and the three spit heads on different
+// sides of the platform art, so only these fixed north anchors are corrected.
+const TWIN_NORTH_ANCHORS = {
+  bosses:{left:[912,97],right:[1100,97]},
+  heads:{left:[942,484],middle:[1006,461],right:[1067,470]},
+};
+const TWIN_BOSS_PORTRAITS = {
+  Vexhul:{name:'维克苏尔',color:'#86efac',image:'https://cdn.raidplan.io/wow/portrait/140993.png'},
+  Ithraz:{name:'伊斯拉兹',color:'#fb7185',image:'https://cdn.raidplan.io/wow/portrait/141309.png'},
+};
+function twinMapPoint(point) {
+  if(!Array.isArray(point)||point.length<2||!point.every(Number.isFinite))return null;
+  const m=TWIN_ARENA_MAP;
+  return [m.centerX+point[0]*m.scale,m.northPixelY+(m.northY-point[1])*m.scale];
+}
+function twinMapRayEnd(start,through) {
+  const dx=through[0]-start[0],dy=through[1]-start[1],m=TWIN_ARENA_MAP;
+  const distances=[dx>0?(m.width-start[0])/dx:dx<0?-start[0]/dx:Infinity,
+    dy>0?(m.height-start[1])/dy:dy<0?-start[1]/dy:Infinity].filter(value=>value>0);
+  const distance=Math.min(...distances);
+  return Number.isFinite(distance)?[start[0]+dx*distance,start[1]+dy*distance]:start;
+}
+function twinSpitMap(row,bossSides) {
+  if(!row.origin||!row.targetPosition||!row.headPositions||!row.bossPositions)return '';
+  const north=row.arena==='north'?TWIN_NORTH_ANCHORS:null;
+  const headPoint=(side,p)=>north?.heads[side]||twinMapPoint(p);
+  const bossPoint=(side,p)=>north?.bosses[side]||twinMapPoint(p);
+  const heads=Object.entries(row.headPositions).map(([side,p])=>[side,headPoint(side,p)]).filter(([,p])=>p);
+  const bosses=Object.entries(row.bossPositions).map(([side,p])=>[side,bossPoint(side,p)]).filter(([,p])=>p);
+  const headBySide=Object.fromEntries(heads),bossBySide=Object.fromEntries(bosses);
+  const rawOrigin=twinMapPoint(row.origin),fixedHead=twinMapPoint(row.headPositions[row.headSlot]);
+  const correctedHead=headBySide[row.headSlot];
+  const origin=rawOrigin&&fixedHead&&correctedHead
+    ?[rawOrigin[0]+correctedHead[0]-fixedHead[0],rawOrigin[1]+correctedHead[1]-fixedHead[1]]:rawOrigin;
+  const target=twinMapPoint(row.targetPosition);
+  if(!origin||!target||Math.hypot(target[0]-origin[0],target[1]-origin[1])<.01)return '';
+  const point=p=>`${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+  const polygon=[headBySide.left,bossBySide.left,bossBySide.right,headBySide.right];
+  const line=[headBySide.left,headBySide.right];
+  const boundaries=['left','right'].map(side=>headBySide[side]&&bossBySide[side]
+    ?[origin[0]+bossBySide[side][0]-headBySide[side][0],origin[1]+bossBySide[side][1]-headBySide[side][1]]:null);
+  const cone=boundaries.every(Boolean)?boundaries.map(p=>twinMapRayEnd(origin,p)):[];
+  const end=twinMapRayEnd(origin,target),color=row.counted?'#fb7185':'#67e8f9';
+  const labels=heads.map(([side,p])=>`<g><circle cx="${p[0]}" cy="${p[1]}" r="11" fill="#a78bfa" stroke="#1e1b4b" stroke-width="4"/><text x="${p[0]}" y="${p[1]+39}" text-anchor="middle" fill="#eee8ff" font-size="27">${({left:'左蛇',middle:'中蛇',right:'右蛇'})[side]}</text></g>`).join('')
+    +bosses.map(([side,p])=>{const boss=TWIN_BOSS_PORTRAITS[bossSides?.[side]];
+      return `<g><rect x="${p[0]-22}" y="${p[1]-22}" width="44" height="44" rx="8" fill="${boss?.color||'#fbbf24'}"/>${boss?`<image href="${boss.image}" x="${p[0]-20}" y="${p[1]-20}" width="40" height="40" preserveAspectRatio="xMidYMid slice"/>`:''}<rect x="${p[0]-22}" y="${p[1]-22}" width="44" height="44" rx="8" fill="none" stroke="${boss?.color||'#fbbf24'}" stroke-width="5"/><text x="${p[0]}" y="${p[1]-32}" text-anchor="middle" fill="${boss?.color||'#fff1b0'}" font-size="29">${boss?.name||`${side==='left'?'左':'右'} Boss`}</text></g>`;
+    }).join('');
+  return `<figure class="twin-spit-map"><svg viewBox="0 0 1997 1118" role="img" aria-label="原场地图上的蛇头射线、Boss、点名目标和禁射范围"><image href="${TWIN_ARENA_IMAGE}" width="1997" height="1118"/><rect width="1997" height="1118" fill="#020617" opacity=".24"/>${cone.length===2?`<polygon points="${[origin,...cone].map(point).join(' ')}" fill="#ef4444" fill-opacity=".2" stroke="#fb7185" stroke-width="5" stroke-dasharray="16 12"/>`:''}${polygon.length===4&&polygon.every(Boolean)?`<polygon points="${polygon.map(point).join(' ')}" fill="#fbbf24" fill-opacity=".14" stroke="#fbbf24" stroke-width="4" stroke-dasharray="12 10"/>`:''}${line.length===2&&line.every(Boolean)?`<line x1="${line[0][0]}" y1="${line[0][1]}" x2="${line[1][0]}" y2="${line[1][1]}" stroke="#e2e8f0" stroke-width="5" stroke-dasharray="12 10"/>`:''}<line x1="${origin[0]}" y1="${origin[1]}" x2="${end[0]}" y2="${end[1]}" stroke="#020617" stroke-width="13"/><line x1="${origin[0]}" y1="${origin[1]}" x2="${end[0]}" y2="${end[1]}" stroke="${color}" stroke-width="7"/>${labels}<circle cx="${origin[0]}" cy="${origin[1]}" r="17" fill="#a78bfa" stroke="#fff" stroke-width="5"/><circle cx="${target[0]}" cy="${target[1]}" r="18" fill="#fff" stroke="${color}" stroke-width="6"/><text x="${target[0]+28}" y="${target[1]+9}" fill="#fff" font-size="32">${esc(row.target?.player||'未知目标')}</text></svg><figcaption>原场地图：绿框维克苏尔、红框伊斯拉兹；紫点为这次施法的蛇头，白点为点名玩家。青色／红色线为实际射线方向，淡红区域为禁射夹角。上方五个固定锚点按标注位置校准。</figcaption></figure>`;
 }
 function renderTwin(tab) {
   const data = boss();
   if (tab === 'venom') return twinCheckpoints(data.eternalVenom?.checkpoints) + twinVenomRounds(data.eternalVenom?.rounds) + renderTwinLegacy(tab);
   if (tab === 'spit') {
     const section=data.spit;if(!section?.enabled)return twinEmpty(section);
-    return `<section class="panel"><h2>蛇头射线：方向错误 ${section.count} 次，额外受击 ${section.collateralCount} 人次</h2><p class="muted">${esc(section.evidenceNote)}</p><details><summary>原场地图与转场规则</summary><p class="muted">两只 Boss 从上方三角顶点两侧开始；转圈结束后进入另一顶点两侧。下图每条射线按当前场地固定左右 Boss 站位计算禁射夹角，转阶段的中间位置不作边界。</p><img src="assets/raids/venomous_abyss/06-twinfangs.jpg" alt="双子毒牙三角场地图：上方、左下与右下三个场地" style="width:100%;max-width:760px;height:auto"></details>${section.events.map(r=>`<details ${r.counted||r.collateral.length?'open':''}><summary>${esc(r.time)}，蛇头 ${r.headID} / ${r.headInstance} → ${r.target?player(r.target):'目标未确认'}，${esc(r.status)}${r.collateral.length?`，额外受击 ${r.collateral.length} 人`:''}</summary><p>${esc(r.reasons.join('；'))}</p>${twinSpitMap(r)}<p class="muted">${esc(r.arenaLabel||'场地未定位')}；目标坐标距完成 ${r.positionAgeMs??'未知'} ms。额外受击者对应此蛇头的射线，是否由点名者错误引导应结合方向结论。</p>${table(['受击玩家','身份','命中时间','伤害'],r.victims.map(v=>[player(v),v.isTarget?'点名目标':'额外受击',esc(v.hitTime),v.damage]))}</details>`).join('')||'<div class="empty">没有蛇头完成射线读条。</div>'}</section>`;
+    let activeArena=null,swapped=false;
+    const events=section.events.map(r=>{
+      if(r.arena&&activeArena&&r.arena!==activeArena)swapped=!swapped;
+      if(r.arena)activeArena=r.arena;
+      const bossSides=r.bossSides||{left:swapped?'Ithraz':'Vexhul',right:swapped?'Vexhul':'Ithraz'};
+      swapped=bossSides.left==='Ithraz';
+      return `<details ${r.counted||r.collateral.length?'open':''}><summary>${esc(r.time)}，蛇头 ${r.headID} / ${r.headInstance} → ${r.target?player(r.target):'目标未确认'}，${esc(r.status)}${r.collateral.length?`，额外受击 ${r.collateral.length} 人`:''}</summary><p>${esc(r.reasons.join('；'))}</p>${twinSpitMap(r,bossSides)}<p class="muted">${esc(r.arenaLabel||'场地未定位')}；左侧 ${TWIN_BOSS_PORTRAITS[bossSides.left]?.name||'待确认'}，右侧 ${TWIN_BOSS_PORTRAITS[bossSides.right]?.name||'待确认'}${r.bossSideEvidence?`（${esc(r.bossSideEvidence)}）`:''}；目标坐标距完成 ${r.positionAgeMs??'未知'} ms。额外受击者对应此蛇头的射线，是否由点名者错误引导应结合方向结论。</p>${table(['受击玩家','身份','命中时间','伤害'],r.victims.map(v=>[player(v),v.isTarget?'点名目标':'额外受击',esc(v.hitTime),v.damage]))}</details>`;
+    }).join('');
+    return `<section class="panel"><h2>蛇头射线：方向错误 ${section.count} 次，额外受击 ${section.collateralCount} 人次</h2><p class="muted">${esc(section.evidenceNote)}</p><p class="muted">两只 Boss 初始站在原场地图上方三角台子的两个角；每次转阶段后交换左右位置。报告优先使用 Boss 在 WCL 中的坐标确认身份，缺少坐标时按转场次数交替。每条射线直接叠在原图上，过渡位置不作禁射边界。</p>${events||'<div class="empty">没有蛇头完成射线读条。</div>'}</section>`;
   }
   if (tab === 'feast') {
     const section = data.feast;

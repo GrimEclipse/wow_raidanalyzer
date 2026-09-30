@@ -14,6 +14,10 @@
 .twin-venom-segment { display:flex; align-items:center; justify-content:center; flex-shrink:0; font-weight:700; font-size:12px; overflow:hidden; }
 .twin-venom-total { font-size:12px; text-align:right; }
 .twin-venom-zero { padding:3px 8px; }
+.twin-spit-map { max-width:900px; margin:18px 0; }
+.twin-spit-map svg { display:block; width:100%; height:auto; border-radius:12px; background:#0b1220; }
+.twin-spit-map svg text { paint-order:stroke; stroke:#020617; stroke-width:8px; stroke-linejoin:round; }
+.twin-spit-map figcaption { margin-top:8px; color:var(--muted,#9ca3af); font-size:12px; line-height:1.6; }
 @media(max-width:600px) {
   .twin-venom-row { grid-template-columns:100px minmax(60px,1fr) 82px; gap:7px; padding:8px 0; }
   .twin-venom-round { padding:10px; }

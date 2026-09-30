@@ -20,7 +20,7 @@ class UlatekTests(unittest.TestCase):
             **extra,
         }
 
-    def test_fangs_use_side_batches_not_stack_cap(self):
+    def test_fangs_use_configured_safe_stack_cap_and_keep_side_evidence(self):
         debuffs = []
         for player_id in (1, 2, 3):
             debuffs.append(self.event(1010, "applydebuff", u.FANG_AURA_ID, player_id))
@@ -44,15 +44,18 @@ class UlatekTests(unittest.TestCase):
             "casts": casts,
             "bossID": 99,
             "bossPositionEvents": [self.event(0, "damage", 1, -1, source=99, x=0, y=0)],
-        })
+        }, safe_stacks=3)
         wrong = {row["playerID"]: row["violationReasons"] for row in result["rounds"][0]["breaks"] if row["wrong"]}
-        self.assertEqual(set(wrong), {4})
-        self.assertIn("对场未等待凋萎静脉消除", wrong[4])
-        self.assertEqual(result["rounds"][0]["firstBreakSide"], "左场")
+        self.assertEqual(set(wrong), {3})
+        self.assertIn("超过安全层数 3", wrong[3][0])
+        self.assertEqual(result["safeStacks"], 3)
         self.assertEqual(result["rounds"][0]["bossInitialPosition"]["x"], 0)
         self.assertTrue(all(row["sideSource"] == "boss-initial-boundary" for row in result["rounds"][0]["sides"]))
-        suppressed = next(row for row in result["rounds"][0]["breaks"] if row["playerID"] == 3)
-        self.assertEqual(suppressed["adjudication"], "not_attributed_after_first_violation")
+        lower_cap = u._analyze_fangs(self.fight, self.actors, self.players, {
+            "debuffs": debuffs, "casts": casts, "bossID": 99,
+            "bossPositionEvents": [self.event(0, "damage", 1, -1, source=99, x=0, y=0)],
+        }, safe_stacks=2)
+        self.assertEqual({row["playerID"] for row in lower_cap["rounds"][0]["breaks"] if row["wrong"]}, {3, 4})
 
     def test_egg_duty_counts_only_p1_and_p25_and_includes_zero_duty_players(self):
         raw = {k: [] for k in ['casts','debuffs','damage','deaths','friendlyCasts','enemyBuffs']}
@@ -83,6 +86,33 @@ class UlatekTests(unittest.TestCase):
         self.assertEqual(result["applicationCount"], 3)
         self.assertEqual(result["waveDeaths"]["totalCount"], 1)
         self.assertEqual(result["waveDeaths"]["p1Count"], 1)
+
+    def test_mythic_wretch_casts_and_collision_clues_are_evidence_only(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {
+            "casts": [self.event(1000, "begincast", 1310763, source=88),
+                      self.event(5000, "cast", 1310763, source=88)],
+            "debuffs": [self.event(1000, "applydebuff", u.EGG_CARRY_ID, 1),
+                        self.event(8000, "removedebuff", u.EGG_CARRY_ID, 1),
+                        self.event(8050, "applydebuff", 1301268, 2)],
+            "damage": [self.event(5020, "damage", 1310763, 2, source=88, amount=700000)],
+            "deaths": [], "enemyBuffs": [],
+        }
+        wretch = u._analyze_mythic_wretch(fight, self.actors, self.players, raw)
+        self.assertEqual(wretch["completedCount"], 1)
+        self.assertEqual(wretch["rounds"][0]["hits"][0]["playerID"], 2)
+        self.assertFalse(wretch["positionVerdictAvailable"])
+        raw["casts"][1].update(x=0, y=0)
+        raw["resources"] = [self.event(5000, "resourcechange", 0, source=1, x=0, y=0),
+                            self.event(5000, "resourcechange", 0, source=2, x=1200, y=0)]
+        raw["deaths"] = [self.event(9000, "death", 0, 2, killingAbilityGameID=1310763)]
+        positioned = u._analyze_mythic_wretch(fight, self.actors, self.players, raw)
+        self.assertTrue(positioned["positionVerdictAvailable"])
+        self.assertEqual([row["playerID"] for row in positioned["rounds"][0]["outside"]], [2])
+        self.assertEqual(positioned["rounds"][0]["outside"][0]["deathAbilityID"], 1310763)
+        waves = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])
+        self.assertEqual(len(waves["possibleCollisionHatches"]), 1)
+        self.assertIn("不能单凭日志认定碰蛋", waves["possibleCollisionHatches"][0]["evidence"])
 
     def test_serpent_bite_participation_uses_ingested_venom_aura(self):
         debuffs = []
@@ -136,6 +166,9 @@ class UlatekTests(unittest.TestCase):
         result = u._analyze_p3_eggs(self.fight, self.actors, self.players, raw, rage_windows)
         self.assertEqual([row["baselineShriekerCount"] for row in result["rounds"]], [0, 0, 1, 2])
         self.assertEqual(result["failedEggCount"], 0)
+        mythic = u._analyze_p3_eggs({**self.fight, "difficulty": 5}, self.actors, self.players, raw, rage_windows)
+        self.assertFalse(mythic["adjudicationAvailable"])
+        self.assertTrue(all(row["baselineShriekerCount"] is None for row in mythic["rounds"]))
 
     def test_extra_shrieker_confirms_failed_egg_and_returns_player_damage(self):
         casts = [
