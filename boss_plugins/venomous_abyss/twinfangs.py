@@ -12,7 +12,7 @@ CONFIG_SCHEMA = [
     {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
     {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
     {"key": "globulesReviewEnabled", "type": "boolean", "label": "每轮吃球与漏吃", "default": True},
-    {"key": "waveReviewEnabled", "type": "boolean", "label": "腐蚀洪流波浪命中", "default": True},
+    {"key": "waveReviewEnabled", "type": "boolean", "label": "绿圈落地与搅动深渊命中", "default": True},
     {"key": "broodReviewEnabled", "type": "boolean", "label": "史诗蛇头打断与点位", "default": True},
     {"key": "venomDeathReviewEnabled", "type": "boolean", "label": "史诗带毒死亡与后续爆球", "default": True},
     {"key": "stoneReviewEnabled", "type": "boolean", "label": "裂石击接圈与全团伤害", "default": True},
@@ -1163,8 +1163,12 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                     "timeMs": row["timeMs"], "time": row["time"], "delta": row["delta"], "toStack": row["toStack"],
                     "source": row["source"], "sourceID": row["sourceID"],
                 })
+    impact_damage = [event for event in damage if int(event.get("amount") or 0) > 0]
+    circle_hits = _avoidable_board(
+        fight, actor_map, players, impact_damage, deaths, {1289994: "腐蚀洪流绿球落地直击"}
+    ) if options["waveReviewEnabled"] else []
     wave_hits = _avoidable_board(
-        fight, actor_map, players, damage, deaths, {1289994: "腐蚀洪流波浪"}
+        fight, actor_map, players, impact_damage, deaths, {1292807: "搅动深渊"}
     ) if options["waveReviewEnabled"] else []
     mythic = int(fight.get("difficulty") or 0) == 5
     if mythic:
@@ -1198,7 +1202,8 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                          "rounds": venom_rounds if options["venomReviewEnabled"] else []},
         "globules": {"rounds": globule_rounds if options["globulesReviewEnabled"] else [],
                      "venomRounds": venom_rounds if options["globulesReviewEnabled"] else []},
-        "waveHits": {"spellID": 1289994, "players": wave_hits},
+        "circleHits": {"spellID": 1289994, "players": circle_hits},
+        "waveHits": {"spellID": 1292807, "players": wave_hits},
         "isMythic": mythic,
         "tankGlobules": {"enabled": mythic and options["globulesReviewEnabled"], "rounds": tank_globules},
         "feast": _feast_review(fight, actor_map, players, raw, options) if options["feastReviewEnabled"] else {"enabled": False},
@@ -1214,25 +1219,34 @@ analyze_mechanics = analyze_twinfangs
 
 def _mechanic_overview(rendered, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    circle_hits = []
     wave_hits = []
     for pull in rendered:
         if pull.get("shortPull"):
             continue
         mechanics = pull.get(BOSS_CONFIG["key"]) or {}
-        for player_row in (mechanics.get("waveHits") or {}).get("players") or []:
-            for event in player_row.get("events") or []:
-                wave_hits.append(nightly_detail(
-                    pull, event.get("time"),
-                    f"{player_row.get('player') or '未知玩家'} 命中腐蚀洪流波浪",
-                    player=player_row.get("player"), classColor=player_row.get("classColor"),
-                    spellID=1289994,
-                ))
+        for key, target, label, spell_id in (
+            ("circleHits", circle_hits, "腐蚀洪流绿球落地直击", 1289994),
+            ("waveHits", wave_hits, "搅动深渊", 1292807),
+        ):
+            for player_row in (mechanics.get(key) or {}).get("players") or []:
+                for event in player_row.get("events") or []:
+                    target.append(nightly_detail(
+                        pull, event.get("time"),
+                        f"{player_row.get('player') or '未知玩家'} 命中{label}",
+                        player=player_row.get("player"), classColor=player_row.get("classColor"),
+                        spellID=spell_id,
+                    ))
     result = {
         "title": "整夜机制统计",
         "subtitle": "按所有 Pull 汇总实际命中事件；单场毒液与吃球明细保持原样。",
         "metrics": [{
+            "key": "circleHits", "label": "绿圈落地直击", "value": len(circle_hits), "unit": "次",
+            "tone": "warning", "description": "腐蚀洪流绿球生成时，1289994 对玩家造成正伤害的人次。",
+            "players": nightly_player_totals(circle_hits), "events": circle_hits,
+        }, {
             "key": "waveHits", "label": "命中波浪", "value": len(wave_hits), "unit": "次",
-            "tone": "warning", "description": "腐蚀洪流波浪 1289994 对玩家造成伤害的总人次。",
+            "tone": "warning", "description": "搅动深渊 1292807 对玩家造成正伤害的事件数。",
             "players": nightly_player_totals(wave_hits), "events": wave_hits,
         }],
     }

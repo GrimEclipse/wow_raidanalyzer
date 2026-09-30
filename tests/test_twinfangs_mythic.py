@@ -16,6 +16,26 @@ def fixture():
     return fight, {}, players, raw
 
 
+def test_green_circle_and_wave_keep_distinct_damage_ids():
+    fight, actor_map, players, raw = fixture()
+    raw['analysisOptions'] = {key: False for key in boss.REVIEW_KEYS}
+    raw['analysisOptions']['waveReviewEnabled'] = True
+    raw['damage'] = [
+        event(10000, 1289237, 'damage', targetID=1, amount=100),
+        event(11000, 1289994, 'damage', targetID=2, amount=100),
+        event(12000, 1292807, 'damage', targetID=3, amount=100),
+        event(22000, 1292807, 'damage', targetID=3, amount=100),
+        event(32000, 1292807, 'damage', targetID=3, amount=100),
+        event(13000, 1292807, 'damage', targetID=4, amount=0),
+    ]
+    result = boss.analyze_twinfangs(fight, actor_map, players, raw)
+    assert result['circleHits']['spellID'] == 1289994
+    assert [row['playerID'] for row in result['circleHits']['players']] == [2]
+    assert result['waveHits']['spellID'] == 1292807
+    assert [row['playerID'] for row in result['waveHits']['players']] == [3]
+    assert result['waveHits']['players'][0]['hitCount'] == 3
+
+
 def options(**kwargs):
     return resolve_analysis_options(boss.CONFIG_SCHEMA,kwargs)
 
