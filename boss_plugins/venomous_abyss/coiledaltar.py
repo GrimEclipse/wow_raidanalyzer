@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from analyzer_core.analysis_scope import filter_fights
 from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.progress import emit_progress
-from analyzer_core.wcl_api import WclClient
+from analyzer_core.wcl_api import WclClient, encounter_phase_metadata, fight_phase_start_ms
 from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.assets.icons import get_boss_icon_path
 from boss_plugins.common import COMBAT_RES_SPELLS, role_to_basic, write_json_result
@@ -61,23 +61,22 @@ ENCOUNTER_ID = 3429
 ENCOUNTER_IDS = {ENCOUNTER_ID, 53429}
 CN_TZ = timezone(timedelta(hours=8))
 ARENA_IMAGE = "assets/raids/venomous_abyss/07-coiledaltar.jpg"
-# 07-coiledaltar.jpg 为 1997×1118；图中正方形石台边长约 1036px，对齐整场地正方形。
+# 07-coiledaltar.jpg 为 1997×1118；图中正方形石台边长约 1036px。
+# WCL 与本团其他 Boss 一致：事件 x/y = 码 × 100。石台边长 110 码，中心 (0, 1158) 码。
+# 旧标定把 110 单位当成 86 码，15 码圈会大 28%，距离判定也会偏松。
 ARENA_IMAGE_WIDTH = 1997
 ARENA_IMAGE_HEIGHT = 1118
 ARENA_SQUARE_PX = 1036
-# 整场地约边长 110 坐标单位 ≈ 86 码；Boss 出生点 (0, 1158) 为石台中心。
-# WCL 事件坐标 = 坐标单位 × 100。
-ARENA_SIDE_UNITS = 110.0
-ARENA_SIDE_YARDS = 86.0
+ARENA_SIDE_YARDS = 110.0
+ARENA_SIDE_UNITS = ARENA_SIDE_YARDS
 ARENA_HALF_SIDE_UNITS = ARENA_SIDE_UNITS / 2.0
 ARENA_HALF_SIDE_YARDS = ARENA_SIDE_YARDS / 2.0
 ARENA_CENTER_X_UNITS = 0.0
 ARENA_CENTER_Y_UNITS = 1158.0
-# 兼容旧字段名（值仍是坐标单位，不是码）。
 ARENA_CENTER_X_YARDS = ARENA_CENTER_X_UNITS
 ARENA_CENTER_Y_YARDS = ARENA_CENTER_Y_UNITS
 WCL_COORD_SCALE = 100.0
-WCL_UNITS_PER_YARD = WCL_COORD_SCALE * ARENA_SIDE_UNITS / ARENA_SIDE_YARDS
+WCL_UNITS_PER_YARD = WCL_COORD_SCALE
 # plotScale 表示「中心到正方形直角边」占示意图宽/高的百分比，故 X/Y 不同以保持圆形半径为正圆。
 ARENA_PLOT_SCALE_X = round((ARENA_SQUARE_PX / 2) / ARENA_IMAGE_WIDTH * 100, 4)
 ARENA_PLOT_SCALE_Y = round((ARENA_SQUARE_PX / 2) / ARENA_IMAGE_HEIGHT * 100, 4)
@@ -136,13 +135,31 @@ SPELLS.update({
     1310744: "恶毒共鸣",
     1310881: "幽暗炸弹",
     1310882: "幽暗炸弹",
+    1310883: "幽暗炸弹",
     1312132: "恶毒共鸣",
+    1310498: "诱变毒液",
+    1310544: "烈毒变异体",
+    1310691: "诱变毒液",
+    1286399: "恐惧哀嚎",
+    1286441: "精魂狂笑",
+    1308011: "恐惧哀嚎",
+    1309105: "灵魂之盾",
 })
 
 TOXIC_DELUGE = 1299960
 COALESCED_VENOM_CAST = 1282403
 COALESCED_VENOM_DAMAGE = 1282408
 VOLATILE_VENOM = 1282419
+# 史诗：烈毒变异体（召唤 NPC）与拾取后的诱变毒液。1310691 多为伤害，光环常见 1310498。
+VIRULENT_MUTATION_CAST = 1310544
+VIRULENT_MUTATION_NPC_GAME_ID = 271982
+MUTAGENIC_VENOM_AURA_IDS = {1310498, 1310691}
+MUTAGENIC_VENOM_DAMAGE = 1310691
+VENOM_KIND_NORMAL = "normal"
+VENOM_KIND_MUTATION = "virulent-mutation"
+VIRULENT_BLAST_RADIUS_YARDS = 8.0
+VENOM_CARRY_AURA_IDS = {VOLATILE_VENOM} | MUTAGENIC_VENOM_AURA_IDS
+VENOM_SPAWN_CAST_IDS = {COALESCED_VENOM_CAST, VIRULENT_MUTATION_CAST}
 # 掉落后短时间内再被捡起 → 视为接力搬运，中间落点不算「场上凝结毒液」。
 VENOM_TRANSFER_WINDOW_MS = 1_500
 # 游戏内毒液球拾取约 3 码；匹配阈值略放宽以吸收 WCL 坐标采样误差。
@@ -192,6 +209,9 @@ DREADMARCH_INITIAL_APPLY_MS = 5_000
 DREADMARCH_FIXATION_HINT_MS = 3_000
 GLOOMBOMB_CAST_IDS = {1286895, 1310882}
 GLOOMBOMB_DEBUFF_IDS = {1310881}
+# 1310883 为实际爆炸伤害（盾碎 / shield cracked）；其它 ID 仅作回退。
+GLOOMBOMB_EXPLODE_DAMAGE_IDS = {1310883}
+GLOOMBOMB_DAMAGE_IDS = GLOOMBOMB_CAST_IDS | GLOOMBOMB_DEBUFF_IDS | GLOOMBOMB_EXPLODE_DAMAGE_IDS
 GRAVEBOUND_IDS = {1286837, 1308330}
 GRAVEBOUND_DEBUFF_IDS = {1286837}
 # 墓缚伤害（拉取 DamageTaken）；致死只认 1297906 的 killing blow。
@@ -199,6 +219,23 @@ GRAVEBOUND_DAMAGE_IDS = {1308330, 1297906, 1286837}
 GRAVEBOUND_KILL_ID = 1297906
 # 炸弹爆炸后短窗口内的 1286837 施加，视为本次幽暗炸弹溅射。
 GLOOMBOMB_GRAVEBOUND_WINDOW_MS = 2_000
+# 点名圈只认该玩家吃到幽暗炸弹伤害前后 100ms 内的坐标。
+GLOOMBOMB_APPLY_TYPES = {"applydebuff", "applybuff", "applydebuffstack", "applybuffstack"}
+GLOOMBOMB_REMOVE_TYPES = {"removedebuff", "removebuff"}
+GLOOMBOMB_STACK_REMOVE_TYPES = {"removedebuffstack", "removebuffstack"}
+GLOOMBOMB_HIT_POS_WINDOW_MS = 100
+# WCL 轨迹点常隔 200–400ms；±100ms 内往往没有第二点，图就不会变。爆炸时刻在两侧样本间插值。
+GLOOMBOMB_INTERP_GAP_MS = 2_000
+GLOOMBOMB_POSITION_MAX_OFFSET_MS = GLOOMBOMB_HIT_POS_WINDOW_MS
+GLOOMBOMB_BEFORE_REMOVE_MAX_AGE_MS = 12_000
+# 四人各一发施法（间隔约 0.5s）；波次按施法合并，再在窗口内收齐施加。
+GLOOMBOMB_MARKS_PER_WAVE = 4
+GLOOMBOMB_CAST_GAP_MS = 8_000
+GLOOMBOMB_CAST_MERGE_MS = 20_000
+GLOOMBOMB_WAVE_SPAN_MS = 15_000
+GLOOMBOMB_APPLY_LOOKBACK_MS = 8_000
+GLOOMBOMB_APPLY_WINDOW_MS = 12_000
+GLOOMBOMB_LEFTOVER_ATTACH_MS = 15_000
 ETERNAL_NIGHTFALL = 1286918
 ETERNAL_NIGHTFALL_AURA = 1310752
 VEIL_SHIELD = 1286912
@@ -232,32 +269,44 @@ INTERMISSION_MS = 35_000
 CONE_RADIUS_YARDS = 35
 CONE_HALF_ANGLE_DEG = 30.0  # 总宽约 60° 的正面锥形
 GLOOMBOMB_RADIUS_YARDS = 15
+# 史诗怨毒盘魂者：灵魂之盾 2 层，需两枚幽暗炸弹；打断恐惧哀嚎会传送换位。
+SPIRIT_SHIELD = 1309105
+SOULCOILER_NPC_GAME_ID = 261521
+SOULCOILER_BOMBS_REQUIRED = 2
+SOULCOILER_EXPECTED_COUNT = 2
+SOULCOILER_DEDUP_YARDS = 4.0
+WAIL_OF_TERROR_IDS = {1286399, 1308011, 1286441}
+SOULCOILER_INTERRUPT_LOOKBACK_MS = 5_000
+SOULCOILER_RELOCATE_YARDS = 8.0
+# 盘魂者取「点名施加 → 爆炸」这一段（约 5s）内、爆炸时刻或之前的最后一点，避免出生点/打断后传送。
+SOULCOILER_BOMB_POS_PAD_MS = 250
 POSITION_RELIABLE_MS = 2_500
 
 # 拉取时只向 WCL 要机制相关技能，避免整场友伤/治疗/带坐标的团员施法。
 MECHANIC_CAST_IDS = (
-    {TOXIC_DELUGE, COALESCED_VENOM_CAST, ETERNAL_NIGHTFALL, ETERNAL_NIGHTFALL_AURA,
+    {TOXIC_DELUGE, COALESCED_VENOM_CAST, VIRULENT_MUTATION_CAST, ETERNAL_NIGHTFALL, ETERNAL_NIGHTFALL_AURA,
      P2_SIGNAL_SPELL, MANIFEST_CAST, FIXATION, RECLAIM_ESSENCE}
     | SEVER_IDS | BLIGHTED_SEVER_IDS | SOUL_SEVER_IDS
     | GUILLOTINE_CAST_IDS | GRIM_GUILLOTINE_CAST_IDS
-    | DREADMARCH_CAST_IDS | GLOOMBOMB_CAST_IDS
+    | DREADMARCH_CAST_IDS | GLOOMBOMB_CAST_IDS | WAIL_OF_TERROR_IDS | {SPIRIT_SHIELD}
 )
 MECHANIC_DAMAGE_IDS = (
-    {COALESCED_VENOM_DAMAGE, VOLATILE_VENOM, VENOM_RUPTURE, GUILLOTINE_DAMAGE_ID,
+    {COALESCED_VENOM_DAMAGE, VOLATILE_VENOM, MUTAGENIC_VENOM_DAMAGE, VENOM_RUPTURE, GUILLOTINE_DAMAGE_ID,
      WIDOW_TOUCH_DAMAGE_ID, WIDOW_KISS_DAMAGE_ID, DEATH_WHISPER_DAMAGE_ID,
      DEATH_EMBRACE_DAMAGE_ID, SPIRIT_ERASURE, RECLAIM_ESSENCE}
     | GRIM_GUILLOTINE_DAMAGE_IDS | GRAVEBOUND_DAMAGE_IDS
-    | GLOOMBOMB_CAST_IDS | GLOOMBOMB_DEBUFF_IDS
+    | GLOOMBOMB_CAST_IDS | GLOOMBOMB_DEBUFF_IDS | GLOOMBOMB_DAMAGE_IDS
 )
 MECHANIC_DEBUFF_IDS = (
     {VOLATILE_VENOM, FIXATION, GUILLOTINE_MARK, VENOM_RUPTURE}
+    | MUTAGENIC_VENOM_AURA_IDS
     | GLOOMBOMB_DEBUFF_IDS | GRAVEBOUND_DEBUFF_IDS
     | DREADMARCH_DEBUFF_IDS | MANIFEST_COLLISION_DEBUFF_IDS
     | GRIM_GUILLOTINE_MARK_IDS
     | SEVER_TANK_DEBUFF_IDS | BLIGHTED_SEVER_TANK_DEBUFF_IDS | SOUL_SEVER_TANK_DEBUFF_IDS
     | SPIRIT_ERASURE_DEBUFF_IDS
 )
-MECHANIC_ENEMY_BUFF_IDS = set(INTERMISSION_BUFFS) | {VEIL_SHIELD, P3_SOULBOUND}
+MECHANIC_ENEMY_BUFF_IDS = set(INTERMISSION_BUFFS) | {VEIL_SHIELD, P3_SOULBOUND, SPIRIT_SHIELD}
 FRIENDLY_CAST_IDS = set(COMBAT_RES_SPELLS) | set(INTERMISSION_POTIONS) | {SPIRIT_ERASURE}
 
 
@@ -281,6 +330,13 @@ TABS = [
     ("p3", "P3 盘卷联合"),
     ("field", "场地示意图"),
 ]
+
+PHASE_LABELS = {
+    "p1": "P1 毒蛇交易",
+    "p2": "P2 篡位者复仇",
+    "intermission": "被夺取的容器",
+    "p3": "P3 盘卷联合",
+}
 
 
 def progress(message, percent=None):
@@ -530,7 +586,7 @@ def coiledaltar_arena(position_index=None, player_ids=None, boss_id=None):
         "halfSideUnits": ARENA_HALF_SIDE_UNITS,
         "unitsPerYard": WCL_UNITS_PER_YARD,
         "wclCoordScale": WCL_COORD_SCALE,
-        "method": "fixed-center-0-1158-square-110u-86y",
+        "method": "fixed-center-0-1158-square-110yd-wcl100",
         "bossCenter": True,
         "bossStart": boss_start,
         "plotScaleX": ARENA_PLOT_SCALE_X,
@@ -541,6 +597,7 @@ def coiledaltar_arena(position_index=None, player_ids=None, boss_id=None):
         "gloombombRadiusYards": GLOOMBOMB_RADIUS_YARDS,
         "coneRadiusYards": CONE_RADIUS_YARDS,
         "guillotineRangeYards": GUILLOTINE_RANGE_YARDS,
+        "virulentBlastRadiusYards": VIRULENT_BLAST_RADIUS_YARDS,
     }
 
 
@@ -572,6 +629,52 @@ def _target_self_point(event):
     resource_actor = event.get("resourceActor")
     if resource_actor in {2, "2", "Target"}:
         return _xy_from_node(event) or _xy_from_node(event.get("resources"))
+    return None
+
+
+def _aura_target_point(event):
+    """光环在目标身上：优先 targetResources；否则顶层 x/y 视为目标（玩家）坐标。"""
+    point = _target_self_point(event)
+    if point:
+        return point
+    kind = event_type(event)
+    if "buff" in kind or "debuff" in kind:
+        return _xy_from_node(event) or _xy_from_node(event.get("resources"))
+    return None
+
+
+def _is_gloombomb_full_remove(event):
+    kind = event_type(event)
+    if kind in GLOOMBOMB_REMOVE_TYPES:
+        return True
+    if kind in GLOOMBOMB_STACK_REMOVE_TYPES:
+        return int(event.get("stack") or 0) == 0
+    return False
+
+
+def _first_full_aura_remove_after(events, target_id, apply_ts, spell_ids):
+    spell_ids = set(spell_ids)
+    wanted = int(target_id) if target_id is not None else None
+    return next(
+        (
+            event for event in events
+            if int(event.get("targetID") or -1) == wanted
+            and int(ability_id(event) or 0) in spell_ids
+            and _is_gloombomb_full_remove(event)
+            and int(event.get("timestamp") or 0) >= int(apply_ts)
+        ),
+        None,
+    )
+
+
+def _point_at_aura_remove(remove_event, position_index, target_id):
+    explode_ts = int(remove_event["timestamp"])
+    point = _aura_target_point(remove_event)
+    if point:
+        return point_dict(point, timestamp=explode_ts, reliable=True, offset_ms=0)
+    sampled = _position_sample(position_index, target_id, explode_ts)
+    if sampled and abs(int(sampled.get("sampleOffsetMs") or 0)) <= GLOOMBOMB_POSITION_MAX_OFFSET_MS:
+        return sampled
     return None
 
 
@@ -828,66 +931,153 @@ def resolve_manifest_instance(source_id, source_instance, actor_catalog):
 def phase_at(time_ms, markers):
     current = markers[0]["key"] if markers else "p1"
     for marker in markers:
+        if marker.get("key") == "wipe":
+            continue
         if time_ms >= marker["timeMs"]:
             current = marker["key"]
     return current
 
 
+def _wcl_phase_key(phase_id, meta, metadata):
+    name = str((meta or {}).get("name") or "")
+    text = name.lower()
+    if (meta or {}).get("isIntermission") or any(
+        token in text for token in ("intermission", "container", "vessel", "host", "容器", "宿体", "stolen", "captured")
+    ):
+        return "intermission"
+    if any(token in text for token in ("usurper", "revenge", "malacrass", "篡", "报复", "复仇")):
+        return "p2"
+    if any(token in text for token in ("coiled", "union", "joint", "combined", "盘卷", "联合")):
+        return "p3"
+    if any(token in text for token in ("serpent", "bargain", "trade", "deal", "毒蛇", "交易")):
+        return "p1"
+    if not metadata:
+        return {1: "p1", 2: "p2", 3: "intermission", 4: "p3"}.get(int(phase_id or 1), "p1")
+    stage = 0
+    for index, row in enumerate(metadata, start=1):
+        pid = int(row.get("id") or index)
+        if row.get("isIntermission"):
+            if pid == int(phase_id):
+                return "intermission"
+            continue
+        stage += 1
+        if pid == int(phase_id):
+            return f"p{stage}" if stage <= 3 else f"p{stage}"
+    return "p1"
+
+
+def _markers_from_wcl(fight, metadata):
+    transitions = list(fight.get("phaseTransitions") or [])
+    if not transitions:
+        return None
+    metadata = list(metadata or fight.get("wclPhaseMetadata") or [])
+    by_id = {int(row.get("id") or index): row for index, row in enumerate(metadata, start=1)}
+    markers = []
+    for transition in sorted(transitions, key=lambda row: int(row.get("startTime") or 0)):
+        phase_id = int(transition.get("id") or 1)
+        meta = by_id.get(phase_id) or {}
+        key = _wcl_phase_key(phase_id, meta, metadata)
+        markers.append({
+            "key": key,
+            "label": PHASE_LABELS.get(key) or meta.get("name") or key,
+            "timeMs": max(0, fight_phase_start_ms(fight, transition)),
+            "signal": "wcl-phase",
+            "wclPhaseId": phase_id,
+            "wclPhaseName": meta.get("name"),
+        })
+    if not markers:
+        return None
+    if markers[0]["timeMs"] > 0 and markers[0]["key"] != "p1":
+        markers.insert(0, {
+            "key": "p1",
+            "label": PHASE_LABELS["p1"],
+            "timeMs": 0,
+            "signal": "wcl-phase-start",
+        })
+    return markers
+
+
 def build_phase_markers(fight, casts, enemy_buffs, enemy_deaths=None, zuljan_id=None, malacrass_id=None):
-    """P2 = 祖尔加死亡 / 玛拉卡斯出现；转阶段与 P3 仍看容器/灵魂绑定 Aura。"""
+    """优先用 WCL phaseTransitions；没有阶段数据时再按死亡/出现/技能推断。"""
     start = int(fight["startTime"])
-    p2_ms = None
-    p2_signal = None
+    wcl_markers = _markers_from_wcl(fight, fight.get("wclPhaseMetadata"))
     intermission_ms = None
     p3_ms = None
-
-    if zuljan_id is not None:
-        for event in sorted(enemy_deaths or [], key=lambda row: int(row.get("timestamp") or 0)):
-            if event.get("targetID") == zuljan_id and event_type(event) == "death":
-                p2_ms = int(event["timestamp"]) - start
-                p2_signal = "zuljan-death"
-                break
-
-    if p2_ms is None and malacrass_id is not None:
-        for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
-            if event.get("sourceID") != malacrass_id:
-                continue
-            if event_type(event) in {"begincast", "cast"}:
-                p2_ms = int(event["timestamp"]) - start
-                p2_signal = "malacrass-appear"
-                break
-
-    if p2_ms is None:
-        for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
-            if int(ability_id(event) or 0) == P2_SIGNAL_SPELL and event_type(event) == "begincast":
-                p2_ms = int(event["timestamp"]) - start
-                p2_signal = "fear-bolt-fallback"
-                break
-
-    for event in sorted(enemy_buffs, key=lambda row: int(row.get("timestamp") or 0)):
+    for event in sorted(enemy_buffs or [], key=lambda row: int(row.get("timestamp") or 0)):
         spell = int(ability_id(event) or 0)
         if spell in INTERMISSION_BUFFS and is_apply(event) and intermission_ms is None:
             intermission_ms = int(event["timestamp"]) - start
         if spell == P3_SOULBOUND and is_apply(event):
             p3_ms = int(event["timestamp"]) - start
 
-    markers = [{"key": "p1", "label": "P1 毒蛇交易", "timeMs": 0}]
+    wipe = {
+        "key": "wipe",
+        "label": "击杀" if fight.get("kill") else "灭团",
+        "timeMs": int(fight["endTime"] - start),
+    }
+    if wcl_markers:
+        keys = {row["key"] for row in wcl_markers}
+        if "intermission" not in keys and intermission_ms is not None:
+            wcl_markers.append({
+                "key": "intermission",
+                "label": PHASE_LABELS["intermission"],
+                "timeMs": intermission_ms,
+                "signal": "container-aura",
+            })
+        if "p3" not in keys and p3_ms is not None:
+            wcl_markers.append({
+                "key": "p3",
+                "label": PHASE_LABELS["p3"],
+                "timeMs": p3_ms,
+                "signal": "soulbound-aura",
+            })
+        wcl_markers.sort(key=lambda row: int(row.get("timeMs") or 0))
+        return wcl_markers + [wipe]
+
+    candidates = []
+
+    if zuljan_id is not None:
+        for event in sorted(enemy_deaths or [], key=lambda row: int(row.get("timestamp") or 0)):
+            if event.get("targetID") == zuljan_id and event_type(event) == "death":
+                candidates.append((int(event["timestamp"]) - start, "zuljan-death"))
+                break
+
+    if malacrass_id is not None:
+        for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
+            if event.get("sourceID") != malacrass_id:
+                continue
+            if event_type(event) in {"begincast", "cast"}:
+                candidates.append((int(event["timestamp"]) - start, "malacrass-appear"))
+                break
+
+    for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
+        if int(ability_id(event) or 0) == P2_SIGNAL_SPELL and event_type(event) == "begincast":
+            candidates.append((int(event["timestamp"]) - start, "fear-bolt"))
+            break
+
+    for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
+        if int(ability_id(event) or 0) in GLOOMBOMB_CAST_IDS and event_type(event) in {"begincast", "cast"}:
+            candidates.append((int(event["timestamp"]) - start, "gloombomb"))
+            break
+
+    p2_ms = None
+    p2_signal = None
+    if candidates:
+        p2_ms, p2_signal = min(candidates, key=lambda row: row[0])
+
+    markers = [{"key": "p1", "label": PHASE_LABELS["p1"], "timeMs": 0}]
     if p2_ms is not None:
         markers.append({
             "key": "p2",
-            "label": "P2 篡位者复仇",
+            "label": PHASE_LABELS["p2"],
             "timeMs": p2_ms,
             "signal": p2_signal,
         })
     if intermission_ms is not None:
-        markers.append({"key": "intermission", "label": "被夺取的容器", "timeMs": intermission_ms})
+        markers.append({"key": "intermission", "label": PHASE_LABELS["intermission"], "timeMs": intermission_ms})
     if p3_ms is not None:
-        markers.append({"key": "p3", "label": "P3 盘卷联合", "timeMs": p3_ms})
-    markers.append({
-        "key": "wipe",
-        "label": "击杀" if fight.get("kill") else "灭团",
-        "timeMs": int(fight["endTime"] - start),
-    })
+        markers.append({"key": "p3", "label": PHASE_LABELS["p3"], "timeMs": p3_ms})
+    markers.append(wipe)
     return markers
 
 
@@ -916,7 +1106,7 @@ def _event_type_filter(types):
 
 # 具象只点名上凝视，不打人。坐标来自其施法/debuff 的 sourceResources，以及被打到时的受击坐标。
 NPC_POSITION_TYPES = (
-    "cast", "begincast", "applybuff", "applydebuff", "removebuff", "removedebuff",
+    "cast", "begincast", "damage", "applybuff", "applydebuff", "removebuff", "removedebuff",
     "refreshbuff", "refreshdebuff", "death",
 )
 
@@ -929,7 +1119,7 @@ def _npc_position_filter_expression(npc_ids):
 
 
 def _fetch_manifest_position_events(client, report_id, fight, manifest_ids):
-    """具象坐标：点名施法/凝视 debuff、敌方资源采样，以及被打到时的受击位置。"""
+    """NPC 坐标：自身施法/资源，以及友方对该敌方目标造成伤害时的目标位置。"""
     source_filter = _source_id_filter(manifest_ids)
     target_filter = _target_id_filter(manifest_ids)
     rows = []
@@ -943,6 +1133,14 @@ def _fetch_manifest_position_events(client, report_id, fight, manifest_ids):
             filter_expression=source_filter, hostility_type="Enemies", include_resources=True,
         ))
     if target_filter:
+        # 敌方 NPC 是 DamageDone 的 target。此前只查 DamageTaken，导致盘魂者
+        # 受击位置没有进入索引；DamageDone 也是 runtime 获取 Boss 位置的路径。
+        for actor_id in sorted({int(actor_id) for actor_id in manifest_ids}):
+            rows.extend(client.events(
+                report_id, "DamageDone", fight,
+                target_id=actor_id, include_resources=True,
+            ))
+        # 保留 DamageTaken 作为不同 WCL 数据视图的兼容路径。
         rows.extend(client.events(
             report_id, "DamageTaken", fight,
             filter_expression=target_filter, hostility_type="Enemies", include_resources=True,
@@ -1001,11 +1199,39 @@ def manifest_actor_ids(actor_rows):
     return ids
 
 
+def virulent_mutation_actor_ids(actor_rows):
+    ids = set()
+    for row in actor_rows or []:
+        game_id = row.get("gameID")
+        name = str(row.get("name") or "").lower()
+        if game_id == VIRULENT_MUTATION_NPC_GAME_ID or "virulent mutation" in name or "烈毒变异体" in name:
+            ids.add(int(row["id"]))
+    return ids
+
+
+def soulcoiler_actor_ids(actor_rows):
+    ids = set()
+    for row in actor_rows or []:
+        game_id = int(row.get("gameID") or 0)
+        name = str(row.get("name") or "").lower()
+        if (
+            game_id == SOULCOILER_NPC_GAME_ID
+            or "spiteful soulcoiler" in name
+            or "怨毒盘魂者" in name
+            or "soulcoiler" in name
+        ):
+            ids.add(int(row["id"]))
+    return ids
+
+
 def _npc_position_events(raw, npc_actor_ids):
     if not npc_actor_ids:
         return []
     events = []
-    for bucket in ("casts", "enemyDamage", "damage", "debuffs", "resources", "enemyDeaths", "npcPositionEvents"):
+    for bucket in (
+        "casts", "enemyDamage", "damage", "debuffs", "enemyBuffs", "buffs",
+        "resources", "enemyDeaths", "npcPositionEvents",
+    ):
         for event in raw.get(bucket) or []:
             source_id = event.get("sourceID")
             target_id = event.get("targetID")
@@ -1016,7 +1242,7 @@ def _npc_position_events(raw, npc_actor_ids):
 
 
 def _npc_actor_point(event, actor_id):
-    """恐惧具象等 NPC 自身坐标。施法顶层 x/y 常是被点名玩家，不能直接当 NPC 位置。"""
+    """NPC 自身坐标。敌方施法 includeResources 时顶层 x/y 是施法者，不能因为有目标就丢掉。"""
     if actor_id is None:
         return None
     kind = event_type(event)
@@ -1027,8 +1253,9 @@ def _npc_actor_point(event, actor_id):
         resource_actor = event.get("resourceActor")
         if resource_actor in {1, "1", "Source"}:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
+        if kind in {"cast", "begincast", "resourcechange", ""}:
+            return _xy_from_node(event) or _xy_from_node(event.get("resources"))
         target_id = event.get("targetID")
-        # 无目标，或目标就是自己：顶层坐标才可能属于 NPC
         if target_id is None or target_id == actor_id:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
         return None
@@ -1039,7 +1266,8 @@ def _npc_actor_point(event, actor_id):
         resource_actor = event.get("resourceActor")
         if resource_actor in {2, "2", "Target"}:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
-        # 友伤/死亡打在具象上时，顶层 x/y 通常是受击 NPC
+        # WCL includeResources 对 damage/healing 只记录目标资源；坐标通常就在
+        # 事件顶层，即使没有 targetResources/resourceActor 也属于受击 NPC。
         if kind in {"damage", "death"}:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
         return None
@@ -1063,6 +1291,8 @@ def build_npc_position_index(events):
         target_id = event.get("targetID")
         target_instance = event.get("targetInstance") or event.get("targetInstanceID")
         kind = event_type(event)
+        if kind == "interrupt":
+            continue
         if kind in {"cast", "begincast"}:
             point = _npc_actor_point(event, source_id)
             facing = (event.get("sourceResources") or {}).get("facing", event.get("facing"))
@@ -1091,7 +1321,30 @@ def _npc_instance_rows(index, actor_id, source_instance):
         exact = index.get((actor_id, int(source_instance))) or []
         if exact:
             return exact
+    matches = [rows for (aid, inst), rows in index.items() if aid == actor_id]
+    if len(matches) == 1:
+        return matches[0]
     return index.get((actor_id, 0)) or []
+
+
+def _position_from_npc_rows(rows, timestamp, allow_future=False):
+    if not rows or timestamp is None:
+        return None
+    ts = int(timestamp)
+    prior = [row for row in rows if int(row["timestamp"]) <= ts]
+    if prior:
+        chosen = prior[-1]
+    elif allow_future:
+        chosen = min(rows, key=lambda row: abs(int(row["timestamp"]) - ts))
+    else:
+        return None
+    offset = int(chosen["timestamp"] - ts)
+    return point_dict(
+        (chosen["x"], chosen["y"]),
+        timestamp=ts,
+        reliable=abs(offset) <= POSITION_RELIABLE_MS,
+        offset_ms=offset,
+    )
 
 
 def _position_sample_npc(index, actor_id, source_instance, timestamp):
@@ -1106,6 +1359,144 @@ def _position_sample_npc(index, actor_id, source_instance, timestamp):
         (nearest["x"], nearest["y"]),
         timestamp=timestamp,
         reliable=abs(offset) <= POSITION_RELIABLE_MS,
+        offset_ms=offset,
+    )
+
+
+def _soulcoiler_instance_rows(index, actor_id, source_instance, extra_rows=None):
+    """只合并当前 instance 与未标 instance(0) 的样本，不能混入另一只盘魂者。"""
+    rows = []
+    seen = set()
+    actor_id = int(actor_id) if actor_id is not None else None
+    if actor_id is None:
+        return []
+    wanted_instance = int(source_instance or 0)
+    for (aid, instance), inst_rows in (index or {}).items():
+        if (
+            int(aid) != actor_id
+            or int(instance or 0) not in {0, wanted_instance}
+            or not inst_rows
+        ):
+            continue
+        for row in inst_rows:
+            ident = (row.get("timestamp"), row.get("x"), row.get("y"))
+            if ident in seen:
+                continue
+            seen.add(ident)
+            rows.append(row)
+    for row in extra_rows or []:
+        row_instance = int(row.get("instance") or 0)
+        if row_instance not in {0, wanted_instance}:
+            continue
+        ident = (row.get("timestamp"), row.get("x"), row.get("y"))
+        if ident in seen:
+            continue
+        seen.add(ident)
+        rows.append(row)
+    return rows
+
+
+def _soulcoiler_event_coord_rows(events, actor_id, start_ts, end_ts):
+    if actor_id is None or not events:
+        return []
+    wanted = int(actor_id)
+    start = int(start_ts)
+    end = int(end_ts)
+    rows = []
+    for event in events:
+        ts = int(event.get("timestamp") or 0)
+        if ts < start or ts > end:
+            continue
+        if event.get("sourceID") != wanted and event.get("targetID") != wanted:
+            continue
+        point = _npc_actor_point(event, wanted)
+        if not point:
+            continue
+        if event.get("targetID") == wanted:
+            instance = event.get("targetInstance") or event.get("targetInstanceID") or 0
+        else:
+            instance = event.get("sourceInstance") or event.get("sourceInstanceID") or 0
+        rows.append({
+            "timestamp": ts,
+            "x": point[0],
+            "y": point[1],
+            "instance": int(instance or 0),
+        })
+    return rows
+
+
+def _soulcoiler_rows(index, actor_id, source_instance):
+    if not index or actor_id is None:
+        return []
+    rows = list(_npc_instance_rows(index, actor_id, source_instance) or [])
+    if rows:
+        return rows
+    actor_id = int(actor_id)
+    pooled = []
+    for (aid, _inst), inst_rows in index.items():
+        if int(aid) != actor_id or not inst_rows:
+            continue
+        pooled.extend(inst_rows)
+    return pooled
+
+
+def _soulcoiler_position_at(index, actor_id, source_instance, timestamp):
+    """盘魂者坐标只取该时刻及之前的最后一点，不用爆炸后打断传送的未来样本。"""
+    if not index or actor_id is None or timestamp is None:
+        return None
+    pos = _position_from_npc_rows(
+        _soulcoiler_rows(index, actor_id, source_instance), timestamp, allow_future=False,
+    )
+    if pos:
+        return pos
+    best = None
+    best_off = None
+    actor_id = int(actor_id)
+    for (aid, _inst), rows in index.items():
+        if int(aid) != actor_id or not rows:
+            continue
+        candidate = _position_from_npc_rows(rows, timestamp, allow_future=False)
+        if not candidate:
+            continue
+        off = abs(int(candidate.get("sampleOffsetMs") or 0))
+        if best is None or off < best_off:
+            best, best_off = candidate, off
+    return best
+
+
+def _soulcoiler_position_near(index, actor_id, source_instance, timestamp, window_ms=SOULCOILER_BOMB_POS_PAD_MS, extra_rows=None):
+    """只取 timestamp ± window_ms 内最近的盘魂者坐标，不跨秒插值、不用窗口外的点。"""
+    if timestamp is None:
+        return None
+    ts = int(timestamp)
+    pad = int(window_ms)
+    return _soulcoiler_position_in_window(
+        index, actor_id, source_instance, ts - pad, ts + pad, ts, extra_rows=extra_rows,
+    )
+
+
+def _soulcoiler_position_in_window(index, actor_id, source_instance, start_ts, end_ts, prefer_ts=None, extra_rows=None):
+    rows = _soulcoiler_instance_rows(
+        index, actor_id, source_instance, extra_rows=extra_rows,
+    )
+    if not rows or start_ts is None or end_ts is None:
+        return None
+    start = int(start_ts)
+    end = int(end_ts)
+    if end < start:
+        start, end = end, start
+    in_window = [row for row in rows if start <= int(row["timestamp"]) <= end]
+    if not in_window:
+        return None
+    prefer = int(prefer_ts) if prefer_ts is not None else end
+    before_prefer = [row for row in in_window if int(row["timestamp"]) <= prefer]
+    pool = before_prefer or in_window
+    nearest = min(pool, key=lambda row: abs(int(row["timestamp"]) - prefer))
+    offset = int(nearest["timestamp"] - prefer)
+    return point_dict(
+        (nearest["x"], nearest["y"]),
+        timestamp=prefer,
+        reliable=abs(offset) <= SOULCOILER_BOMB_POS_PAD_MS,
         offset_ms=offset,
     )
 
@@ -1232,13 +1623,16 @@ def _venom_spawn_point(event):
     return None
 
 
-def _nearest_ground_puddle(ground, point, max_yards=VENOM_PICKUP_MAX_YARDS):
+def _nearest_ground_puddle(ground, point, max_yards=VENOM_PICKUP_MAX_YARDS, kinds=None):
     """地上毒液中，落点/生成点距 point 最近且不超过 max_yards 的一团。"""
     if not ground or not point:
         return None
+    allowed = set(kinds) if kinds else None
     best = None
     best_dist = None
     for puddle in ground:
+        if allowed is not None and puddle.get("venomKind", VENOM_KIND_NORMAL) not in allowed:
+            continue
         pos = _position_xy(puddle.get("position"))
         if not pos:
             continue
@@ -1251,31 +1645,73 @@ def _nearest_ground_puddle(ground, point, max_yards=VENOM_PICKUP_MAX_YARDS):
     return best
 
 
-def _match_puddle_for_pickup(ground, player_xy, max_yards=VENOM_PICKUP_MAX_YARDS):
+def _match_puddle_for_pickup(ground, player_xy, max_yards=VENOM_PICKUP_MAX_YARDS, kinds=None):
     """
     判断捡球是否对应已有地上毒液：用获得 debuff 时玩家位置与此前放球/生成位置是否过近。
     禁止「无近距时取最早落地」——会把远处另一球误绑并留下孤儿落点，造成去重失败。
     无可靠玩家坐标且场上仅一团时，只能归属该团。
     """
-    if not ground:
+    allowed = set(kinds) if kinds else None
+    candidates = [
+        puddle for puddle in (ground or [])
+        if allowed is None or puddle.get("venomKind", VENOM_KIND_NORMAL) in allowed
+    ]
+    if not candidates:
         return None
     if player_xy:
-        return _nearest_ground_puddle(ground, player_xy, max_yards=max_yards)
-    if len(ground) == 1:
-        return ground[0]
+        return _nearest_ground_puddle(candidates, player_xy, max_yards=max_yards, kinds=allowed)
+    if len(candidates) == 1:
+        return candidates[0]
     return None
+
+
+def _venom_kind_from_spell(spell_id):
+    if int(spell_id or 0) in MUTAGENIC_VENOM_AURA_IDS or int(spell_id or 0) == VIRULENT_MUTATION_CAST:
+        return VENOM_KIND_MUTATION
+    return VENOM_KIND_NORMAL
+
+
+def _venom_blast_yards(kind):
+    return VIRULENT_BLAST_RADIUS_YARDS if kind == VENOM_KIND_MUTATION else None
+
+
+def _venom_map_kind(kind, *, grounded=True):
+    if kind == VENOM_KIND_MUTATION:
+        return "virulent-mutation" if grounded else "virulent-mutation-spawn"
+    return "ground-venom" if grounded else "venom-spawn"
+
+
+def _puddle_snapshot(puddle, picked_up_at_ms=None):
+    kind = puddle.get("venomKind") or VENOM_KIND_NORMAL
+    return {
+        "puddleID": puddle["puddleID"],
+        "venomKind": kind,
+        "blastRadiusYards": _venom_blast_yards(kind),
+        "position": dict(puddle["position"]) if isinstance(puddle.get("position"), dict) else puddle.get("position"),
+        "groundedFromMs": puddle["groundedFromMs"],
+        "pickedUpAtMs": picked_up_at_ms,
+        "transferCount": int(puddle.get("transferCount") or 0),
+        "carriers": list(puddle.get("carriers") or []),
+        "lastTickMs": puddle.get("lastTickMs"),
+        "sourceID": puddle.get("sourceID"),
+        "sourceInstance": puddle.get("sourceInstance"),
+    }
 
 
 def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, players, markers, damage_events=None):
     """
     凝结毒液支持多次搬运：
     - 地上毒液 ↔ 玩家不稳定毒液(1282419) 来回切换
+    - 史诗烈毒变异体（1310544 / 诱变毒液 1310498·1310691）单独成团，不与普通毒液球混绑
     - 掉落后短窗口内再被捡起视为接力，不把中间落点当成最终场上位置
     - 有 1282408 伤害源坐标时刷新地上毒液位置
     """
     fight_start = int(fight["startTime"])
     deluge_casts = [event for event in casts if int(ability_id(event) or 0) == TOXIC_DELUGE and is_cast_complete(event)]
-    spawn_events = [event for event in casts if int(ability_id(event) or 0) == COALESCED_VENOM_CAST and is_cast_complete(event)]
+    spawn_events = [
+        event for event in casts
+        if int(ability_id(event) or 0) in VENOM_SPAWN_CAST_IDS and is_cast_complete(event)
+    ]
     rounds = []
     for index, deluge in enumerate(deluge_casts, start=1):
         start = int(deluge["timestamp"])
@@ -1283,11 +1719,15 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
         spawns = []
         for event in _events_between(spawn_events, start, start + 12_000):
             spawn_point = _venom_spawn_point(event)
+            venom_kind = _venom_kind_from_spell(ability_id(event))
             spawns.append({
                 "spawnTimeMs": int(event["timestamp"]) - fight_start,
                 "spawnTime": fmt_ms(int(event["timestamp"]) - fight_start),
                 "sourceID": event.get("sourceID"),
                 "sourceInstance": event.get("sourceInstance") or event.get("sourceInstanceID"),
+                "spellID": int(ability_id(event) or 0),
+                "venomKind": venom_kind,
+                "blastRadiusYards": _venom_blast_yards(venom_kind),
                 "position": point_dict(spawn_point, timestamp=int(event["timestamp"])) if spawn_point else None,
             })
         rounds.append({
@@ -1296,6 +1736,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             "timeMs": start - fight_start,
             "time": fmt_ms(start - fight_start),
             "spawnCount": len(spawns),
+            "mutationSpawnCount": sum(1 for spawn in spawns if spawn.get("venomKind") == VENOM_KIND_MUTATION),
             "spawns": spawns,
             "carriers": [],
             "drops": [],
@@ -1310,11 +1751,14 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
     carrier_rows = []
     puddle_seq = 0
 
-    def new_puddle(position, grounded_from_abs, spawn_meta=None):
+    def new_puddle(position, grounded_from_abs, spawn_meta=None, venom_kind=VENOM_KIND_NORMAL):
         nonlocal puddle_seq
         puddle_seq += 1
+        kind = (spawn_meta or {}).get("venomKind") or venom_kind or VENOM_KIND_NORMAL
         return {
             "puddleID": puddle_seq,
+            "venomKind": kind,
+            "blastRadiusYards": _venom_blast_yards(kind),
             "position": point_dict(position, timestamp=grounded_from_abs) if isinstance(position, tuple) else position,
             "groundedFromMs": grounded_from_abs - fight_start,
             "pickedUpAtMs": None,
@@ -1331,39 +1775,35 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             if not spawn.get("position"):
                 continue
             abs_ts = fight_start + int(spawn["spawnTimeMs"])
-            ground.append(new_puddle(spawn["position"], abs_ts, spawn_meta=spawn))
+            ground.append(new_puddle(
+                spawn["position"], abs_ts, spawn_meta=spawn,
+                venom_kind=spawn.get("venomKind") or VENOM_KIND_NORMAL,
+            ))
 
-    volatile_events = sorted(
+    carry_events = sorted(
         (
             event for event in debuffs
-            if int(ability_id(event) or 0) == VOLATILE_VENOM and event.get("targetID") in players
+            if int(ability_id(event) or 0) in VENOM_CARRY_AURA_IDS and event.get("targetID") in players
         ),
         key=lambda row: int(row.get("timestamp") or 0),
     )
 
-    for event in volatile_events:
+    for event in carry_events:
         target_id = event.get("targetID")
         timestamp = int(event["timestamp"])
         rel_ms = timestamp - fight_start
+        carry_kind = _venom_kind_from_spell(ability_id(event))
         if is_apply(event):
+            if target_id in carrying:
+                continue
             player_pos = _position_sample(position_index, target_id, timestamp)
             player_xy = _position_xy(player_pos)
-            puddle = _match_puddle_for_pickup(ground, player_xy)
+            puddle = _match_puddle_for_pickup(ground, player_xy, kinds={carry_kind})
             if puddle is not None and puddle in ground:
                 ground.remove(puddle)
                 # 固化这一段「在地」区间，供撕裂时刻回放
                 if puddle.get("groundedFromMs") is not None and puddle.get("position"):
-                    completed_puddles.append({
-                        "puddleID": puddle["puddleID"],
-                        "position": dict(puddle["position"]),
-                        "groundedFromMs": puddle["groundedFromMs"],
-                        "pickedUpAtMs": rel_ms,
-                        "transferCount": int(puddle.get("transferCount") or 0),
-                        "carriers": list(puddle.get("carriers") or []),
-                        "lastTickMs": puddle.get("lastTickMs"),
-                        "sourceID": puddle.get("sourceID"),
-                        "sourceInstance": puddle.get("sourceInstance"),
-                    })
+                    completed_puddles.append(_puddle_snapshot(puddle, picked_up_at_ms=rel_ms))
                 # 若距上次落地很近，记为接力搬运
                 if puddle.get("carriers") and (
                     rel_ms - int(puddle.get("groundedFromMs") or rel_ms) <= VENOM_TRANSFER_WINDOW_MS
@@ -1372,14 +1812,18 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 puddle["pickedUpAtMs"] = rel_ms
                 puddle["groundedFromMs"] = None
             else:
-                puddle = new_puddle(player_pos, timestamp)
+                puddle = new_puddle(player_pos, timestamp, venom_kind=carry_kind)
                 puddle["pickedUpAtMs"] = rel_ms
                 puddle["groundedFromMs"] = None
+            puddle["venomKind"] = carry_kind
+            puddle["blastRadiusYards"] = _venom_blast_yards(carry_kind)
             puddle.setdefault("carriers", []).append({
                 **player_ref(players, actor_map, target_id),
                 "applyTimeMs": rel_ms,
                 "applyTime": fmt_ms(rel_ms),
                 "pickupPosition": player_pos,
+                "venomKind": carry_kind,
+                "spellID": int(ability_id(event) or 0),
             })
             carrying[target_id] = puddle
             carrier_rows.append({
@@ -1393,17 +1837,23 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 "dropPosition": None,
                 "puddleID": puddle["puddleID"],
                 "transferCount": puddle.get("transferCount") or 0,
+                "venomKind": carry_kind,
+                "blastRadiusYards": _venom_blast_yards(carry_kind),
+                "spellID": int(ability_id(event) or 0),
                 "kind": "pickup",
             })
             continue
 
         if not is_remove(event):
             continue
+        if target_id not in carrying:
+            continue
         puddle = carrying.pop(target_id, None)
         drop_position = _position_sample(position_index, target_id, timestamp)
         apply_rel = None
         if puddle and puddle.get("carriers"):
             apply_rel = puddle["carriers"][-1].get("applyTimeMs")
+        drop_kind = (puddle or {}).get("venomKind") or carry_kind
         row = {
             **player_ref(players, actor_map, target_id),
             "phase": phase_at(rel_ms, markers),
@@ -1415,22 +1865,29 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             "dropPosition": drop_position,
             "puddleID": (puddle or {}).get("puddleID"),
             "transferCount": (puddle or {}).get("transferCount") or 0,
+            "venomKind": drop_kind,
+            "blastRadiusYards": _venom_blast_yards(drop_kind),
+            "spellID": int(ability_id(event) or 0),
             "kind": "drop",
+            "finalDrop": True,
         }
         carrier_rows.append(row)
         if puddle is None:
-            puddle = new_puddle(drop_position, timestamp)
+            puddle = new_puddle(drop_position, timestamp, venom_kind=drop_kind)
         else:
             if drop_position:
                 puddle["position"] = drop_position
             puddle["groundedFromMs"] = rel_ms
             puddle["pickedUpAtMs"] = None
+            puddle["venomKind"] = drop_kind
+            puddle["blastRadiusYards"] = _venom_blast_yards(drop_kind)
             if puddle.get("carriers"):
                 puddle["carriers"][-1].update({
                     "removeTimeMs": rel_ms,
                     "removeTime": fmt_ms(rel_ms),
                     "carryDurationMs": row["carryDurationMs"],
                     "dropPosition": drop_position,
+                    "venomKind": drop_kind,
                 })
         ground.append(puddle)
         round_match = next((item for item in reversed(rounds) if item["timeMs"] <= rel_ms), rounds[-1] if rounds else None)
@@ -1457,7 +1914,9 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                     matched = puddle
                     break
         if matched is None:
-            matched = _nearest_ground_puddle(ground, point, max_yards=VENOM_PICKUP_MAX_YARDS)
+            matched = _nearest_ground_puddle(
+                ground, point, max_yards=VENOM_PICKUP_MAX_YARDS, kinds={VENOM_KIND_NORMAL},
+            )
         if matched is None:
             continue
         matched["position"] = point_dict(point, timestamp=timestamp)
@@ -1469,17 +1928,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
     # 收尾：仍在地上的记为未再被捡起的区间
     for puddle in list(ground):
         if puddle.get("position") and puddle.get("groundedFromMs") is not None:
-            completed_puddles.append({
-                "puddleID": puddle["puddleID"],
-                "position": dict(puddle["position"]) if isinstance(puddle.get("position"), dict) else puddle.get("position"),
-                "groundedFromMs": puddle["groundedFromMs"],
-                "pickedUpAtMs": None,
-                "transferCount": int(puddle.get("transferCount") or 0),
-                "carriers": list(puddle.get("carriers") or []),
-                "lastTickMs": puddle.get("lastTickMs"),
-                "sourceID": puddle.get("sourceID"),
-                "sourceInstance": puddle.get("sourceInstance"),
-            })
+            completed_puddles.append(_puddle_snapshot(puddle, picked_up_at_ms=None))
 
     for round_row in rounds:
         next_ms = rounds[round_row["index"]]["timeMs"] if round_row["index"] < len(rounds) else 10**12
@@ -1489,17 +1938,33 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             and puddle.get("groundedFromMs") is not None
             and round_row["timeMs"] <= int(puddle["groundedFromMs"]) < next_ms
         ]
+        last_drop_by_puddle = {}
+        for drop in round_row["drops"]:
+            if drop.get("puddleID") is None:
+                continue
+            last_drop_by_puddle[drop["puddleID"]] = drop
+        for drop in round_row["drops"]:
+            drop["finalDrop"] = last_drop_by_puddle.get(drop.get("puddleID")) is drop
 
     drop_rows = [row for row in carrier_rows if row.get("kind") == "drop"]
+    mutation_drops = [row for row in drop_rows if row.get("venomKind") == VENOM_KIND_MUTATION]
     return {
         "rounds": rounds,
         "carriers": drop_rows,
         "pickups": [row for row in carrier_rows if row.get("kind") == "pickup"],
         "groundPuddles": completed_puddles,
+        "hasVirulentMutation": bool(mutation_drops) or any(
+            spawn.get("venomKind") == VENOM_KIND_MUTATION
+            for round_row in rounds
+            for spawn in round_row.get("spawns") or []
+        ),
+        "virulentBlastRadiusYards": VIRULENT_BLAST_RADIUS_YARDS,
         "evidenceNote": (
             "凝结毒液按落地/拾取状态机追踪，支持多次接力；"
             f"掉落后 {VENOM_TRANSFER_WINDOW_MS}ms 内再捡起记为搬运中转；"
             f"捡球时用玩家位置与放球点是否 ≤{VENOM_PICKUP_MAX_YARDS:g} 码判断同一球；"
+            "史诗烈毒变异体（1310544）与诱变毒液（1310498/1310691）单独成团，"
+            f"最终落点绘制 {VIRULENT_BLAST_RADIUS_YARDS:g} 码引爆圈；"
             "撕裂几何只用「释放前仍在地上」的区间，优先 1282408 伤害源坐标。"
         ),
     }
@@ -1513,8 +1978,11 @@ def build_active_venom_points(toxic_deluge):
         grounded_from = puddle.get("groundedFromMs")
         if not position or grounded_from is None:
             continue
+        kind = puddle.get("venomKind") or VENOM_KIND_NORMAL
         points.append({
-            "kind": "ground-venom",
+            "kind": _venom_map_kind(kind, grounded=True),
+            "venomKind": kind,
+            "blastRadiusYards": _venom_blast_yards(kind),
             "puddleID": puddle.get("puddleID"),
             "position": position,
             "groundedFromMs": grounded_from,
@@ -1533,8 +2001,11 @@ def build_active_venom_points(toxic_deluge):
     for round_row in toxic_deluge.get("rounds") or []:
         for drop in round_row.get("drops") or []:
             if drop.get("dropPosition"):
+                drop_kind = drop.get("venomKind") or VENOM_KIND_NORMAL
                 points.append({
-                    "kind": "dropped-venom",
+                    "kind": _venom_map_kind(drop_kind, grounded=True),
+                    "venomKind": drop_kind,
+                    "blastRadiusYards": _venom_blast_yards(drop_kind) if drop.get("finalDrop") else None,
                     "carrier": drop.get("player"),
                     "player": drop.get("player"),
                     "playerID": drop.get("playerID"),
@@ -1620,11 +2091,16 @@ def analyze_cone_sever(
         timestamp = int(cast["timestamp"])
         source_id = cast.get("sourceID")
         fight_start = int(fight["startTime"])
-        venom_pts = [point for point in active_points if point.get("kind") in {"ground-venom", "dropped-venom"}]
+        venom_pts = [
+            point for point in active_points
+            if point.get("kind") in {"ground-venom", "dropped-venom", "virulent-mutation"}
+            or point.get("venomKind") in {VENOM_KIND_NORMAL, VENOM_KIND_MUTATION}
+        ]
         manifest_pts = [point for point in active_points if point.get("kind") == "manifestation"]
         other_pts = [
             point for point in active_points
-            if point.get("kind") not in {"ground-venom", "dropped-venom", "manifestation"}
+            if point.get("kind") not in {"ground-venom", "dropped-venom", "virulent-mutation", "manifestation"}
+            and point.get("venomKind") not in {VENOM_KIND_NORMAL, VENOM_KIND_MUTATION}
         ]
         venom_after_ms = previous_cone_sever_rel_ms(casts, timestamp, fight_start)
         nearby_raw = (
@@ -2417,31 +2893,762 @@ def analyze_soul_sever(
     return {"rounds": rounds}
 
 
+def _soulcoiler_event_key(event, coiler_ids):
+    target_id = event.get("targetID")
+    source_id = event.get("sourceID")
+    actor_id = target_id if target_id in coiler_ids else source_id if source_id in coiler_ids else None
+    if actor_id is None:
+        return None
+    instance = (
+        event.get("targetInstance") or event.get("targetInstanceID")
+        or event.get("sourceInstance") or event.get("sourceInstanceID")
+        or 0
+    )
+    return (int(actor_id), int(instance or 0))
+
+
+def _spirit_shield_crack_event(buffs, coiler_ids, key, start_ts, end_ts):
+    """返回该 instance 在本轮掉盾的原始事件；事件本身可能携带目标坐标。"""
+    start = int(start_ts)
+    end = int(end_ts)
+    matches = []
+    for event in buffs or []:
+        if int(ability_id(event) or 0) != SPIRIT_SHIELD:
+            continue
+        if _soulcoiler_event_key(event, coiler_ids) != key:
+            continue
+        kind = event_type(event)
+        if kind not in {"removebuffstack", "removebuff"}:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if start <= ts <= end:
+            matches.append(event)
+    return min(matches, key=lambda event: int(event.get("timestamp") or 0), default=None)
+
+
+def _round_soulcoiler_cracks(buffs, coiler_ids, start_ts, end_ts):
+    """本轮炸弹实际打掉的盾事件；用它限定活跃盘魂者，不能从整场 instance 中猜。"""
+    start = int(start_ts)
+    end = int(end_ts)
+    rows = []
+    for event in buffs or []:
+        if int(ability_id(event) or 0) != SPIRIT_SHIELD:
+            continue
+        if event_type(event) not in {"removebuffstack", "removebuff"}:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        key = _soulcoiler_event_key(event, coiler_ids)
+        if key and start <= ts <= end:
+            rows.append((key, event))
+    return rows
+
+
+def _round_soulcoiler_specs(round_cracks, fallback_keys):
+    """保留有 instance 的每只怪；instance 缺失时按掉盾坐标聚成最多两只怪。"""
+    if not round_cracks:
+        return [(actor_id, instance, None) for actor_id, instance in fallback_keys]
+    specs = []
+    seen_keys = set()
+    uninstanced = []
+    for key, event in round_cracks:
+        actor_id, instance = key
+        if instance:
+            if key not in seen_keys:
+                specs.append((actor_id, instance, event))
+                seen_keys.add(key)
+            continue
+        point = _target_self_point(event)
+        if not point:
+            if key not in seen_keys:
+                specs.append((actor_id, 0, event))
+                seen_keys.add(key)
+            continue
+        matched = False
+        for cluster in uninstanced:
+            if distance_yards(point, cluster["point"]) <= SOULCOILER_DEDUP_YARDS:
+                matched = True
+                break
+        if not matched:
+            uninstanced.append({"actorID": actor_id, "event": event, "point": point})
+    specs.extend((row["actorID"], 0, row["event"]) for row in uninstanced)
+    return specs
+
+
+def _spirit_shield_stacks_at(buffs, coiler_ids, key, timestamp):
+    stacks = 0
+    for event in buffs or []:
+        if int(ability_id(event) or 0) != SPIRIT_SHIELD:
+            continue
+        event_key = _soulcoiler_event_key(event, coiler_ids)
+        if event_key != key:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if ts > timestamp:
+            break
+        kind = event_type(event)
+        if kind in {"applybuff", "applybuffstack", "refreshbuff"}:
+            stacks = int(event.get("stack") or stacks or SOULCOILER_BOMBS_REQUIRED)
+        elif kind == "removebuffstack":
+            stacks = int(event.get("stack") or max(0, stacks - 1))
+        elif kind == "removebuff":
+            stacks = 0
+    return stacks
+
+
+def _soulcoiler_keys(coiler_ids, casts, buffs, npc_position_index=None):
+    keys = set()
+    for event in list(casts or []) + list(buffs or []):
+        if int(ability_id(event) or 0) not in WAIL_OF_TERROR_IDS | {SPIRIT_SHIELD}:
+            continue
+        key = _soulcoiler_event_key(event, coiler_ids)
+        if key:
+            keys.add(key)
+    for (actor_id, instance) in (npc_position_index or {}):
+        if actor_id in coiler_ids:
+            keys.add((int(actor_id), int(instance or 0)))
+    for actor_id in coiler_ids:
+        insts = [inst for aid, inst in keys if aid == actor_id]
+        real = [inst for inst in insts if inst != 0]
+        if real and 0 in insts:
+            keys.discard((int(actor_id), 0))
+        elif not insts:
+            keys.add((int(actor_id), 0))
+    return sorted(keys)
+
+
+def _pick_round_soulcoilers(candidates, bomb_positions):
+    """每轮只保留当场两只怨毒盘魂者；同点重复 instance / 已死 / 无坐标的丢掉。"""
+    ranked = []
+    for row in candidates:
+        pos = row.get("position")
+        if not pos:
+            continue
+        nearest_bomb = None
+        for bomb in bomb_positions or []:
+            dist = _xy_distance_yards(pos, bomb)
+            if dist is None:
+                continue
+            if nearest_bomb is None or dist < nearest_bomb:
+                nearest_bomb = dist
+        ranked.append({
+            **row,
+            "nearestBombYards": nearest_bomb,
+        })
+    ranked.sort(
+        key=lambda row: (
+            0 if int(row.get("shieldStacks") or 0) > 0 else 1,
+            row["nearestBombYards"] if row["nearestBombYards"] is not None else 10**9,
+            -int(row.get("sourceInstance") or 0),
+        )
+    )
+    picked = []
+    for row in ranked:
+        xy = _position_xy(row.get("position"))
+        if not xy:
+            continue
+        duplicate = False
+        for kept in picked:
+            kept_xy = _position_xy(kept.get("position"))
+            if kept_xy and distance_yards(xy, kept_xy) <= SOULCOILER_DEDUP_YARDS:
+                duplicate = True
+                break
+        if duplicate:
+            continue
+        picked.append(row)
+        if len(picked) >= SOULCOILER_EXPECTED_COUNT:
+            break
+    return picked
+
+
+def _is_wail_interrupt(event, coiler_ids):
+    extra = int(event.get("extraAbilityGameID") or 0)
+    if extra not in WAIL_OF_TERROR_IDS:
+        return False
+    kind = event_type(event)
+    if kind and kind not in {"interrupt"}:
+        return False
+    return event.get("targetID") in coiler_ids or event.get("sourceID") in coiler_ids
+
+
+def _xy_distance_yards(left, right):
+    left_xy = _position_xy(left)
+    right_xy = _position_xy(right)
+    if not left_xy or not right_xy:
+        return None
+    return round(distance_yards(left_xy, right_xy), 1)
+
+
+def annotate_gloombomb_soulcoilers(
+    fight, rounds, casts, enemy_buffs, interrupts, npc_position_index, actor_map, players,
+    actor_rows, markers, enemy_deaths=None, damage_events=None,
+):
+    """史诗：把每轮幽暗炸弹对齐到怨毒盘魂者灵魂之盾，并检查打断换位导致炸空。"""
+    coiler_ids = soulcoiler_actor_ids(actor_rows)
+    has_shield = any(int(ability_id(event) or 0) == SPIRIT_SHIELD for event in (enemy_buffs or []))
+    if not coiler_ids or not has_shield:
+        return False
+    fight_start = int(fight["startTime"])
+    buffs = sorted(enemy_buffs or [], key=lambda row: int(row.get("timestamp") or 0))
+    interrupt_rows = [
+        event for event in interrupts or []
+        if _is_wail_interrupt(event, coiler_ids)
+    ]
+    keys = _soulcoiler_keys(coiler_ids, casts, buffs, npc_position_index)
+    pet_owners = _pet_owner_map(actor_rows)
+    for round_row in rounds:
+        explode_times = [
+            fight_start + int(target["explodeTimeMs"])
+            for target in round_row.get("targets") or []
+            if target.get("explodeTimeMs") is not None
+        ]
+        round_abs = fight_start + int(round_row.get("timeMs") or 0)
+        apply_times = [
+            fight_start + int(target["applyTimeMs"])
+            for target in round_row.get("targets") or []
+            if target.get("applyTimeMs") is not None
+        ]
+        if explode_times:
+            snapshot_ts = min(explode_times)
+            bomb_pos_end = max(explode_times) + SOULCOILER_BOMB_POS_PAD_MS
+            bomb_pos_start = (min(apply_times) if apply_times else min(explode_times) - 5_500)
+        else:
+            snapshot_ts = round_abs
+            bomb_pos_start = snapshot_ts - 5_500
+            bomb_pos_end = snapshot_ts + SOULCOILER_BOMB_POS_PAD_MS
+        bomb_positions = [
+            target.get("position")
+            for target in round_row.get("targets") or []
+            if target.get("position")
+        ]
+        round_cracks = _round_soulcoiler_cracks(
+            buffs, coiler_ids, bomb_pos_start, bomb_pos_end,
+        )
+        round_specs = _round_soulcoiler_specs(round_cracks, keys)
+        candidates = []
+        for actor_id, instance, round_crack_event in round_specs:
+            death_ts = _npc_instance_death_ts(enemy_deaths, actor_id, instance)
+            if death_ts is not None and death_ts < snapshot_ts:
+                continue
+            crack_event = round_crack_event
+            if crack_event is None:
+                crack_event = _spirit_shield_crack_event(
+                    buffs, coiler_ids, (actor_id, instance),
+                    bomb_pos_start, bomb_pos_end,
+                )
+            crack_ts = int(crack_event["timestamp"]) if crack_event else None
+            coiler_ts = crack_ts or snapshot_ts
+            stacks = _spirit_shield_stacks_at(buffs, coiler_ids, (actor_id, instance), coiler_ts)
+            extra_rows = (
+                _soulcoiler_event_coord_rows(damage_events, actor_id, bomb_pos_start, bomb_pos_end)
+                + _soulcoiler_event_coord_rows(buffs, actor_id, bomb_pos_start, bomb_pos_end)
+                + _soulcoiler_event_coord_rows(casts, actor_id, bomb_pos_start, bomb_pos_end)
+            )
+            # 盾事件只使用明确属于 Target 的坐标；不能把顶层来源坐标误画成盘魂者。
+            crack_point = _target_self_point(crack_event) if crack_event else None
+            sample_start = coiler_ts - SOULCOILER_BOMB_POS_PAD_MS
+            sample_end = coiler_ts + SOULCOILER_BOMB_POS_PAD_MS
+            position = (
+                point_dict(crack_point, timestamp=coiler_ts, reliable=True, offset_ms=0)
+                if crack_point else
+                _soulcoiler_position_in_window(
+                    npc_position_index, actor_id, instance,
+                    sample_start, sample_end, coiler_ts,
+                    extra_rows=extra_rows,
+                )
+            )
+            if not position:
+                continue
+            position_source = "shield-crack-event" if crack_point else "bomb-window-sample"
+            window_start = snapshot_ts - SOULCOILER_INTERRUPT_LOOKBACK_MS
+            window_end = max(explode_times) if explode_times else snapshot_ts
+            interrupts_here = [
+                event for event in interrupt_rows
+                if _soulcoiler_event_key(event, coiler_ids) == (actor_id, instance)
+                and window_start <= int(event.get("timestamp") or 0) <= window_end
+            ]
+            last_interrupt = interrupts_here[-1] if interrupts_here else None
+            prev_position = None
+            relocate_yards = None
+            if last_interrupt:
+                interrupt_ts = int(last_interrupt["timestamp"])
+                prev_position = _soulcoiler_position_at(
+                    npc_position_index, actor_id, instance, interrupt_ts - 50,
+                )
+                relocate_yards = _xy_distance_yards(prev_position, position)
+            interrupt_player = None
+            if last_interrupt:
+                interrupt_id = _resolve_player_source(last_interrupt, players, pet_owners) or last_interrupt.get("sourceID")
+                interrupt_player = player_ref(players, actor_map, interrupt_id)
+            hits = []
+            displaced_here = []
+            for target in round_row.get("targets") or []:
+                explode_rel = target.get("explodeTimeMs")
+                bomb_pos = target.get("position")
+                if explode_rel is None or not bomb_pos:
+                    continue
+                explode_ts = fight_start + int(explode_rel)
+                coiler_at_explode = position
+                if instance:
+                    coiler_at_explode = _soulcoiler_position_near(
+                        npc_position_index, actor_id, instance, explode_ts,
+                        extra_rows=extra_rows,
+                    ) or position
+                distance = _xy_distance_yards(bomb_pos, coiler_at_explode)
+                hit = distance is not None and distance < GLOOMBOMB_RADIUS_YARDS
+                would_hit_prev = False
+                if prev_position:
+                    prev_dist = _xy_distance_yards(bomb_pos, prev_position)
+                    would_hit_prev = prev_dist is not None and prev_dist < GLOOMBOMB_RADIUS_YARDS
+                relocated = relocate_yards is not None and relocate_yards >= SOULCOILER_RELOCATE_YARDS
+                displaced_miss = bool(last_interrupt and relocated and would_hit_prev and not hit)
+                hit_row = {
+                    "player": target.get("player"),
+                    "playerID": target.get("playerID"),
+                    "classColor": target.get("classColor"),
+                    "distanceYards": distance,
+                    "hit": hit,
+                    "wouldHitBeforeInterrupt": would_hit_prev,
+                    "displacedMiss": displaced_miss,
+                }
+                hits.append(hit_row)
+                if displaced_miss:
+                    displaced_here.append({
+                        **hit_row,
+                        "soulcoilerInstance": instance,
+                        "interruptTime": fmt_ms(int(last_interrupt["timestamp"]) - fight_start),
+                        "interruptPlayer": interrupt_player,
+                        "relocateYards": relocate_yards,
+                    })
+            candidates.append({
+                "kind": "soulcoiler",
+                "sourceID": actor_id,
+                "sourceInstance": instance,
+                "name": actor_name(actor_map, actor_id) or "怨毒盘魂者",
+                "position": position,
+                "positionSource": position_source,
+                "previousPosition": prev_position if relocate_yards and relocate_yards >= SOULCOILER_RELOCATE_YARDS else None,
+                "shieldStacks": stacks,
+                "bombsRequired": SOULCOILER_BOMBS_REQUIRED,
+                "bombHits": sum(1 for row in hits if row["hit"]),
+                "hits": hits,
+                "interrupted": bool(last_interrupt),
+                "interruptTime": fmt_ms(int(last_interrupt["timestamp"]) - fight_start) if last_interrupt else None,
+                "interruptPlayer": interrupt_player,
+                "relocateYards": relocate_yards,
+                "displacedMiss": any(row["displacedMiss"] for row in hits),
+                "_displacedRows": displaced_here,
+            })
+        coilers = _pick_round_soulcoilers(candidates, bomb_positions)
+        displaced_misses = []
+        for coiler in coilers:
+            displaced_misses.extend(coiler.pop("_displacedRows", []))
+        round_row["soulcoilers"] = coilers
+        round_row["soulcoilerCount"] = len(coilers)
+        round_row["shieldHits"] = sum(row.get("bombHits") or 0 for row in coilers)
+        round_row["displacedMisses"] = displaced_misses
+        round_row["displacedMissCount"] = len(displaced_misses)
+    return True
+
+
+def _cluster_timestamped_events(events, gap_ms, span_ms):
+    waves = []
+    current = []
+    for event in events:
+        ts = int(event["timestamp"])
+        if not current:
+            current = [event]
+            continue
+        first = int(current[0]["timestamp"])
+        last = int(current[-1]["timestamp"])
+        if ts - last <= gap_ms and ts - first <= span_ms:
+            current.append(event)
+        else:
+            waves.append(current)
+            current = [event]
+    if current:
+        waves.append(current)
+    return waves
+
+
+def _merge_small_waves(waves, gap_ms, max_size):
+    merged = []
+    for wave in waves:
+        if merged:
+            prev = merged[-1]
+            gap = int(wave[0]["timestamp"]) - int(prev[-1]["timestamp"])
+            if gap <= gap_ms and len(prev) + len(wave) <= max_size:
+                prev.extend(wave)
+                continue
+        merged.append(list(wave))
+    return merged
+
+
+def _cluster_gloombomb_apply_waves(debuff_rows, players):
+    applies = [
+        event for event in (debuff_rows or [])
+        if int(ability_id(event) or 0) in GLOOMBOMB_DEBUFF_IDS
+        and event_type(event) in GLOOMBOMB_APPLY_TYPES
+        and event.get("targetID") in players
+    ]
+    clustered = _cluster_timestamped_events(applies, GLOOMBOMB_CAST_GAP_MS, GLOOMBOMB_WAVE_SPAN_MS)
+    return _merge_small_waves(clustered, GLOOMBOMB_CAST_MERGE_MS, GLOOMBOMB_MARKS_PER_WAVE)
+
+
+def _unique_wave_applies(wave):
+    seen = set()
+    unique = []
+    for event in wave:
+        target_id = event.get("targetID")
+        if target_id in seen:
+            continue
+        seen.add(target_id)
+        unique.append(event)
+    return unique
+
+
+def _is_roster_player(target_id, players):
+    if target_id in (players or {}):
+        return True
+    try:
+        return int(target_id) in players
+    except (TypeError, ValueError):
+        return False
+
+
+def _gloombomb_apply_events(debuff_rows, players):
+    return [
+        event for event in (debuff_rows or [])
+        if int(ability_id(event) or 0) in GLOOMBOMB_DEBUFF_IDS
+        and event_type(event) in GLOOMBOMB_APPLY_TYPES
+        and _is_roster_player(event.get("targetID"), players)
+    ]
+
+
+def _gloombomb_wave_specs(completed, debuff_rows, players):
+    """每轮以施法波次为准，把窗口内点名收进同一张图；没有施法时才退回施加聚类。"""
+    applies = _gloombomb_apply_events(debuff_rows, players)
+    if completed:
+        cast_waves = _merge_small_waves(
+            _cluster_timestamped_events(completed, GLOOMBOMB_CAST_GAP_MS, GLOOMBOMB_WAVE_SPAN_MS),
+            GLOOMBOMB_CAST_MERGE_MS,
+            GLOOMBOMB_MARKS_PER_WAVE,
+        )
+        specs = []
+        claimed = set()
+        for index, wave in enumerate(cast_waves):
+            first_cast = int(wave[0]["timestamp"])
+            last_cast = int(wave[-1]["timestamp"])
+            next_start = (
+                int(cast_waves[index + 1][0]["timestamp"])
+                if index + 1 < len(cast_waves)
+                else last_cast + 30_000
+            )
+            window_start = first_cast - GLOOMBOMB_APPLY_LOOKBACK_MS
+            window_end = min(next_start, last_cast + GLOOMBOMB_APPLY_WINDOW_MS)
+            window_applies = [
+                event for event in applies
+                if window_start <= int(event["timestamp"]) < window_end
+            ]
+            unique = _unique_wave_applies(window_applies)
+            for event in unique:
+                claimed.add(id(event))
+            specs.append((wave[0], unique, first_cast))
+        leftovers = [event for event in applies if id(event) not in claimed]
+        for event in leftovers:
+            ts = int(event["timestamp"])
+            best_index = None
+            best_dist = None
+            for index, (_cast, _unique, first_cast) in enumerate(specs):
+                dist = abs(ts - first_cast)
+                if best_index is None or dist < best_dist:
+                    best_index, best_dist = index, dist
+            if best_index is None or best_dist > GLOOMBOMB_LEFTOVER_ATTACH_MS:
+                continue
+            target_id = event.get("targetID")
+            unique = specs[best_index][1]
+            if any(row.get("targetID") == target_id for row in unique):
+                continue
+            unique.append(event)
+        return [(cast, _unique_wave_applies(unique), first_cast) for cast, unique, first_cast in specs if unique]
+
+    waves = _cluster_gloombomb_apply_waves(debuff_rows, players)
+    specs = []
+    for wave in waves:
+        unique = _unique_wave_applies(wave)
+        if not unique:
+            continue
+        specs.append((None, unique, int(unique[0]["timestamp"])))
+    return specs
+
+
+def _gloombomb_cast_for_wave(completed, first_ts, last_ts):
+    if not completed:
+        return None
+    window_start = first_ts - 3_000
+    window_end = last_ts + 2_000
+    in_window = [
+        event for event in completed
+        if window_start <= int(event["timestamp"]) <= window_end
+    ]
+    if in_window:
+        return in_window[0]
+    mid = (first_ts + last_ts) // 2
+    return min(completed, key=lambda event: abs(int(event["timestamp"]) - mid))
+
+
+def _index_rows_for_actor(index, actor_id):
+    if actor_id is None or not index:
+        return []
+    keys = {actor_id}
+    try:
+        keys.add(int(actor_id))
+    except (TypeError, ValueError):
+        pass
+    rows = []
+    seen = set()
+    for key in keys:
+        for row in index.get(key) or []:
+            ident = (row.get("timestamp"), row.get("x"), row.get("y"))
+            if ident in seen:
+                continue
+            seen.add(ident)
+            rows.append(row)
+    return rows
+
+
+def _event_coord_row(event):
+    if not event:
+        return None
+    point = _target_self_point(event) or _aura_target_point(event) or event_point(event)
+    if not point:
+        return None
+    return {"timestamp": int(event["timestamp"]), "x": point[0], "y": point[1]}
+
+
+def _timeline_point_near(rows, timestamp, window_ms=GLOOMBOMB_HIT_POS_WINDOW_MS):
+    """按 timestamp 在轨迹上取值：两侧样本间隔不超过 2s 则插值（与回放同一时刻），否则取 2s 内最近点。"""
+    if not rows or timestamp is None:
+        return None
+    ts = int(timestamp)
+    window = int(window_ms)
+    max_gap = int(GLOOMBOMB_INTERP_GAP_MS)
+    before = [row for row in rows if int(row["timestamp"]) <= ts]
+    after = [row for row in rows if int(row["timestamp"]) >= ts]
+    left = max(before, key=lambda row: int(row["timestamp"])) if before else None
+    right = min(after, key=lambda row: int(row["timestamp"])) if after else None
+    if left and right:
+        left_ts = int(left["timestamp"])
+        right_ts = int(right["timestamp"])
+        gap = right_ts - left_ts
+        if gap == 0:
+            return point_dict((left["x"], left["y"]), timestamp=ts, reliable=True, offset_ms=left_ts - ts)
+        if gap <= max_gap:
+            t = (ts - left_ts) / gap
+            x = float(left["x"]) + (float(right["x"]) - float(left["x"])) * t
+            y = float(left["y"]) + (float(right["y"]) - float(left["y"])) * t
+            reliable = min(ts - left_ts, right_ts - ts) <= window
+            return point_dict((x, y), timestamp=ts, reliable=reliable, offset_ms=0)
+    nearby = [row for row in rows if abs(int(row["timestamp"]) - ts) <= max_gap]
+    if not nearby:
+        return None
+    nearest = min(nearby, key=lambda row: abs(int(row["timestamp"]) - ts))
+    offset = int(nearest["timestamp"] - ts)
+    return point_dict(
+        (nearest["x"], nearest["y"]),
+        timestamp=ts,
+        reliable=abs(offset) <= window,
+        offset_ms=offset,
+    )
+
+
+def _timeline_point_at(rows, timestamp, max_age_ms=GLOOMBOMB_POSITION_MAX_OFFSET_MS):
+    """取 timestamp 当时（含）的坐标；晚于该时刻的样本不用，过早的上点名坐标也不用。"""
+    if not rows or timestamp is None:
+        return None
+    ts = int(timestamp)
+    at_or_before = [row for row in rows if int(row["timestamp"]) <= ts]
+    if not at_or_before:
+        return None
+    last = max(at_or_before, key=lambda row: int(row["timestamp"]))
+    offset = int(last["timestamp"] - ts)
+    if max_age_ms is not None and abs(offset) > max_age_ms:
+        return None
+    return point_dict(
+        (last["x"], last["y"]),
+        timestamp=ts,
+        reliable=abs(offset) <= POSITION_RELIABLE_MS,
+        offset_ms=offset,
+    )
+
+
+def _index_point_at(index, actor_id, timestamp, max_age_ms=GLOOMBOMB_POSITION_MAX_OFFSET_MS):
+    if actor_id is None:
+        return None
+    return _timeline_point_at(_index_rows_for_actor(index, actor_id), timestamp, max_age_ms=max_age_ms)
+
+
+def _index_point_near(index, actor_id, timestamp, window_ms=GLOOMBOMB_HIT_POS_WINDOW_MS):
+    if actor_id is None:
+        return None
+    return _timeline_point_near(_index_rows_for_actor(index, actor_id), timestamp, window_ms=window_ms)
+
+
+def _npc_point_at(npc_index, actor_id, timestamp, max_age_ms=GLOOMBOMB_POSITION_MAX_OFFSET_MS):
+    if not npc_index or actor_id is None:
+        return None
+    rows = []
+    for (aid, _inst), inst_rows in npc_index.items():
+        if int(aid) != int(actor_id):
+            continue
+        rows.extend(inst_rows or [])
+    return _timeline_point_at(rows, timestamp, max_age_ms=max_age_ms)
+
+
+def _aura_row(event):
+    if not event:
+        return None
+    point = _aura_target_point(event)
+    if not point:
+        return None
+    return {"timestamp": int(event["timestamp"]), "x": point[0], "y": point[1]}
+
+
+def _index_point_last_before(index, actor_id, timestamp, max_age_ms=GLOOMBOMB_BEFORE_REMOVE_MAX_AGE_MS):
+    """取 timestamp 之前（不含）的最后坐标，避免用上爆炸/位移后的样本。"""
+    if not index or actor_id is None or timestamp is None:
+        return None
+    rows = index.get(actor_id) or []
+    prior = [row for row in rows if int(row["timestamp"]) < int(timestamp)]
+    if not prior:
+        return None
+    last = prior[-1]
+    offset = int(last["timestamp"] - timestamp)
+    if max_age_ms is not None and abs(offset) > max_age_ms:
+        return None
+    return point_dict(
+        (last["x"], last["y"]),
+        timestamp=int(timestamp),
+        reliable=abs(offset) <= POSITION_RELIABLE_MS,
+        offset_ms=offset,
+    )
+
+
+def _npc_point_last_before(npc_index, actor_id, timestamp, max_age_ms=GLOOMBOMB_BEFORE_REMOVE_MAX_AGE_MS):
+    if not npc_index or actor_id is None or timestamp is None:
+        return None
+    rows = []
+    for (aid, _inst), inst_rows in npc_index.items():
+        if int(aid) != int(actor_id):
+            continue
+        rows.extend(inst_rows or [])
+    if not rows:
+        return None
+    rows.sort(key=lambda row: int(row["timestamp"]))
+    prior = [row for row in rows if int(row["timestamp"]) < int(timestamp)]
+    if not prior:
+        return None
+    last = prior[-1]
+    offset = int(last["timestamp"] - timestamp)
+    if max_age_ms is not None and abs(offset) > max_age_ms:
+        return None
+    return point_dict(
+        (last["x"], last["y"]),
+        timestamp=int(timestamp),
+        reliable=abs(offset) <= POSITION_RELIABLE_MS,
+        offset_ms=offset,
+    )
+
+
+def _player_event_point(event):
+    """DamageTaken 顶层 x/y 属于受击玩家。"""
+    if not event:
+        return None
+    point = _target_self_point(event)
+    if point:
+        return point
+    if event_type(event) == "damage":
+        return (
+            _xy_from_node(event.get("targetResources"))
+            or _xy_from_node(event)
+            or _xy_from_node(event.get("resources"))
+        )
+    return None
+
+
+def _gloombomb_damage_hit(damage_events, target_id, apply_ts, remove_ts=None):
+    if target_id is None:
+        return None
+    wanted = int(target_id)
+    start = int(apply_ts)
+    end = int(remove_ts) + 1_000 if remove_ts is not None else start + 20_000
+    hits = []
+    for event in damage_events or []:
+        if event_type(event) != "damage":
+            continue
+        if int(ability_id(event) or 0) not in GLOOMBOMB_DAMAGE_IDS:
+            continue
+        if int(event.get("targetID") or -1) != wanted:
+            continue
+        ts = int(event.get("timestamp") or 0)
+        if ts < start or ts > end:
+            continue
+        hits.append(event)
+    if not hits:
+        return None
+    explode_hits = [
+        event for event in hits
+        if int(ability_id(event) or 0) in GLOOMBOMB_EXPLODE_DAMAGE_IDS
+    ]
+    pool = explode_hits or hits
+    if remove_ts is not None:
+        return min(pool, key=lambda event: abs(int(event["timestamp"]) - int(remove_ts)))
+    return max(pool, key=lambda event: int(event["timestamp"]))
+
+
+def _gloombomb_target_position(hit_event, position_index, target_id):
+    """只使用吃到幽暗炸弹伤害时刻 ±100ms 的受击者坐标。"""
+    if not hit_event:
+        return None, None
+    snapshot_ts = int(hit_event["timestamp"])
+    rows = _index_rows_for_actor(position_index, target_id)
+    point = _player_event_point(hit_event)
+    if point:
+        rows.append({"timestamp": snapshot_ts, "x": point[0], "y": point[1]})
+    position = _timeline_point_near(rows, snapshot_ts, GLOOMBOMB_HIT_POS_WINDOW_MS)
+    if position:
+        return position, "damage-hit"
+    return None, None
+
+
 def analyze_gloombomb(
     fight, casts, debuffs, position_index, actor_map, players, markers,
-    origin_index=None, boss_actor_id=None,
+    origin_index=None, boss_actor_id=None, npc_position_index=None, actor_rows=None,
+    enemy_buffs=None, interrupts=None, enemy_deaths=None, damage_events=None,
 ):
     completed = [event for event in casts if int(ability_id(event) or 0) in GLOOMBOMB_CAST_IDS and is_cast_complete(event)]
+    completed.sort(key=lambda row: int(row.get("timestamp") or 0))
     debuff_rows = sorted(debuffs, key=lambda row: int(row.get("timestamp") or 0))
     fight_start = int(fight["startTime"])
     rounds = []
-    for index, cast in enumerate(completed, start=1):
-        timestamp = int(cast["timestamp"])
-        next_cast = int(completed[index]["timestamp"]) if index < len(completed) else timestamp + 20_000
-        apply_window_end = min(next_cast, timestamp + 8_000)
+    for index, (cast, apply_events, round_ts) in enumerate(_gloombomb_wave_specs(completed, debuff_rows, players), start=1):
+        if not apply_events:
+            continue
+        first_ts = int(apply_events[0]["timestamp"])
+        last_ts = int(apply_events[-1]["timestamp"])
+        if cast is None:
+            cast = _gloombomb_cast_for_wave(completed, first_ts, last_ts)
+        timestamp = int(cast["timestamp"]) if cast else round_ts
         targets = []
-        seen = set()
-        for event in _events_between(debuff_rows, timestamp - 500, apply_window_end, GLOOMBOMB_DEBUFF_IDS):
-            if not is_apply(event):
-                continue
+        for event in apply_events:
             target_id = event.get("targetID")
-            if target_id not in players or target_id in seen:
-                continue
-            seen.add(target_id)
             apply_ts = int(event["timestamp"])
-            remove_event = _first_remove_after(debuff_rows, target_id, apply_ts, GLOOMBOMB_DEBUFF_IDS)
-            explode_ts = int(remove_event["timestamp"]) if remove_event else None
-            position = _position_sample(position_index, target_id, explode_ts) if explode_ts else None
+            remove_event = _first_full_aura_remove_after(debuff_rows, target_id, apply_ts, GLOOMBOMB_DEBUFF_IDS)
+            hit_event = _gloombomb_damage_hit(
+                damage_events, target_id, apply_ts,
+                remove_ts=int(remove_event["timestamp"]) if remove_event else None,
+            )
+            explode_ts = int(hit_event["timestamp"]) if hit_event else None
+            position, position_rule = _gloombomb_target_position(hit_event, position_index, target_id)
             targets.append({
                 **player_ref(players, actor_map, target_id),
                 "applyTimeMs": apply_ts - fight_start,
@@ -2449,6 +3656,7 @@ def analyze_gloombomb(
                 "explodeTimeMs": (explode_ts - fight_start) if explode_ts else None,
                 "explodeTime": fmt_ms(explode_ts - fight_start) if explode_ts else None,
                 "position": position,
+                "positionRule": position_rule,
             })
         named_ids = {row["playerID"] for row in targets}
         spacing = []
@@ -2485,7 +3693,7 @@ def analyze_gloombomb(
             for player_id in players:
                 if player_id in named_ids:
                     continue
-                other_pos = _position_sample(position_index, player_id, explode_ts)
+                other_pos = _index_point_near(position_index, player_id, explode_ts)
                 if not other_pos:
                     continue
                 distance = distance_yards(
@@ -2518,13 +3726,25 @@ def analyze_gloombomb(
             target["nearbyUnnamed"] = nearby_rows
             target["collateralGravebound"] = collateral_rows
         too_close = [row for row in spacing if row["tooClose"]]
-        caster_id = cast.get("sourceID") if cast.get("sourceID") is not None else boss_actor_id
-        boss_position = boss_field_position(origin_index, caster_id, timestamp, cast_event=cast)
+        explode_abs = [
+            fight_start + int(target["explodeTimeMs"])
+            for target in targets
+            if target.get("explodeTimeMs") is not None
+        ]
+        boss_ts = min(explode_abs) if explode_abs else (timestamp if cast else first_ts)
+        caster_id = (cast.get("sourceID") if cast and cast.get("sourceID") is not None else boss_actor_id)
+        boss_position = (
+            _index_point_at(origin_index or {}, caster_id, boss_ts, max_age_ms=POSITION_RELIABLE_MS)
+            or _index_point_at(origin_index or {}, boss_actor_id, boss_ts, max_age_ms=POSITION_RELIABLE_MS)
+            or _npc_point_at(npc_position_index or {}, caster_id, boss_ts, max_age_ms=POSITION_RELIABLE_MS)
+            or _npc_point_at(npc_position_index or {}, boss_actor_id, boss_ts, max_age_ms=POSITION_RELIABLE_MS)
+        )
+        round_time_ms = timestamp - fight_start if cast else (round_ts - fight_start)
         rounds.append({
             "index": index,
-            "phase": phase_at(timestamp - fight_start, markers),
-            "timeMs": timestamp - fight_start,
-            "time": fmt_ms(timestamp - fight_start),
+            "phase": phase_at(round_time_ms, markers),
+            "timeMs": round_time_ms,
+            "time": fmt_ms(round_time_ms),
             "targetCount": len(targets),
             "targets": targets,
             "bossPosition": boss_position,
@@ -2537,11 +3757,26 @@ def analyze_gloombomb(
             "collateralCount": len(collateral_hits),
             "failed": bool(too_close or collateral_hits),
         })
+    mythic_shield = annotate_gloombomb_soulcoilers(
+        fight, rounds, casts, enemy_buffs, interrupts, npc_position_index or {},
+        actor_map, players, actor_rows or [], markers, enemy_deaths=enemy_deaths,
+        damage_events=damage_events,
+    )
+    note = (
+        "点名玩家按爆炸伤害时刻取值；怨毒盘魂者优先直接取灵魂之盾掉层事件携带的目标坐标，"
+        "否则只在本轮幽暗炸弹从点名到爆炸（约 5s）的同一 NPC instance 内取坐标。"
+        "只列出爆炸时 15 码内、且 2 秒内获得墓缚 1286837 的非点名玩家。"
+    )
+    if mythic_shield:
+        note += (
+            "史诗怨毒盘魂者灵魂之盾（1309105）需两枚 15 码内幽暗炸弹移除；"
+            "打断恐惧哀嚎后若盘魂者位移超过 8 码，且炸弹本可命中原位、爆炸时已出圈，记为打断炸空。"
+        )
     return {
         "rounds": rounds,
-        "evidenceNote": (
-            "点名以 1310881 施加/移除为准；只列出爆炸时 15 码内、且 2 秒内获得墓缚 1286837 的非点名玩家。"
-        ),
+        "hasSoulcoilerShield": bool(mythic_shield),
+        "soulcoilerBombsRequired": SOULCOILER_BOMBS_REQUIRED,
+        "evidenceNote": note,
     }
 
 
@@ -3027,8 +4262,7 @@ def build_field_audit(
     arena, toxic_deluge, sever, soul_sever, gloombomb, blighted_sever,
     manifestations=None, guillotine=None, grim_guillotine=None,
 ):
-    """场地示意图：撕裂锥形清场 + 处斩跑离 + 幽暗炸弹分散。"""
-    del toxic_deluge, manifestations
+    """场地示意图：撕裂锥形清场 + 处斩跑离 + 幽暗炸弹分散 + 史诗毒液/烈毒变异体落点。"""
     diagrams = []
 
     def append_cone_diagram(row, mechanic, primary_key):
@@ -3090,8 +4324,10 @@ def build_field_audit(
         elif mechanic == "凋零撕裂":
             annotation = annotation or f"P3 组合清场推断 {row.get('inferredClearedCount')}"
         else:
+            mutation_n = sum(1 for point in targets if point.get("venomKind") == VENOM_KIND_MUTATION)
             annotation = annotation or (
                 f"推断清理 {row.get('inferredClearedCount')} 团，几何命中 {row.get('clearedByGeometry')}"
+                + (f"；烈毒变异体 {mutation_n} 团（紫圈 {VIRULENT_BLAST_RADIUS_YARDS:g} 码）" if mutation_n else "")
             )
         diagrams.append({
             "kind": "cone-clear",
@@ -3146,9 +4382,58 @@ def build_field_audit(
                 "bossPosition": row.get("bossPosition"),
                 "dangerRadiusYards": row.get("dangerRadiusYards", GUILLOTINE_RANGE_YARDS),
                 "targets": targets,
-                "annotation": annotation,
-            })
+            "annotation": annotation,
+        })
 
+    def append_venom_diagram(row):
+        targets = []
+        for spawn in row.get("spawns") or []:
+            if not spawn.get("position"):
+                continue
+            kind = spawn.get("venomKind") or VENOM_KIND_NORMAL
+            targets.append({
+                "kind": _venom_map_kind(kind, grounded=False),
+                "venomKind": kind,
+                "position": spawn["position"],
+                "player": "烈毒变异体生成" if kind == VENOM_KIND_MUTATION else "凝结毒液生成",
+            })
+        last_drops = {}
+        for drop in row.get("drops") or []:
+            if drop.get("puddleID") is None or not drop.get("dropPosition"):
+                continue
+            last_drops[drop["puddleID"]] = drop
+        for drop in last_drops.values():
+            kind = drop.get("venomKind") or VENOM_KIND_NORMAL
+            mutation = kind == VENOM_KIND_MUTATION
+            targets.append({
+                **{k: drop.get(k) for k in ("player", "classColor", "playerID", "icon", "role") if drop.get(k) is not None},
+                "kind": _venom_map_kind(kind, grounded=True),
+                "venomKind": kind,
+                "position": drop["dropPosition"],
+                "blastRadiusYards": _venom_blast_yards(kind) if mutation else None,
+                "finalDrop": True,
+            })
+        if not targets:
+            return
+        mutation_n = sum(1 for target in targets if target.get("venomKind") == VENOM_KIND_MUTATION and target.get("finalDrop"))
+        diagrams.append({
+            "kind": "venom-field",
+            "mechanic": "剧毒洪流",
+            "roundIndex": row["index"],
+            "phase": row["phase"],
+            "time": row["time"],
+            "targets": targets,
+            "virulentBlastRadiusYards": VIRULENT_BLAST_RADIUS_YARDS,
+            "annotation": (
+                f"生成 {row.get('spawnCount', 0)} 团"
+                + (f"，其中烈毒变异体 {row.get('mutationSpawnCount', 0)} 团" if row.get("mutationSpawnCount") else "")
+                + f"；最终落点 {len(last_drops)} 团"
+                + (f"；紫圈为烈毒变异体 {VIRULENT_BLAST_RADIUS_YARDS:g} 码引爆范围（{mutation_n} 团）" if mutation_n else "")
+            ),
+        })
+
+    for row in (toxic_deluge.get("rounds") or []):
+        append_venom_diagram(row)
     for row in (sever.get("rounds") or []):
         append_cone_diagram(row, row.get("label") or "撕裂", "targetsInCone")
     for row in ((guillotine or {}).get("rounds") or []):
@@ -3167,9 +4452,35 @@ def build_field_audit(
             player for player in (row.get("collateralHits") or [])
             if player.get("position")
         ]
-        if not targets:
+        if not targets and not (row.get("soulcoilers") or []):
             continue
         too_close = row.get("tooClosePairs") or []
+        bomb_targets = []
+        for target in targets:
+            bomb_targets.append({**target, "kind": target.get("kind") or "bomb"})
+        for coiler in row.get("soulcoilers") or []:
+            current_pos = coiler.get("position")
+            if not current_pos:
+                continue
+            bomb_targets.append({
+                "kind": "soulcoiler",
+                "player": coiler.get("name") or "怨毒盘魂者",
+                "position": current_pos,
+                "sourceInstance": coiler.get("sourceInstance"),
+                "shieldStacks": coiler.get("shieldStacks"),
+                "bombHits": coiler.get("bombHits"),
+                "displacedMiss": coiler.get("displacedMiss"),
+            })
+        if not bomb_targets:
+            continue
+        miss_n = row.get("displacedMissCount") or 0
+        shield_note = ""
+        if row.get("soulcoilers"):
+            shield_note = (
+                f"；怨毒盘魂者 {row.get('soulcoilerCount', 0)}；"
+                f"盾层命中 {row.get('shieldHits', 0)}"
+                + (f"；打断炸空 {miss_n}" if miss_n else "")
+            )
         diagrams.append({
             "kind": "spread",
             "mechanic": "幽暗炸弹",
@@ -3177,7 +4488,7 @@ def build_field_audit(
             "phase": row["phase"],
             "time": row["time"],
             "bossPosition": row.get("bossPosition"),
-            "targets": targets,
+            "targets": bomb_targets,
             "nearbyPlayers": collateral,
             "spreadRadiusYards": row.get("spreadRadiusYards", GLOOMBOMB_RADIUS_YARDS),
             "tooClosePairs": too_close,
@@ -3186,6 +4497,7 @@ def build_field_audit(
                 f"过近组合 {len(too_close)}；"
                 f"误伤墓缚 {row.get('collateralCount', len(collateral))}"
                 f"（分散半径 {row.get('spreadRadiusYards', GLOOMBOMB_RADIUS_YARDS)} 码）"
+                f"{shield_note}"
             ),
         })
     for row in (soul_sever.get("rounds") or []):
@@ -3210,7 +4522,8 @@ def build_field_audit(
         "icons": dict(FIELD_ICONS),
         "diagrams": diagrams,
         "evidenceNote": (
-            f"场地中心固定为坐标 ({ARENA_CENTER_X_UNITS:g}, {ARENA_CENTER_Y_UNITS:g})，"
+            f"场地中心 ({ARENA_CENTER_X_UNITS:g}, {ARENA_CENTER_Y_UNITS:g}) 码，石台边长 {int(ARENA_SIDE_YARDS)} 码（WCL 坐标=码×100）。"
+            f"史诗烈毒变异体最终落点按 {VIRULENT_BLAST_RADIUS_YARDS:g} 码紫圈绘制引爆范围。"
         ),
     }
 
@@ -3238,7 +4551,9 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     raw["deaths"] = deaths
     actor_catalog = build_actor_catalog(actor_rows)
     manifest_ids = manifest_actor_ids(actor_rows)
-    npc_position_events = _npc_position_events(raw, manifest_ids) if field_enabled else []
+    mutation_ids = virulent_mutation_actor_ids(actor_rows)
+    soulcoiler_ids = soulcoiler_actor_ids(actor_rows)
+    npc_position_events = _npc_position_events(raw, set(manifest_ids) | set(mutation_ids) | set(soulcoiler_ids)) if field_enabled else []
     npc_position_index = build_npc_position_index(npc_position_events) if field_enabled else {}
     zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
     malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
@@ -3316,6 +4631,9 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     gloombomb = analyze_gloombomb(
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         origin_index=caster_index, boss_actor_id=malacrass_id,
+        npc_position_index=npc_position_index, actor_rows=actor_rows,
+        enemy_buffs=raw.get("enemyBuffs") or [], interrupts=raw.get("interrupts") or [],
+        enemy_deaths=enemy_deaths, damage_events=list(raw.get("damage") or []),
     ) if options["gloombombReviewEnabled"] else {}
     gravebound = analyze_gravebound_failures(
         fight, raw["debuffs"], deaths, actor_map, players,
@@ -3363,6 +4681,14 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         "npcCatalog": {
             "manifestNpcGameID": MANIFEST_NPC_GAME_ID,
             "manifestActors": actor_catalog["byGameID"].get(MANIFEST_NPC_GAME_ID, []),
+            "soulcoilerNpcGameID": SOULCOILER_NPC_GAME_ID,
+            "soulcoilerActors": actor_catalog["byGameID"].get(SOULCOILER_NPC_GAME_ID, []),
+            "soulcoilerActorIDs": sorted(soulcoiler_ids),
+            "soulcoilerPositionSampleKeys": sorted(
+                f"{actor_id}:{instance}"
+                for actor_id, instance in npc_position_index
+                if actor_id in soulcoiler_ids
+            ),
             "positionEventCount": len(npc_position_events),
             "positionSampleKeys": sorted(
                 {f"{actor_id}:{instance}" for actor_id, instance in npc_position_index}
@@ -3381,8 +4707,10 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
     malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
     manifest_ids = set(manifest_actor_ids(actor_rows))
+    mutation_ids = set(virulent_mutation_actor_ids(actor_rows))
+    soulcoiler_ids = set(soulcoiler_actor_ids(actor_rows))
     boss_ids = {actor_id for actor_id in (zuljan_id, malacrass_id) if actor_id is not None}
-    npc_filter = _npc_position_filter_expression(manifest_ids | boss_ids)
+    npc_filter = _npc_position_filter_expression(manifest_ids | boss_ids | mutation_ids | soulcoiler_ids)
     npc_position_events = []
     if field_enabled and npc_filter:
         npc_position_events.extend(client.events(
@@ -3394,6 +4722,8 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         ))
     if needs["manifestationsReviewEnabled"]:
         npc_position_events.extend(_fetch_manifest_position_events(client, report_id, fight, manifest_ids))
+    if field_enabled and soulcoiler_ids:
+        npc_position_events.extend(_fetch_manifest_position_events(client, report_id, fight, soulcoiler_ids))
     boss_damage = []
     if intermission_enabled and zuljan_id is not None:
         boss_damage = client.events(report_id, "DamageDone", fight, target_id=zuljan_id)
@@ -3407,7 +4737,11 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         ),
         "damage": _fetch_by_abilities(
             client, report_id, "DamageTaken", fight, MECHANIC_DAMAGE_IDS, include_resources=field_enabled,
-        ) if any(options[key] for key in ("toxicDelugeReviewEnabled", "dreadmarchReviewEnabled", "guillotineReviewEnabled", "grimGuillotineReviewEnabled", "graveboundReviewEnabled", "intermissionReviewEnabled")) or needs["toxicDelugeReviewEnabled"] else [],
+        ) if field_enabled or any(options[key] for key in (
+            "toxicDelugeReviewEnabled", "dreadmarchReviewEnabled", "guillotineReviewEnabled",
+            "grimGuillotineReviewEnabled", "graveboundReviewEnabled", "intermissionReviewEnabled",
+            "gloombombReviewEnabled",
+        )) else [],
         "heals": _fetch_by_abilities(client, report_id, "Healing", fight, {RECLAIM_ESSENCE}) if intermission_enabled else [],
         "debuffs": _fetch_by_abilities(
             client, report_id, "Debuffs", fight, MECHANIC_DEBUFF_IDS, include_resources=field_enabled,
@@ -3417,12 +4751,13 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         ) if intermission_enabled else [],
         "enemyBuffs": _fetch_by_abilities(
             client, report_id, "Buffs", fight, MECHANIC_ENEMY_BUFF_IDS, hostility_type="Enemies",
+            include_resources=field_enabled,
         ),
         "deaths": client.events(report_id, "Deaths", fight),
         "enemyDeaths": client.events(report_id, "Deaths", fight, hostility_type="Enemies"),
         "combatants": client.events(report_id, "CombatantInfo", fight),
         "resources": client.events(report_id, "Resources", fight, include_resources=True) if field_enabled else [],
-        "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Friendlies") if phase_enabled else [],
+        "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Friendlies") if phase_enabled or options["gloombombReviewEnabled"] else [],
         "npcPositionEvents": npc_position_events,
         "bossDamage": boss_damage,
         "analysisOptions": options,
@@ -3450,7 +4785,7 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
         "duration": fmt_ms(duration_ms),
         "wipePhase": end_phase,
         "wipeReason": "已击杀" if fight.get("kill") else f"灭团于{end_phase}",
-        "investigation": "凝结毒液、恐惧行军、锥形清场、幽暗炸弹分散与转阶段残片均已按阶段对齐。",
+        "investigation": "阶段以 WCL 报告 phaseTransitions 为准；凝结毒液、恐惧行军、锥形清场、幽暗炸弹分散与转阶段残片均已按阶段对齐。",
         "phaseTimeline": mechanics["phaseTimeline"],
         "wclDeepLink": f"https://www.warcraftlogs.com/reports/{report_id}#fight={fight['id']}&type=summary",
         "players": list(players.values()),
@@ -3607,10 +4942,15 @@ def build_aggregated_json(report_ids, options=None):
     progress("读取盘卷祭坛 Pull 列表", 8)
     for report_id in report_id_list:
         report = client.report_fights(report_id)
+        phase_metadata = encounter_phase_metadata(report, ENCOUNTER_IDS)
         fights = filter_fights(
             report_id,
             [
-                fight for fight in report["fights"]
+                {
+                    **fight,
+                    "wclPhaseMetadata": phase_metadata,
+                }
+                for fight in report["fights"]
                 if int(fight.get("encounterID") or 0) in ENCOUNTER_IDS
                 and fight["endTime"] - fight["startTime"] >= 20_000
             ],
@@ -3656,11 +4996,11 @@ def build_aggregated_json(report_ids, options=None):
             "evidenceLimits": {
                 "positions": (
                     f"示意图把坐标 ({ARENA_CENTER_X_UNITS:g}, {ARENA_CENTER_Y_UNITS:g}) 映射为 "
-                    f"边长约 {int(ARENA_SIDE_UNITS)} 单位（≈{int(ARENA_SIDE_YARDS)} 码）正方形场地中心；"
+                    f"边长 {int(ARENA_SIDE_YARDS)} 码正方形（WCL 坐标=码×100），"
                     "示意图含撕裂锥形、处斩/冷酷处斩跑离、幽暗炸弹分散；"
                     "撕裂圆心优先取施法 sourceResources，朝向按坦克易伤 debuff / 读条末秒位置锁定；"
                     "剧毒洪流落点按落地/拾取状态机追踪（支持多次接力），场上毒液优先 1282408 源坐标；"
-                    "P2 以祖尔加死亡或玛拉卡斯出现为准。"
+                    "阶段优先使用 WCL phaseTransitions；没有阶段数据时再按祖尔加死亡或玛拉卡斯出现推断 P2。"
                 ),
                 "manifestNpc": (
                     f"恐惧具象实例通过 debuff {FIXATION} 的 sourceID/sourceInstance 与 NPC gameID {MANIFEST_NPC_GAME_ID} 对齐；"

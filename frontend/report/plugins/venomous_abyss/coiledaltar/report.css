@@ -107,6 +107,22 @@
 }
 .marker.venom { background: #66d68a; }
 .marker.venom-spawn { background: #2dd4bf; border-color: #99f6e4; }
+.marker.virulent-mutation { background: #a855f7; border-color: #e9d5ff; }
+.marker.virulent-mutation-spawn { background: #7c3aed; border-color: #d8b4fe; }
+.marker.soulcoiler {
+  width: 16px;
+  height: 16px;
+  background: #f59e0b;
+  border-color: #fde68a;
+  z-index: 6;
+}
+.marker.soulcoiler-prev {
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: 2px dashed #fbbf24;
+  z-index: 4;
+}
 .marker.manifest { background: #c084fc; border-color: #e9d5ff; width: 14px; height: 14px; }
 .marker.manifest-target { background: #fb7185; border-color: #fecdd3; }
 .marker.spec-token {
@@ -145,6 +161,22 @@
   width: 20px;
   height: 20px;
   border-color: #99f6e4;
+}
+.marker.spec-token.virulent-mutation,
+.marker.spec-token.virulent-mutation-spawn {
+  width: 22px;
+  height: 22px;
+  border-color: #c084fc;
+  box-shadow: 0 0 0 2px #7c3aed99;
+}
+.mutation-blast {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: 2px solid #c084fc;
+  background: #a855f733;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 2;
 }
 .player-tip {
   display: none;
@@ -207,6 +239,11 @@
   stroke: #ff4d6d;
   stroke-width: 0.45;
   stroke-opacity: 0.95;
+}
+.link-map line.interrupt-move {
+  stroke: #fbbf24;
+  stroke-width: 0.55;
+  stroke-dasharray: 1.2 0.8;
 }
 .legend {
   margin: 8px 0 0;

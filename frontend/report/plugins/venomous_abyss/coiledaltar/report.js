@@ -81,9 +81,12 @@ function renderGuillotineTable(title, data) {
   const insideCol = isGrim ? "死亡之拥（仍在圈内）" : "寡妇之吻（仍在圈内）";
   return `<section class="panel" data-analysis-option="${title === "冷酷处斩" ? "grimGuillotineReviewEnabled" : "guillotineReviewEnabled"}"><h2>${esc(title)}</h2><p class="muted">${esc(evidence)}</p>${table(["轮次", "时间", "分摊人数", "参与者", insideCol], rounds.map((row) => [`#${row.index}`, esc(row.time), row.participantCount, players(row.participants), players(stillInsideRows(row).map((p) => ({ player: p.player, classColor: p.classColor })))]))}</section>`;
 }
-function renderGloombomb(data) {
-  const rounds = data?.rounds || [];
+function renderGloombomb(data, phase) {
+  const rounds = phase ? phaseRows(data?.rounds, phase, "p2") : (data?.rounds || []);
   const splashRows = [];
+  const shieldRows = [];
+  const missRows = [];
+  const showShield = Boolean(data?.hasSoulcoilerShield) || rounds.some((row) => (row.soulcoilers || []).length);
   (rounds || []).forEach((row) => {
     (row.collateralHits || []).forEach((hit) => {
       splashRows.push([
@@ -94,8 +97,50 @@ function renderGloombomb(data) {
         `<span class="badge bad">墓缚 ${esc(hit.graveboundApplyTime || "")}</span>`,
       ]);
     });
+    (row.soulcoilers || []).forEach((coiler) => {
+      const hitPlayers = (coiler.hits || []).filter((hit) => hit.hit).map((hit) => hit.player).join("、") || "—";
+      shieldRows.push([
+        `#${row.index}`,
+        esc(coiler.name || "怨毒盘魂者"),
+        coiler.sourceInstance ?? "—",
+        coiler.shieldStacks == null ? "—" : `${coiler.shieldStacks} / ${coiler.bombsRequired || 2}`,
+        `${coiler.bombHits ?? 0}`,
+        hitPlayers,
+        coiler.interrupted
+          ? `<span class="badge warn">${player(coiler.interruptPlayer || { player: "打断" })} ${esc(coiler.interruptTime || "")}${coiler.relocateYards != null ? `，位移 ${coiler.relocateYards}码` : ""}</span>`
+          : "—",
+        coiler.displacedMiss ? '<span class="badge bad">打断炸空</span>' : (coiler.bombHits >= (coiler.bombsRequired || 2) ? '<span class="badge good">够两枚</span>' : '<span class="badge warn">不足两枚</span>'),
+      ]);
+    });
+    (row.displacedMisses || []).forEach((hit) => {
+      missRows.push([
+        `#${row.index}`,
+        player(hit),
+        esc(hit.soulcoilerInstance ?? "—"),
+        hit.distanceYards == null ? "—" : `${hit.distanceYards}码`,
+        player(hit.interruptPlayer || { player: "—" }),
+        esc(hit.interruptTime || "—"),
+        hit.relocateYards == null ? "—" : `${hit.relocateYards}码`,
+      ]);
+    });
   });
-  return `<section class="panel" data-analysis-option="gloombombReviewEnabled"><h2>幽暗炸弹分散</h2><p class="muted">${esc(data?.evidenceNote || "只列出爆炸时 15 码内、且 2 秒内获得墓缚 1286837 的非点名玩家。")}</p>${table(["轮次", "时间", "点名数", "点名过近", "误伤墓缚"], rounds.map((row) => [`#${row.index}`, esc(row.time), row.targetCount, (row.tooClosePairs || []).map((pair) => `${esc(pair.left)}↔${esc(pair.right)} ${pair.distanceYards}码`).join("；") || "—", row.collateralCount ?? (row.collateralHits || []).length]))}${splashRows.length ? `<h3>圈内误伤墓缚</h3>${table(["轮次", "点名", "误伤玩家", "距离", "墓缚"], splashRows)}` : '<div class="empty">本场没有圈内误伤墓缚。</div>'}</section>`;
+  const headers = showShield
+    ? ["轮次", "时间", "点名数", "点名过近", "误伤墓缚", "盘魂者", "打断炸空"]
+    : ["轮次", "时间", "点名数", "点名过近", "误伤墓缚"];
+  const roundTable = table(headers, rounds.map((row) => {
+    const base = [`#${row.index}`, esc(row.time), row.targetCount, (row.tooClosePairs || []).map((pair) => `${esc(pair.left)}↔${esc(pair.right)} ${pair.distanceYards}码`).join("；") || "—", row.collateralCount ?? (row.collateralHits || []).length];
+    if (!showShield) return base;
+    base.push(row.soulcoilerCount ?? (row.soulcoilers || []).length);
+    base.push(row.displacedMissCount ? `<span class="badge bad">${row.displacedMissCount}</span>` : "0");
+    return base;
+  }));
+  const shieldTable = showShield && shieldRows.length
+    ? `<h3>${spellLink(1309105, "灵魂之盾")} / ${spellLink(1310881, "幽暗炸弹")}</h3><p class="muted">每轮只标两只怨毒盘魂者。拆盾需要两名点名玩家在 15 码内爆炸。</p>${table(["轮次", "盘魂者", "实例", "炸时盾层", "命中炸弹", "命中玩家", "打断", "结果"], shieldRows)}`
+    : "";
+  const missTable = missRows.length
+    ? `<h3>打断导致炸空</h3>${table(["轮次", "炸弹玩家", "盘魂者实例", "爆炸时距离", "打断者", "打断时间", "位移"], missRows)}`
+    : "";
+  return `<section class="panel" data-analysis-option="gloombombReviewEnabled"><h2>幽暗炸弹${showShield ? "与灵魂之盾" : "分散"}</h2><p class="muted">${esc(data?.evidenceNote || "只列出爆炸时 15 码内、且 2 秒内获得墓缚 1286837 的非点名玩家。")}</p>${roundTable}${shieldTable}${missTable}${splashRows.length ? `<h3>圈内误伤墓缚</h3>${table(["轮次", "点名", "误伤玩家", "距离", "墓缚"], splashRows)}` : '<div class="empty">本场没有圈内误伤墓缚。</div>'}</section>`;
 }
 function phaseKey(row) { return String(row?.phase || "").toLowerCase(); }
 function withPhaseRounds(data, phase, untaggedPhase = "p2") {
@@ -119,9 +164,26 @@ function venomRoundsForPhase(rounds, phase) {
     return [{ ...round, index: round.index, time: carriers[0]?.applyTime || carriers[0]?.removeTime || round.time, carriers }];
   });
 }
+function venomKindBadge(row) {
+  if ((row?.venomKind || row?.kind) === "virulent-mutation" || String(row?.kind || "").includes("virulent")) {
+    return `<span class="badge warn">${spellLink(1310544, "烈毒变异体")}</span>`;
+  }
+  return `<span class="badge">${spellLink(1282403, "凝结毒液")}</span>`;
+}
 function renderToxicDeluge(rounds) {
-  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index}，${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(["玩家", "拾起", "掉落", "持有时长", "落点"], (round.carriers || []).map((row) => [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)]))}</article>`).join("");
-  return `<section class="panel" data-analysis-option="toxicDelugeReviewEnabled"><h2>剧毒洪流，凝结毒液搬运</h2><div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
+  const showKind = (rounds || []).some((round) =>
+    (round.carriers || []).some((row) => row.venomKind === "virulent-mutation")
+    || (round.spawns || []).some((row) => row.venomKind === "virulent-mutation")
+    || Number(round.mutationSpawnCount || 0)
+  );
+  const headers = showKind
+    ? ["类型", "玩家", "拾起", "掉落", "持有时长", "落点"]
+    : ["玩家", "拾起", "掉落", "持有时长", "落点"];
+  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index}，${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(headers, (round.carriers || []).map((row) => {
+    const cells = [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)];
+    return showKind ? [venomKindBadge(row), ...cells] : cells;
+  }))}</article>`).join("");
+  return `<section class="panel" data-analysis-option="toxicDelugeReviewEnabled"><h2>剧毒洪流，凝结毒液与烈毒变异体</h2><div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
 }
 function renderManifestations(fixations) {
   return `<section class="panel" data-analysis-option="manifestationsReviewEnabled"><h2>恐惧具象 / 凝视</h2><p class="muted">具象坐标为恐惧具象 NPC；玩家坐标为被凝视者。</p>${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section>`;
@@ -152,7 +214,7 @@ function renderP2() {
     if (showResonance) base.push(row.manifestCollisionDebuff ? "是" : "否");
     return base;
   });
-  return `<section class="panel" data-analysis-option="dreadmarchReviewEnabled"><h2>恐惧行军</h2><p class="muted">救援以被控 debuff（1297445）移除为准。首次救人后至下一轮释放前再次被心控，记为撞到恐惧具象（可结合凝视变化${showResonance ? "；史诗另用恶毒共鸣印证" : ""}）。</p><p class="muted">${esc(data.dreadmarch?.evidenceNote || "")}</p>${table(["轮次", "时间", "点名人数", "成功救人", "失败", "撞具象"], (data.dreadmarch?.rounds || []).map((row) => [`#${row.index}${row.unassigned ? "（未对齐轮次）" : ""}`, esc(row.time), row.targetCount, row.rescuedCount, row.failedCount, row.manifestCollisionCount ?? 0]))}${table(["玩家", "轮次", "拾起", "解除", "来源", "结果"], (data.dreadmarch?.applications || []).map((row) => [player(row), row.roundIndex ?? "—", esc(row.appliedTime), esc(row.removedTime || "—"), collisionBadge(row), row.rescued ? '<span class="badge good">救出</span>' : row.diedWhileControlled ? '<span class="badge bad">控中死亡</span>' : '<span class="badge bad">未解除</span>']))}<h3>撞具象触发的恐惧行军</h3>${(data.dreadmarch?.manifestCollisions || []).length ? table(collisionHeaders, collisionRows) : '<div class="empty">本场没有记录到救人后的二次心控。</div>'}</section>${renderManifestations(phaseRows(data.manifestations?.fixations, "p2"))}<section class="panel" data-analysis-option="soulSeverReviewEnabled"><h2>灵魂撕裂</h2><p class="muted">具象取释放前位置；清掉=释放后短窗口内凝视移除；红线对应未消掉。</p>${table(["轮次", "时间", "释放前具象", "锥内", "debuff 清掉", "未消掉", "add 死亡"], (data.soulSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), (row.nearbyPoints || []).length, row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.addDeathSignals]))}</section>${renderGloombomb(data.gloombomb)}<section class="panel" data-analysis-option="graveboundReviewEnabled"><h2>墓缚伤害致死</h2><p class="muted">只统计 1297906 直接致死；1286837 / 1308330 以及其他技能致死不计入。死亡时是否仍带墓缚仅作标注。</p>${table(["时间", "玩家", "致死技能", "当时带墓缚"], (data.graveboundFailures?.failures || []).map((row) => [esc(row.time), player(row), spellLink(row.deathAbilityID, row.deathAbility), row.graveboundActive ? '<span class="badge bad">是</span>' : '<span class="badge">否</span>']))}</section>${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p2"))}`;
+  return `<section class="panel" data-analysis-option="dreadmarchReviewEnabled"><h2>恐惧行军</h2><p class="muted">救援以被控 debuff（1297445）移除为准。首次救人后至下一轮释放前再次被心控，记为撞到恐惧具象（可结合凝视变化${showResonance ? "；史诗另用恶毒共鸣印证" : ""}）。</p><p class="muted">${esc(data.dreadmarch?.evidenceNote || "")}</p>${table(["轮次", "时间", "点名人数", "成功救人", "失败", "撞具象"], (data.dreadmarch?.rounds || []).map((row) => [`#${row.index}${row.unassigned ? "（未对齐轮次）" : ""}`, esc(row.time), row.targetCount, row.rescuedCount, row.failedCount, row.manifestCollisionCount ?? 0]))}${table(["玩家", "轮次", "拾起", "解除", "来源", "结果"], (data.dreadmarch?.applications || []).map((row) => [player(row), row.roundIndex ?? "—", esc(row.appliedTime), esc(row.removedTime || "—"), collisionBadge(row), row.rescued ? '<span class="badge good">救出</span>' : row.diedWhileControlled ? '<span class="badge bad">控中死亡</span>' : '<span class="badge bad">未解除</span>']))}<h3>撞具象触发的恐惧行军</h3>${(data.dreadmarch?.manifestCollisions || []).length ? table(collisionHeaders, collisionRows) : '<div class="empty">本场没有记录到救人后的二次心控。</div>'}</section>${renderManifestations(phaseRows(data.manifestations?.fixations, "p2"))}<section class="panel" data-analysis-option="soulSeverReviewEnabled"><h2>灵魂撕裂</h2><p class="muted">具象取释放前位置；清掉=释放后短窗口内凝视移除；红线对应未消掉。</p>${table(["轮次", "时间", "释放前具象", "锥内", "debuff 清掉", "未消掉", "add 死亡"], (data.soulSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), (row.nearbyPoints || []).length, row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.addDeathSignals]))}</section>${renderGloombomb(data.gloombomb, "p2")}<section class="panel" data-analysis-option="graveboundReviewEnabled"><h2>墓缚伤害致死</h2><p class="muted">只统计 1297906 直接致死；1286837 / 1308330 以及其他技能致死不计入。死亡时是否仍带墓缚仅作标注。</p>${table(["时间", "玩家", "致死技能", "当时带墓缚"], (data.graveboundFailures?.failures || []).map((row) => [esc(row.time), player(row), spellLink(row.deathAbilityID, row.deathAbility), row.graveboundActive ? '<span class="badge bad">是</span>' : '<span class="badge">否</span>']))}</section>${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p2"))}`;
 }
 function renderIntermission() {
   const data = boss().intermission || {};
@@ -165,7 +227,7 @@ function renderIntermission() {
     : '<span class="badge warn">未使用</span>';
   return `<section class="panel"><h2>被夺取的容器</h2><p class="muted">开始 ${esc(data.startTime)}，持续 ${esc(data.duration)}，漏掉灵魂 <b>${leakCount}</b>（收回精华 1287718），踩片 <b>${stepCount}</b></p><p class="muted">${esc(data.evidenceNote || "漏掉的灵魂=残片抵达祖尔加时的收回精华次数。灵魂抹除按全团脉冲合并，列出触发的友方。")}</p><h3>漏掉的灵魂（收回精华）</h3>${(data.leakedFragments || []).length ? table(["时间", "来源", "治疗量"], (data.leakedFragments || []).map((row) => [esc(row.time), esc(row.source || row.target || "—"), row.amount == null ? "—" : Number(row.amount).toLocaleString()])) : '<div class="empty">本场转阶段没有记录到收回精华，漏片为 0。</div>'}<h3>踩片（灵魂抹除）</h3>${(data.spiritErasureSteps || []).length ? table(["时间", "踩片玩家", "全团命中"], (data.spiritErasureSteps || []).map((row) => [esc(row.time), stepPlayer(row), row.hitCount ?? "—"])) : '<div class="empty">本场转阶段没有灵魂抹除脉冲。</div>'}<h3>爆发药水与对祖尔加伤害</h3><p class="muted">转阶段开始时存活的非治疗（含战复） ${data.survivorCount ?? (data.survivors || []).length} 人，已用爆发药水 ${data.potionUsedCount ?? 0}，对祖尔加合计 ${num(data.zuljanDamageTotal)}</p>${table(["玩家", "爆发药水", "使用时间", "对祖尔加伤害", "占比"], (data.survivors || []).filter((row) => !String(row.role || "").includes("healer")).map((row) => [player(row), potionBadge(row), esc(row.potionTime || "—"), num(row.zuljanDamage), row.zuljanPercent == null ? "—" : `${row.zuljanPercent}%`]))}</section>`;
 }
-function renderP3() { const data = boss(); return `<section class="panel" data-analysis-option="blightedSeverReviewEnabled"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (data.blightedSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p3"))}${renderManifestations(phaseRows(data.manifestations?.fixations, "p3"))}${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p3"))}`; }
+function renderP3() { const data = boss(); return `<section class="panel" data-analysis-option="blightedSeverReviewEnabled"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (data.blightedSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}${renderGloombomb(data.gloombomb, "p3")}${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p3"))}${renderManifestations(phaseRows(data.manifestations?.fixations, "p3"))}${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p3"))}`; }
 function diagramHasContent(diagram) {
   if (!diagram) return false;
   if ((diagram.targets || []).some((row) => row.position || row.manifestPosition || row.playerPosition)) return true;
@@ -184,7 +246,7 @@ function renderLinkOverlay(links, arena) {
     const from = pct(row.from, arena);
     const to = pct(row.to, arena);
     if (!from || !to) return "";
-    return `<line x1="${from.left}" y1="${from.top}" x2="${to.left}" y2="${to.top}"></line>`;
+    return `<line class="${esc(row.kind || "fixation")}" x1="${from.left}" y1="${from.top}" x2="${to.left}" y2="${to.top}"></line>`;
   }).filter(Boolean);
   if (!segments.length) return "";
   return `<svg class="link-map" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${segments.join("")}</svg>`;
@@ -242,7 +304,9 @@ function bossIconName(diagram) {
 function npcIconUrl(cls) {
   const icons = fieldIcons();
   if (cls === "manifest") return icons.manifestation || "";
-  if (cls === "venom" || cls === "venom-spawn") return icons.poisonOrb || "";
+  if (["venom", "venom-spawn", "virulent-mutation", "virulent-mutation-spawn", "ground-venom", "dropped-venom"].includes(cls)) {
+    return icons.poisonOrb || "";
+  }
   return "";
 }
 function assetFace(url, alt) {
@@ -284,7 +348,7 @@ function playerTokenExtra(cls, row) {
   return "";
 }
 function isPlayerToken(row, cls) {
-  if (["manifest", "venom", "venom-spawn"].includes(cls)) return false;
+  if (["manifest", "venom", "venom-spawn", "virulent-mutation", "virulent-mutation-spawn", "ground-venom", "dropped-venom", "soulcoiler", "soulcoiler-prev"].includes(cls)) return false;
   if (cls === "tank" && !row?.playerID && !row?.icon) return false;
   return Boolean(row && (row.playerID || row.icon || ["manifest-target", "bomb", "bomb-splash", "bomb-nearby", "share", "inside"].includes(cls)));
 }
@@ -310,7 +374,7 @@ function fieldMap(data, diagram) {
   if (!arena || !diagram) return '<div class="empty">缺少场地示意图数据。</div>';
   const bg = data.arenaImage || state.payload?.meta?.arenaImage;
   const squareW = Number(arena.plotScaleX || 25.9389) * 2, squareH = Number(arena.plotScaleY || 46.3327) * 2;
-  const square = `<span class="arena-square" title="${Number(arena.sideUnits || arena.sideYards || 110)} 单位 / ${Number(arena.sideYards || 86)} 码正方形场地" style="width:${squareW}%;height:${squareH}%"></span>`;
+  const square = `<span class="arena-square" title="${Number(arena.sideYards || 110)} 码正方形场地" style="width:${squareW}%;height:${squareH}%"></span>`;
   const bossDot = diagram.kind === "cone-clear" ? "" : (() => {
     const pos = diagram.bossPosition;
     const p = pct(pos, arena);
@@ -320,7 +384,9 @@ function fieldMap(data, diagram) {
     const position = row.kind === "manifestation" ? (row.manifestPosition || row.position) : (row.position || row.manifestPosition);
     const p = pct(position, arena);
     if (!p) return "";
-    const cls = diagram.mechanic?.includes("炸弹")
+    const cls = row.kind === "soulcoiler" || row.kind === "soulcoiler-prev"
+      ? row.kind
+      : diagram.mechanic?.includes("炸弹")
       ? (row.kind === "bomb-splash" ? "bomb-splash" : row.kind === "bomb-nearby" ? "bomb-nearby" : "bomb")
       : row.kind === "tank"
         ? "tank"
@@ -334,18 +400,28 @@ function fieldMap(data, diagram) {
                 ? "manifest-target"
                 : row.kind === "venom-spawn"
                   ? "venom-spawn"
-                  : row.kind === "ground-venom" || row.kind === "dropped-venom"
-                    ? "venom"
-                    : "venom";
+                  : row.kind === "virulent-mutation-spawn"
+                    ? "virulent-mutation-spawn"
+                    : row.kind === "virulent-mutation" || row.venomKind === "virulent-mutation"
+                      ? "virulent-mutation"
+                      : row.kind === "ground-venom" || row.kind === "dropped-venom"
+                        ? "venom"
+                        : "venom";
     const label = row.kind === "manifestation"
       ? `恐惧具象，${row.player || ""}`
       : row.kind === "manifest-target"
         ? `被点名，${row.player || ""}`
-        : (row.player || row.carrier || row.kind || "");
+        : row.venomKind === "virulent-mutation" || String(row.kind || "").includes("virulent")
+          ? `烈毒变异体，${row.player || ""}`
+          : row.kind === "soulcoiler"
+            ? `${row.player || "怨毒盘魂者"}，盾 ${row.shieldStacks ?? "?"}，命中 ${row.bombHits ?? 0}${row.displacedMiss ? "，打断炸空" : ""}`
+            : row.kind === "soulcoiler-prev"
+              ? "怨毒盘魂者打断前位置"
+              : (row.player || row.carrier || row.kind || "");
     return fieldMarker(row, p, cls, label);
   }).join("");
   const links = renderLinkOverlay(diagram.links, arena);
-  const spread = diagram.kind === "spread" ? (diagram.targets || []).map((row) => {
+  const spread = diagram.kind === "spread" ? (diagram.targets || []).filter((row) => row.kind !== "soulcoiler" && row.kind !== "soulcoiler-prev").map((row) => {
     const p = pct(row.position, arena);
     const size = pctSize(diagram.spreadRadiusYards || 15, arena);
     return p ? `<span class="spread-target" style="left:${p.left}%;top:${p.top}%;width:${size.width * 2}%;height:${size.height * 2}%"></span>` : "";
@@ -359,6 +435,12 @@ function fieldMap(data, diagram) {
     ? rangeCircle(diagram.origin, diagram.dangerRadiusYards || 40, arena, "runout-range", `${diagram.dangerRadiusYards || 40} 码跑离圈`)
     : "";
   const cone = diagram.kind === "cone-clear" && diagram.origin ? renderConeOverlay(diagram, arena) : "";
+  const mutationBlast = (diagram.targets || []).map((row) => {
+    const yards = Number(row.blastRadiusYards || 0);
+    if (!yards) return "";
+    const position = row.position || row.manifestPosition;
+    return rangeCircle(position, yards, arena, "mutation-blast", `烈毒变异体引爆 ${yards} 码`);
+  }).join("");
   const legend = diagram.facingInferred
     ? '<p class="legend warn">锥形朝向为估算值，仅供示意。</p>'
     : diagram.facingRule === "tank-debuff"
@@ -372,10 +454,15 @@ function fieldMap(data, diagram) {
       ? '<p class="legend">本轮凝视均已清掉或缺少坐标，无红线。</p>'
       : "";
   const nearbyLegend = diagram.kind === "spread"
-    ? '<p class="legend">黄圈=点名爆炸 15 码；圆形专精图标=点名玩家 / 误伤墓缚（悬停查看信息）。</p>'
+    ? (diagram.targets || []).some((row) => row.kind === "soulcoiler")
+      ? '<p class="legend">黄圈=幽暗炸弹 15 码；橙点=本轮两只怨毒盘魂者（爆炸时刻）。</p>'
+      : '<p class="legend">黄圈=点名爆炸 15 码；圆形专精图标=点名玩家 / 误伤墓缚（悬停查看信息）。</p>'
     : "";
-  const empty = !markers && !spread && !nearbyActors && !cone && !runout ? '<p class="legend">该轮次缺少可绘制的坐标样本。</p>' : "";
-  return `<div class="replay-map" style="background-image:url('${esc(bg)}')">${square}${bossDot}${cone}${links}${spread}${nearbyActors}${runout}${markers}</div>${legend}${linkLegend}${nearbyLegend}${empty}<p class="muted">${esc(diagram.annotation || diagram.mechanic || "")}</p>`;
+  const venomLegend = (diagram.targets || []).some((row) => Number(row.blastRadiusYards || 0) || row.venomKind === "virulent-mutation" || String(row.kind || "").includes("virulent"))
+    ? '<p class="legend">绿边=凝结毒液；紫边=烈毒变异体；紫圈=最终落点 8 码引爆范围。</p>'
+    : "";
+  const empty = !markers && !spread && !nearbyActors && !cone && !runout && !mutationBlast ? '<p class="legend">该轮次缺少可绘制的坐标样本。</p>' : "";
+  return `<div class="replay-map" style="background-image:url('${esc(bg)}')">${square}${bossDot}${cone}${links}${spread}${nearbyActors}${runout}${mutationBlast}${markers}</div>${legend}${linkLegend}${nearbyLegend}${venomLegend}${empty}<p class="muted">${esc(diagram.annotation || diagram.mechanic || "")}</p>`;
 }
 function fieldMechanicGroups(diagrams) {
   const groups = [];

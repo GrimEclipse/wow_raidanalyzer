@@ -118,11 +118,34 @@ class WclClient:
         query($code: String!) {
           reportData { report(code: $code) {
             title startTime
-            fights { id name encounterID difficulty kill startTime endTime bossPercentage fightPercentage }
+            fights {
+              id name encounterID difficulty kill startTime endTime
+              bossPercentage fightPercentage
+              lastPhase lastPhaseIsIntermission
+              phaseTransitions { id startTime }
+            }
+            phases {
+              encounterID
+              separatesWipes
+              phases { id name isIntermission }
+            }
           } }
         }
         """
-        return self.graphql(query, {"code": report_id})
+        try:
+            return self.graphql(query, {"code": report_id})
+        except RuntimeError:
+            return self.graphql(
+                """
+                query($code: String!) {
+                  reportData { report(code: $code) {
+                    title startTime
+                    fights { id name encounterID difficulty kill startTime endTime bossPercentage fightPercentage }
+                  } }
+                }
+                """,
+                {"code": report_id},
+            )
 
     def actors(self, report_id: str) -> list:
         def read(fields):
@@ -252,3 +275,21 @@ class WclClient:
         }
         """
         return self.graphql(query, {"code": report_id, "fightIDs": [fight_id]}).get("table") or {}
+
+
+def encounter_phase_metadata(report: dict, encounter_ids) -> list[dict]:
+    """WCL report.phases 里该首领的阶段定义（id / name / isIntermission）。"""
+    wanted = {int(encounter_id) for encounter_id in (encounter_ids or []) if encounter_id}
+    for document in report.get("phases") or []:
+        if int(document.get("encounterID") or 0) in wanted:
+            return list(document.get("phases") or [])
+    return []
+
+
+def fight_phase_start_ms(fight: dict, transition: dict) -> int:
+    """phaseTransitions.startTime 可能是报告绝对时间，也可能已是战斗内相对毫秒。"""
+    fight_start = int(fight.get("startTime") or 0)
+    raw = int(transition.get("startTime") or fight_start)
+    if raw >= fight_start:
+        return raw - fight_start
+    return raw
