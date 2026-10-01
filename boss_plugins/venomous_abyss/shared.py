@@ -376,7 +376,12 @@ def death_near(deaths, player_id, timestamp, window_ms=500):
 
 
 def event_point(event):
-    for node in (event, event.get("resources") or {}, event.get("sourceResources") or {}):
+    for node in (
+        event,
+        event.get("resources") or {},
+        event.get("targetResources") or {},
+        event.get("sourceResources") or {},
+    ):
         if not isinstance(node, dict):
             continue
         for x_key, y_key in (("x", "y"), ("positionX", "positionY"), ("X", "Y")):
