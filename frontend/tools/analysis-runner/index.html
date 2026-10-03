@@ -294,20 +294,41 @@ function renderConfig() {
                 if (!value[group.key]?.length) value[group.key] = group.migrateFrom.flatMap(key => value[key] || []);
                 group.migrateFrom.forEach(key => {value[key] = [];});
             }
+            const groups = field.groups || [];
+            const configured = groups.filter(group => !group.hidden && (value[group.key] || []).length).length;
             control = `
-                <div class="text-sm font-semibold text-gray-200">${label}</div>
+                <details ${configured ? 'open' : ''}>
+                <summary class="cursor-pointer text-sm font-semibold text-gray-200">${label} <span data-group-count class="text-xs font-normal text-gray-500">已填 ${configured}/${groups.filter(group => !group.hidden).length} 组</span></summary>
                 ${description}
                 <div class="mt-3 grid gap-3 md:grid-cols-2">
-                    ${(field.groups || []).map(group => `
+                    ${groups.map((group, index) => `
                         <label ${group.hidden ? 'hidden' : ''} class="${group.hidden ? 'hidden' : 'block'} rounded border border-gray-800 bg-gray-950 p-3">
                             <span class="text-xs font-bold text-gray-400">${escapeHtml(group.label)}</span>
                             <input data-group="${escapeHtml(group.key)}" value="${escapeHtml((value?.[group.key] || []).join(' '))}" class="${inputClass}" placeholder="${escapeHtml(group.placeholder || field.placeholder || '填写分配到该任务的角色名')}">
+                            ${field.copyPrevious && index && !group.hidden ? `<button type="button" data-copy-group="${escapeHtml(groups[index-1].key)}" class="mt-2 text-xs text-cyan-300">沿用上一轮</button>` : ''}
                         </label>
                     `).join('')}
                 </div>
+                </details>
             `;
         }
         wrapper.innerHTML = control;
+        if (field.type === 'interruptGroups') {
+            const updateCount = () => {
+                const inputs = [...wrapper.querySelectorAll('label:not([hidden]) input[data-group]')];
+                wrapper.querySelector('[data-group-count]').textContent = `已填 ${inputs.filter(input => splitList(input.value).length).length}/${inputs.length} 组`;
+            };
+            wrapper.addEventListener('input', updateCount);
+            wrapper.addEventListener('click', event => {
+                const button = event.target.closest('button[data-copy-group]');
+                if (!button) return;
+                const previous = [...wrapper.querySelectorAll('input[data-group]')].find(input => input.dataset.group === button.dataset.copyGroup);
+                const input = button.closest('label').querySelector('input[data-group]');
+                input.value = previous?.value || '';
+                input.dispatchEvent(new Event('change', {bubbles:true}));
+                updateCount();
+            });
+        }
         wrapper.querySelectorAll('input, textarea, select').forEach(input => {
             input.addEventListener('change', () => {
                 rememberConfigValue(field.key, readConfigField(wrapper));

@@ -57,7 +57,7 @@ BOSS_CONFIG = {
         ["crosswinds", "狂怒侧风"],
         ["fury", "毒蛇之怒"],
     ],
-    "mechanicVersion": "sszorak-mythic-fury-tactical-checkpoints-2026-09-18",
+    "mechanicVersion": "sszorak-mythic-cyst-backup-wind-cohort-2026-09-27",
     "features": {"survival": True, "fieldReplay": True},
     "bossGameID": 257347,
     "bossNameKeywords": ["Sszorak", "斯索拉克"],
@@ -118,7 +118,9 @@ CROSSWIND_COLLISION_WINDOW_MS = 120
 
 CROSSWIND_DAMAGE_IDS = {1285616, 1312219}
 
-CYST_WIND_EXCLUDE_BEFORE_MS = 300
+# Half a replay sample before activation; 300ms discarded the last clean
+# synchronized wind sample when a cyst was triggered between two frames.
+CYST_WIND_EXCLUDE_BEFORE_MS = 100
 
 CYST_WIND_EXCLUDE_AFTER_MS = 2_500
 
@@ -336,6 +338,8 @@ def _infer_wind_from_frames(frames, arena, excluded_timestamps=None):
         for left, right in zip(prev["players"], curr["players"]):
             if not left.get("position") or not right.get("position"):
                 continue
+            if left.get("positionReliable") is False or right.get("positionReliable") is False:
+                continue
             dx = right["position"]["x"] - left["position"]["x"]
             dy = right["position"]["y"] - left["position"]["y"]
             if math.hypot(dx, dy) >= WIND_STEP_DISPLACEMENT:
@@ -366,6 +370,8 @@ def _infer_wind_from_frames(frames, arena, excluded_timestamps=None):
     source_key, selected_steps = max(
         direction_steps.items(),
         key=lambda item: (
+            sum(sorted((len(step["selected"]) for step in item[1]), reverse=True)[:2]),
+            max(len(step["selected"]) for step in item[1]),
             len(item[1]),
             sum(len(step["selected"]) for step in item[1]),
             sum(math.hypot(row[0], row[1]) for step in item[1] for row in step["selected"]),
@@ -392,6 +398,7 @@ def _infer_wind_from_frames(frames, arena, excluded_timestamps=None):
         "directionVoteCount": len(selected),
         "directionVoteRatio": round(vote_ratio, 3),
         "directionConfidence": "high" if vote_ratio >= .6 and angle_delta <= 20 else "medium" if vote_ratio >= .4 else "low",
+        "selectionEvidence": "优先两帧最多玩家同步移动的方向，再比较持续帧；排除囊肿激活前100ms及后2500ms反弹窗口",
         "directionKey": direction["key"],
         "directionLabel": direction["label"],
         "sourceKey": source_key,
@@ -401,14 +408,14 @@ def _infer_wind_from_frames(frames, arena, excluded_timestamps=None):
         "lineKey": direction["lineKey"],
     }
 
-def _infer_dig_winds(frames, arena, segment_count=3, activation_rows=None):
+def _infer_dig_winds(frames, arena, segment_count=3, activation_rows=None, *, duration_ms=None):
     if not frames:
         return []
     activation_rows = activation_rows or []
     excluded_timestamps = [row["activatedTimestamp"] for row in activation_rows]
     start_ms = frames[0]["timeMs"]
     end_ms = frames[-1]["timeMs"]
-    span = max(end_ms - start_ms, 1)
+    span = max(duration_ms if duration_ms is not None else end_ms - start_ms, 1)
     winds = []
     for index in range(segment_count):
         seg_start = start_ms + int(span * index / segment_count)
@@ -432,12 +439,14 @@ def _infer_dig_winds(frames, arena, segment_count=3, activation_rows=None):
         winds.append(wind)
     return winds
 
-def _placement_slot_validation(placements, winds, expected_wind_count=3):
+def _placement_slot_validation(placements, winds, expected_wind_count=3, *, difficulty=None):
     rows = placements[:4]
     for index, row in enumerate(rows, start=1):
         row["slot"] = index
         row["windSideLabel"] = DIG_WIND_MARKERS.get(row.get("windSide"), {}).get("label")
         row["placementOk"] = None
+        row.pop("placementStatus", None)
+        row.pop("exemptionReason", None)
         row["expected"] = "风向待推断"
 
     valid_winds = [wind for wind in winds if wind]
@@ -481,6 +490,18 @@ def _placement_slot_validation(placements, winds, expected_wind_count=3):
                 else:
                     row["placementOk"] = None
                     row["placementStatus"] = "unverified"
+    if int(difficulty or 0) == 5:
+        for row in rows[2:]:
+            if row["slot"] == 4:
+                row["placementOk"] = None
+                row["placementStatus"] = "exempt"
+                row["exemptionReason"] = "史诗按插件固定分配，第四人没有补位义务，不按未补足风向归责"
+                row["expected"] = row["exemptionReason"]
+            elif row.get("placementOk") is False and any(prior.get("placementOk") is False for prior in rows[:2]):
+                row["placementOk"] = None
+                row["placementStatus"] = "exempt"
+                row["exemptionReason"] = "前序放置存在偏差，后续可能补位；无插件个人分配证据，不追加未补足责任"
+                row["expected"] = row["exemptionReason"]
     return placements
 
 def _sszorak_cysts(fight, actor_map, players, raw, position_index, arena):
@@ -1328,7 +1349,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
             position_index,
             players,
             timestamp,
-            wind_end,
+            min(wind_end, int(fight["endTime"])),
             step_ms=REPLAY_STEP_MS,
             death_times=death_times,
         )
@@ -1350,9 +1371,9 @@ def analyze_sszorak(fight, actor_map, players, raw):
             and timestamp <= fight["startTime"] + row["activatedAtMs"] <= wind_end
         ]
         winds = _infer_dig_winds(
-            wind_frames, arena, segment_count=3, activation_rows=activation_rows,
+            wind_frames, arena, segment_count=3, activation_rows=activation_rows, duration_ms=DIG_DURATION_MS,
         )
-        validated = _placement_slot_validation(placements, winds)
+        validated = _placement_slot_validation(placements, winds, difficulty=fight.get("difficulty"))
         cyst_rounds.append({
             "index": index,
             "time": fmt_ms(timestamp - fight["startTime"]),
@@ -1480,7 +1501,7 @@ def _mechanic_overview(rendered):
         "metrics": [
             {
                 "key": "badCystPlacements", "label": "囊肿放置错误", "value": len(bad_cysts), "unit": "次",
-                "tone": "danger", "description": "只统计已有坐标和风向证据、明确判定 placementOk=false 的放置。",
+                "tone": "danger", "description": "只统计明确错误放置；史诗第四人未补位豁免，前序放置有误时后续补位不重复归责。",
                 "players": nightly_player_totals(bad_cysts), "events": bad_cysts,
             },
             {

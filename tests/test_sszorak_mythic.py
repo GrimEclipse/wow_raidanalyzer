@@ -179,3 +179,63 @@ class SszorakMythicTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SszorakCystWindTests(unittest.TestCase):
+    def placements(self, sides):
+        return [dict(player=f'P{i}', windSide=side) for i, side in enumerate(sides, 1)]
+
+    def winds(self):
+        return [dict(targetKey=side) for side in ('skull', 'square', 'triangle')]
+
+    def test_mythic_fourth_is_exempt_and_third_helper_not_double_blamed(self):
+        rows = s._placement_slot_validation(self.placements(['skull','diamond','cross','cross']), self.winds(), difficulty=5)
+        self.assertFalse(rows[1]['placementOk'])
+        for row in rows[2:]:
+            self.assertIsNone(row['placementOk'])
+            self.assertEqual(row['placementStatus'], 'exempt')
+        rows = s._placement_slot_validation(self.placements(['skull','square','cross','cross']), self.winds(), difficulty=5)
+        self.assertFalse(rows[2]['placementOk'])
+        self.assertEqual(rows[3]['placementStatus'], 'exempt')
+
+    def test_heroic_fourth_keeps_coverage_validation(self):
+        rows = s._placement_slot_validation(self.placements(['skull','square','cross','cross']), self.winds(), difficulty=4)
+        self.assertFalse(rows[3]['placementOk'])
+        self.assertNotIn('exemptionReason', rows[3])
+
+    def frames(self):
+        import math
+        positions = [dict(x=0.,y=0.) for _ in range(12)]
+        frames = [dict(timeMs=0,players=[dict(position=dict(p),positionReliable=True) for p in positions])]
+        for i in range(1,13):
+            key, count = ('square',3) if i<=10 else ('cross',10)
+            angle=math.radians(s.DIG_WIND_DIRECTIONS[key]['wclAngleDegrees'])
+            for p in positions[:count]:
+                p['x']+=300*math.cos(angle);p['y']-=300*math.sin(angle)
+            frames.append(dict(timeMs=i*200,players=[dict(position=dict(p),positionReliable=True) for p in positions]))
+        return frames
+
+    def test_large_synchronized_cohort_beats_long_small_group(self):
+        wind=s._infer_wind_from_frames(self.frames(), {'centerX':0})
+        self.assertEqual(wind['sourceKey'],'cross')
+        self.assertEqual(wind['sustainedFrameCount'],2)
+
+    def test_activation_keeps_clean_prior_frame_and_excludes_bounce(self):
+        frames=self.frames()
+        # 2400 is a clean pre-activation frame; 2600 is post-activation motion.
+        frames.append(dict(timeMs=2600,players=[dict(position=dict(x=0,y=0),positionReliable=True) for _ in range(12)]))
+        wind=s._infer_wind_from_frames(frames, {'centerX':0}, excluded_timestamps=[2579])
+        self.assertEqual(wind['sourceKey'],'cross')
+        self.assertEqual(wind['samplePlayerCount'],10)
+
+    def test_truncated_fight_does_not_compress_three_wind_windows(self):
+        winds=s._infer_dig_winds(self.frames(), {'centerX':0}, duration_ms=25000)
+        self.assertIsNotNone(winds[0])
+        self.assertEqual(winds[1:],[None,None])
+
+    def test_unreliable_coordinates_do_not_vote(self):
+        frames=self.frames()
+        for frame in frames:
+            for p in frame['players']:
+                p['positionReliable']=False
+        self.assertIsNone(s._infer_wind_from_frames(frames, {'centerX':0}))

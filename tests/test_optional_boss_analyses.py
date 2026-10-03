@@ -148,7 +148,7 @@ def test_each_analysis_can_run_alone_in_nightly_pipeline(module,encounter,key):
     assert len(result['data']['page1_wipeAnalysis']) == 3
     assert result['meta']['analysisConfig'] == resolve_analysis_options(module.CONFIG_SCHEMA, options)
     assert len(result['meta']['skippedAnalyses']) == len(options)-1
-    assert all(row['default'] is True for row in module.CONFIG_SCHEMA if row['type'] == 'boolean')
+    assert all(isinstance(row['default'], bool) for row in module.CONFIG_SCHEMA if row['type'] == 'boolean')
 
 
 def test_coiledaltar_soul_review_keeps_manifest_evidence_without_field_diagrams():

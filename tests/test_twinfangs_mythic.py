@@ -16,6 +16,26 @@ def fixture():
     return fight, {}, players, raw
 
 
+def test_green_circle_and_wave_keep_distinct_damage_ids():
+    fight, actor_map, players, raw = fixture()
+    raw['analysisOptions'] = {key: False for key in boss.REVIEW_KEYS}
+    raw['analysisOptions']['waveReviewEnabled'] = True
+    raw['damage'] = [
+        event(10000, 1289237, 'damage', targetID=1, amount=100),
+        event(11000, 1289994, 'damage', targetID=2, amount=100),
+        event(12000, 1292807, 'damage', targetID=3, amount=100),
+        event(22000, 1292807, 'damage', targetID=3, amount=100),
+        event(32000, 1292807, 'damage', targetID=3, amount=100),
+        event(13000, 1292807, 'damage', targetID=4, amount=0),
+    ]
+    result = boss.analyze_twinfangs(fight, actor_map, players, raw)
+    assert result['circleHits']['spellID'] == 1289994
+    assert [row['playerID'] for row in result['circleHits']['players']] == [2]
+    assert result['waveHits']['spellID'] == 1292807
+    assert [row['playerID'] for row in result['waveHits']['players']] == [3]
+    assert result['waveHits']['players'][0]['hitCount'] == 3
+
+
 def options(**kwargs):
     return resolve_analysis_options(boss.CONFIG_SCHEMA,kwargs)
 
@@ -230,6 +250,45 @@ def test_stone_raid_explosion_count_is_not_victim_count():
     assert len(out['events'][0]['victims'])==5
 
 
+def test_stone_counts_only_first_raid_damage_in_a_fight():
+    f,am,players,raw=fixture();players[2]['role']='tank'
+    raw['casts']=[event(ts,1289092,sourceID=90,targetID=2) for ts in (10000,13000)]
+    raw['damage']=[event(ts,1289153,'damage',sourceID=90,targetID=1,amount=100) for ts in (10010,13010)]
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==1 and out['observedRaidDamageCount']==2
+    assert [row['raidDamageCount'] for row in out['events']]==[1,0]
+    assert out['events'][1]['raidDamage'] and out['events'][1]['exemptionReasons']
+
+
+def test_stone_prior_ball_explosion_exempts_first_damage_but_later_ball_does_not():
+    f,am,players,raw=fixture();players[2]['role']='tank'
+    raw['casts']=[event(10000,1289092,sourceID=90,targetID=2)]
+    raw['damage']=[event(9000,1290338,'damage',targetID=1,amount=100),
+                   event(10010,1289153,'damage',sourceID=90,targetID=1,amount=100)]
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==0
+    assert out['events'][0]['priorBallExplosionTimeMs']==9000
+    assert '炸球' in out['events'][0]['exemptionReasons'][0]
+    raw['casts'].append(event(13000,1289092,sourceID=90,targetID=2))
+    raw['damage'].append(event(13010,1289153,'damage',sourceID=90,targetID=1,amount=100))
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==0 and '之后' in out['events'][1]['exemptionReasons'][0]
+    raw['damage'][0]['timestamp']=11000
+    assert boss._stone_review(f,am,players,raw)['raidDamageCount']==1
+
+
+def test_stone_exempts_only_when_more_than_three_players_died_before_damage():
+    f,am,players,raw=fixture();players[2]['role']='tank'
+    raw['casts']=[event(10000,1289092,sourceID=90,targetID=2)]
+    raw['damage']=[event(10010,1289153,'damage',sourceID=90,targetID=1,amount=100)]
+    raw['deaths']=[event(9000,0,'death',targetID=i) for i in (1,3,4)]
+    assert boss._stone_review(f,am,players,raw)['raidDamageCount']==1
+    raw['deaths'].append(event(9500,0,'death',targetID=5))
+    out=boss._stone_review(f,am,players,raw)
+    assert out['raidDamageCount']==0 and out['events'][0]['priorDeathCount']==4
+    assert '超过 3 人' in out['events'][0]['exemptionReasons'][0]
+
+
 def test_stone_stops_at_first_tank_death_and_never_blames_non_tank():
     f,am,players,raw=fixture();players[2]['role']='tank'
     raw['deaths']=[event(11000,0,'death',targetID=2)]
@@ -301,3 +360,19 @@ def test_short_pull_retains_deaths_but_is_excluded_from_nightly_metrics():
         result=boss.build_aggregated_json('a'*16)
     assert pull['shortPull'] and pull['wipePhase']=='误开怪 / ADD处理'
     assert all(m['value']==0 for m in result['data']['mechanicOverview']['metrics'])
+
+
+def test_five_ranged_slots_and_no_wrap_after_fifth():
+    for order in (4, 5, 6):
+        f,am,players,raw=fixture()
+        raw['casts']=[event(10000,1308356,sourceID=90)]
+        raw['casts'] += [event(11000+i*1000,1308385,'begincast',sourceID=99,sourceInstance=i+1,
+                              resourceActor=1,x=-3733,y=65496) for i in range(order)]
+        raw['casts'] += [event(20000,1308385,sourceID=99,sourceInstance=order,resourceActor=1,x=-3733,y=65496)]
+        opt=options(broodGroups={**{f'left{i}':[f'P{i}'] for i in range(1,6)},'leftRangedBackup':['P1']})
+        row=boss._brood_review(f,am,players,raw,opt)['events'][0]
+        assert row['groupOrder']==order
+        if order <= 5:
+            assert row['assigned'][0]['playerID']==order
+        else:
+            assert not row['assigned'] and row['backup'][0]['playerID']==1

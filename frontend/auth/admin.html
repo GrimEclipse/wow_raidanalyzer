@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>账号管理 · Mythic Analyzer</title>
+  <link rel="stylesheet" href="/frontend/core/design-system.css?v=1.4.0">
+  <style>
+    .head{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:30px}.head h1{margin:4px 0;font-size:34px}.links{display:flex;gap:8px;flex-wrap:wrap}.panel{padding:24px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--space-line)}td select{min-height:38px;padding:7px;background:#071021;color:var(--space-text);border:1px solid var(--space-line);border-radius:9px}.actions{display:flex;gap:6px;flex-wrap:wrap}.danger{border-color:rgba(251,113,133,.35);color:#fecdd3}.note{margin:0 0 18px}.cosmic-status{margin:12px 0}@media(max-width:680px){.head{align-items:start;flex-direction:column}table,thead,tbody,tr,td{display:block}thead{display:none}tr{padding:12px 0;border-bottom:1px solid var(--space-line)}td{border:0;padding:5px 0}}
+  </style>
+</head>
+<body class="cosmic-page" data-cosmic-density="220">
+<main class="cosmic-content cosmic-shell">
+  <header class="head"><div><div class="cosmic-eyebrow">admin only</div><h1>账号管理</h1><p class="cosmic-muted">只有 admin 可以查看和管理全站账号。</p></div><nav class="links"><a class="cosmic-button" href="/account">我的账号</a><a class="cosmic-button" href="/">返回首页</a></nav></header>
+  <section class="glass-panel panel"><p class="cosmic-muted note">普通账户可运行自己的 WCL 分析并修改自己的凭据；管理员可维护 Avalon 工会运营；admin 还可管理账号。</p><div id="status" class="cosmic-status" role="status"></div><div style="overflow:auto"><table><thead><tr><th>账号</th><th>等级</th><th>状态</th><th>操作</th></tr></thead><tbody id="users"></tbody></table></div></section>
+</main>
+<script src="/frontend/core/cosmic-background.js?v=1.4.0"></script>
+<script>
+let me;
+const host=document.querySelector('#users'),statusBox=document.querySelector('#status');
+function status(message,error=false){statusBox.textContent=message;statusBox.classList.toggle('error',error)}
+function escapeHtml(value){const span=document.createElement('span');span.textContent=String(value??'');return span.innerHTML}
+async function api(path,options={}){const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401){location.href='/login?next=/admin/accounts';throw new Error('请先登录')}if(!response.ok)throw new Error(data.error||'操作失败');return data}
+async function load(){const data=await api('/api/auth/me');me=data.user;if(!me.isAdmin){location.href='/';return}await loadUsers()}
+async function loadUsers(){const data=await api('/api/admin/users');host.innerHTML='';for(const user of data.users){const tr=document.createElement('tr');tr.innerHTML=`<td>${escapeHtml(user.username)}</td><td><select data-role aria-label="${escapeHtml(user.username)} 的等级"><option value="viewer">普通账户</option><option value="editor">管理员</option><option value="admin">admin</option></select></td><td><label><input data-disabled type="checkbox"> 禁用</label></td><td><div class="actions"><button class="cosmic-button" data-save>保存</button><button class="cosmic-button" data-reset>重置密码</button><button class="cosmic-button danger" data-delete ${user.id===me.id?'disabled':''}>删除</button></div></td>`;tr.querySelector('[data-role]').value=user.role;tr.querySelector('[data-disabled]').checked=user.disabled;tr.querySelector('[data-save]').onclick=async()=>{try{await api('/api/admin/users/'+user.id,{method:'PUT',body:JSON.stringify({role:tr.querySelector('[data-role]').value,disabled:tr.querySelector('[data-disabled]').checked})});status(`已更新 ${user.username}`);await loadUsers()}catch(error){status(error.message,true)}};tr.querySelector('[data-reset]').onclick=async()=>{const newPassword=prompt(`为 ${user.username} 设置新密码：`);if(newPassword===null)return;try{await api(`/api/admin/users/${user.id}/password`,{method:'POST',body:JSON.stringify({newPassword,mustChangePassword:true})});status(`已重置 ${user.username} 的密码`)}catch(error){status(error.message,true)}};tr.querySelector('[data-delete]').onclick=async()=>{if(!confirm(`确定删除账号「${user.username}」？`))return;try{await api('/api/admin/users/'+user.id,{method:'DELETE'});status(`已删除 ${user.username}`);await loadUsers()}catch(error){status(error.message,true)}};host.appendChild(tr)}}
+load().catch(error=>status(error.message,true));
+</script>
+</body></html>
