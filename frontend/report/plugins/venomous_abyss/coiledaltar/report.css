@@ -109,6 +109,7 @@
 .marker.venom-spawn { background: #2dd4bf; border-color: #99f6e4; }
 .marker.virulent-mutation { background: #a855f7; border-color: #e9d5ff; }
 .marker.virulent-mutation-spawn { background: #7c3aed; border-color: #d8b4fe; }
+.marker.miss { box-shadow: 0 0 0 2px #f87171; }
 .marker.soulcoiler {
   width: 16px;
   height: 16px;
