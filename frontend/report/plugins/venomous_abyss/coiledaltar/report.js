@@ -179,11 +179,35 @@ function renderToxicDeluge(rounds) {
   const headers = showKind
     ? ["类型", "玩家", "拾起", "掉落", "持有时长", "落点"]
     : ["玩家", "拾起", "掉落", "持有时长", "落点"];
-  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index}，${esc(round.time)}</h3><h4>搬运者 / 落点</h4>${table(headers, (round.carriers || []).map((row) => {
+  const paired = (rounds || []).some((round) => round.mythicSeverClear);
+  const rule = paired ? `<p class="muted">史诗下每两轮撕裂处理这一轮剧毒洪流。默认第一下劈场地南侧的凝结毒液和烈毒变异体，第二下劈场地北侧。</p>` : "";
+  const clearLine = (round) => {
+    const clear = round.mythicSeverClear;
+    if (!clear) return "";
+    const side = (label, assigned, hit, missed) => `${esc(label || "尚无")}：应清 ${assigned ?? 0}，锥内 ${hit ?? 0}，未覆盖 ${Number(missed || 0) > 0 ? `<span class="badge bad">${missed}</span>` : "0"}`;
+    return `<p class="muted">南侧 ${side(clear.southLabel, clear.southAssigned, clear.southInCone, clear.southMissed)}；北侧 ${side(clear.northLabel, clear.northAssigned, clear.northInCone, clear.northMissed)}。</p>`;
+  };
+  const cards = (rounds || []).map((round) => `<article class="card"><h3>#${round.index}，${esc(round.time)}</h3>${clearLine(round)}<h4>搬运者 / 落点</h4>${table(headers, (round.carriers || []).map((row) => {
     const cells = [player(row), esc(row.applyTime), esc(row.removeTime || "—"), row.carryDurationMs == null ? "—" : `${(row.carryDurationMs / 1000).toFixed(1)}s`, posLabel(row.dropPosition)];
     return showKind ? [venomKindBadge(row), ...cells] : cells;
   }))}</article>`).join("");
-  return `<section class="panel" data-analysis-option="toxicDelugeReviewEnabled"><h2>剧毒洪流，凝结毒液与烈毒变异体</h2><div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
+  return `<section class="panel" data-analysis-option="toxicDelugeReviewEnabled"><h2>剧毒洪流，凝结毒液与烈毒变异体</h2>${rule}<div class="cards">${cards || '<div class="empty">没有剧毒洪流记录。</div>'}</div></section>`;
+}
+function mythicSeverCells(row) {
+  const pair = row.mythicDelugePair || {};
+  const missed = Number(pair.assignedMissed || 0);
+  return [
+    esc(pair.sideLabel || "—"),
+    pair.delugeIndex ? `#${pair.delugeIndex}` : "—",
+    pair.assignedCount ?? "—",
+    pair.assignedInCone ?? "—",
+    missed > 0 ? `<span class="badge bad">${missed}</span>` : (pair.assignedCount == null ? "—" : "0"),
+  ];
+}
+function renderMythicVenomSeverTable(rounds) {
+  const paired = (rounds || []).filter((row) => row.mythicDelugePair);
+  if (!paired.length) return "";
+  return `<h3>剧毒洪流清场</h3><p class="muted">每两轮撕裂处理一轮剧毒洪流的凝结毒液和烈毒变异体。默认第一下劈场地南侧，第二下劈场地北侧。未覆盖表示应清的球没有进入这一下的锥形。</p>${table(["轮次", "时间", "清场侧", "洪流", "应清", "锥内", "未覆盖"], paired.map((row) => [`#${row.index}`, esc(row.time), ...mythicSeverCells(row)]))}`;
 }
 function renderManifestations(fixations) {
   return `<section class="panel" data-analysis-option="manifestationsReviewEnabled"><h2>恐惧具象 / 凝视</h2><p class="muted">具象坐标为恐惧具象 NPC；玩家坐标为被凝视者。</p>${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section>`;
@@ -199,7 +223,20 @@ function renderEternalNightfall(data) {
   const rounds = data?.rounds || [];
   return `<section class="panel" data-analysis-option="eternalNightfallReviewEnabled"><h2>永恒夜幕</h2><p class="muted">${esc(data?.evidenceNote || "先破盾再打断。")}</p>${rounds.length ? table(["轮次", "开始", "破盾", "打断", "读条完成"], rounds.map((row) => [`#${row.index}`, esc(row.time), row.shieldRemoved ? `<span class="badge good">${esc(row.shieldRemoveTime)}</span>` : '<span class="badge bad">未破盾</span>', nightfallInterrupt(row), row.castCompleted ? '<span class="badge bad">完成</span>' : '<span class="badge good">未完成</span>'])) : '<div class="empty">没有永恒夜幕记录。</div>'}</section>`;
 }
-function renderP1() { const data = boss(); const sever = data.sever || {}, guillotine = data.guillotine || {}; return `${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p1"))}<section class="panel" data-analysis-option="severReviewEnabled"><h2>撕裂清场</h2>${table(["轮次", "时间", "几何命中", "推断清理", "爆裂层数线索"], (sever.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.inferredClearedCount, (row.ruptureEvents || []).length]))}</section>${renderGuillotineTable("处斩分摊", guillotine)}`; }
+function renderP1() {
+  const data = boss();
+  const sever = data.sever || {}, guillotine = data.guillotine || {};
+  const rounds = sever.rounds || [];
+  const paired = rounds.some((row) => row.mythicDelugePair);
+  const note = paired ? `<p class="muted">${esc(sever.mythicPairing?.rule || "史诗下每两轮撕裂处理一轮剧毒洪流。默认第一下劈场地南侧，第二下劈场地北侧。")}</p>` : "";
+  const headers = paired
+    ? ["轮次", "时间", "清场侧", "洪流", "应清", "锥内", "未覆盖", "爆裂层数线索"]
+    : ["轮次", "时间", "几何命中", "推断清理", "爆裂层数线索"];
+  const body = rounds.map((row) => paired
+    ? [`#${row.index}`, esc(row.time), ...mythicSeverCells(row), (row.ruptureEvents || []).length]
+    : [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.inferredClearedCount, (row.ruptureEvents || []).length]);
+  return `${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p1"))}<section class="panel" data-analysis-option="severReviewEnabled"><h2>撕裂清场</h2>${note}${table(headers, body)}</section>${renderGuillotineTable("处斩分摊", guillotine)}`;
+}
 function renderP2() {
   const data = boss();
   const showResonance = Boolean(data.dreadmarch?.useMalevolentResonance);
@@ -227,7 +264,11 @@ function renderIntermission() {
     : '<span class="badge warn">未使用</span>';
   return `<section class="panel"><h2>被夺取的容器</h2><p class="muted">开始 ${esc(data.startTime)}，持续 ${esc(data.duration)}，漏掉灵魂 <b>${leakCount}</b>（收回精华 1287718），踩片 <b>${stepCount}</b></p><p class="muted">${esc(data.evidenceNote || "漏掉的灵魂=残片抵达祖尔加时的收回精华次数。灵魂抹除按全团脉冲合并，列出触发的友方。")}</p><h3>漏掉的灵魂（收回精华）</h3>${(data.leakedFragments || []).length ? table(["时间", "来源", "治疗量"], (data.leakedFragments || []).map((row) => [esc(row.time), esc(row.source || row.target || "—"), row.amount == null ? "—" : Number(row.amount).toLocaleString()])) : '<div class="empty">本场转阶段没有记录到收回精华，漏片为 0。</div>'}<h3>踩片（灵魂抹除）</h3>${(data.spiritErasureSteps || []).length ? table(["时间", "踩片玩家", "全团命中"], (data.spiritErasureSteps || []).map((row) => [esc(row.time), stepPlayer(row), row.hitCount ?? "—"])) : '<div class="empty">本场转阶段没有灵魂抹除脉冲。</div>'}<h3>爆发药水与对祖尔加伤害</h3><p class="muted">转阶段开始时存活的非治疗（含战复） ${data.survivorCount ?? (data.survivors || []).length} 人，已用爆发药水 ${data.potionUsedCount ?? 0}，对祖尔加合计 ${num(data.zuljanDamageTotal)}</p>${table(["玩家", "爆发药水", "使用时间", "对祖尔加伤害", "占比"], (data.survivors || []).filter((row) => !String(row.role || "").includes("healer")).map((row) => [player(row), potionBadge(row), esc(row.potionTime || "—"), num(row.zuljanDamage), row.zuljanPercent == null ? "—" : `${row.zuljanPercent}%`]))}</section>`;
 }
-function renderP3() { const data = boss(); return `<section class="panel" data-analysis-option="blightedSeverReviewEnabled"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (data.blightedSever?.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}${renderGloombomb(data.gloombomb, "p3")}${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p3"))}${renderManifestations(phaseRows(data.manifestations?.fixations, "p3"))}${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p3"))}`; }
+function renderP3() {
+  const data = boss();
+  const blighted = data.blightedSever || {};
+  return `<section class="panel" data-analysis-option="blightedSeverReviewEnabled"><h2>凋零撕裂（P3 组合清场）</h2><p class="muted">具象是否消除以凝视 debuff 在凋零撕裂后短窗口内是否消失为准；红线只连未消掉的玩家。</p>${table(["轮次", "时间", "几何命中", "debuff 清掉", "未消掉", "推断清理"], (blighted.rounds || []).map((row) => [`#${row.index}`, esc(row.time), row.clearedByGeometry, row.clearedByDebuff ?? "—", row.unclearedCount ?? "—", row.inferredClearedCount]))}${renderMythicVenomSeverTable(blighted.rounds)}</section>${renderGuillotineTable("冷酷处斩", data.grimGuillotine)}${renderGloombomb(data.gloombomb, "p3")}${renderToxicDeluge(venomRoundsForPhase(data.toxicDeluge?.rounds, "p3"))}${renderManifestations(phaseRows(data.manifestations?.fixations, "p3"))}${renderEternalNightfall(withPhaseRounds(data.eternalNightfall, "p3"))}`;
+}
 function diagramHasContent(diagram) {
   if (!diagram) return false;
   if ((diagram.targets || []).some((row) => row.position || row.manifestPosition || row.playerPosition)) return true;
@@ -407,18 +448,19 @@ function fieldMap(data, diagram) {
                       : row.kind === "ground-venom" || row.kind === "dropped-venom"
                         ? "venom"
                         : "venom";
+    const markerClass = row.assignedSide && row.inCone === false ? `${cls} miss` : cls;
     const label = row.kind === "manifestation"
       ? `恐惧具象，${row.player || ""}`
       : row.kind === "manifest-target"
         ? `被点名，${row.player || ""}`
         : row.venomKind === "virulent-mutation" || String(row.kind || "").includes("virulent")
-          ? `烈毒变异体，${row.player || ""}`
+          ? `烈毒变异体${row.assignedSideLabel ? `，${row.assignedSideLabel}` : ""}${row.assignedSide && row.inCone === false ? "，未进锥" : ""}，${row.player || ""}`
           : row.kind === "soulcoiler"
             ? `${row.player || "怨毒盘魂者"}，盾 ${row.shieldStacks ?? "?"}，命中 ${row.bombHits ?? 0}${row.displacedMiss ? "，打断炸空" : ""}`
             : row.kind === "soulcoiler-prev"
               ? "怨毒盘魂者打断前位置"
-              : (row.player || row.carrier || row.kind || "");
-    return fieldMarker(row, p, cls, label);
+              : `${row.player || row.carrier || row.kind || ""}${row.assignedSideLabel ? `，${row.assignedSideLabel}` : ""}${row.assignedSide && row.inCone === false ? "，未进锥" : ""}`;
+    return fieldMarker(row, p, markerClass, label);
   }).join("");
   const links = renderLinkOverlay(diagram.links, arena);
   const spread = diagram.kind === "spread" ? (diagram.targets || []).filter((row) => row.kind !== "soulcoiler" && row.kind !== "soulcoiler-prev").map((row) => {
@@ -461,8 +503,11 @@ function fieldMap(data, diagram) {
   const venomLegend = (diagram.targets || []).some((row) => Number(row.blastRadiusYards || 0) || row.venomKind === "virulent-mutation" || String(row.kind || "").includes("virulent"))
     ? '<p class="legend">绿边=凝结毒液；紫边=烈毒变异体；紫圈=最终落点 8 码引爆范围。</p>'
     : "";
+  const sideLegend = (diagram.targets || []).some((row) => row.assignedSide)
+    ? '<p class="legend">史诗清场：本图只画这一下应劈的一侧。红圈=应清但没有进入锥形。</p>'
+    : "";
   const empty = !markers && !spread && !nearbyActors && !cone && !runout && !mutationBlast ? '<p class="legend">该轮次缺少可绘制的坐标样本。</p>' : "";
-  return `<div class="replay-map" style="background-image:url('${esc(bg)}')">${square}${bossDot}${cone}${links}${spread}${nearbyActors}${runout}${mutationBlast}${markers}</div>${legend}${linkLegend}${nearbyLegend}${venomLegend}${empty}<p class="muted">${esc(diagram.annotation || diagram.mechanic || "")}</p>`;
+  return `<div class="replay-map" style="background-image:url('${esc(bg)}')">${square}${bossDot}${cone}${links}${spread}${nearbyActors}${runout}${mutationBlast}${markers}</div>${legend}${linkLegend}${nearbyLegend}${venomLegend}${sideLegend}${empty}<p class="muted">${esc(diagram.annotation || diagram.mechanic || "")}</p>`;
 }
 function fieldMechanicGroups(diagrams) {
   const groups = [];
@@ -488,7 +533,7 @@ function renderField() {
     const open = Boolean(state.fieldOpen[group.key]);
     const items = group.items.map(({ row, index }) => {
       const active = index === state.diagram;
-      return `<article class="field-diagram-item ${active ? "active" : ""}"><button type="button" class="round-button ${active ? "active" : ""}" data-diagram="${index}"><b>#${row.roundIndex}</b><div>${esc(row.time)}，${esc(row.phase)}</div></button>${active && open ? `<div class="field-diagram-map">${fieldMap(data, row)}</div>` : ""}</article>`;
+      return `<article class="field-diagram-item ${active ? "active" : ""}"><button type="button" class="round-button ${active ? "active" : ""}" data-diagram="${index}"><b>#${row.roundIndex}</b><div>${esc(row.time)}，${esc(row.phase)}${row.assignedSideLabel ? `，${esc(row.assignedSideLabel)}` : ""}</div></button>${active && open ? `<div class="field-diagram-map">${fieldMap(data, row)}</div>` : ""}</article>`;
     }).join("");
     return `<details class="field-mechanic-panel" data-mechanic="${esc(group.key)}"${open ? " open" : ""}><summary><span class="field-mechanic-title">${esc(group.mechanic)}</span><span class="muted">${group.items.length} 轮</span></summary><div class="field-diagram-list">${items}</div></details>`;
   }).join("");

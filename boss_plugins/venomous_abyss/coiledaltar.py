@@ -2230,6 +2230,178 @@ def analyze_cone_sever(
     return {"label": label, "castIDs": sorted(cast_ids), "rounds": rounds}
 
 
+MYTHIC_DIFFICULTY = 5
+MYTHIC_SEVER_PAIR_RULE = (
+    "史诗 P1/P3：每两轮撕裂处理一轮剧毒洪流的凝结毒液和烈毒变异体。"
+    "默认第一下劈场地南侧，第二下劈场地北侧。"
+)
+
+
+def _is_ground_venom_point(point):
+    kind = point.get("kind")
+    if kind in {"manifestation", "manifest-target", "venom-spawn", "virulent-mutation-spawn"}:
+        return False
+    return kind in {"ground-venom", "dropped-venom", "virulent-mutation"} or point.get("venomKind") in {
+        VENOM_KIND_NORMAL, VENOM_KIND_MUTATION,
+    }
+
+
+def venom_arena_side(point):
+    """场地中心以南（WCL Y 更小、示意图更靠下）为南侧，其余为北侧。"""
+    coords = _position_xy((point or {}).get("position") or point)
+    if not coords:
+        return None
+    return "south" if coords[1] < arena_center_units()[1] else "north"
+
+
+def _next_deluge_time_ms(deluge_rounds, deluge):
+    start = int(deluge.get("timeMs") or 0)
+    later = [int(row.get("timeMs") or 0) for row in deluge_rounds or [] if int(row.get("timeMs") or 0) > start]
+    return min(later) if later else 10**15
+
+
+def _orbs_for_deluge_side(venom_points, sever_time_ms, side, window_start, window_end):
+    """本轮撕裂应清的球：该次剧毒洪流落地、释放时仍在地上、且位于指定一侧。"""
+    chosen = {}
+    loose = []
+    for point in venom_points or []:
+        if not _is_ground_venom_point(point) or venom_arena_side(point) != side:
+            continue
+        grounded = point.get("groundedFromMs")
+        if grounded is None:
+            continue
+        grounded = int(grounded)
+        if grounded < int(window_start) or grounded >= int(window_end) or grounded > int(sever_time_ms):
+            continue
+        picked = point.get("pickedUpAtMs")
+        if picked is not None and int(picked) <= int(sever_time_ms):
+            continue
+        key = point.get("puddleID")
+        if key is None:
+            loose.append(point)
+            continue
+        previous = chosen.get(key)
+        if previous is None or grounded >= int(previous.get("groundedFromMs") or 0):
+            chosen[key] = point
+    return list(chosen.values()) + loose
+
+
+def _apply_mythic_side_assignment(row, assigned, side, side_label, slot, pair_index, deluge):
+    origin_xy = _position_xy(row.get("origin"))
+    facing = row.get("facingRadians")
+    marked = []
+    for point in assigned:
+        coords = _position_xy(point.get("position"))
+        inside = bool(coords and in_frontal_cone(origin_xy, facing, coords))
+        marked.append({
+            **point,
+            "assignedSide": side,
+            "assignedSideLabel": side_label,
+            "inCone": inside,
+        })
+    non_venom = [point for point in (row.get("nearbyPoints") or []) if not _is_ground_venom_point(point)]
+    row["nearbyPoints"] = non_venom + marked
+    kept_hits = [point for point in (row.get("targetsInCone") or []) if not _is_ground_venom_point(point)]
+    venom_hits = [point for point in marked if point.get("inCone")]
+    row["targetsInCone"] = kept_hits + venom_hits
+    row["clearedByGeometry"] = len(row["targetsInCone"])
+    normal = sum(1 for point in marked if point.get("venomKind") != VENOM_KIND_MUTATION)
+    mutation = len(marked) - normal
+    missed = len(marked) - len(venom_hits)
+    deluge_index = deluge.get("index") if deluge else None
+    row["mythicDelugePair"] = {
+        "enabled": True,
+        "pairIndex": pair_index,
+        "slot": slot,
+        "side": side,
+        "sideLabel": side_label,
+        "delugeIndex": deluge_index,
+        "delugeTime": deluge.get("time") if deluge else None,
+        "assignedCount": len(marked),
+        "assignedInCone": len(venom_hits),
+        "assignedMissed": missed,
+        "normalCount": normal,
+        "mutationCount": mutation,
+    }
+    sentence = (
+        f"史诗默认第 {slot} 下劈{side_label}：剧毒洪流 #{deluge_index or '—'}，"
+        f"应清 {len(marked)}（凝结毒液 {normal}，烈毒变异体 {mutation}），"
+        f"锥内 {len(venom_hits)}，未覆盖 {missed}。"
+        "南侧为场地中心以南，北侧为中心以北。"
+    )
+    if row.get("label") == "凋零撕裂":
+        prior = (row.get("evidenceNote") or "").rstrip("。")
+        row["evidenceNote"] = f"{prior}。{sentence}" if prior else sentence
+    else:
+        row["evidenceNote"] = sentence
+    if not deluge:
+        return
+    clear = deluge.setdefault("mythicSeverClear", {
+        "southSeverIndex": None,
+        "northSeverIndex": None,
+        "southLabel": None,
+        "northLabel": None,
+        "southAssigned": 0,
+        "northInCone": 0,
+        "southMissed": 0,
+        "northAssigned": 0,
+        "southInCone": 0,
+        "northMissed": 0,
+    })
+    prefix = "south" if side == "south" else "north"
+    clear[f"{prefix}SeverIndex"] = row.get("index")
+    clear[f"{prefix}Label"] = f"{row.get('label')} #{row.get('index')}"
+    clear[f"{prefix}Assigned"] = len(marked)
+    clear[f"{prefix}InCone"] = len(venom_hits)
+    clear[f"{prefix}Missed"] = missed
+
+
+def annotate_mythic_sever_deluge_pairs(fight, toxic_deluge, sever, blighted_sever, venom_points):
+    """史诗 P1 撕裂、P3 凋零撕裂：两轮一组，分别对应同一轮剧毒洪流的南侧和北侧。"""
+    if int((fight or {}).get("difficulty") or 0) != MYTHIC_DIFFICULTY or not toxic_deluge:
+        return
+    points = venom_points or build_active_venom_points(toxic_deluge)
+    all_deluges = list(toxic_deluge.get("rounds") or [])
+    for phase, result in (("p1", sever), ("p3", blighted_sever)):
+        if not result:
+            continue
+        phase_severs = sorted(
+            [row for row in (result.get("rounds") or []) if row.get("phase") == phase],
+            key=lambda row: int(row.get("timeMs") or 0),
+        )
+        if not phase_severs:
+            continue
+        phase_deluges = sorted(
+            [row for row in all_deluges if row.get("phase") == phase],
+            key=lambda row: int(row.get("timeMs") or 0),
+        )
+        deluge_cursor = 0
+        for pair_index, start in enumerate(range(0, len(phase_severs), 2), start=1):
+            chunk = phase_severs[start:start + 2]
+            first_time = int(chunk[0].get("timeMs") or 0)
+            deluge = None
+            if deluge_cursor < len(phase_deluges) and int(phase_deluges[deluge_cursor].get("timeMs") or 0) <= first_time:
+                deluge = phase_deluges[deluge_cursor]
+                deluge_cursor += 1
+            window_start = int(deluge["timeMs"]) if deluge else None
+            window_end = _next_deluge_time_ms(all_deluges, deluge) if deluge else None
+            for slot_index, row in enumerate(chunk):
+                side, side_label = ("south", "南侧") if slot_index == 0 else ("north", "北侧")
+                assigned = []
+                if deluge is not None:
+                    assigned = _orbs_for_deluge_side(
+                        points, int(row.get("timeMs") or 0), side, window_start, window_end,
+                    )
+                _apply_mythic_side_assignment(
+                    row, assigned, side, side_label, slot_index + 1, pair_index, deluge,
+                )
+        result["mythicPairing"] = {"enabled": True, "phase": phase, "rule": MYTHIC_SEVER_PAIR_RULE}
+    if any((result or {}).get("mythicPairing") for result in (sever, blighted_sever)):
+        note = toxic_deluge.get("evidenceNote") or ""
+        if MYTHIC_SEVER_PAIR_RULE not in note:
+            toxic_deluge["evidenceNote"] = f"{note}{MYTHIC_SEVER_PAIR_RULE}"
+
+
 def analyze_guillotine(
     fight,
     casts,
@@ -4349,6 +4521,7 @@ def build_field_audit(
             "links": links,
             "clearedCount": row.get("inferredClearedCount", row.get("clearedByGeometry")),
             "unclearedCount": row.get("unclearedCount"),
+            "assignedSideLabel": (row.get("mythicDelugePair") or {}).get("sideLabel"),
             "annotation": annotation,
         })
 
@@ -4601,6 +4774,8 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         active_points, actor_catalog, boss_actor_id=zuljan_id, origin_index=caster_index,
         npc_position_index=npc_position_index,
     ) if options["blightedSeverReviewEnabled"] else {}
+    if int(fight.get("difficulty") or 0) == MYTHIC_DIFFICULTY:
+        annotate_mythic_sever_deluge_pairs(fight, toxic_deluge, sever, blighted_sever, venom_points)
     guillotine = analyze_guillotine(
         fight, raw["casts"], raw["damage"], raw["debuffs"], position_index, actor_map, players, markers,
         GUILLOTINE_CAST_IDS, "处斩",
