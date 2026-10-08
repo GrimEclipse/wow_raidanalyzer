@@ -272,6 +272,7 @@
           "bosses": [
             {
               "key": "nakzali",
+              "previewImage": "assets/raids/venomous_abyss/01-nakzali-hero.jpg",
               "order": 1,
               "name": "盘魂者内克扎利",
               "encounterIds": [3470, 53470],
@@ -401,6 +402,7 @@
             },
             {
               "key": "sentinels",
+              "previewImage": "assets/raids/venomous_abyss/02-sentinels-hero.jpg",
               "order": 2,
               "name": "陵寝哨兵",
               "encounterIds": [3445, 53445],
@@ -499,6 +501,7 @@
             },
             {
               "key": "vashnik",
+              "previewImage": "assets/raids/venomous_abyss/03-vashnik-hero.jpg",
               "order": 4,
               "name": "万毒邪祟者瓦什尼克",
               "encounterIds": [3455, 53455],
@@ -521,6 +524,7 @@
             },
             {
               "key": "lostexplorers",
+              "previewImage": "assets/raids/venomous_abyss/04-lostexplorers-hero.jpg",
               "order": 3,
               "name": "迷失的探险者",
               "encounterIds": [3497, 53497],
@@ -543,6 +547,7 @@
             },
             {
               "key": "sszorak",
+              "previewImage": "assets/raids/venomous_abyss/05-sszorak-hero.jpg",
               "order": 5,
               "name": "斯索拉克",
               "encounterIds": [3420, 53420],
@@ -565,6 +570,7 @@
             },
             {
               "key": "twinfangs",
+              "previewImage": "assets/raids/venomous_abyss/06-twinfangs-hero.jpg",
               "order": 6,
               "name": "双子毒牙",
               "encounterIds": [3421, 53421],
@@ -587,6 +593,7 @@
             },
             {
               "key": "coiledaltar",
+              "previewImage": "assets/raids/venomous_abyss/07-bargained-hero.jpg",
               "order": 7,
               "name": "盘卷祭坛",
               "englishName": "The Coiled Altar",
@@ -604,6 +611,7 @@
             },
             {
               "key": "ulatek",
+              "previewImage": "assets/raids/venomous_abyss/08-ulatek-hero.jpg",
               "order": 8,
               "name": "乌拉特克",
               "englishName": "Ula'tek",
@@ -630,6 +638,7 @@
           "bosses": [
             {
               "key": "nymrissa_wavecaller",
+              "previewImage": "assets/raids/tidebound_grotto/01-nymrissa-hero.png",
               "order": 1,
               "name": "尼姆瑞莎·唤潮者",
               "englishName": "Nymrissa Wavecaller",
