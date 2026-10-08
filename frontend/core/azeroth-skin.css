@@ -1,0 +1,224 @@
+/*
+ * Azeroth UI · 子页面统一换皮（ui/wow-reskin）
+ * 目的：让所有二级/三级页面（工具页、Boss 报告页）跟首页同一套暖石+黄铜质感。
+ * 做法：覆盖各页自己声明的设计变量 + 少量硬编码色值；不动结构、不动类名、不动 JS。
+ */
+:root, html:root, body:root {
+  --az-bg:#0c0a08; --az-panel:#17130f; --az-panel2:#1f1913; --az-line:#3a2f22;
+  --az-ink:#ede4d3; --az-muted:#b6a68c; --az-gold:#ffd100; --az-legendary:#ff8000;
+  --az-brass:#c69b6d; --az-red:#8f1d14;
+
+  /* 通用变量名（覆盖各页 :root 里的同名变量） */
+  --bg:#0c0a08; --panel:#17130f; --panel-2:#1f1913; --panel2:#1f1913;
+  --line:#3a2f22; --border:#3a2f22; --divider:#3a2f22;
+  --ink:#ede4d3; --text:#ede4d3; --fg:#ede4d3;
+  --muted:#b6a68c; --dim:#b6a68c; --subtle:#b6a68c;
+  --gold:#ffd100; --amber:#ff8000; --accent:#ffd100;
+  --accent-soft:rgba(255,209,0,.14);
+  --cyan:#ffd100; --teal:#ffd100; --blue:#7fb2e5; --blue-soft:rgba(127,178,229,.16);
+  --green:#4fd18b; --red:#ff8b73; --purple:#b779e8;
+  --good:#4fd18b; --bad:#ff8b73; --warn:#ff8000;
+  --shadow:0 18px 48px rgba(0,0,0,.55);
+  --radius:4px;
+}
+html { background:#0c0a08; }
+body {
+  background-color:#0c0a08 !important;
+  background-image:
+    radial-gradient(1200px 600px at 50% -10%, rgba(255,128,0,.07), transparent 60%),
+    url("/frontend/assets/theme/leather.webp") !important;
+  background-size:auto, 420px 420px !important;
+  background-repeat:no-repeat, repeat !important;
+  background-attachment:fixed, fixed !important;
+  color:#ede4d3;
+}
+/* 面板统一：暖石底 + 黄铜描边 + 内高光 */
+.panel, .card, .report-shell, .panel-body, .board, .section-body, .modal, .drawer,
+[class*="panel"], [class*="card"], [class*="box"], [class*="board"] {
+  border-color:#3a2f22 !important;
+}
+.panel, .card, .report-shell, .modal, .drawer, .pull-board, .overview-tools, .stats {
+  background-color:#17130f;
+  background-image:linear-gradient(180deg, rgba(255,209,0,.035), transparent 42%);
+  border-radius:4px;
+  box-shadow:0 10px 26px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,209,0,.07);
+}
+h1, h2, h3, .eyebrow, .kicker, .section-heading, .panel-heading, .drawer-heading, .report-head h1 {
+  font-family:"Cinzel", "Azeroth Serif SC", Georgia, "Songti SC", "SimSun", serif;
+  letter-spacing:.02em;
+}
+h1 { color:#f4ecdc; text-shadow:0 2px 10px rgba(0,0,0,.6); }
+.eyebrow, .kicker, .muted-label { color:#c69b6d !important; text-transform:none; letter-spacing:.06em; }
+a { color:#ffd100; }
+a:hover { color:#ff8000; }
+code, pre, .mono, [class*="time"], [class*="Time"] { font-variant-numeric:tabular-nums; }
+button, .button, .btn, [class*="btn"], [class*="button"] {
+  border-radius:3px;
+}
+button.primary, .button.primary, .btn-primary, .cosmic-button.primary,
+button[class*="primary"], .primary {
+  background-image:linear-gradient(180deg,#b8291b,#7d150c 55%,#5e0f08) !important;
+  border:1px solid #c69b6d !important;
+  color:#ffe9a8 !important;
+  font-family:"Cinzel","Azeroth Serif SC",Georgia,serif;
+  text-shadow:0 1px 2px rgba(0,0,0,.7);
+  box-shadow:inset 0 1px 0 rgba(255,214,120,.35), 0 6px 16px rgba(0,0,0,.45);
+}
+button.primary:hover, .button.primary:hover, .primary:hover { filter:brightness(1.12); }
+table th { color:#c69b6d; }
+table tr:hover > td { background:rgba(255,209,0,.045); }
+input, select, textarea, .field input, .field select {
+  background-color:#120f0b !important;
+  border:1px solid #3a2f22 !important;
+  color:#ede4d3 !important;
+  border-radius:3px;
+}
+input:focus, select:focus, textarea:focus { border-color:#c69b6d !important; outline:none; box-shadow:0 0 0 2px rgba(198,155,109,.18); }
+::selection { background:rgba(255,128,0,.35); }
+/* 滚动条 */
+* { scrollbar-color:#4a3a28 #14100c; scrollbar-width:thin; }
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-track { background:#14100c; }
+::-webkit-scrollbar-thumb { background:#4a3a28; border-radius:6px; }
+::-webkit-scrollbar-thumb:hover { background:#6b5334; }
+
+/* ---- Tailwind 工具类页面（raid-cooldowns / analysis-runner / void_spire） ---- */
+.bg-slate-950,.bg-slate-900,.bg-gray-950,.bg-gray-900 { background-color:#0c0a08 !important; }
+.bg-slate-800,.bg-gray-800,.bg-slate-800\/60,.bg-gray-800\/60 { background-color:#17130f !important; }
+.bg-slate-700,.bg-gray-700 { background-color:#241d15 !important; }
+.bg-slate-900\/50,.bg-gray-900\/50 { background-color:rgba(23,19,15,.6) !important; }
+.border-slate-800,.border-gray-800,.border-slate-700,.border-gray-700 { border-color:#3a2f22 !important; }
+.text-slate-100,.text-gray-100,.text-slate-200,.text-gray-200 { color:#ede4d3 !important; }
+.text-slate-300,.text-gray-300 { color:#d8cbb6 !important; }
+.text-slate-400,.text-gray-400,.text-slate-500,.text-gray-500 { color:#a2917a !important; }
+.text-cyan-400,.text-sky-400,.text-blue-400,.text-teal-400,.text-indigo-400 { color:#ffd100 !important; }
+.text-amber-400,.text-yellow-400 { color:#ffd100 !important; }
+.bg-cyan-500,.bg-sky-500,.bg-blue-500,.bg-indigo-500 { background-color:#b8291b !important; }
+.text-slate-900,.text-gray-900 { color:#2a2118 !important; }
+
+/* Tailwind 带透明度变体（bg-slate-900/70 这类）在子页面里仍是冷色，统一压成暖石 */
+[class*="bg-slate-9"],[class*="bg-slate-8"],[class*="bg-gray-9"],[class*="bg-gray-8"],[class*="bg-zinc-9"],[class*="bg-neutral-9"]{
+  background-color:#17130f !important;
+}
+[class*="border-slate-"],[class*="border-gray-"]{ border-color:#3a2f22 !important; }
+[class*="text-cyan-"],[class*="text-sky-"],[class*="text-indigo-"]{ color:#ffd100 !important; }
+[class*="bg-indigo-"],[class*="bg-violet-"],[class*="bg-purple-"]{ background-color:#4a2a12 !important; }
+[class*="text-slate-5"],[class*="text-gray-5"],[class*="text-zinc-5"]{ color:#a2917a !important; }
+
+/* 次要文字整体提亮一档，避免暖底上灰字发闷 */
+.muted, .dim, .subtle, small, .subtitle, .hint, .note, .meta-sub, [class*="muted"], [class*="subtitle"], [class*="hint"] {
+  color:#b6a68c;
+}
+[class*="text-slate-5"],[class*="text-gray-5"],[class*="text-slate-4"],[class*="text-gray-4"]{ color:#b6a68c !important; }
+
+/* 小屏：给固定的音乐播放器留出空间，避免压住卡片底部说明文字 */
+@media (max-width:720px){
+  body{padding-bottom:58px}
+  .aze-mu{left:12px;bottom:12px}
+  .aze-mu-txt{max-width:104px}
+  .aze-mu-panel{left:12px;right:12px;bottom:60px;max-width:none;width:auto}
+}
+
+
+/* ================= 移动端适配 ================= */
+
+/* ① 横向溢出根治：CSS Grid 里的 1fr 最小尺寸等于内容 min-content，
+   内部任何固定宽度（例如抄轴页表格的 min-width:720px）都会把整页撑宽。
+   大秘境抄轴页在手机上整页横向溢出 398px 就是这个原因，改用 minmax(0,1fr)。 */
+@media (max-width: 940px){
+  body .workspace{grid-template-columns:minmax(0,1fr)}
+  body .workspace > *{min-width:0}
+  body .pull-sidebar,body .pull-detail,body .panel,body .table-scroll{min-width:0;max-width:100%}
+  body main{padding-left:14px;padding-right:14px}
+}
+
+/* ② 报告页顶部工具条：Fight 下拉框比手机屏还宽（溢出 73–117px） */
+@media (max-width: 940px){
+  body .tools{max-width:100%;flex-wrap:wrap}
+  body .tools select,body .tools input,body .tools .button{max-width:100%}
+  body .report-head,body .detail-header{flex-direction:column;align-items:flex-start}
+}
+
+/* ③ 小字抬到手机上看得清的下限（手册/日历/报告页里大量 8–10px） */
+@media (max-width: 720px){
+  body .boss-name span,body .boss-raid-label,body .phase-label,body .timeline-stat b,
+  body .phase-band strong,body .event-source,body .event-kind,body .signal-rule,
+  body .review-badge,body .evidence b,body .spell-tags span,body .mythic-note strong,
+  body .day-label,body .day-summary,body .eyebrow,body .kicker,
+  body .actor-name,body .chip,body .badge,body .pull-copy small,body .pull-percent small,
+  body .phase-card span,body .event-sub,body .skill-counts,body .ruling-notes,
+  body .tooltip-id,body .map-zoom{font-size:11.5px;line-height:1.5}
+  body .day-summary{bottom:5px}
+  /* 手册的 Boss 侧栏按钮偏窄，手机上加宽一点更好点 */
+  body .pull-button{min-width:190px}
+}
+
+
+/* ================= v2 · 机制复盘工作台（mechanic-workbench）换皮 =================
+   新功能原样是冷蓝配色，这里统一压成暖石+黄铜，与全站一致；只改颜色/字体，不动布局。 */
+.mw{--mw-line:#3a2f22;--mw-ink:#ede4d3;--mw-muted:#a2917a;background:linear-gradient(180deg,#1b1611,#14100c)!important;border-color:#3a2f22!important;border-radius:4px!important;box-shadow:0 18px 40px rgba(0,0,0,.55),inset 0 0 0 1px rgba(0,0,0,.7),inset 0 1px rgba(255,220,160,.05)!important}
+.mw h2,.mw h3{font-family:var(--f-title,serif);color:#f3d58f;letter-spacing:.01em}
+.mw-eyebrow{color:#d7b36a!important;font:700 11px/1 var(--f-title,serif)!important;letter-spacing:.2em!important}
+.mw button,.mw select,.mw input:not([type=checkbox]):not([type=range]),.mw-upload{border-color:#4a3a28!important;border-radius:3px!important;background:linear-gradient(180deg,#2a2118,#1a140e)!important;color:#d8cbb6!important}
+.mw button:hover,.mw button.active{background:linear-gradient(180deg,#3a2b1a,#241b12)!important;border-color:#d7b36a!important;color:#f3d58f!important}
+.mw button:focus-visible,.mw input:focus-visible,.mw select:focus-visible{outline-color:#ff8000!important}
+.mw input[type=checkbox]{accent-color:#d7b36a}
+.mw-scrub{accent-color:#ff8000}
+.mw-layers label{background:#1d1711!important;border-color:#3a2f22!important}
+.mw-transport output{color:#f3d58f!important;font-family:var(--f-num,serif)}
+.mw-track{color:#b6a68c!important}
+.mw-track>div{border-bottom-color:#3a2f22!important;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),rgba(138,106,58,.22) 10%)!important}
+.mw-track>div:after{background:#ffd100!important;box-shadow:0 0 6px rgba(255,209,0,.6)}
+.mw-track button{background:#c69b6d!important}
+.mw-track button.mw-bad,.mw-map svg circle.mw-problem{background:#e0533d!important;fill:#e0533d!important}
+.mw-detail,.mw-calibration,.mw-columns{background:#17130f!important;border-color:#3a2f22!important;border-radius:3px!important}
+.mw-detail dt,.mw-calibration p,.mw-map-caption{color:#a2917a!important}
+.mw-map{background:#0b0907!important;border-color:#4a3a28!important;border-radius:3px!important;box-shadow:inset 0 0 0 1px #000,0 0 0 1px rgba(201,164,92,.12)}
+.mw-map svg circle:not([fill]){fill:#e6cc80;stroke:#1a120a}
+.mw-map svg text{stroke:#0c0805!important}
+.mw-map-note{background:rgba(12,9,6,.88)!important;color:#d8cbb6!important;border:1px solid #3a2f22}
+.mw-table-wrap{border-color:#3a2f22!important;border-radius:3px!important}
+.mw th{background:#221b14!important;color:#d7b36a!important;font-family:var(--f-title,serif);letter-spacing:.04em}
+.mw td,.mw th{border-bottom-color:#2c2318!important}
+.mw tr.mw-selected td{background:rgba(255,128,0,.14)!important}
+.mw tr[data-event]:hover td{background:rgba(215,179,106,.08)!important}
+.mw-status{color:#e6cc80!important}
+.mw-columns summary{color:#d8cbb6!important}
+.mw-relative{background:repeating-linear-gradient(0deg,transparent 0,transparent calc(10% - 1px),rgba(138,106,58,.3) 10%),repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),rgba(138,106,58,.3) 10%),#0e0b08!important}
+.mw-calibration [data-slot=calibrationStatus]{color:#ffd100!important}
+.mw-map-stage{scrollbar-color:#6b5334 #14100c!important}
+.mw-video{background:#0c0a08!important}
+.mw-boss-card{border-color:#8a6a3a!important;border-radius:3px!important;background:linear-gradient(180deg,rgba(34,27,20,.95),rgba(16,12,9,.95))!important;color:#ede4d3!important;box-shadow:0 0 0 1px #000,0 4px 14px rgba(0,0,0,.6)!important}
+.mw-boss-card b{color:#f3d58f;font-family:var(--f-title,serif)}
+.mw-health,.mw-cast{background:#0b0907!important;box-shadow:inset 0 1px 3px rgba(0,0,0,.9),0 0 0 1px #3a2f22;border-radius:2px!important}
+.mw-health i{background:linear-gradient(180deg,#4fd04a,#1f8a1b)!important}
+.mw-cast i{background:linear-gradient(180deg,#ffcf5a,#e08a12 55%,#a85d06)!important}
+.mw-cast:not(.active) span{color:#8a7a62!important}
+
+/* 机制演示外框页（/demos） */
+.demo-shell h1{font-family:var(--f-title,serif);color:#f3d58f}
+.demo-shell .choices{gap:2px!important;border-bottom:1px solid #8a6a3a;padding:0 6px;margin-bottom:0!important}
+.demo-shell .choices button{position:relative;top:1px;border:1px solid #3a2f22!important;border-bottom-color:#8a6a3a!important;border-radius:4px 4px 0 0!important;background:linear-gradient(180deg,#1d1711,#120e0a)!important;color:#a2917a!important;font-family:var(--f-title,serif)!important}
+.demo-shell .choices button:hover{color:#f3d58f!important}
+.demo-shell .choices button.active{border-color:#8a6a3a!important;border-bottom-color:#1a1510!important;background:linear-gradient(180deg,#3a2b1a,#1a1510)!important;color:#f3d58f!important}
+.demo-shell iframe{border:1px solid #8a6a3a!important;border-top:0!important;border-radius:0 0 4px 4px!important;background:#0c0a08!important}
+.demo-shell .hint{color:#b6a68c!important}
+
+
+/* ================= v2 · 各 Boss 复盘页（插件页内联冷色）统一压暖 =================
+   插件页各自写了深蓝底和青色选中态；这里只覆盖底色/边框/选中色，语义色（击杀绿、失误红）保留。 */
+.report-shell .stat,.stat,.analysis-stat,.summary-item,.pull-tile,.kill-tile,.phase-card{background:linear-gradient(180deg,#1f1912,#16110c)!important;border-color:#3a2f22!important;border-radius:3px!important;box-shadow:inset 0 1px rgba(255,220,160,.05),inset 0 0 0 1px rgba(0,0,0,.5)}
+.stat strong,.analysis-stat strong,.summary-item strong{color:#f3d58f;font-family:var(--f-num,serif)}
+.stat span,.analysis-stat span,.summary-item span{color:#a2917a!important}
+.tabs button.active,.page-tabs button.active,.analysis-tags button.active,.skill-focus button.active,.round-button.active,.event-button.active{border-color:#d7b36a!important;background:linear-gradient(180deg,#3a2b1a,#241b12)!important;color:#f3d58f!important;box-shadow:0 0 0 1px #000,0 0 12px rgba(255,150,40,.18)!important}
+.skill-focus button,.round-button,.event-button,.map-controls button,.chip,.event-chip{border-color:#3a2f22!important;background:#1a140e!important;color:#d8cbb6!important}
+.field-toolbar,.marker-note,.vash-result,.vash-totem-list,.abnormal-panel,.field-mechanic-panel,.rage-view-toggle,.round,.round-list .round>summary,.round-content-grid{background:#17130f!important;border-color:#3a2f22!important;border-radius:3px!important}
+.round-list .round[open]>summary{background:#221b14!important}
+.field-toolbar select,.venom-picker select,.twin-replay-jumps select{border-color:#4a3a28!important;background:#120f0b!important;color:#ede4d3!important;border-radius:3px!important}
+.field-toolbar span{color:#a2917a!important}
+.vash-field,.replay-map,.map,.map-wrap,.twin-spit-map svg{background-color:#0b0907!important;border-color:#4a3a28!important}
+.vash-result strong{color:#ffd100!important}
+.report-head,.detail-header{border-bottom-color:#3a2f22!important}
+a.spell{color:#ffd100!important}
+a.spell:hover{color:#ff8000!important}
+th{color:#d7b36a}
