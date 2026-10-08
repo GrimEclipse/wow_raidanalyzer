@@ -22,6 +22,7 @@ from analyzer_core.progress import emit_progress
 from analyzer_core.raid_cooldowns import RAIDS
 from analyzer_core.runner import analyze_report
 from analyzer_core.wcl_api import WclClient
+from analyzer_core.evidence_cache import with_evidence_cache, current_stats
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -389,6 +390,9 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
         ROOT / "analyzer_core" / "single_fight.py",
         ROOT / "analyzer_core" / "config.py",
         ROOT / "analyzer_core" / "runner.py",
+        ROOT / "analyzer_core" / "event_evidence.py",
+        ROOT / "analyzer_core" / "combat_replay.py",
+        ROOT / "analyzer_core" / "wcl_api.py",
     ]
     if entry.raid_key == "venomous_abyss":
         implementation_paths.extend([
@@ -419,6 +423,7 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
     return hashlib.sha256(json.dumps(source, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
 
 
+@with_evidence_cache
 def analyze_single_fight(
     *, report_code: str, fight_id: int, output_path: Path, options: dict | None = None,
     force: bool = False, progress_callback=None,
@@ -451,6 +456,7 @@ def analyze_single_fight(
         single_meta["cacheHit"] = True
         single_meta["sourceElapsedSeconds"] = single_meta.get("elapsedSeconds")
         single_meta["elapsedSeconds"] = round(time.perf_counter() - started, 3)
+        single_meta["evidenceFetch"] = current_stats()
         output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         emit_progress("命中同场分析缓存", percent=99, stage="cache")
         return {"path": output_path, "cacheHit": True, "cacheKey": cache_key}
@@ -480,6 +486,7 @@ def analyze_single_fight(
         "cacheKey": cache_key,
         "cacheHit": False,
         "elapsedSeconds": elapsed,
+        "evidenceFetch": current_stats(),
         "abilitySelection": fight["abilitySelection"],
         "analysisConfig": options,
     }

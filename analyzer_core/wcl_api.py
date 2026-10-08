@@ -14,6 +14,7 @@ from urllib3.exceptions import InsecureRequestWarning
 from analyzer_core.concurrency import MAX_REQUEST_RETRIES, REQUEST_RETRY_BASE_SECONDS, request_post
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_context import resolve_wcl_credentials
+from analyzer_core.evidence_cache import query_cache_path, read_cached, write_cached, record_network
 
 
 def load_project_env() -> None:
@@ -97,6 +98,12 @@ class WclClient:
         return self._token
 
     def graphql_data(self, query: str, variables: dict) -> dict:
+        cache_path = query_cache_path(self.base_url, resolve_wcl_credentials(self.client_id, self.client_secret), query, variables)
+        # Discovery is short-lived so an ongoing report can acquire new fights.
+        cached = read_cached(cache_path, max_age=1800 if "events(" in query else 30)
+        if cached is not None:
+            return cached
+        started = time.perf_counter()
         response = self._post(
             f"{self.base_url}/api/v2/client",
             json={"query": query, "variables": variables},
@@ -105,9 +112,11 @@ class WclClient:
             timeout=90,
         )
         response.raise_for_status()
+        record_network(time.perf_counter() - started)
         payload = response.json()
         if payload.get("errors"):
             raise RuntimeError(json.dumps(payload["errors"], ensure_ascii=False))
+        write_cached(cache_path, payload["data"])
         return payload["data"]
 
     def graphql(self, query: str, variables: dict) -> dict:
@@ -134,7 +143,9 @@ class WclClient:
         """
         try:
             return self.graphql(query, {"code": report_id})
-        except RuntimeError:
+        except RuntimeError as error:
+            if not any(field in str(error) for field in ("phaseTransitions", "lastPhase", "phases", "lastPhaseIsIntermission")):
+                raise
             return self.graphql(
                 """
                 query($code: String!) {
@@ -275,6 +286,27 @@ class WclClient:
         }
         """
         return self.graphql(query, {"code": report_id, "fightIDs": [fight_id]}).get("table") or {}
+
+    def world_marker_events(self, report_id: str, end_time: int) -> list:
+        """Include pre-pull placement history; fight-filtered queries lose it."""
+        query = '''
+        query($code: String!, $start: Float!, $end: Float!) {
+          reportData { report(code: $code) {
+            events(dataType: All, startTime: $start, endTime: $end,
+              filterExpression: "type in (\\"worldmarkerplaced\\", \\"worldmarkerremoved\\")",
+              limit: 10000) { data nextPageTimestamp }
+          } }
+        }
+        '''
+        rows, start = [], -1
+        while start < end_time:
+            page = self.graphql(query, {"code": report_id, "start": float(start), "end": float(end_time)}).get("events") or {}
+            rows.extend(page.get("data") or [])
+            next_page = page.get("nextPageTimestamp")
+            if next_page is None or next_page <= start:
+                break
+            start = next_page
+        return rows
 
 
 def encounter_phase_metadata(report: dict, encounter_ids) -> list[dict]:

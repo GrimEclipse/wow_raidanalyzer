@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from math import atan2, degrees, hypot
+from math import atan2, degrees, hypot, radians, sin, cos, pi
 from statistics import median
 from analyzer_core.config import resolve_analysis_options
+from analyzer_core.event_evidence import actor_position
 
 CONFIG_SCHEMA = [
+    {"key":"fullReplayEnabled", "type":"boolean", "default":True, "label":"完整场地回放", "description":"读取整场所有玩家的位置记录。"},
     {"key": "spitReviewEnabled", "type": "boolean", "label": "蛇头射线方向与误伤", "default": False},
     {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
     {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
@@ -88,6 +90,7 @@ BOSS_CONFIG = {
         ["globules", "地板炸圈"],
         ["feast", "盛宴分摊"], ["spit", "蛇头射线"], ["brood", "蛇头打断"],
         ["venomDeaths", "带毒死亡"], ["stone", "裂石击"], ["earlyDeaths", "提前死亡"],
+        ["explore", "机制工作台"],
     ],
     "mechanicVersion": "twinfangs-checkpoint-death-exempt-five-kicks-2026-09-27",
     "features": {"survival": True, "fieldReplay": False},
@@ -135,12 +138,20 @@ BROOD_ARENAS = (
 BROOD_NPC_ID = 270898
 BOSS_NPC_IDS = {257361, 257368}
 BOSS_IDENTITY_BY_GAME_ID = {257361: "Vexhul", 257368: "Ithraz"}
+BULWARK_NPC_ID = 269194
+STRIKER_NPC_ID = 264023
+TANK_CHANNELS = {1289192: "腐蚀洪流", 1303230: "鲜血洪流"}
+REPLAY_CONTROL_SPELLS = {119381: "扫堂腿", 192058: "电能图腾", 30283: "暗影之怒", 179057: "混乱新星",
+    46968: "震荡波", 132469: "台风", 51490: "雷霆风暴", 853: "制裁之锤", 408: "肾击", 5211: "蛮力猛击",
+    107570: "风暴之锤", 221562: "窒息", 5484: "恐惧嚎叫", 8122: "心灵尖啸", 31661: "龙息术",
+    357214: "翼龙打击", 368970: "扫尾", 115750: "盲目之光", 108199: "血魔之握", 202137: "沉默咒符"}
 BROOD_CAST_ID = 1308385
 BROOD_SUMMON_ID = 1308356
 FEAST_HIT_ID = 1290662
+FEAST_PRIMARY_WINDOW_MS = 100
 STONE_RAID_DAMAGE_ID = 1289153
 IMMUNITY_NAMES = {45438: "寒冰屏障", 642: "圣盾术", 1022: "保护祝福", 186265: "灵龟守护"}
-REVIEW_KEYS = [field["key"] for field in CONFIG_SCHEMA if field["type"] == "boolean"]
+REVIEW_KEYS = [field["key"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and field["key"] != "fullReplayEnabled"]
 
 
 def _unique_events(events):
@@ -257,9 +268,11 @@ def _brood_review(fight, actor_map, players, raw, options):
         point = _locate_head(median(p[0] for p in coordinates), median(p[1] for p in coordinates)) if coordinates else None
         round_no = sum(int(e["timestamp"]) <= begun for e in summons)
         output.append({"round": round_no, "timeMs": begun - start, "time": fmt_ms(begun - start), "actorID": actor,
+                       "endTimeMs": min((int(e["timestamp"])-start for e in raw.get("trackedActorEvents") or [] if event_type(e)=="death" and e.get("targetID")==actor and e.get("targetInstance",1)==instance), default=None),
                        "instance": instance, "position": point, "successfulCasts": len(completed),
                        "successTimesMs": [int(e["timestamp"]) - start for e in completed],
-                       "interrupts": [{"time": fmt_ms(int(e["timestamp"]) - start), "spellID": ability_id(e),
+                       "castWindows": [{"timeMs": int(e["timestamp"]) - start, "type": event_type(e)} for e in sorted(events, key=lambda e: int(e["timestamp"]))],
+                       "interrupts": [{"timeMs": int(e["timestamp"]) - start, "time": fmt_ms(int(e["timestamp"]) - start), "spellID": ability_id(e),
                                        "player": player_ref(players, actor_map, raw.get("petOwners", {}).get(e.get("sourceID"), e.get("sourceID")))} for e in kicks],
                        "status": "漏断成功施法" if completed else "已打断" if kicks else "未见成功施法，结局未确认",
                        "assigned": [], "backup": [], "failures": [], "assignmentNote": "", "rangedOrder": None})
@@ -306,6 +319,8 @@ def _brood_review(fight, actor_map, players, raw, options):
         row["assigned"] = [player_ref(players, actor_map, pid) for pid in assigned]
         row["responsibilitySlot"] = ("左" if side == "left" else "右") + ("前" if group == "melee" else "后") + str(row["groupOrder"]) + "断"
         row["responsiblePlayers"] = row["assigned"]
+    # Keep the complete encounter evidence independent of first-leak adjudication.
+    replay_events = deepcopy(output)
     leaks = [row for row in output if row["successTimesMs"]]
     first = min(leaks, key=lambda row: min(row["successTimesMs"])) if leaks else None
     dead_count = sum(not _life_at(raw, pid, start + min(first["successTimesMs"]) - 1) for pid in players) if first else 0
@@ -322,9 +337,13 @@ def _brood_review(fight, actor_map, players, raw, options):
         first["successTimesMs"] = [first["timeMs"]]
         first["successfulCasts"] = 1
     output = [first] if first else []
-    return {"enabled": True, "events": output, "successfulCastCount": int(first is not None), "firstLeakOnly": True, "collapseExemption": excluded,
+    return {"enabled": True, "events": output, "replayEvents": replay_events,
+            "headCount": len(replay_events), "summonCount": len(summons),
+            "interruptCount": sum(len(row["interrupts"]) for row in replay_events),
+            "observedSuccessfulCastCount": sum(row["successfulCasts"] for row in replay_events),
+            "successfulCastCount": int(first is not None), "firstLeakOnly": True, "collapseExemption": excluded,
             "unresolvedCount": sum(r["position"] is None for r in output),
-            "positionNote": "每场仅返回首次脏腑爆裂成功施法，后续漏断忽略。序号按此前该组蛇头出现顺序计算。面向场地尖端按左5→左1、右1→右5编号；坐标误差超过4码不匹配。", "arenas": BROOD_ARENAS}
+            "positionNote": "回放保留全部蛇头和打断记录；判责仍仅计首次漏断，崩溃阶段豁免。序号按此前该组蛇头出现顺序计算。面向场地尖端按左5→左1、右1→右5编号；坐标误差超过4码不匹配。", "arenas": BROOD_ARENAS}
 
 
 def _immunity_state(raw, pid, timestamp, hits=()):
@@ -495,9 +514,10 @@ def _feast_review(fight, actor_map, players, raw, options):
         for strike_index, group in groups:
             hit_time = min(int(e["timestamp"]) for e in group)
             # Underfilled soaks produce a later raid-wide burst using the SAME
-            # damage ID (~325ms later in live logs). Those victims did not soak.
-            primary = [e for e in group if int(e["timestamp"]) - hit_time <= 200]
-            spill = [e for e in group if int(e["timestamp"]) - hit_time > 200]
+            # damage ID. F23's raid-wide burst starts just 156ms after the
+            # immune hits; all observed direct soak hits finish within 100ms.
+            primary = [e for e in group if int(e["timestamp"]) - hit_time <= FEAST_PRIMARY_WINDOW_MS]
+            spill = [e for e in group if int(e["timestamp"]) - hit_time > FEAST_PRIMARY_WINDOW_MS]
             by_player = defaultdict(list)
             for e in primary:
                 by_player[e["targetID"]].append(e)
@@ -506,8 +526,15 @@ def _feast_review(fight, actor_map, players, raw, options):
                 immunity = _immunity_state(raw, pid, hit_time, events)
                 participants.append({**player_ref(players, actor_map, pid), "damage": sum(int(e.get("amount") or 0) for e in events),
                                      "immunity": immunity, "result": "免疫" if immunity["immuneHit"] else "偏转/免疫覆盖的零伤害" if immunity["protectedHit"] else "实际命中"})
+            display = ([p for p in participants if p["playerID"] in ids or p["immunity"]["protectedHit"]
+                        or (strike_index in {2, 3} and p["damage"] > 0)]
+                       if options["feastStrategy"] == "immunity" else participants)
+            direct_unprotected = [p for p in participants if strike_index in {2, 3}
+                                  and p["damage"] > 0 and not p["immunity"]["protectedHit"]]
             strike = {"index": strike_index, "time": fmt_ms(hit_time - start), "timeMs": hit_time - start,
-                      "participants": participants, "displayParticipants": [p for p in participants if p["playerID"] in ids or p["immunity"]["protectedHit"]] if options["feastStrategy"] == "immunity" else participants, "participantCount": len(by_player), "minimum": 4,
+                      "participants": participants, "displayParticipants": display,
+                      "directUnprotected": direct_unprotected,
+                      "participantCount": len(by_player), "minimum": 4,
                       "underfilled": len(by_player) < 4, "assignmentChecks": [],
                       "secondaryRaidDamage": [{**player_ref(players, actor_map, e["targetID"]), "damage": int(e.get("amount") or 0),
                                                "delayMs": int(e["timestamp"]) - hit_time} for e in spill]}
@@ -569,7 +596,7 @@ def _feast_review(fight, actor_map, players, raw, options):
         rounds.append(round_row)
     return {"enabled": True, "strategy": options["feastStrategy"], "rounds": rounds,
             "immunityUsage": _immunity_usage_review(fight, actor_map, players, raw, rounds) if options["feastStrategy"] == "immunity" else None,
-            "evidenceNote": "每次盛宴分三段；首段全团，免疫打法只核对后两段。命中包含 immune、偏转及零伤害，按玩家去重；延迟超过200ms的同ID全团溅射单列，不算分摊参与者。每人每轮最多计一次失误；缺失整段记录不凭空归责。"}
+            "evidenceNote": "每次盛宴分三段；首段全团，免疫打法只核对后两段。命中包含 immune、偏转及零伤害，按玩家去重；延迟超过100ms的同ID全团溅射单列，不算分摊参与者。每人每轮最多计一次失误；缺失整段记录不凭空归责。"}
 
 
 def _stone_review(fight, actor_map, players, raw):
@@ -997,6 +1024,169 @@ def _spit_review(fight, actor_map, players, raw):
             "evidenceNote": "取完成读条时的目标；坐标样本距完成不超过250ms。三只蛇头共用左蛇头→左Boss、右蛇头→右Boss两条固定边界的禁射方向夹角（含边界）；同时禁止朝生成线背离Boss一侧射击。每条完成射线最多计一次。误伤按同一蛇头实例、完成后750ms内实际伤害对应；额外受击不单独证明点名玩家走错。"}
 
 
+def _torrent_rotation(torrents, events, start, players):
+    """Fit one constant angular speed; sparse rounds do not invent a direction."""
+    def wrap(angle):
+        return (angle+pi) % (2*pi)-pi
+    candidates = []
+    for torrent in torrents:
+        begin, end, actor = torrent["startTimeMs"]+start, (torrent["endTimeMs"] or 0)+start, torrent["actorID"]
+        origin = next((actor_position(e, "source") for e in events if e.get("sourceID")==actor and e.get("abilityGameID")==1294293 and e.get("type")=="cast" and int(e["timestamp"])==begin and actor_position(e,"source")), None)
+        if not origin:
+            owned = [(abs(int(e["timestamp"])-begin), actor_position(e, side)) for e in events for side in ("source","target") if e.get(side+"ID")==actor and actor_position(e,side)]
+            origin = min(owned, default=(0,None), key=lambda row:row[0])[1]
+        if not origin:
+            continue
+        previous = [(int(e["timestamp"]), actor_position(e,side)) for e in events for side in ("source","target") if e.get(side+"ID")==actor and begin-25000<=int(e["timestamp"])<=begin-5000 and actor_position(e,side)]
+        settled=[row for row in previous if min(hypot(row[1]["x"]-p[0],row[1]["y"]-p[1]) for a in BROOD_ARENAS for p in a["bosses"].values())<1500]
+        anchor = max(settled or previous, default=(0,origin), key=lambda row:row[0])[1]
+        arena = min(BROOD_ARENAS,key=lambda a:min(hypot(anchor["x"]-p[0],anchor["y"]-p[1]) for p in a["bosses"].values()))
+        center = [sum(p[i] for p in arena["bosses"].values())/2 for i in (0,1)]
+        initial = atan2(center[1]-origin["y"],center[0]-origin["x"])
+        hit_rows = []
+        for e in events:
+            if e.get("sourceID")!=actor or e.get("abilityGameID") not in {1293749,1294605} or event_type(e)!="damage" or not begin<=int(e["timestamp"])<end:
+                continue
+            point = actor_position(e,"target")
+            if point:
+                hit_rows.append(((int(e["timestamp"])-begin)/1000,atan2(point["y"]-origin["y"],point["x"]-origin["x"])))
+        votes=[]
+        for pid,player in players.items():
+            if player.get("specID")!=66:
+                continue
+            positions={}
+            for e in events:
+                if not begin<=int(e["timestamp"])<end:continue
+                for side in ("source","target"):
+                    if e.get(side+"ID")==pid:
+                        p=actor_position(e,side)
+                        if p and hypot(p["x"]-origin["x"],p["y"]-origin["y"])>800:
+                            positions[(int(e["timestamp"])-begin)//500]=atan2(p["y"]-origin["y"],p["x"]-origin["x"])
+            angles=[a for _,a in sorted(positions.items())]
+            delta=sum(wrap(b-a) for a,b in zip(angles,angles[1:]) if abs(wrap(b-a))<radians(45))
+            if len(angles)>=4 and abs(delta)>radians(15):votes.append(1 if delta>0 else -1)
+        direction=1 if votes and sum(votes)>0 else -1 if votes and sum(votes)<0 else None
+        torrent.update(origin=origin,previousArena=arena["key"],initialAngleRadians=initial,rotationDirection=direction,angularSpeedDegrees=None,rotationEvidence="防骑连续绕场跑位确定方向" if direction else "命中跨度不足，旋转方向待确认")
+        # Collapse simultaneous raid hits so one tick does not outweigh a later hit.
+        buckets = defaultdict(list)
+        for time, angle in hit_rows:
+            buckets[round(time,1)].append(angle)
+        samples = [(time,atan2(sum(sin(a) for a in angles),sum(cos(a) for a in angles))) for time,angles in sorted(buckets.items())]
+        torrent["rotationHitCount"] = len(hit_rows)
+        torrent["_rotationSamples"]=samples
+        if not direction or len(samples)<2 or samples[-1][0]-samples[0][0]<1.5:
+            continue
+        unwrapped=[samples[0][1]]
+        for (_,a),(_,b) in zip(samples,samples[1:]):
+            delta=wrap(b-a)
+            if direction*delta<0:delta+=direction*2*pi
+            unwrapped.append(unwrapped[-1]+delta)
+        mean_time=sum(t for t,_ in samples)/len(samples);mean_angle=sum(unwrapped)/len(samples)
+        slope=sum((t-mean_time)*(a-mean_angle) for (t,_),a in zip(samples,unwrapped))/sum((t-mean_time)**2 for t,_ in samples)
+        speed=abs(degrees(slope));phase=mean_angle-slope*mean_time
+        error=sum(wrap(a-phase-slope*t)**2 for (t,_),a in zip(samples,unwrapped))/len(samples)
+        if 1<speed<180 and error<radians(12)**2 and abs(wrap(phase-initial))<radians(50):
+            candidates.append(speed)
+            torrent.update(angularSpeedDegrees=speed,initialAngleRadians=phase,rotationEvidence="防骑连续绕场跑位确定方向；分离射线命中估算速度，示意动画")
+    if candidates:
+        shared_speed=median(candidates)
+        for torrent in torrents:
+            torrent["angularSpeedDegrees"]=shared_speed
+            samples=torrent.get("_rotationSamples") or []
+            if samples and torrent.get("rotationDirection") and "估算速度" not in torrent["rotationEvidence"]:
+                phases=[a-torrent["rotationDirection"]*radians(shared_speed)*t for t,a in samples]
+                torrent["initialAngleRadians"]=atan2(sum(sin(a) for a in phases),sum(cos(a) for a in phases))
+    for torrent in torrents:torrent.pop("_rotationSamples",None)
+
+
+def _replay_animation_units(fight, events, raw, players):
+    start,end=int(fight["startTime"]),int(fight["endTime"])
+    ids={a["id"] for a in raw.get("actorRows") or [] if a.get("gameID")==STRIKER_NPC_ID}
+    heads, channels = {}, []
+    for e in events:
+        ts=int(e["timestamp"])
+        if e.get("type")=="cast" and ability_id(e) in TANK_CHANNELS:
+            death=next((int(row["timestamp"]) for row in events if row.get("type")=="death" and row.get("targetID")==e["sourceID"] and ts<=int(row["timestamp"])<ts+4000),end)
+            channels.append({"actorID":e["sourceID"],"targetID":e.get("targetID"),"spellID":ability_id(e),"spellName":TANK_CHANNELS[ability_id(e)],"startTimeMs":ts-start,"endTimeMs":min(ts+4000,end,death)-start,"outcome":"completed","phase":"channel"})
+        for side in ("source","target"):
+            actor=e.get(side+"ID")
+            if actor not in ids:
+                continue
+            instance=int(e.get(side+"Instance") or 0)
+            key=f"{actor}:{instance}"
+            head=heads.setdefault(key,{"key":key,"actorID":actor,"instance":instance,"spawnTimeMs":ts-start,"endTimeMs":None,"position":None,"casts":[]})
+            point=actor_position(e,side)
+            if point and head["position"] is None:head["position"]=point
+            if side=="target" and e["type"]=="death":head["endTimeMs"]=ts-start
+            if side=="source" and ability_id(e)==1291478:
+                if e["type"]=="begincast":head["casts"].append({"startTimeMs":ts-start,"endTimeMs":None,"targetID":None})
+                elif e["type"]=="cast":
+                    cast=next((c for c in reversed(head["casts"]) if c["endTimeMs"] is None),None)
+                    if cast:cast.update(endTimeMs=ts-start,targetID=e.get("targetID"),targetPosition=actor_position(e,"target"))
+    for head in heads.values():
+        point=head["position"]
+        if point:
+            arena,slot,_=min(((a,s,hypot(point["x"]-p[0],point["y"]-p[1])) for a,slots in SPIT_HEAD_POSITIONS.items() for s,p in slots.items()),key=lambda r:r[2])
+            head.update(arena=arena,slot=slot)
+    # A missing NPC death is explicit; do not infer a kill from the last sample.
+    return list(heads.values()),channels
+
+
+def _replay_feedback(fight, actor_map, players, raw):
+    start = int(fight["startTime"])
+    combined=list(raw.get("replayEvents") or []) + list(raw.get("trackedActorEvents") or []) + list(raw.get("damage") or [])
+    events = _unique_events(sorted(combined,key=lambda e:not any(actor_position(e,s) for s in ("source","target"))))
+    wall_ids = {a["id"] for a in raw.get("actorRows") or [] if a.get("gameID") == BULWARK_NPC_ID}
+    hits, controls, walls = [], [], {}
+    # Stirring Abyss is unavoidable raid damage; venom accounting still keeps it.
+    avoidable = (set(VENOM_ABNORMAL_DAMAGE) - {1292806, 1292807}) | AVOIDABLE_DEATH_DAMAGE_IDS | {1295107, 1291478, 1293295, 1293979}
+    for event in events:
+        time = int(event.get("timestamp") or 0) - start
+        if time < 0:
+            continue
+        if event_type(event) == "damage" and event.get("targetID") in players and ability_id(event) in avoidable and int(event.get("amount") or 0) > 0:
+            hits.append({"timeMs": time, "spellID": ability_id(event), **player_ref(players, actor_map, event["targetID"])})
+        for side in ("source", "target"):
+            actor = event.get(side+"ID")
+            if actor not in wall_ids:
+                continue
+            instance = int(event.get(side+"Instance") or 0)
+            key = f"{actor}:{instance}"
+            wall = walls.setdefault(key, {"key": key, "actorID": actor, "instance": instance, "spawnTimeMs": time, "endTimeMs": None, "position": None, "attacks": [], "breaker": None})
+            point = actor_position(event, side)
+            if point:
+                wall["position"] = point
+            if side == "target" and event_type(event) in {"damage", "absorbed"}:
+                owner = (raw.get("petOwners") or {}).get(event.get("sourceID"), event.get("sourceID"))
+                if owner in players:
+                    wall["attacks"].append({"timeMs": time, **player_ref(players, actor_map, owner)})
+            if side == "target" and (event_type(event) == "death" or event_type(event) == "removebuff" and ability_id(event) == 1303378):
+                wall["endTimeMs"] = time
+                owner = (raw.get("petOwners") or {}).get(event.get("sourceID"), event.get("sourceID"))
+                if owner in players:
+                    wall["breaker"] = player_ref(players, actor_map, owner)
+                elif wall["attacks"] and time-wall["attacks"][-1]["timeMs"] <= 500:
+                    wall["breaker"] = {**wall["attacks"][-1], "evidence": "死亡前最后一次伤害"}
+    for event in raw.get("friendlyCasts") or []:
+        spell = ability_id(event)
+        if event_type(event) == "cast" and spell in REPLAY_CONTROL_SPELLS and event.get("sourceID") in players:
+            controls.append({"timeMs": int(event["timestamp"])-start, "spellID": spell, "spell": REPLAY_CONTROL_SPELLS[spell], **player_ref(players, actor_map, event["sourceID"])})
+    _immunity_state(raw, next(iter(players), 0), start)
+    immunities = [{"playerID": pid, "spellID": sid, "spell": IMMUNITY_NAMES[sid], "startTimeMs": max(0, begin-start),
+                   "endTimeMs": min(int(fight["endTime"]), end)-start, "sourceID": source}
+                  for pid, intervals in raw["_twinImmunityIntervals"].items() for sid, begin, end, source in intervals]
+    torrents = []
+    for event in events:
+        if ability_id(event) != 1294293 or event_type(event) != "applybuff" or event.get("sourceID") != event.get("targetID"):
+            continue
+        begin = int(event["timestamp"])
+        end = next((int(e["timestamp"]) for e in events if ability_id(e)==1294293 and event_type(e)=="removebuff" and e.get("sourceID")==event.get("sourceID")==e.get("targetID") and int(e["timestamp"])>begin), None)
+        torrents.append({"actorID": event["sourceID"], "startTimeMs": begin-start, "endTimeMs": end-start if end else None, "spellID":1294293, "spellName":"邪恶洪流"})
+    _torrent_rotation(torrents,events,start,players)
+    strikers,channels=_replay_animation_units(fight,events,raw,players)
+    return {"hits": hits, "controls": controls, "bulwarks": list(walls.values()), "immunities": immunities, "torrents": torrents,"strikers":strikers,"channels":channels}
+
+
 def analyze_twinfangs(fight, actor_map, players, raw):
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     if not any(options[key] for key in REVIEW_KEYS):
@@ -1196,6 +1386,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                                                 "x": e.get("x"), "y": e.get("y"), "time": fmt_ms(int(e["timestamp"]) - fight["startTime"])} for e in cover]})
     venom_rounds = _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds)
     return {
+        "replayFeedback": _replay_feedback(fight, actor_map, players, raw) if options["fullReplayEnabled"] else {},
         "eternalVenom": {"players": histories if options["venomReviewEnabled"] else [], "feastChecks": feast_checks,
                          "checkpoints": _venom_checkpoints(fight, actor_map, players, raw, histories) if options["venomReviewEnabled"] else [],
                          "abnormalGains": abnormal_gains if options["venomReviewEnabled"] else [],
@@ -1349,6 +1540,7 @@ def _mechanic_overview(rendered, options=None):
 def build_aggregated_json(report_ids, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
     config = deepcopy(BOSS_CONFIG)
+    config["fetchCombatReplay"] = options["fullReplayEnabled"]
     config["fetchEventResources"] = False
     config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
     if options["venomReviewEnabled"] or options["feastReviewEnabled"]:
@@ -1364,8 +1556,12 @@ def build_aggregated_json(report_ids, options=None):
     if options["earlyDeathReviewEnabled"] or options["venomDeathReviewEnabled"]:
         config["fetchKeys"].update({"damage", "debuffs"})
     config["fetchCastResources"] = options["broodReviewEnabled"] or options["globulesReviewEnabled"] or options["spitReviewEnabled"]
-    config["trackedActorGameIDs"] = BOSS_NPC_IDS | {BROOD_NPC_ID}
+    config["trackedActorGameIDs"] = BOSS_NPC_IDS | {BROOD_NPC_ID, STRIKER_NPC_ID}
     config["trackedActorEventFilters"] = []
+    if options["fullReplayEnabled"] and any(options[k] for k in REVIEW_KEYS):
+        config["trackedActorEventFilters"].append(f"source.id = {STRIKER_NPC_ID} or target.id = {STRIKER_NPC_ID}")
+    if options["fullReplayEnabled"] and options["globulesReviewEnabled"]:
+        config["trackedActorEventFilters"].append(f"source.id = {BULWARK_NPC_ID} or target.id = {BULWARK_NPC_ID}")
     if options["venomReviewEnabled"]:
         config["trackedActorEventFilters"].append("ability.id = 1294293")
     if options["spitReviewEnabled"]:
@@ -1382,7 +1578,7 @@ def build_aggregated_json(report_ids, options=None):
         config["trackedActorGameIDs"] = set()
     tab_enabled = {"survival": True, "venom": options["venomReviewEnabled"] or options["feastReviewEnabled"],
                    "globules": options["globulesReviewEnabled"], "feast": options["feastReviewEnabled"], "brood": options["broodReviewEnabled"], "spit": options["spitReviewEnabled"],
-                   "venomDeaths": options["venomDeathReviewEnabled"], "stone": options["stoneReviewEnabled"], "earlyDeaths": options["earlyDeathReviewEnabled"]}
+                   "venomDeaths": options["venomDeathReviewEnabled"], "stone": options["stoneReviewEnabled"], "earlyDeaths": options["earlyDeathReviewEnabled"], "explore": options["broodReviewEnabled"]}
     config["tabs"] = [row for row in config["tabs"] if tab_enabled[row[0]]]
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]]
     result = _build(config, analyze_mechanics, report_ids, options)

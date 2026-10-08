@@ -364,8 +364,9 @@ function specIconUrl(row) {
   const slug = row?.icon;
   if (!slug) return "";
   const name = String(slug);
-  if (name.startsWith("assets/")) return name;
-  return `assets/specs/${name}.jpg`;
+  if (name.startsWith("/")) return name;
+  if (name.startsWith("assets/")) return `/${name}`;
+  return `/assets/specs/${name}.jpg`;
 }
 function playerHoverCard(row, extra) {
   const color = row?.classColor || "#fff";
@@ -554,14 +555,32 @@ function renderField() {
   }, 0);
   return `<section class="panel"><h2>场地示意图</h2><p class="muted">${esc(data.evidenceNote || "")}</p><p class="muted">按技能收起或展开；点开某一轮查看该次示意图。</p><div class="field-mechanic-groups">${panels}</div></section>`;
 }
-function renderContent() { let html = ""; if (state.tab === "survival") html = renderSurvival(); else if (state.tab === "p1") html = renderP1(); else if (state.tab === "p2") html = renderP2(); else if (state.tab === "intermission") html = renderIntermission(); else if (state.tab === "p3") html = renderP3(); else if (state.tab === "field") html = renderField(); $("content").innerHTML = html || '<div class="empty">该页暂无数据。</div>'; $("content").querySelectorAll('[data-analysis-option]').forEach(section => {
+function mountAltarWorkbench() {
+  const data=boss().fieldAudit||{},events=[];
+  const venom=boss().toxicDeluge||{},carriers=venom.carriers||[],pickupPositions=new Map();
+  for(const puddle of venom.groundPuddles||[])for(const carrier of puddle.carriers||[])if(carrier.pickupPosition)pickupPositions.set(`${carrier.playerID}:${carrier.applyTimeMs}`,carrier.pickupPosition);
+  const diagramTime=diagram=>{if(diagram.timeMs!=null)return Number(diagram.timeMs);const match=String(diagram.time||'').match(/^(\d+):(\d+(?:\.\d+)?)$/);return match?(Number(match[1])*60+Number(match[2]))*1000:null;};
+  for(const diagram of data.diagrams||[]){const targets=diagram.targets?.length?diagram.targets:[{}];for(const target of targets){if(diagram.kind==='venom-field'&&target.finalDrop&&carriers.length)continue;events.push({id:String(events.length),timeMs:target.timeMs??diagramTime(diagram),layer:diagram.mechanic||diagram.kind,label:diagram.mechanic||diagram.kind,
+    actor:target.player||target.name||'团队事件',group:`${diagram.phase||''} · 第 ${diagram.roundIndex||'?'} 轮`,kind:diagram.kind,problem:target.failed===true||target.clearOutcome==='missed-in-cone',outcome:target.clearOutcome||target.status||'机制快照',
+    evidence:target.position?.reliable===false||target.position?.positionReliable===false?'推断位置 · 请复核':data.evidenceNote||'WCL 事件快照',diagram,points:target.position?[{position:target.position,label:target.player}]:[]});}}
+  for(const carrier of carriers){for(const [kind,timeMs,position] of [['pickup',carrier.applyTimeMs,pickupPositions.get(`${carrier.playerID}:${carrier.applyTimeMs}`)],['drop',carrier.removeTimeMs,carrier.dropPosition]]){
+    if(timeMs==null)continue;
+    const label=kind==='pickup'?'毒液拾取':'毒液放下',annotation='光环应用 / 移除对应的事件快照；位置不会沿时间轴插值。',target={...carrier,kind:kind==='drop'?(carrier.venomKind==='virulent-mutation'?'virulent-mutation':'ground-venom'):'carrier',position};
+    events.push({id:String(events.length),timeMs,layer:'毒液搬运',label,actor:carrier.player,actorID:carrier.playerID,group:`${carrier.phase||''} · 毒液 #${carrier.puddleID??'?'}`,kind,spellID:carrier.spellID,problem:false,outcome:kind==='pickup'?'开始搬运':'结束搬运',
+      evidence:`WCL 搬运光环${kind==='pickup'?'应用':'移除'}；${position?'位置快照，偏移 '+(position.sampleOffsetMs??0)+'ms':'缺少该时刻位置'}`,detail:`搬运 ${carrier.carryDurationMs==null?'时长未知':(carrier.carryDurationMs/1000).toFixed(1)+' 秒'}；转移记录 ${carrier.transferCount||0} 次`,
+      diagram:{kind:'venom-field',mechanic:label,phase:carrier.phase,timeMs,targets:position?[target]:[],annotation},points:position?[{position,label:carrier.player,color:carrier.classColor}]:[]});
+  }}
+  window.MechanicWorkbench?.mount(document.getElementById('altarWorkbench'),{key:'coiledaltar',combatReplay:boss().combatReplay,title:'盘卷祭坛 · 机制工作台',events,durationMs:current()?.durationMs,deaths:current()?.survival?.timeline||[],note:'时间轴联动毒液搬运、锥形清场、恐惧行军、炸弹与转场快照。筛选和矩阵在本地计算。当前展示事件时刻的场地快照；缺失的连续移动不作补造。'},
+    {project(point){const mapped=pct(point,data.arena);return mapped?{x:mapped.left,y:mapped.top}:null;},renderMap(selected,_events,cursor,config){if(!selected)return '<div class="empty">当前筛选没有事件。</div>';const diagram={...selected.diagram,targets:(selected.diagram.targets||[]).filter(x=>(x.timeMs==null||x.timeMs<=cursor)&&(!config.actor||(x.player||x.name)===config.actor))};return fieldMap(data,diagram);}});
+}
+function renderContent() { let html = ""; if (state.tab === "survival") html = renderSurvival(); else if (state.tab === "p1") html = renderP1(); else if (state.tab === "p2") html = renderP2(); else if (state.tab === "intermission") html = renderIntermission(); else if (state.tab === "p3") html = renderP3(); else if (state.tab === "field") html = renderField(); else if(state.tab==='explore')html='<div id="altarWorkbench"></div>'; $("content").innerHTML = html || '<div class="empty">该页暂无数据。</div>'; if(state.tab==='explore')mountAltarWorkbench(); $("content").querySelectorAll('[data-analysis-option]').forEach(section => {
   if(state.payload?.meta?.analysisConfig?.[section.dataset.analysisOption] !== false) return;
   const heading = section.querySelector('h2')?.cloneNode(true);
   const note = document.createElement('p'); note.className = 'muted'; note.textContent = '本次未分析：已关闭此项目，不代表没有发生该机制。';
   section.replaceChildren(...(heading ? [heading, note] : [note]));
 }); refreshWowhead(); }
 function render() { renderStats(); renderTabs(); renderContent(); }
-function load(payload) { state.payload = payload; state.pulls = [...(payload.data?.page1_wipeAnalysis || [])].sort((a, b) => String(b.startTimeIso || `${b.date || ""}${b.fightID || ""}`).localeCompare(String(a.startTimeIso || `${a.date || ""}${a.fightID || ""}`))); const fight = Number(new URLSearchParams(location.search).get("fight")); const index = state.pulls.findIndex((row) => Number(row.fightID) === fight); state.pull = index >= 0 ? index : 0; state.tab = (payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); $("pullSelect").innerHTML = state.pulls.map((row, index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage).toFixed(2)}%`}，${esc(row.duration)}</option>`).join(""); $("pullSelect").value = String(state.pull); $("error").textContent = state.pulls.length ? "" : "分析结果中没有该 Boss 战斗。"; render(); }
+function load(payload) { state.payload = payload; state.pulls = [...(payload.data?.page1_wipeAnalysis || [])].sort((a, b) => String(b.startTimeIso || `${b.date || ""}${b.fightID || ""}`).localeCompare(String(a.startTimeIso || `${a.date || ""}${a.fightID || ""}`))); const fight = Number(new URLSearchParams(location.search).get("fight")); const index = state.pulls.findIndex((row) => Number(row.fightID) === fight); state.pull = index >= 0 ? index : 0; state.tab = new URLSearchParams(location.search).get("tab") || (payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); $("pullSelect").innerHTML = state.pulls.map((row, index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage).toFixed(2)}%`}，${esc(row.duration)}</option>`).join(""); $("pullSelect").value = String(state.pull); $("error").textContent = state.pulls.length ? "" : "分析结果中没有该 Boss 战斗。"; render(); }
 $("pullSelect").onchange = (event) => { state.pull = Number(event.target.value); state.tab = (state.payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); render(); };
 $("fileInput").onchange = async (event) => { try { load(await window.MythicReportRuntime.readLocalFile(event.target.files[0])); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
 const path = new URLSearchParams(location.search).get("json"); state.sourcePath = path || ""; if (path) $("overviewLink").href = `/frontend/report/overview.html?json=${encodeURIComponent(path)}`; if (path) window.MythicReportRuntime.loadPayload(path).then(load).catch((error) => ($("error").textContent = error.message)); else $("error").textContent = "请从全场概览进入，或导入分析 JSON。";

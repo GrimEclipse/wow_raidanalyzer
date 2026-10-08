@@ -16,9 +16,9 @@ window.AnalysisConfigForm = {
         default: return input.value;
       }
     }
-    function collect() { return Object.fromEntries(sections().map(section => [section.dataset.configKey, read(section)])); }
+    function collect(includeHidden=false) { return Object.fromEntries(sections().filter(section => includeHidden||!section.closest('[hidden]')).map(section => [section.dataset.configKey, read(section)])); }
     function visibility() {
-      const values = collect();
+      const values = collect(true);
       const byKey = Object.fromEntries(sections().map(section => [section.dataset.configKey, section]));
       schema.forEach(field => {
         const condition = field.visibleWhen;
@@ -26,9 +26,10 @@ window.AnalysisConfigForm = {
         const actual = values[condition.field];
         byKey[field.key].hidden = byKey[condition.field]?.hidden || ('equals' in condition ? actual !== condition.equals : actual === condition.notEquals);
       });
+      sections().forEach(section => section.querySelectorAll('input,select,textarea,button').forEach(node => {node.disabled=Boolean(section.closest('[hidden]'));}));
     }
     function setSchema(next, key, fightRoster = []) {
-      if (identity) drafts.set(identity, collect());
+      if (identity) drafts.set(identity, collect(true));
       identity = key; schema = next || []; roster = fightRoster || [];
       const saved = drafts.get(identity) || {};
       container.innerHTML = schema.map(field => {
@@ -64,7 +65,7 @@ window.AnalysisConfigForm = {
           } else if (['playerList','textList'].includes(field.type)) {
             input = `<textarea data-config-input rows="2">${esc(Array.isArray(value) ? value.join(' ') : value)}</textarea>`;
           } else {
-            input = `<input data-config-input type="${field.type === 'number' ? 'number' : 'text'}" value="${esc(value)}" ${['min','max','step'].filter(k => field[k] != null).map(k => `${k}="${esc(field[k])}"`).join(' ')}>`;
+            input = `<input data-config-input type="${field.type === 'number' ? 'number' : 'text'}" value="${esc(value)}" ${field.type==='number'&&field.step==null?'step="any"':''} ${['min','max','step'].filter(k => field[k] != null).map(k => `${k}="${esc(field[k])}"`).join(' ')}>`;
           }
           control = `<label class="stack">${label}${help}${input}</label>`;
         }

@@ -1,5 +1,4 @@
-import sys
-from importlib import import_module, reload
+from importlib import import_module
 from inspect import signature
 from pathlib import Path
 from typing import Optional, Union
@@ -10,25 +9,9 @@ from analyzer_core.progress import emit_progress, progress_scope
 
 
 def load_plugin(entry):
-    plugin_name = entry.plugin
-    parts = plugin_name.split(".")
-    names = []
-    if len(parts) >= 3:
-        raid_pkg = ".".join(parts[:-1])
-        names.append(f"{raid_pkg}.shared")
-    names.append(plugin_name)
-    module = None
-    for name in names:
-        try:
-            if name in sys.modules:
-                loaded = reload(sys.modules[name])
-            else:
-                loaded = import_module(name)
-        except ImportError:
-            continue
-        module = loaded
-    if module is None:
-        module = import_module(plugin_name)
+    # Imports are cached by Python. Reloading during concurrent jobs can replace
+    # module globals while another fight is still using them.
+    module = import_module(entry.plugin)
     if not hasattr(module, "analyze"):
         raise AttributeError(f"{entry.plugin} 缺少 analyze(report_ids, output_path) 接口")
     return module

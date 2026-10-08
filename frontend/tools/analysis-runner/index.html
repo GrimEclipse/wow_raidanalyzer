@@ -253,7 +253,7 @@ function renderConfig() {
                     <input data-config-input type="number" value="${escapeHtml(value)}"
                         ${field.min != null ? `min="${escapeHtml(field.min)}"` : ''}
                         ${field.max != null ? `max="${escapeHtml(field.max)}"` : ''}
-                        ${field.step != null ? `step="${escapeHtml(field.step)}"` : ''}
+                        step="${escapeHtml(field.step ?? 'any')}"
                         class="${inputClass}">
                 </label>
             `;
@@ -389,6 +389,9 @@ function updateConfigVisibility() {
             !parentVisible || !configConditionMatches(condition, parentValue)
         );
     });
+    sections.forEach(section => section.querySelectorAll('input,select,textarea,button').forEach(node => {
+        node.disabled=section.classList.contains('hidden')||Boolean(node.closest('[hidden]'));
+    }));
 }
 
 function renderState() {
@@ -408,8 +411,9 @@ function collectOptions() {
     const options = {};
     document.querySelectorAll('[data-config-key]').forEach(section => {
         const key = section.dataset.configKey;
-        options[key] = readConfigField(section);
-        rememberConfigValue(key, options[key]);
+        const value = readConfigField(section);
+        rememberConfigValue(key, value);
+        if (!section.classList.contains('hidden') && !section.closest('[hidden]')) options[key] = value;
     });
     return options;
 }
@@ -449,9 +453,11 @@ async function loadCatalog() {
         state.catalog = await response.json();
         state.apiAvailable = false;
     }
-    state.selectedVersion = state.catalog.versions[0]?.version || '';
-    state.selectedRaid = activeVersion().raids?.[0]?.key || '';
-    state.selectedBoss = activeRaid().bosses?.find(item => item.supported)?.key || activeRaid().bosses?.[0]?.key || '';
+    const requested = new URLSearchParams(location.search);
+    state.selectedVersion = requested.get('version') || state.catalog.versions[0]?.version || '';
+    state.selectedRaid = requested.get('raid') || activeVersion().raids?.[0]?.key || '';
+    state.selectedBoss = requested.get('boss') || activeRaid().bosses?.find(item => item.supported)?.key || activeRaid().bosses?.[0]?.key || '';
+    if (requested.get('report')) el.reportIds.value = requested.get('report');
     renderSelectors();
 }
 

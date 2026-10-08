@@ -648,6 +648,7 @@
                 "verdict": { "enabled": false, "renderer": "mistake-verdict" },
                 "replay": { "enabled": false, "renderer": "field-audit" }
               },
+              "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
                 { "key": "default", "path": "assets/raids/tidebound_grotto/01-nymrissa.jpg", "width": 1997, "height": 1118 }

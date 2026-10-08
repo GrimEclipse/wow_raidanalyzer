@@ -59,7 +59,7 @@
     <div class="wait-actions"><button id="closeWait" class="hidden">返回选择</button></div>
   </div>
 </section>
-<script src="/frontend/core/analysis-config.js?v=20260930-roster-groups"></script>
+<script src="/frontend/core/analysis-config.js?v=20261008-14"></script>
 <script>
 (() => {
   const $=id=>document.getElementById(id);
@@ -129,7 +129,9 @@
       renderFights();
       const sameDay=(state.report.fights||[]).filter(row=>row.raidNightDate===$("dateInput").value);
       const last=[...(sameDay.length?sameDay:state.report.fights||[])].sort((a,b)=>Number(a.absoluteStartTime||0)-Number(b.absoluteStartTime||0)).pop();
-      if(last)selectFight(last.id);
+      const requestedID=Number(new URLSearchParams(location.search).get('fight'));
+      const requested=(state.report.fights||[]).find(row=>row.id===requestedID);
+      if(requested){$("dateInput").value=requested.raidNightDate;renderFights();selectFight(requested.id)}else if(last)selectFight(last.id);
     }catch(error){$("reportTitle").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`}
   }
 
@@ -188,6 +190,8 @@
   $("guildSelect").addEventListener("change",event=>{const option=event.target.selectedOptions[0];$("guildLabel").textContent=option?option.textContent:guildLabel(event.target.value)});
   $("loadReports").addEventListener("click",loadReports);$("openReport").addEventListener("click",()=>openReport());$("analyze").addEventListener("click",analyze);$("closeWait").addEventListener("click",closeWait);
   loadConfig().catch(error=>$("reportMessage").innerHTML=`<span class="error">${escapeHtml(error.message)}</span>`);
+  const requestedReport=new URLSearchParams(location.search).get('report');
+  if(requestedReport){$("reportInput").value=requestedReport;openReport(requestedReport)}
 })();
 </script>
 <script src="/frontend/core/home-button.js?v=1"></script></body>

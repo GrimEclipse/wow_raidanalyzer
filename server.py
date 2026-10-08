@@ -727,7 +727,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
             config = load_single_fight_config()
             guilds = user_guilds(user["id"])
-            selected_guild = next((guild for guild in guilds if guild["isDefault"]), guilds[0])
+            selected_guild = next((guild for guild in guilds if guild["isDefault"]), guilds[0] if guilds else {"id": 0, "name": ""})
             return self.send_response_body(*json_bytes({
                 "schemaVersion": config["schemaVersion"],
                 "guild": selected_guild,
@@ -1478,7 +1478,30 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def is_public_page(path):
-        return path in {"/", "/index.html", "/raid-guide", "/frontend/tools/raid-guide",
+        demo_assets = {
+            "/boss_catalog.json", "/demos", "/frontend/tools/mechanic-demos/index.html",
+            "/assets/demos/manifest.json", "/assets/demos/twinfangs.json", "/assets/demos/coiledaltar.json",
+            "/assets/demos/coiledaltar_progression.json",
+            "/assets/demos/vashnik.json", "/assets/demos/nymrissa_wavecaller.json",
+            "/assets/demos/sszorak.json",
+            "/assets/spells/1022.jpg", "/assets/spells/642.jpg", "/assets/spells/45438.jpg", "/assets/spells/186265.jpg",
+            "/assets/spells/853.jpg", "/assets/spells/192058.jpg", "/assets/spells/46968.jpg", "/assets/spells/5484.jpg", "/assets/spells/115750.jpg", "/assets/spells/31661.jpg", "/assets/spells/119381.jpg", "/assets/spells/8122.jpg", "/assets/spells/357214.jpg", "/assets/spells/107570.jpg", "/assets/spells/408.jpg",
+            "/assets/spells/30283.jpg", "/assets/spells/179057.jpg", "/assets/spells/132469.jpg", "/assets/spells/51490.jpg", "/assets/spells/5211.jpg", "/assets/spells/221562.jpg", "/assets/spells/368970.jpg", "/assets/spells/108199.jpg", "/assets/spells/202137.jpg",
+            "/frontend/core/home-workspace.css", "/frontend/core/home-workspace.js",
+            "/frontend/core/mechanic-workbench.css", "/frontend/core/mechanic-workbench.js",
+            "/frontend/report/plugins/venomous_abyss/vashnik/wave-replay.js",
+            "/frontend/report/plugins/venomous_abyss/vashnik/field-view.js",
+        }
+        for plugin in ("venomous_abyss/progression", "venomous_abyss/coiledaltar", "venomous_abyss/vashnik", "tidebound_grotto/nymrissa_wavecaller"):
+            demo_assets.update(f"/frontend/report/plugins/{plugin}/report.{suffix}" for suffix in ("html", "css", "js"))
+        for plugin in ("twinfangs", "sszorak"):
+            demo_assets.update(f"/frontend/report/plugins/venomous_abyss/{plugin}/mechanics.{suffix}" for suffix in ("css", "js"))
+        if path in demo_assets:
+            return True
+        return (
+            (path.startswith("/assets/raids/") or path.startswith("/assets/specs/") or path.startswith("/boss_plugins/assets/"))
+            and Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        ) or path in {"/", "/index.html", "/raid-guide", "/frontend/tools/raid-guide",
                         "/frontend/tools/raid-guide/index.html",
                         "/frontend/core/design-system.css", "/frontend/core/cosmic-background.js",
                         "/frontend/core/auth-dialog.css", "/frontend/core/auth-dialog.js",
@@ -1501,6 +1524,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/cooldowns": "/frontend/tools/raid-cooldowns/index.html",
             "/mythic-dungeon": "/frontend/tools/mythic-dungeon/index.html",
             "/raid-guide": "/frontend/tools/raid-guide/index.html",
+            "/demos": "/frontend/tools/mechanic-demos/index.html",
             "/frontend/tools/raid-guide": "/frontend/tools/raid-guide/index.html",
             "/audit": "/frontend/report/plugins/void_spire/crown_of_the_cosmos/audit.html",
             "/LuraJudgement.html": "/frontend/report/index.html",
@@ -1519,7 +1543,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             or path.startswith("/frontend/")
             or path.startswith("/data/")
         )
-        if public and path not in {"/frontend/auth/login.html", "/index.html",
+        if public and not self.is_public_page(path) and path not in {"/frontend/auth/login.html", "/index.html",
                                 "/frontend/tools/raid-guide/index.html",
                                 "/frontend/core/design-system.css", "/frontend/core/cosmic-background.js",
                                 "/frontend/core/auth-dialog.css", "/frontend/core/auth-dialog.js",
@@ -1570,7 +1594,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
 
     def send_security_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
+        path = urlparse(self.path).path
+        demo_frame = path in {"/demos", "/frontend/tools/mechanic-demos/index.html"} or (
+            path.endswith("/report.html") and self.is_public_page(path)
+        )
+        self.send_header("X-Frame-Options", "SAMEORIGIN" if demo_frame else "DENY")
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 

@@ -79,6 +79,16 @@ def test_round_display_only_shows_assigned_or_actual_immune_players():
     assert {r['playerID'] for r in strike['displayParticipants']} == {1, 2, 3, 4}
 
 
+def test_extra_unprotected_player_is_visible_as_direct_soak_not_raid_splash():
+    f, am, players, raw, opt = feast_setup()
+    raw['damage'].append(event(12039, 1290662, 'damage', targetID=5,
+                               sourceID=90, hitType=1, amount=697302))
+    strike = boss._feast_review(f, am, players, raw, opt)['rounds'][0]['strikes'][1]
+    assert {p['playerID'] for p in strike['displayParticipants']} == {1, 2, 3, 4, 5}
+    assert [(p['playerID'], p['damage']) for p in strike['directUnprotected']] == [(5, 697302)]
+    assert strike['secondaryRaidDamage'] == []
+
+
 def test_immune_and_turtle_deflection_count_as_participants_not_damage():
     f,am,players,raw,opt = feast_setup()
     for e in raw['damage']:
@@ -132,6 +142,16 @@ def test_underfilled_raid_splash_does_not_turn_victims_into_soakers():
     assert out['strikes'][1]['participantCount']==3 and out['strikes'][1]['underfilled']
     assert len(out['strikes'][1]['secondaryRaidDamage'])==5
     assert [p['playerID'] for p in out['failures']]==[1]
+
+
+def test_fast_raid_splash_156ms_after_immune_soak_is_not_a_participant():
+    f, am, players, raw, opt = feast_setup()
+    raw['damage'] += [event(12156, 1290662, 'damage', targetID=5,
+                            sourceID=90, hitType=1, amount=1000)]
+    strike = boss._feast_review(f, am, players, raw, opt)['rounds'][0]['strikes'][1]
+    assert strike['participantCount'] == 4
+    assert {p['playerID'] for p in strike['participants']} == {1, 2, 3, 4}
+    assert [(p['playerID'], p['delayMs']) for p in strike['secondaryRaidDamage']] == [(5, 156)]
 
 
 def test_nonimmune_mode_and_unresolved_names_never_invent_individual_failures():
@@ -376,3 +396,62 @@ def test_five_ranged_slots_and_no_wrap_after_fifth():
             assert row['assigned'][0]['playerID']==order
         else:
             assert not row['assigned'] and row['backup'][0]['playerID']==1
+def test_replay_shield_break_uses_absorb_removal_and_last_attacker():
+    players={1:{"name":"First"},2:{"name":"Breaker"}}
+    raw={"actorRows":[{"id":9,"gameID":boss.BULWARK_NPC_ID}],"replayEvents":[
+        {"timestamp":100,"type":"cast","sourceID":9,"sourceInstance":2,"abilityGameID":1303378,"resourceActor":1,"x":20,"y":30},
+        {"timestamp":200,"type":"absorbed","sourceID":1,"targetID":9,"targetInstance":2,"abilityGameID":123},
+        {"timestamp":450,"type":"damage","sourceID":2,"targetID":9,"targetInstance":2,"abilityGameID":123},
+        {"timestamp":500,"type":"removebuff","sourceID":9,"sourceInstance":2,"targetID":9,"targetInstance":2,"abilityGameID":1303378},
+    ],"friendlyCasts":[{"timestamp":350,"type":"cast","sourceID":1,"abilityGameID":119381}],"friendlyBuffs":[
+        {"timestamp":200,"type":"applybuff","sourceID":1,"targetID":2,"abilityGameID":1022},
+        {"timestamp":600,"type":"removebuff","sourceID":1,"targetID":2,"abilityGameID":1022},
+    ]}
+    result=boss._replay_feedback({"startTime":0,"endTime":1000},{1:"First",2:"Breaker"},players,raw)
+    wall=result["bulwarks"][0]
+    assert wall["endTimeMs"]==500
+    assert wall["breaker"]["playerID"]==2
+    assert len(wall["attacks"])==2
+    assert result["controls"][0]["spellID"]==119381
+    assert result["immunities"][0]["playerID"]==2
+    assert result["immunities"][0]["endTimeMs"]==600
+
+
+def test_replay_raid_damage_is_not_avoidable_feedback_and_channels_follow_cast():
+    raw={"actorRows":[],"replayEvents":[
+        {"timestamp":100,"type":"damage","sourceID":9,"targetID":1,"abilityGameID":1292806,"amount":10},
+        {"timestamp":200,"type":"damage","sourceID":9,"targetID":1,"abilityGameID":1306876,"amount":10},
+        {"timestamp":300,"type":"cast","sourceID":9,"targetID":1,"abilityGameID":1289192},
+    ],"friendlyBuffs":[]}
+    result=boss._replay_feedback({"startTime":0,"endTime":10000},{1:"Tank"},{1:{"name":"Tank"}},raw)
+    assert [h["spellID"] for h in result["hits"]]==[1306876]
+    channel=result["channels"][0]
+    assert (channel["startTimeMs"],channel["endTimeMs"],channel["targetID"])==(300,4300,1)
+    assert channel["phase"]=="channel"
+
+
+def test_replay_striker_windup_and_death_are_instance_local():
+    rows=[{"timestamp":100,"type":"begincast","sourceID":9,"sourceInstance":2,"abilityGameID":1291478,"resourceActor":1,"x":-624,"y":63384},
+          {"timestamp":5100,"type":"cast","sourceID":9,"sourceInstance":2,"targetID":1,"abilityGameID":1291478},
+          {"timestamp":5500,"type":"death","targetID":9,"targetInstance":2,"abilityGameID":0},
+          {"timestamp":6000,"type":"begincast","sourceID":9,"sourceInstance":3,"abilityGameID":1291478,"resourceActor":1,"x":22,"y":63613}]
+    heads,_=boss._replay_animation_units({"startTime":0,"endTime":10000},rows,{"actorRows":[{"id":9,"gameID":boss.STRIKER_NPC_ID}]},{})
+    assert heads[0]["endTimeMs"]==5500 and heads[1]["endTimeMs"] is None
+    assert heads[0]["arena"]=="north" and heads[0]["slot"]=="left"
+    assert heads[0]["casts"][0]["targetID"]==1
+
+
+def test_rotation_uses_paladin_path_and_separated_hits():
+    from math import sin,cos,radians
+    rows=[{"timestamp":1000,"type":"cast","sourceID":9,"abilityGameID":1,"resourceActor":1,"x":-1616,"y":69157},
+          {"timestamp":10000,"type":"cast","sourceID":9,"abilityGameID":1294293,"resourceActor":1,"x":0,"y":61155}]
+    for time,angle in [(10500,80),(18000,-70)]:
+        rows.append({"timestamp":time,"type":"damage","sourceID":9,"targetID":2,"abilityGameID":1294605,"resourceActor":2,"x":round(3000*cos(radians(angle))),"y":61155+round(3000*sin(radians(angle)))})
+    for i in range(20):
+        a=radians(90-i*4)
+        rows.append({"timestamp":10000+i*500,"type":"damage","sourceID":1,"targetID":9,"abilityGameID":1,"resourceActor":1,"x":round(3000*cos(a)),"y":61155+round(3000*sin(a))})
+    torrents=[{"actorID":9,"startTimeMs":10000,"endTimeMs":24000}]
+    boss._torrent_rotation(torrents,rows,0,{1:{"specID":66},2:{"specID":62}})
+    assert torrents[0]["rotationDirection"]==-1
+    assert abs(torrents[0]["angularSpeedDegrees"]-20)<.1
+    assert torrents[0]["previousArena"]=="north"

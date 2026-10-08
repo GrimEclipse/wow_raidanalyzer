@@ -12,6 +12,7 @@ from analyzer_core.analysis_scope import filter_fights
 from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
+from analyzer_core.combat_replay import fetch_replay_events, build_replay_tracks
 from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.common import write_json_result
 from boss_plugins.venomous_abyss.shared import (
@@ -52,22 +53,31 @@ def fetch_payload(
             return []
         return client.events(*args, **kwargs)
 
+    streams = [
+        ("casts", "Casts", {"hostility_type": "Enemies", "include_resources": bool(config.get("fetchCastResources"))}),
+        ("friendlyCasts", "Casts", {"hostility_type": "Friendlies", "include_resources": bool(config.get("fetchFriendlyCastResources"))}),
+        ("damage", "DamageTaken", {"include_resources": bool(config.get("fetchEventResources", True))}),
+        ("debuffs", "Debuffs", {"include_resources": bool(config.get("fetchEventResources", True))}),
+        ("enemyBuffs", "Buffs", {"hostility_type": "Enemies"}),
+        ("friendlyBuffs", "Buffs", {"hostility_type": "Friendlies"}),
+        ("deaths", "Deaths", {}),
+        ("combatants", "CombatantInfo", {}),
+    ]
+    if config.get("fetchInterrupts"):
+        streams.append(("interrupts", "Interrupts", {}))
+
+    def fetch_stream(item):
+        index, (key, data_type, kwargs) = item
+        return index, (key, read(key, report_id, data_type, fight, **kwargs))
+
+    # Each stream paginates in order. The shared request semaphore still limits
+    # total WCL traffic across fights and jobs; context propagation preserves
+    # credential-scoped evidence caching and progress callbacks.
+    fetched = dict(row for _, row in run_parallel_indexed(
+        enumerate(streams), fetch_stream, max_workers=int(config.get("fetchConcurrency") or 1)))
     payload = {
-        "casts": read("casts",
-            report_id,
-            "Casts",
-            fight,
-            hostility_type="Enemies",
-            include_resources=bool(config.get("fetchCastResources")),
-        ),
-        "friendlyCasts": read("friendlyCasts", report_id, "Casts", fight, hostility_type="Friendlies"),
-        "damage": read("damage", report_id, "DamageTaken", fight, include_resources=bool(config.get("fetchEventResources", True))),
-        "debuffs": read("debuffs", report_id, "Debuffs", fight, include_resources=bool(config.get("fetchEventResources", True))),
-        "enemyBuffs": read("enemyBuffs", report_id, "Buffs", fight, hostility_type="Enemies"),
-        "friendlyBuffs": read("friendlyBuffs", report_id, "Buffs", fight, hostility_type="Friendlies"),
-        "deaths": read("deaths", report_id, "Deaths", fight),
-        "combatants": read("combatants", report_id, "CombatantInfo", fight),
-        "interrupts": read("interrupts", report_id, "Interrupts", fight) if config.get("fetchInterrupts") else [],
+        **fetched,
+        "interrupts": fetched.get("interrupts", []),
         "resources": [],
         "bossPositionEvents": [],
         "trackedActorEvents": [],
@@ -76,6 +86,7 @@ def fetch_payload(
         "trackedDamageTargetGameIDByActorID": dict(tracked_damage_target_game_ids or {}),
         "petOwners": dict(pet_owners or {}),
         "bossID": boss_id,
+        "reportID": report_id,
     }
     tracked_filters = config.get("trackedActorEventFilters") or []
     if tracked_filters:
@@ -121,6 +132,10 @@ def fetch_payload(
                 include_resources=False,
             )
         )
+    if config.get("extraPayloadLoader"):
+        payload.update(config["extraPayloadLoader"](client, report_id, fight))
+    if config.get("fetchCombatReplay"):
+        payload["replayEvents"] = fetch_replay_events(client, report_id, fight)
     return payload
 
 
@@ -140,6 +155,11 @@ def render_fight(config, analyzer, report_id, report_start, actor_map, actor_typ
         config["spellNames"],
     )
     mechanics = analyzer(fight, actor_map, players, raw)
+    if "replayEvents" in raw:
+        replay = build_replay_tracks(fight, players, actor_map, raw["replayEvents"],
+                                    actor_rows=raw.get("actorRows") or [], spell_names=config.get("spellNames"), deaths=deaths, survival_timeline=survival["timeline"],
+                                    resurrections=[e for e in raw.get("trackedActorEvents") or [] if e.get("type") == "resurrect"])
+        (mechanics.get("eventScene") or mechanics)["combatReplay"] = replay
     return {
         "reportID": report_id,
         "fightID": int(fight["id"]),
@@ -238,6 +258,7 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 pet_owners=pet_owners,
             )
             raw["analysisOptions"] = dict(options or {})
+            raw["actorRows"] = actors
             return index, render_fight(
                 config,
                 analyzer,

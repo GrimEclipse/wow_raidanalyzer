@@ -1,6 +1,7 @@
 """Evidence-first analyzer for The Coiled Altar / 盘卷祭坛 (12.1 heroic)."""
 
 from __future__ import annotations
+from analyzer_core.combat_replay import fetch_replay_events, build_replay_tracks
 
 from analyzer_core.config import resolve_analysis_options
 
@@ -329,6 +330,7 @@ TABS = [
     ("intermission", "转阶段 被夺取的宿体"),
     ("p3", "P3 盘卷联合"),
     ("field", "场地示意图"),
+    ("explore", "机制工作台"),
 ]
 
 PHASE_LABELS = {
@@ -1052,7 +1054,7 @@ def build_phase_markers(fight, casts, enemy_buffs, enemy_deaths=None, zuljan_id=
 
     for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
         if int(ability_id(event) or 0) == P2_SIGNAL_SPELL and event_type(event) == "begincast":
-            candidates.append((int(event["timestamp"]) - start, "fear-bolt"))
+            candidates.append((int(event["timestamp"]) - start, "fear-bolt-fallback"))
             break
 
     for event in sorted(casts, key=lambda row: int(row.get("timestamp") or 0)):
@@ -1253,7 +1255,7 @@ def _npc_actor_point(event, actor_id):
         resource_actor = event.get("resourceActor")
         if resource_actor in {1, "1", "Source"}:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
-        if kind in {"cast", "begincast", "resourcechange", ""}:
+        if kind in {"resourcechange", ""}:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
         target_id = event.get("targetID")
         if target_id is None or target_id == actor_id:
@@ -3821,6 +3823,13 @@ def analyze_gloombomb(
             )
             explode_ts = int(hit_event["timestamp"]) if hit_event else None
             position, position_rule = _gloombomb_target_position(hit_event, position_index, target_id)
+            # Older callers omitted the damage stream. Keep their aura-removal
+            # snapshot available, explicitly labelled as a proxy. Live analysis
+            # passes a damage list and requires an observed explosion instead.
+            if damage_events is None and remove_event is not None:
+                explode_ts = int(remove_event["timestamp"])
+                position = _index_point_near(position_index, target_id, explode_ts)
+                position_rule = "aura-remove-proxy"
             targets.append({
                 **player_ref(players, actor_map, target_id),
                 "applyTimeMs": apply_ts - fight_start,
@@ -3903,7 +3912,7 @@ def analyze_gloombomb(
             for target in targets
             if target.get("explodeTimeMs") is not None
         ]
-        boss_ts = min(explode_abs) if explode_abs else (timestamp if cast else first_ts)
+        boss_ts = min(explode_abs) if explode_abs and damage_events is not None else (timestamp if cast else first_ts)
         caster_id = (cast.get("sourceID") if cast and cast.get("sourceID") is not None else boss_actor_id)
         boss_position = (
             _index_point_at(origin_index or {}, caster_id, boss_ts, max_age_ms=POSITION_RELIABLE_MS)
@@ -3920,6 +3929,7 @@ def analyze_gloombomb(
             "targetCount": len(targets),
             "targets": targets,
             "bossPosition": boss_position,
+            "bossPositionTimeMs": boss_ts - fight_start,
             "spreadRadiusYards": GLOOMBOMB_RADIUS_YARDS,
             "pairSpacing": spacing,
             "tooClosePairs": too_close,
@@ -4507,6 +4517,7 @@ def build_field_audit(
             "roundIndex": row["index"],
             "phase": row["phase"],
             "time": row["time"],
+            "timeMs": row.get("timeMs"),
             "origin": row.get("origin"),
             "originRule": row.get("originRule"),
             "tankPosition": row.get("tankPosition"),
@@ -4551,6 +4562,7 @@ def build_field_audit(
                 "roundIndex": row["index"],
                 "phase": row["phase"],
                 "time": row["time"],
+            "timeMs": row.get("timeMs"),
                 "origin": row.get("shareCentroid"),
                 "bossPosition": row.get("bossPosition"),
                 "dangerRadiusYards": row.get("dangerRadiusYards", GUILLOTINE_RANGE_YARDS),
@@ -4568,6 +4580,7 @@ def build_field_audit(
                 "kind": _venom_map_kind(kind, grounded=False),
                 "venomKind": kind,
                 "position": spawn["position"],
+                "timeMs": spawn.get("timeMs"),
                 "player": "烈毒变异体生成" if kind == VENOM_KIND_MUTATION else "凝结毒液生成",
             })
         last_drops = {}
@@ -4583,6 +4596,7 @@ def build_field_audit(
                 "kind": _venom_map_kind(kind, grounded=True),
                 "venomKind": kind,
                 "position": drop["dropPosition"],
+                "timeMs": drop.get("removeTimeMs"),
                 "blastRadiusYards": _venom_blast_yards(kind) if mutation else None,
                 "finalDrop": True,
             })
@@ -4595,6 +4609,7 @@ def build_field_audit(
             "roundIndex": row["index"],
             "phase": row["phase"],
             "time": row["time"],
+            "timeMs": row.get("timeMs"),
             "targets": targets,
             "virulentBlastRadiusYards": VIRULENT_BLAST_RADIUS_YARDS,
             "annotation": (
@@ -4660,6 +4675,7 @@ def build_field_audit(
             "roundIndex": row["index"],
             "phase": row["phase"],
             "time": row["time"],
+            "timeMs": row.get("timeMs"),
             "bossPosition": row.get("bossPosition"),
             "targets": bomb_targets,
             "nearbyPlayers": collateral,
@@ -4933,6 +4949,7 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         "combatants": client.events(report_id, "CombatantInfo", fight),
         "resources": client.events(report_id, "Resources", fight, include_resources=True) if field_enabled else [],
         "interrupts": client.events(report_id, "Interrupts", fight, hostility_type="Friendlies") if phase_enabled or options["gloombombReviewEnabled"] else [],
+        "replayEvents": fetch_replay_events(client, report_id, fight) if options["fieldReplayEnabled"] else [],
         "npcPositionEvents": npc_position_events,
         "bossDamage": boss_damage,
         "analysisOptions": options,
@@ -4942,9 +4959,12 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
 def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fight, raw):
     players = build_player_catalog(actor_map, actor_type, raw["combatants"])
     mechanics = analyze_fight(fight, actor_map, actor_type, actor_rows, raw)
+
     duration_ms = int(fight["endTime"] - fight["startTime"])
     started = datetime.fromtimestamp((report_start + fight["startTime"]) / 1000, tz=CN_TZ)
     survival = build_survival_timeline(fight, actor_map, players, raw["deaths"], raw["friendlyCasts"], SPELLS)
+    if raw.get("replayEvents"):
+        mechanics["combatReplay"] = build_replay_tracks(fight, players, actor_map, raw["replayEvents"], actor_rows=actor_rows, spell_names=SPELLS, deaths=raw["deaths"], survival_timeline=survival["timeline"])
     end_phase = mechanics["phaseTimeline"][-2]["label"] if len(mechanics["phaseTimeline"]) > 1 else "P1"
     return {
         "reportID": report_id,

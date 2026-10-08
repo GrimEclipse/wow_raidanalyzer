@@ -23,3 +23,4 @@
   .twin-venom-round { padding:10px; }
   .twin-venom-player { font-size:12px; }
 }
+ .twin-replay-jumps{display:flex;align-items:center;margin:12px 0;gap:12px}.twin-replay-jumps select{margin-left:10px;max-width:100%;background:#111b2a;color:#e2e8f0;border:1px solid #334155;border-radius:7px;padding:8px}

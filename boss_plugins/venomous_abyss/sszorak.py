@@ -1529,6 +1529,7 @@ def build_aggregated_json(report_ids, options=None):
     config = deepcopy(BOSS_CONFIG)
     spatial = any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled", "serpentsFuryReviewEnabled"))
     config["fetchPositionResources"] = spatial
+    config["fetchCombatReplay"] = options["fieldReplayEnabled"]
     config["fetchEventResources"] = spatial
     config["features"]["fieldReplay"] = options["fieldReplayEnabled"]
     tab_enabled = {"survival": True, "predator": options["predatorReviewEnabled"] or options["tempestReviewEnabled"],
