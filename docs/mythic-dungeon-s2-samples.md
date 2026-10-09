@@ -36,3 +36,19 @@ py -3.9 -m analyzer_core.mythic_dungeon_export --report 9n2r3JATCDZGkaVN --fight
 ```
 
 使用已配置的 WCL 凭据。生成数据留在本地，遵循 AGENTS.md，不暂存 WCL 输出、数据库或凭据。新增 Boss 的最终规则应放在各自模块；通用导出器只处理传输、证据与文档结构。
+
+## 关键技能判定（rulings）
+
+S2 关键技能筛选走「声明式判定数据 + 导出器注入」：判定文件
+`assets/samples/mythic_dungeon_s2_skill_rulings.json`（结构：
+副本 → Boss 上下文（`encounter:<id>` 或 `trash`）→ 技能 ID → `{category, evidence, notes}`），
+与 S2 样本同口径**留在本地、不随代码提交**；仓库内只提交 JSON Schema 与示例
+（`specs/001-s2-key-skills/contracts/`）。
+
+- 生成时合并：`--rulings <file>`（默认即上述路径）；`--no-rulings` 导出未判定的原始候选预览。
+- 生效表现：导出的样本文档 `skillSelection.status` 变为 `curated`，`skillCandidates[]`
+  带 `ruling`（关键/小怪/未判定）与 `include`/`notes`；前端按三组通用渲染，关键技能附判定依据。
+- 降级：判定文件缺失/坏 JSON/结构不符时报 `skillSelection.rulingsError`，状态保持
+  `needs-review`，页面回退「实际施法候选」预览，服务不报错。
+- 修订流程：改判定文件 → 重新生成对应样本 → 页面即生效（无需改代码）。
+  判定必须先有量化依据（`category=key` 且 `evidence` 非空），不得凭空判定。
