@@ -31,7 +31,7 @@
   function addCss() {
     if (document.querySelector('link[data-azeroth-skin]')) return;
     var l = document.createElement("link");
-    l.rel = "stylesheet"; l.href = abs("frontend/core/azeroth-skin.css?v=5");
+    l.rel = "stylesheet"; l.href = abs("frontend/core/azeroth-skin.css?v=6");
     l.setAttribute("data-azeroth-skin", "1");
     document.head.appendChild(l);
   }
@@ -53,8 +53,8 @@
 
   addCss(); addFonts();
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { loadScript(abs("frontend/core/azeroth-music.js?v=8")); });
+    document.addEventListener("DOMContentLoaded", function () { loadScript(abs("frontend/core/azeroth-music.js?v=9")); });
   } else {
-    loadScript(abs("frontend/core/azeroth-music.js?v=8"));
+    loadScript(abs("frontend/core/azeroth-music.js?v=9"));
   }
 })();

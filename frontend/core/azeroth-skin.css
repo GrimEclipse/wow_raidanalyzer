@@ -222,3 +222,29 @@ input:focus, select:focus, textarea:focus { border-color:#c69b6d !important; out
 a.spell{color:#ffd100!important}
 a.spell:hover{color:#ff8000!important}
 th{color:#d7b36a}
+
+
+/* ================= v2 · 登录 / 注册弹窗（auth-dialog）魔兽化 =================
+   原版是冷蓝圆角玻璃；改成羊皮卷式暖石面板 + 黄铜双线边 + 红底金字主按钮。 */
+dialog.auth-dialog{border:1px solid #8a6a3a!important;border-radius:4px!important;background:linear-gradient(180deg,#221b14,#15110c)!important;color:#ede4d3!important;box-shadow:0 30px 90px rgba(0,0,0,.75),inset 0 0 0 3px #0a0806,inset 0 0 0 4px #3a2f22!important;font-family:var(--f-body,"Segoe UI","Microsoft YaHei",sans-serif)!important;overflow:hidden}
+dialog.auth-dialog::backdrop{background:rgba(5,3,2,.82)!important;backdrop-filter:none!important}
+dialog.auth-dialog::before{content:"";position:absolute;inset:0 0 auto 0;height:150px;background:linear-gradient(180deg,rgba(10,8,6,.35),#1b1611 95%),url("/frontend/assets/theme/hero-abyss-960.webp") center 35%/cover no-repeat;opacity:.55;pointer-events:none}
+dialog.auth-dialog>*{position:relative}
+dialog.auth-dialog .auth-dialog__head{border-bottom:1px solid #3a2f22!important;align-items:center}
+dialog.auth-dialog .auth-dialog__head>div{display:grid;grid-template-columns:52px 1fr;column-gap:14px;align-items:center}
+dialog.auth-dialog .auth-dialog__head>div::before{content:"";grid-row:1/3;width:52px;height:52px;background:url("/frontend/assets/theme/emblem-128.webp") center/contain no-repeat;filter:drop-shadow(0 2px 6px rgba(0,0,0,.8))}
+dialog.auth-dialog .auth-dialog__eyebrow{color:#d7b36a!important;font:600 11px/1 "Cinzel",Georgia,serif!important;letter-spacing:.24em!important}
+dialog.auth-dialog h2{color:#f3d58f!important;font:700 26px/1.25 var(--f-title,"Azeroth Serif SC",serif)!important;letter-spacing:.04em!important;text-shadow:0 1px 0 #000,0 0 18px rgba(255,150,40,.2)}
+dialog.auth-dialog .auth-dialog__close{border:1px solid #8a6a3a!important;border-radius:50%!important;background:#2a1510!important;color:#d7b36a!important}
+dialog.auth-dialog .auth-dialog__close:hover{background:#6e0f08!important;color:#ffd66b!important}
+dialog.auth-dialog .auth-dialog__tabs{gap:2px!important;padding:0!important;border-radius:0!important;background:transparent!important;border-bottom:1px solid #8a6a3a}
+dialog.auth-dialog .auth-dialog__tabs button{position:relative;top:1px;border:1px solid #3a2f22!important;border-bottom-color:#8a6a3a!important;border-radius:4px 4px 0 0!important;background:linear-gradient(180deg,#1d1711,#120e0a)!important;color:#a2917a!important;font:600 15px/1 var(--f-title,serif)!important;letter-spacing:.1em}
+dialog.auth-dialog .auth-dialog__tabs button:hover{color:#f3d58f!important}
+dialog.auth-dialog .auth-dialog__tabs button[aria-selected="true"]{border-color:#8a6a3a!important;border-bottom-color:#1c1712!important;background:linear-gradient(180deg,#3a2b1a,#1c1712)!important;color:#f3d58f!important}
+dialog.auth-dialog label{color:#c9bca5!important}
+dialog.auth-dialog input{border:1px solid #3a2f22!important;border-radius:3px!important;background:#0f0c09!important;color:#ede4d3!important;box-shadow:inset 0 2px 6px rgba(0,0,0,.6)!important}
+dialog.auth-dialog input:focus{border-color:#d7b36a!important;box-shadow:inset 0 2px 6px rgba(0,0,0,.6),0 0 0 3px rgba(215,179,106,.14)!important}
+dialog.auth-dialog .auth-dialog__submit{border:1px solid #c79a3e!important;border-radius:3px!important;background:linear-gradient(180deg,#9c1c10 0%,#6e0f08 55%,#4d0904 100%)!important;color:#ffd66b!important;font:700 16px/1 var(--f-title,serif)!important;letter-spacing:.12em;text-shadow:0 1px 0 #000;box-shadow:inset 0 1px rgba(255,190,120,.35),inset 0 -2px rgba(0,0,0,.35),0 0 0 1px #000,0 0 22px rgba(255,120,30,.22)!important;transition:filter .15s}
+dialog.auth-dialog .auth-dialog__submit:hover{filter:brightness(1.15)}
+dialog.auth-dialog .auth-dialog__hint{color:#a2917a!important}
+dialog.auth-dialog .auth-dialog__message{color:#ff8b73!important}

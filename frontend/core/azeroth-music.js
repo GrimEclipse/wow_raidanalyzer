@@ -17,6 +17,9 @@
 (function () {
   if (window.__azerothMusic) return;
   window.__azerothMusic = true;
+  // 只在顶层页面挂播放器：首页嵌入的机制演示、/demos 里的报告都是 iframe，
+  // 不能在卡片里再冒出第二个播放器（也避免两路音乐同时响）。
+  try { if (window.self !== window.top) return; } catch (e) { return; }
 
   // 各版本主题曲 + 各版本最具代表性的 Boss 战曲 / 剧情曲
   var TRACKS = [
