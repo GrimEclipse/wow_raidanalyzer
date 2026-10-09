@@ -95,7 +95,7 @@ function renderRun() {
   $("#pull-count").textContent = `${pulls.length} 段`;
   $("#wcl-link").href = source.reportUrl;
   $("#team").innerHTML = team.map((member) => `
-    <div class="member" style="--class-color:${CLASS_COLORS[member.class] || "#94a3b8"}">
+    <div class="member" style="--class-color:${CLASS_COLORS[member.class] || "#c0b1a0"}">
       <strong>${escapeHtml(member.name)}</strong>
       <span>${escapeHtml(member.spec)} ${escapeHtml(member.className)}，${escapeHtml(member.role)}</span>
     </div>
