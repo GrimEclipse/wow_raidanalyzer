@@ -2,7 +2,6 @@
  * 曲目：《魔兽世界》各版本官方主题曲 + 各版本最具代表性的 Boss 战曲：
  *   巫妖王之怒 · A Call to Arms（佛丁代表曲）
  *   熊猫人之谜 · The Wandering Isle（浮岛）
- *   争霸艾泽拉斯 · 达萨罗之战 拉斯塔哈大王 / 吉安娜 Boss 战
  *   地心之战 · 迪门修斯 Vita Mundus Devora（最终 Boss）
  *   至暗之夜 · March On Quel'Danas（鲁拉 Boss 战）
  *
@@ -31,8 +30,6 @@
     { f: "06-wod-times-change.mp3",              n: "Times Change",                    c: "德拉诺之王" },
     { f: "07-legion-kingdoms-will-burn.mp3",     n: "Kingdoms Will Burn",              c: "军团再临" },
     { f: "08-bfa-before-the-storm.mp3",          n: "Before the Storm",                c: "争霸艾泽拉斯" },
-    { f: "bfa-king-rasthakan.mp3",               n: "King Rasthakan · 达萨罗 Boss 战", c: "争霸艾泽拉斯" },
-    { f: "bfa-lady-jaina-proudmoore.mp3",        n: "Lady Jaina · 达萨罗 Boss 战",     c: "争霸艾泽拉斯" },
     { f: "09-shadowlands-king-and-queen.mp3",    n: "The King & The Queen",            c: "暗影国度" },
     { f: "10-dragonflight-isles-awaken.mp3",     n: "The Isles Awaken",                c: "巨龙时代" },
     { f: "11-tww-the-war-within.mp3",            n: "The War Within 主标题",           c: "地心之战" },
