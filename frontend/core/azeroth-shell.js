@@ -53,8 +53,8 @@
 
   addCss(); addFonts();
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { loadScript(abs("frontend/core/azeroth-music.js?v=6")); });
+    document.addEventListener("DOMContentLoaded", function () { loadScript(abs("frontend/core/azeroth-music.js?v=7")); });
   } else {
-    loadScript(abs("frontend/core/azeroth-music.js?v=6"));
+    loadScript(abs("frontend/core/azeroth-music.js?v=7"));
   }
 })();

@@ -54,6 +54,20 @@
   } catch (e) {}
   if (!(st.i >= 0 && st.i < TRACKS.length)) st.i = 0;
   if (!(st.v >= 0 && st.v <= 1)) st.v = 0.5;
+  // 随机播放：每次新打开网站（新的浏览器会话）随机挑一首从头放；
+  // 同一会话里换页面仍然续播当前这首，不打断。
+  function pick(except) {
+    if (TRACKS.length < 2) return 0;
+    var r;
+    do { r = Math.floor(Math.random() * TRACKS.length); } while (r === except);
+    return r;
+  }
+  try {
+    if (!sessionStorage.getItem("azeMu.session")) {
+      st.i = pick(st.i); st.t = 0;
+      sessionStorage.setItem("azeMu.session", "1");
+    }
+  } catch (e) { st.i = pick(st.i); st.t = 0; }
   function save() { try { localStorage.setItem(LS, JSON.stringify(st)); } catch (e) {} }
 
   var audio = new Audio();
@@ -226,11 +240,11 @@
     else { st.on = false; save(); audio.pause(); paint(); }
   });
   q('[data-act="prev"]').addEventListener("click", function (e) { e.stopPropagation(); start(st.i - 1, 0); });
-  q('[data-act="next"]').addEventListener("click", function (e) { e.stopPropagation(); start(st.i + 1, 0); });
+  q('[data-act="next"]').addEventListener("click", function (e) { e.stopPropagation(); start(pick(st.i), 0); });
   q(".aze-mu-vol input").addEventListener("input", function (e) { audio.volume = st.v = Number(e.target.value) / 100; save(); });
   q(".aze-mu-vol input").addEventListener("click", function (e) { e.stopPropagation(); });
   document.addEventListener("click", function () { if (st.open) { st.open = false; save(); paint(); } });
-  audio.addEventListener("ended", function () { start(st.i + 1, 0); });
+  audio.addEventListener("ended", function () { start(pick(st.i), 0); });
   audio.addEventListener("error", function () {
     // 当前文件没加载出来时跳到下一首，别卡死
     if (!audio.paused || st.on) { if (retries < 2) { retries++; start(st.i + 1, 0); } else { st.on = false; save(); paint(); } }
@@ -278,7 +292,7 @@
   window.AzerothMusic = {
     play: function () { st.on = true; save(); return tryPlay(); },
     pause: function () { audio.pause(); },
-    next: function () { start(st.i + 1, 0); },
+    next: function () { start(pick(st.i), 0); },
     // 「点关闭公告」专用：把这次点击当作手势，立刻出声。
     // 正在静音预热 → 直接取消静音；没播 → 带着手势直接播。
     unlock: function () {
