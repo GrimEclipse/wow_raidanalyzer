@@ -1,4 +1,5 @@
 const state={payload:null,pulls:[],pull:0,tab:"survival",sourcePath:"",replayRound:0,replayFrame:0,replayBlend:0,venomPlayer:"",timer:null};
+if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('mw-embed');
 const $=id=>document.getElementById(id),esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),num=v=>Number(v||0).toLocaleString("zh-CN");
 function current(){return state.pulls[state.pull]||null}function boss(){return current()?.[state.payload?.meta?.bossKey]||{}}
 function player(row){return`<span class="player" style="color:${row?.classColor||'#fff'}">${esc(row?.player||row?.name||'—')}</span>`}

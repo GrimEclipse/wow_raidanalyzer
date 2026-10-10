@@ -119,12 +119,24 @@ def test_single_fight_normalizes_options_and_keeps_selected_and_full_caches_sepa
     assert all(json.loads(path.read_text(encoding='utf-8')) for path in (tmp_path/'cache').rglob('*.json'))
 
 
-def test_ulatek_rage_keeps_add_damage_when_wave_review_is_disabled():
+def test_ulatek_legacy_rage_keeps_add_damage_when_wave_review_is_disabled():
     client = Client(3492)
     client.actors = lambda _: [{'id':99,'name':'Add','gameID':267460,'type':'NPC'}]
     with patch('boss_plugins.venomous_abyss.runtime.WclClient',return_value=client):
-        ulatek.build_aggregated_json('A'*16,{'wavesReviewEnabled':False})
+        ulatek.build_aggregated_json('A'*16,{'wavesReviewEnabled':False,'fullReplayEnabled':False})
     assert any(kind == 'DamageDone' and kwargs.get('target_id') == 99 for kind,kwargs in client.requests)
+
+
+def test_ulatek_replay_keeps_ravenous_variant_by_confirmed_name():
+    client = Client(3492)
+    client.actors = lambda _: [{'id': 99, 'name': 'Ravenous Doomscale', 'gameID': 999999, 'type': 'NPC'}]
+    replay = {'units': [{'actorID': 99, 'kind': 'enemy', 'gameID': 999999, 'name': 'Ravenous Doomscale'},
+                        {'actorID': 98, 'kind': 'enemy', 'gameID': 999998, 'name': 'Unrelated NPC'}]}
+    with patch('boss_plugins.venomous_abyss.runtime.WclClient', return_value=client), \
+         patch('boss_plugins.venomous_abyss.runtime.build_replay_tracks', return_value=replay):
+        result = ulatek.build_aggregated_json('A'*16)
+    units = result['data']['page1_wipeAnalysis'][0]['ulatek']['combatReplay']['units']
+    assert [u['actorID'] for u in units] == [99]
 
 
 @pytest.mark.parametrize('module,encounter,key', [

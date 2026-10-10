@@ -57,7 +57,7 @@ BOSS_CONFIG = {
         ["crosswinds", "狂怒侧风"],
         ["fury", "毒蛇之怒"],
     ],
-    "mechanicVersion": "sszorak-mythic-cyst-backup-wind-cohort-2026-09-27",
+    "mechanicVersion": "sszorak-replay-mark-energy-2026-10-09",
     "features": {"survival": True, "fieldReplay": True},
     "bossGameID": 257347,
     "bossNameKeywords": ["Sszorak", "斯索拉克"],
@@ -1446,6 +1446,7 @@ def analyze_sszorak(fight, actor_map, players, raw):
         "crosswinds": {"waves": crosswind_waves, "players": crosswind_rows} if options["crosswindsReviewEnabled"] else {"enabled": False},
         "fieldReplay": {
             "enabled": options["fieldReplayEnabled"],
+            "marks": _replay_marks(fight, raw) if options['fieldReplayEnabled'] else [],
             "arena": arena,
             "arenaImage": BOSS_CONFIG["arena"],
             "bossIcon": BOSS_CONFIG["bossIcon"],
@@ -1457,6 +1458,23 @@ def analyze_sszorak(fight, actor_map, players, raw):
         },
         "fallDeaths": fall_deaths,
     }
+
+def _replay_marks(fight, raw):
+    active, result = {}, []
+    for e in sorted(raw.get('debuffs') or [], key=lambda e: int(e['timestamp'])):
+        if ability_id(e) != SERPENTS_FURY_MARK_ID:
+            continue
+        pid, ts, kind = e.get('targetID'), int(e['timestamp']), event_type(e)
+        if kind == 'applydebuff' and pid not in active:
+            active[pid] = ts
+        elif kind == 'removedebuff' and pid in active:
+            result.append({'playerID': pid, 'startTimeMs': active.pop(pid)-fight['startTime'],
+                           'endTimeMs': ts-fight['startTime'], 'radiusYards': FURY_SOAK_RADIUS_YARDS})
+    for pid, ts in active.items():
+        result.append({'playerID': pid, 'startTimeMs': ts-fight['startTime'],
+                       'endTimeMs': fight['endTime']-fight['startTime'], 'radiusYards': FURY_SOAK_RADIUS_YARDS})
+    return result
+
 
 analyze_mechanics = analyze_sszorak
 
@@ -1530,6 +1548,13 @@ def build_aggregated_json(report_ids, options=None):
     spatial = any(options[key] for key in ("fieldReplayEnabled", "cystsReviewEnabled", "crosswindsReviewEnabled", "serpentsFuryReviewEnabled"))
     config["fetchPositionResources"] = spatial
     config["fetchCombatReplay"] = options["fieldReplayEnabled"]
+    config['fetchUnifiedEvents'] = options['fieldReplayEnabled']
+    if options['fieldReplayEnabled']:
+        config['unifiedEventFilter'] = ('resources.actor.id > 0 OR '
+            'type IN ("damage", "cast", "begincast", "combatantinfo", "death", "resurrect", "interrupt", "dispel") '
+            'OR ability.id IN (' + ', '.join(map(str, sorted(GUIDE_SPELLS))) + ')')
+        config['replayActorGameIDs'] = {BOSS_CONFIG['bossGameID']}
+        config['trackedActorEventTypes'] = {'dispel'} if options['tempestReviewEnabled'] else set()
     config["fetchEventResources"] = spatial
     config["features"]["fieldReplay"] = options["fieldReplayEnabled"]
     tab_enabled = {"survival": True, "predator": options["predatorReviewEnabled"] or options["tempestReviewEnabled"],

@@ -48,3 +48,14 @@ def test_boss_health_uses_resource_owner_and_casts_ignore_other_npcs():
     boss = result["bosses"][0]
     assert boss["health"] == [[100, 800, 1000]]
     assert boss["casts"] == [{"startTimeMs": 200, "endTimeMs": 700, "spellID": 100, "spellName": "Cast", "outcome": "completed"}]
+
+
+def test_boss_energy_does_not_use_the_players_resource_snapshot():
+    rows = [{'type': 'damage', 'timestamp': 100, 'sourceID': 1, 'targetID': 9,
+             'resourceActor': 2, 'hitPoints': 800, 'maxHitPoints': 1000,
+             'classResources': [{'type': 3, 'amount': 25, 'max': 100}]},
+            {'type': 'damage', 'timestamp': 200, 'sourceID': 9, 'targetID': 1,
+             'resourceActor': 2, 'classResources': [{'type': 3, 'amount': 90, 'max': 100}]}]
+    replay = build_replay_tracks({'startTime': 0, 'endTime': 1000}, {1: {'name': 'P'}}, {9: 'B'}, rows,
+                                actor_rows=[{'id': 9, 'subType': 'Boss'}])
+    assert replay['bosses'][0]['energy'] == [[100, 25, 100]]

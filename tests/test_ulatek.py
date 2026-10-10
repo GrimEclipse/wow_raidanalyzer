@@ -20,6 +20,22 @@ class UlatekTests(unittest.TestCase):
             **extra,
         }
 
+    def test_replay_uses_aura_lifetimes_and_no_damage_wave_contact(self):
+        raw = {'debuffs': [self.event(100, 'applydebuff', u.EGG_CARRY_ID, 1),
+                           self.event(200, 'refreshdebuff', u.EGG_CARRY_ID, 1),
+                           self.event(500, 'removedebuff', u.EGG_CARRY_ID, 1),
+                           self.event(600, 'applydebuff', u.WAVE_ID, 1),
+                           self.event(700, 'applydebuff', u.FANG_AURA_ID, 2, source=98)],
+               'damage': [], 'enemyBuffs': [],
+               'casts': [self.event(1000, 'begincast', 1315341), self.event(4000, 'cast', 1315341)]}
+        out = u._replay_feedback(self.fight, self.players, raw)
+        egg = next(a for a in out['auras'] if a['kind'] == 'egg')
+        self.assertEqual((egg['startTimeMs'], egg['endTimeMs']), (100, 500))
+        fang = next(a for a in out['auras'] if a['kind'] == 'fang')
+        self.assertEqual(fang['sourceID'], 98)
+        self.assertEqual(out['hits'], [{'timeMs': 600, 'playerID': 1}])
+        self.assertEqual([e['timeMs'] for e in out['events'] if e['kind'] == 'shatter'], [4000])
+
     def test_fangs_use_configured_safe_stack_cap_and_keep_side_evidence(self):
         debuffs = []
         for player_id in (1, 2, 3):
@@ -98,6 +114,7 @@ class UlatekTests(unittest.TestCase):
             "damage": [self.event(5020, "damage", 1310763, 2, source=88, amount=700000)],
             "deaths": [], "enemyBuffs": [],
         }
+
         wretch = u._analyze_mythic_wretch(fight, self.actors, self.players, raw)
         self.assertEqual(wretch["completedCount"], 1)
         self.assertEqual(wretch["rounds"][0]["hits"][0]["playerID"], 2)

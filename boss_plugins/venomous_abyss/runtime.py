@@ -13,6 +13,7 @@ from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
 from analyzer_core.combat_replay import fetch_replay_events, build_replay_tracks
+from analyzer_core.event_evidence import actor_position
 from analyzer_core.wcl_report_ids import parse_wcl_report_ids
 from boss_plugins.common import write_json_result
 from boss_plugins.venomous_abyss.shared import (
@@ -45,8 +46,14 @@ def fetch_payload(
     tracked_damage_target_ids=(),
     tracked_damage_target_game_ids=None,
     pet_owners=None,
+    actor_rows=(),
 ):
     fetch_keys = config.get("fetchKeys")
+
+    if config.get("fetchUnifiedEvents"):
+        return _unified_payload(client, report_id, fight, config, boss_id, actor_rows,
+                                tracked_actor_ids, tracked_actor_game_ids,
+                                tracked_damage_target_ids, tracked_damage_target_game_ids, pet_owners)
 
     def read(key, *args, **kwargs):
         if fetch_keys is not None and key not in fetch_keys:
@@ -139,6 +146,65 @@ def fetch_payload(
     return payload
 
 
+def _unified_payload(client, report_id, fight, config, boss_id, actor_rows,
+                     tracked_actor_ids, tracked_actor_game_ids,
+                     tracked_damage_target_ids, tracked_damage_target_game_ids, pet_owners):
+    """One lossless transport pass shared by analysis streams and scene replay.
+
+    Opt-in only. Classification is based on actor hostility and event type;
+    Boss modules continue to own all spell and mechanic selection.
+    """
+    rows = fetch_replay_events(client, report_id, fight, position_filter=False,
+                               include_metadata=False, max_workers=6,
+                               filter_expression=config.get('unifiedEventFilter'))
+    friendly = {a['id'] for a in actor_rows if a.get('type') in {'Player', 'Pet'} or a.get('petOwner') is not None}
+    tracked, targets = set(tracked_actor_ids), set(tracked_damage_target_ids)
+    payload = {k: [] for k in ('casts', 'friendlyCasts', 'damage', 'debuffs', 'enemyBuffs',
+                               'friendlyBuffs', 'deaths', 'combatants', 'interrupts', 'resources',
+                               'trackedActorEvents', 'trackedDamageTaken')}
+    for e in rows:
+        kind = e.get('type', '').lower()
+        if kind in {'begincast', 'cast'}:
+            payload['friendlyCasts' if e.get('sourceID') in friendly else 'casts'].append(e)
+        elif kind == 'damage':
+            if e.get('targetID') in friendly:
+                payload['damage'].append(e)
+            if e.get('targetID') in targets:
+                payload['trackedDamageTaken'].append(e)
+        elif 'debuff' in kind:
+            payload['debuffs'].append(e)
+        elif 'buff' in kind:
+            payload['friendlyBuffs' if e.get('targetID') in friendly else 'enemyBuffs'].append(e)
+        elif kind == 'death':
+            payload['deaths'].append(e)
+        elif kind == 'combatantinfo':
+            payload['combatants'].append(e)
+        elif kind == 'interrupt':
+            payload['interrupts'].append(e)
+        if kind == 'resurrect' or kind in config.get('trackedActorEventTypes', ()) or e.get('sourceID') in tracked:
+            payload['trackedActorEvents'].append(e)
+        if config.get('fetchPositionResources'):
+            for side in ('source', 'target'):
+                p = actor_position(e, side)
+                if p and e.get(side+'ID') is not None:
+                    payload['resources'].append({'timestamp': e['timestamp'], 'type': 'resourcechange',
+                        'sourceID': e[side+'ID'], 'resourceActor': 1, 'x': p['x'], 'y': p['y'],
+                        'facing': (e.get(side+'Resources') or {}).get('facing', e.get('facing'))})
+    fetch_keys = config.get('fetchKeys')
+    for key in ('casts', 'friendlyCasts', 'damage', 'debuffs', 'enemyBuffs', 'friendlyBuffs', 'deaths', 'combatants'):
+        if fetch_keys is not None and key not in fetch_keys:
+            payload[key] = []
+    payload.update({'bossPositionEvents': compact_actor_position_events(rows, boss_id) if boss_id is not None else [],
+                    'trackedActorGameIDByActorID': dict(tracked_actor_game_ids or {}),
+                    'trackedDamageTargetGameIDByActorID': dict(tracked_damage_target_game_ids or {}),
+                    'petOwners': dict(pet_owners or {}), 'bossID': boss_id, 'reportID': report_id})
+    if config.get('fetchCombatReplay'):
+        payload['replayEvents'] = rows
+    if config.get('extraPayloadLoader'):
+        payload.update(config['extraPayloadLoader'](client, report_id, fight))
+    return payload
+
+
 def render_fight(config, analyzer, report_id, report_start, actor_map, actor_type, fight, raw):
     boss_key = config["key"]
     players = build_player_catalog(actor_map, actor_type, raw["combatants"])
@@ -156,9 +222,19 @@ def render_fight(config, analyzer, report_id, report_start, actor_map, actor_typ
     )
     mechanics = analyzer(fight, actor_map, players, raw)
     if "replayEvents" in raw:
-        replay = build_replay_tracks(fight, players, actor_map, raw["replayEvents"],
+        replay_events = raw['replayEvents']
+        if config.get('replayActorGameIDs') is not None:
+            allowed_names = set(config.get('replayActorNames') or [])
+            selected = set(players) | {a['id'] for a in raw.get('actorRows') or []
+                                      if a.get('gameID') in config['replayActorGameIDs'] or a.get('name') in allowed_names}
+            # Compact display tracks only; statistical streams and the full
+            # roster remain intact, including pet damage attribution.
+            replay_events = [e for e in replay_events if e.get('sourceID') in selected or e.get('targetID') in selected]
+        replay = build_replay_tracks(fight, players, actor_map, replay_events,
                                     actor_rows=raw.get("actorRows") or [], spell_names=config.get("spellNames"), deaths=deaths, survival_timeline=survival["timeline"],
                                     resurrections=[e for e in raw.get("trackedActorEvents") or [] if e.get("type") == "resurrect"])
+        if config.get('replayActorGameIDs') is not None:
+            replay['units'] = [u for u in replay['units'] if u['kind'] == 'player' or u.get('gameID') in config['replayActorGameIDs'] or u.get('name') in allowed_names]
         (mechanics.get("eventScene") or mechanics)["combatReplay"] = replay
     return {
         "reportID": report_id,
@@ -256,6 +332,7 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 tracked_damage_target_ids=tracked_damage_target_ids,
                 tracked_damage_target_game_ids=tracked_damage_target_game_ids,
                 pet_owners=pet_owners,
+                actor_rows=actors,
             )
             raw["analysisOptions"] = dict(options or {})
             raw["actorRows"] = actors

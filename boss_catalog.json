@@ -234,10 +234,26 @@
                   "type": "interruptGroups",
                   "label": "终结矩阵打断分配预设（请保证 id 完全一致）",
                   "groups": [
-                    { "key": "group1", "label": "第一组", "slots": 3 },
-                    { "key": "group2", "label": "第二组", "slots": 3 },
-                    { "key": "group3", "label": "第三组", "slots": 3 },
-                    { "key": "group4", "label": "第四组", "slots": 3 }
+                    {
+                      "key": "group1",
+                      "label": "第一组",
+                      "slots": 3
+                    },
+                    {
+                      "key": "group2",
+                      "label": "第二组",
+                      "slots": 3
+                    },
+                    {
+                      "key": "group3",
+                      "label": "第三组",
+                      "slots": 3
+                    },
+                    {
+                      "key": "group4",
+                      "label": "第四组",
+                      "slots": 3
+                    }
                   ]
                 }
               ]
@@ -305,7 +321,10 @@
                   "label": "确认漏怪计入错误",
                   "description": "只有小怪实例与额外仪式灼烧闭环时才计数；疑似事件始终只展示。",
                   "default": false,
-                  "visibleWhen": { "field": "amaniLeakReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "amaniLeakReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "essenceRendReviewEnabled",
@@ -320,7 +339,10 @@
                   "label": "内场解除计入错误",
                   "description": "当前场地中心仍由样本估算，默认仅取证；完成坐标标定后再开启。",
                   "default": false,
-                  "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "essenceRendReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "essenceRendMaxSampleOffsetMs",
@@ -333,7 +355,10 @@
                   "max": 3000,
                   "step": 50,
                   "default": 1250,
-                  "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "essenceRendReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "essenceRendMinDistanceYards",
@@ -345,7 +370,10 @@
                   "max": 40,
                   "step": 1,
                   "default": 20,
-                  "visibleWhen": { "field": "essenceRendReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "essenceRendReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "possessionBarrageReviewEnabled",
@@ -360,7 +388,10 @@
                   "label": "疑似提前挡线计入错误",
                   "description": "默认只展示；需要同时满足飞行显著提前与人均伤害显著高于击杀基线。",
                   "default": false,
-                  "visibleWhen": { "field": "possessionBarrageReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "possessionBarrageReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "innerRealmReviewEnabled",
@@ -374,12 +405,24 @@
                   "type": "interruptGroups",
                   "label": "史诗内场小队名单",
                   "description": "WCL 不含游戏内小队编号；在此填写 3 队和 4 队的玩家名单后，按 3 → 4 交替核对。",
-                  "default": {"3": [], "4": []},
+                  "default": {
+                    "3": [],
+                    "4": []
+                  },
                   "groups": [
-                    {"key": "3", "label": "3 队"},
-                    {"key": "4", "label": "4 队"}
+                    {
+                      "key": "3",
+                      "label": "3 队"
+                    },
+                    {
+                      "key": "4",
+                      "label": "4 队"
+                    }
                   ],
-                  "visibleWhen": { "field": "innerRealmReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "innerRealmReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "invokeInterruptReviewEnabled",
@@ -397,7 +440,12 @@
                 }
               ],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/01-nakzali.png", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/01-nakzali.png",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -439,7 +487,10 @@
                   "max": 30,
                   "step": 0.5,
                   "default": 8,
-                  "visibleWhen": { "field": "helicalToxinReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "helicalToxinReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "markReviewEnabled",
@@ -465,7 +516,10 @@
                   "max": 30,
                   "step": 0.5,
                   "default": 8,
-                  "visibleWhen": { "field": "waterPlacementReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "waterPlacementReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "waterMaxSampleOffsetMs",
@@ -478,7 +532,10 @@
                   "max": 5000,
                   "step": 50,
                   "default": 1500,
-                  "visibleWhen": { "field": "waterPlacementReviewEnabled", "equals": true }
+                  "visibleWhen": {
+                    "field": "waterPlacementReviewEnabled",
+                    "equals": true
+                  }
                 },
                 {
                   "key": "livingVenomReviewEnabled",
@@ -496,7 +553,12 @@
                 }
               ],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/02-sentinels.png", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/02-sentinels.png",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -519,7 +581,12 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/03-vashnik.png", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/03-vashnik.png",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -542,7 +609,12 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/04-lostexplorers.jpg", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/04-lostexplorers.jpg",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -565,7 +637,12 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/05-sszorak.jpg", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/05-sszorak.jpg",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -588,7 +665,12 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/06-twinfangs.jpg", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/06-twinfangs.jpg",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -606,7 +688,12 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/venomous_abyss/07-coiledaltar.jpg", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/07-coiledaltar.jpg",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             },
             {
@@ -624,9 +711,22 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "arena", "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg", "width": 1997, "height": 1118 },
-                { "key": "broken", "path": "assets/raids/venomous_abyss/08-ulatek-broken.jpg", "width": 1997, "height": 1118 }
-              ]
+                {
+                  "key": "arena",
+                  "path": "assets/raids/venomous_abyss/08-ulatek-arena.jpg",
+                  "width": 1997,
+                  "height": 1118
+                },
+                {
+                  "key": "broken",
+                  "path": "assets/raids/venomous_abyss/08-ulatek-broken.jpg",
+                  "width": 1997,
+                  "height": 1118
+                }
+              ],
+              "capabilities": {
+                "replay": { "enabled": true, "renderer": "ulatek" }
+              }
             }
           ]
         },
@@ -638,6 +738,7 @@
           "bosses": [
             {
               "key": "nymrissa_wavecaller",
+              "homepageVisible": false,
               "previewImage": "assets/raids/tidebound_grotto/01-nymrissa-hero.png",
               "order": 1,
               "name": "尼姆瑞莎·唤潮者",
@@ -660,7 +761,12 @@
               "configSchemaFromPlugin": true,
               "configSchema": [],
               "arenaAssets": [
-                { "key": "default", "path": "assets/raids/tidebound_grotto/01-nymrissa.jpg", "width": 1997, "height": 1118 }
+                {
+                  "key": "default",
+                  "path": "assets/raids/tidebound_grotto/01-nymrissa.jpg",
+                  "width": 1997,
+                  "height": 1118
+                }
               ]
             }
           ]

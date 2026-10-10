@@ -7,6 +7,13 @@ description: Maintain the 12.1 Venomous Abyss raid leader guide and seed future 
 
 Keep raid-leader guidance and developer evidence distinct but linked.
 
+## Field simulation and public demos
+
+- Every new Boss analyzer must provide field simulation, enabled by default with a Boss-owned configuration option to disable it. Disabling it must also skip its full-fight replay fetch and computation.
+- Keep public demos limited to playback controls and the field scene. Full analysis navigation, statistics, and the custom workbench belong in the normal analysis interface.
+- Public demo buttons use only Boss names: 斯索拉克、盘卷祭坛、双子毒牙、乌拉特克、瓦什尼克. Show one public scene per Boss; use an API-readable Mythic record for the Coiled Altar.
+- Do not use the middle-dot separator in new interface titles or labels.
+
 ## Select the Boss
 
 Read the matching file in `references/bosses/`. Do not load all source dumps unless the task spans multiple Bosses.

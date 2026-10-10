@@ -1,6 +1,6 @@
 # Boss 5 — 斯索拉克 / Sszorak
 
-Status: raid-leader flow authored; Heroic timeline and Mythic Serpent's Fury evidence mapped; analyzer remains inactive.
+Status: raid-leader flow authored; Heroic timeline and Mythic Serpent's Fury evidence mapped; analyzer and continuous field replay are active.
 
 ## Encounter model
 
@@ -35,3 +35,5 @@ Status: raid-leader flow authored; Heroic timeline and Mythic Serpent's Fury evi
 - Authoritative guide copy: `../source-data/raid-guide-source.json`
 - Heroic/Mythic representative timelines: `../source-data/boss-timelines.json`
 - Spell inventory: project-root `zone54_spell_discovery.md`
+
+Replay marks use the observed Serpent’s Fury apply/refresh/remove aura interval and follow the marked player; refreshes do not create another marker. Boss energy uses only the Boss’s own class resource samples. Never borrow the player’s resource values from a damage event.

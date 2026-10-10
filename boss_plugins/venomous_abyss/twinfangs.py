@@ -5,11 +5,12 @@ from __future__ import annotations
 from copy import deepcopy
 from math import atan2, degrees, hypot, radians, sin, cos, pi
 from statistics import median
+from bisect import bisect_left, bisect_right
 from analyzer_core.config import resolve_analysis_options
 from analyzer_core.event_evidence import actor_position
 
 CONFIG_SCHEMA = [
-    {"key":"fullReplayEnabled", "type":"boolean", "default":True, "label":"完整场地回放", "description":"读取整场所有玩家的位置记录。"},
+    {"key":"fullReplayEnabled", "type":"boolean", "default":True, "label":"场地推演", "description":"读取整场所有玩家的位置记录；关闭后不读取整场回放数据。"},
     {"key": "spitReviewEnabled", "type": "boolean", "label": "蛇头射线方向与误伤", "default": False},
     {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
     {"key": "feastReviewEnabled", "type": "boolean", "label": "贪婪盛宴消层检查", "default": True},
@@ -141,10 +142,23 @@ BOSS_IDENTITY_BY_GAME_ID = {257361: "Vexhul", 257368: "Ithraz"}
 BULWARK_NPC_ID = 269194
 STRIKER_NPC_ID = 264023
 TANK_CHANNELS = {1289192: "腐蚀洪流", 1303230: "鲜血洪流"}
+# Replay calibration from the reviewed tank movement, separate from hit fitting.
+TORRENT_REPLAY_SWEEP_DEGREES = 270
 REPLAY_CONTROL_SPELLS = {119381: "扫堂腿", 192058: "电能图腾", 30283: "暗影之怒", 179057: "混乱新星",
     46968: "震荡波", 132469: "台风", 51490: "雷霆风暴", 853: "制裁之锤", 408: "肾击", 5211: "蛮力猛击",
     107570: "风暴之锤", 221562: "窒息", 5484: "恐惧嚎叫", 8122: "心灵尖啸", 31661: "龙息术",
-    357214: "翼龙打击", 368970: "扫尾", 115750: "盲目之光", 108199: "血魔之握", 202137: "沉默咒符"}
+    357214: "翼龙打击", 368970: "扫尾", 115750: "盲目之光", 108199: "血魔之握", 202137: "沉默咒符",
+    357210: "深呼吸", 403631: "亘古吐息"}
+VENOM_ORIGINS = (
+    {"key": "green", "label": "绿圈直击", "color": "#f5b65a"},
+    {"key": "wave", "label": "中波", "color": "#48b9ef"},
+    {"key": "spitFirst", "label": "蛇头第一次点名", "color": "#9383b5"},
+    {"key": "spitRepeat", "label": "蛇头第二次及后续点名", "color": "#ff8eaf"},
+    {"key": "orb", "label": "吃球", "color": "#8bd547"},
+    {"key": "flood", "label": "邪恶洪流", "color": "#e76657"},
+    {"key": "emergence", "label": "剧毒涌现（无法规避）", "color": "#d4cfdf"},
+    {"key": "unknown", "label": "其他 / 来源待确认", "color": "#64748b"},
+)
 BROOD_CAST_ID = 1308385
 BROOD_SUMMON_ID = 1308356
 FEAST_HIT_ID = 1290662
@@ -505,7 +519,8 @@ def _feast_review(fight, actor_map, players, raw, options):
         groups = sorted(buckets.items())
         ids, unresolved = _match_names(options["feastGroups"].get("round" + str(index), []), players)
         configured = len(ids) == 4 and not unresolved
-        round_row = {"index": index, "time": fmt_ms(ts - start), "timeMs": ts - start, "strikes": [], "failures": [],
+        begin = max((int(e["timestamp"]) for e in raw.get("casts", []) if event_type(e) == "begincast" and ability_id(e) == 1290516 and e.get("sourceID") == cast.get("sourceID") and ts-8000 <= int(e["timestamp"]) < ts), default=ts-4000)
+        round_row = {"index": index, "time": fmt_ms(ts - start), "timeMs": ts - start, "casterID": cast.get("sourceID"), "castStartTimeMs": max(0, begin-start), "channelEndTimeMs": min(ts+4000, int(fight["endTime"]))-start, "strikes": [], "failures": [],
                      "assigned": [player_ref(players, actor_map, pid) for pid in ids], "unresolvedNames": unresolved,
                      "assignmentValid": configured, "configurationNote": "" if configured else "本轮需配置四名可唯一识别的免疫玩家，当前只展示实测证据"}
         protection_pairs, pair_warnings = _protection_pairs(options, index, players)
@@ -524,7 +539,8 @@ def _feast_review(fight, actor_map, players, raw, options):
             participants = []
             for pid, events in by_player.items():
                 immunity = _immunity_state(raw, pid, hit_time, events)
-                participants.append({**player_ref(players, actor_map, pid), "damage": sum(int(e.get("amount") or 0) for e in events),
+                position = next((actor_position(e, "target") for e in events if actor_position(e, "target")), None)
+                participants.append({**player_ref(players, actor_map, pid), "position": position, "damage": sum(int(e.get("amount") or 0) for e in events),
                                      "immunity": immunity, "result": "免疫" if immunity["immuneHit"] else "偏转/免疫覆盖的零伤害" if immunity["protectedHit"] else "实际命中"})
             display = ([p for p in participants if p["playerID"] in ids or p["immunity"]["protectedHit"]
                         or (strike_index in {2, 3} and p["damage"] > 0)]
@@ -735,10 +751,74 @@ def _death_reviews(fight, actor_map, players, raw, options):
              "expectedGlobuleCount": sum(r["venomStacks"] for r in venom_rows), "explosions": burst_rows,
              "evidenceNote": "带毒死亡层数对应机制预期额外球数，并非日志观测到的实体生成数量；球爆炸单独按实测全团伤害展示。"})
 
-def _venom_attribution(damage_events, casts, timestamp, player_id):
+def _venom_source_index(damage, casts, debuffs=None):
+    """Index once per pull; each aura change searches only its player's hits."""
+    by_player, spit_casts, wave_auras, ranks = defaultdict(list), defaultdict(list), defaultdict(list), Counter()
+    for event in _unique_events(debuffs or []):
+        if ability_id(event) == 1292807 and event_type(event) in {"applydebuff", "refreshdebuff", "applydebuffstack"}:
+            wave_auras[event.get("targetID")].append(int(event["timestamp"]))
+    for rows in wave_auras.values():
+        rows.sort()
+    for cast in sorted(_unique_events(casts), key=lambda e: int(e.get("timestamp") or 0)):
+        if ability_id(cast) != 1291478 or event_type(cast) != "cast":
+            continue
+        key = (cast.get("sourceID"), cast.get("sourceInstance"))
+        if key[1] is None:
+            continue
+        ranks[key] += 1
+        spit_casts[key].append((int(cast["timestamp"]), ranks[key], cast.get("targetID")))
+    for event in _unique_events(damage):
+        # An immunity can prevent damage while the independently recorded venom
+        # aura still gains a stack. Attribution follows that aura, not damage size.
+        if ability_id(event) not in {*VENOM_GAIN_DAMAGE, *VENOM_ABNORMAL_DAMAGE} - {1292806}:
+            continue
+        by_player[event.get("targetID")].append(event)
+    for rows in by_player.values():
+        rows.sort(key=lambda e: int(e["timestamp"]))
+    return {"damage": by_player, "times": {pid: [int(e["timestamp"]) for e in rows] for pid, rows in by_player.items()},
+            "spitCasts": spit_casts, "waveAuras": wave_auras}
+
+
+def _venom_origin(source_id, timestamp, player_id, index):
+    key = {1289994: "green", 1292807: "wave", 1289201: "orb",
+           1293749: "flood", 1294293: "flood", 1294605: "flood",
+           1291404: "emergence", 1308122: "emergence"}.get(source_id)
+    if key:
+        return key
+    if source_id not in {1291478, 1293295, 1293979}:
+        return "unknown"
+    rows, times = index["damage"].get(player_id, []), index["times"].get(player_id, [])
+    hits = [e for e in rows[bisect_left(times, timestamp-750):bisect_right(times, timestamp+750)]
+            if ability_id(e) in {1291478, 1293295, 1293979}]
+    hit = min(hits, key=lambda e: abs(int(e["timestamp"])-timestamp), default=None)
+    if hit:
+        casts = index["spitCasts"].get((hit.get("sourceID"), hit.get("sourceInstance")), [])
+        cast = min((c for c in casts if abs(c[0]-int(hit["timestamp"])) <= 750 and c[2] == player_id),
+                   key=lambda c: abs(c[0]-timestamp), default=None)
+        if cast:
+            return "spitFirst" if cast[1] == 1 else "spitRepeat"
+    if source_id == 1291478:
+        cast = min((c for rows in index["spitCasts"].values() for c in rows
+                    if c[2] == player_id and abs(c[0]-timestamp) <= 750),
+                   key=lambda c: abs(c[0]-timestamp), default=None)
+        if cast:
+            return "spitFirst" if cast[1] == 1 else "spitRepeat"
+    # A point-of-view damage event without a head instance cannot establish cast order.
+    return "unknown"
+
+
+def _venom_attribution(damage_events, casts, timestamp, player_id, index=None):
+    if index is not None:
+        waves = index["waveAuras"].get(player_id, [])
+        if waves[bisect_left(waves, timestamp-250):bisect_right(waves, timestamp+50)]:
+            return "中波", 1292807, "abnormal"
+        rows, times = index["damage"].get(player_id, []), index["times"].get(player_id, [])
+        damage_events = rows[bisect_left(times, timestamp-4500):bisect_right(times, timestamp+4500)]
     nearby = sorted(
         (event for event in damage_events if event.get("targetID") == player_id
          and abs(int(event.get("timestamp") or 0) - timestamp) <= 4500
+         # Wave contact applies venom before its next periodic damage tick.
+         and int(event.get("timestamp") or 0) <= timestamp+(1500 if ability_id(event)==1292807 else 100)
          and int(ability_id(event) or 0) in {*VENOM_GAIN_DAMAGE, *VENOM_ABNORMAL_DAMAGE}),
         key=lambda event: abs(int(event.get("timestamp") or 0) - timestamp),
     )
@@ -749,7 +829,7 @@ def _venom_attribution(damage_events, casts, timestamp, player_id):
         return VENOM_GAIN_DAMAGE[spell_id], spell_id, "normal"
     emergence = min(
         (cast for cast in casts if int(ability_id(cast) or 0) in {1291404, 1308122}
-         and abs(int(cast.get("timestamp") or 0) - timestamp) <= 4500),
+         and event_type(cast) == "cast" and -100 <= timestamp-int(cast.get("timestamp") or 0) <= 1500),
         key=lambda cast: abs(int(cast.get("timestamp") or 0) - timestamp),
         default=None,
     )
@@ -759,7 +839,7 @@ def _venom_attribution(damage_events, casts, timestamp, player_id):
     targeted_cast = min(
         (cast for cast in casts if cast.get("targetID") == player_id
          and int(ability_id(cast) or 0) in {1289201, 1291478}
-         and abs(int(cast.get("timestamp") or 0) - timestamp) <= 4500),
+         and event_type(cast) == "cast" and -100 <= timestamp-int(cast.get("timestamp") or 0) <= 1500),
         key=lambda cast: abs(int(cast.get("timestamp") or 0) - timestamp),
         default=None,
     )
@@ -767,7 +847,7 @@ def _venom_attribution(damage_events, casts, timestamp, player_id):
         spell_id = int(ability_id(targeted_cast) or 0)
         return VENOM_GAIN_DAMAGE.get(spell_id, spell_name(spell_id)), spell_id, "normal"
     direct_cast = min(
-        (cast for cast in casts if int(ability_id(cast) or 0) == 1290336
+        (cast for cast in casts if int(ability_id(cast) or 0) == 1290336 and cast.get("targetID") == player_id
          and abs(int(cast.get("timestamp") or 0) - timestamp) <= 5000),
         key=lambda cast: abs(int(cast.get("timestamp") or 0) - timestamp),
         default=None,
@@ -792,6 +872,27 @@ def _venom_stack_at(events, player_id, timestamp):
         elif kind == "removedebuff":
             current = 0
     return current
+
+
+def _wave_contact_events(raw):
+    """Count entering the wave once, including contact with no damage tick."""
+    auras = sorted((e for e in _unique_events(raw.get("debuffs", [])) if ability_id(e)==1292807),
+                   key=lambda e: int(e["timestamp"]))
+    damage = [e for e in _unique_events(raw.get("damage", [])) if ability_id(e)==1292807]
+    intervals, contacts = [], []
+    for aura in auras:
+        if event_type(aura) != "applydebuff":
+            continue
+        begin, pid = int(aura["timestamp"]), aura.get("targetID")
+        end = next((int(e["timestamp"]) for e in auras if e.get("targetID")==pid
+                    and event_type(e)=="removedebuff" and int(e["timestamp"])>=begin), begin+2000)
+        ticks = [e for e in damage if e.get("targetID")==pid and begin-100<=int(e["timestamp"])<=end+100]
+        intervals.append((pid,begin-100,end+100))
+        contacts.append({**aura,"type":"damage","amount":sum(int(e.get("amount") or 0) for e in ticks),
+                         "absorbed":sum(int(e.get("absorbed") or 0) for e in ticks),"contactEvidence":"波浪 debuff"})
+    contacts.extend(e for e in damage if e.get("hitType")!=10 and int(e.get("amount") or 0)+int(e.get("absorbed") or 0)>0
+                    and not any(pid==e.get("targetID") and begin<=int(e["timestamp"])<=end for pid,begin,end in intervals))
+    return contacts
 
 def _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds):
     """Use the existing Corrosive Deluge pickup windows, including zero pickups."""
@@ -832,6 +933,7 @@ def _venom_checkpoints(fight, actor_map, players, raw, histories):
               and event_type(e) == "applybuff" and e.get("sourceID") == e.get("targetID")]
     checkpoints = []
     by_player = {p["playerID"]: p["events"] for p in histories}
+    previous_checkpoint = -1
     for index, start in enumerate(starts[:2], 1):
         begin = int(start["timestamp"])
         end = next((e for e in evidence if ability_id(e) == 1294293 and event_type(e) == "removebuff"
@@ -861,16 +963,40 @@ def _venom_checkpoints(fight, actor_map, players, raw, histories):
             for e in history:
                 if e["delta"] > 0:
                     sources[e["source"]] += e["delta"]
+            contributions, interval_contributions = Counter(), Counter()
+            for e in history:
+                if e["delta"] > 0:
+                    origin = e.get("originKey", "unknown")
+                    contributions[origin] += e["delta"]
+                    if e["timeMs"] > previous_checkpoint:
+                        interval_contributions[origin] += e["delta"]
+            death_events = [e for e in prior_deaths if e.get("targetID") == pid]
+            death_loss = 0
+            for death in death_events:
+                dt = int(death["timestamp"])-fight["startTime"]
+                removal = next((e for e in history if e.get("deathAtMs") == dt), None)
+                preceding = [e for e in history if e["timeMs"] < dt]
+                before_death = removal["fromStack"] if removal else preceding[-1]["toStack"] if preceding else 0
+                death_loss += min(3, before_death)
+            observed_death_loss = -sum(e["delta"] for e in history if e["delta"] < 0 and e.get("category") == "death")
+            feast_loss = -sum(e["delta"] for e in history if e["delta"] < 0 and e.get("category") == "feast")
+            other_loss = -sum(e["delta"] for e in history if e["delta"] < 0 and e.get("category") not in {"death", "feast"})
+            gained = sum(contributions.values())
             rows.append({**player_ref(players, actor_map, pid), "stacks": stack,
                          "alive": _life_at(raw, pid, ts), "exceeded": stack > limit,
                          "count": int(stack > limit and exemption is None), "exempt": exemption is not None, "history": history,
                          "gainsBySource": [{"source": name, "stacks": n} for name, n in sources.items()],
-                         "removedStacks": -sum(e["delta"] for e in history if e["delta"] < 0)})
+                         "removedStacks": -sum(e["delta"] for e in history if e["delta"] < 0),
+                         "sourceStacks": dict(contributions), "intervalSourceStacks": dict(interval_contributions),
+                         "gainTotal": gained, "deathCount": len(death_events), "deathReduction": death_loss,
+                         "observedDeathReduction": observed_death_loss, "feastReduction": feast_loss, "otherReduction": other_loss,
+                         "reconciliationDelta": stack-(gained-death_loss-feast_loss-other_loss)})
         checkpoints.append({"index": index, "timeMs": ts - fight["startTime"],
                             "time": fmt_ms(ts - fight["startTime"]), "limit": limit,
                             "players": rows, "count": sum(p["count"] for p in rows),
                             "exempt": exemption is not None, "exemption": exemption,
                             "evidence": "涌动自身光环完整结束（1294293 removebuff）"})
+        previous_checkpoint = ts-fight["startTime"]
     return checkpoints
 
 
@@ -1087,15 +1213,17 @@ def _torrent_rotation(torrents, events, start, players):
         error=sum(wrap(a-phase-slope*t)**2 for (t,_),a in zip(samples,unwrapped))/len(samples)
         if 1<speed<180 and error<radians(12)**2 and abs(wrap(phase-initial))<radians(50):
             candidates.append(speed)
-            torrent.update(angularSpeedDegrees=speed,initialAngleRadians=phase,rotationEvidence="防骑连续绕场跑位确定方向；分离射线命中估算速度，示意动画")
-    if candidates:
-        shared_speed=median(candidates)
-        for torrent in torrents:
-            torrent["angularSpeedDegrees"]=shared_speed
-            samples=torrent.get("_rotationSamples") or []
-            if samples and torrent.get("rotationDirection") and "估算速度" not in torrent["rotationEvidence"]:
-                phases=[a-torrent["rotationDirection"]*radians(shared_speed)*t for t,a in samples]
-                torrent["initialAngleRadians"]=atan2(sum(sin(a) for a in phases),sum(cos(a) for a in phases))
+            torrent["fittedInitialAngleRadians"] = phase
+    for torrent in torrents:
+        if candidates:
+            torrent["fittedAngularSpeedDegrees"] = median(candidates)
+        duration = (torrent.get("endTimeMs") or torrent["startTimeMs"])-torrent["startTimeMs"]
+        rotation_duration = max(14000, duration)
+        torrent["rotationDurationMs"] = rotation_duration
+        torrent["sweepDegrees"] = TORRENT_REPLAY_SWEEP_DEGREES*min(1, max(0, duration)/rotation_duration)
+        if duration > 0 and torrent.get("rotationDirection"):
+            torrent["angularSpeedDegrees"] = TORRENT_REPLAY_SWEEP_DEGREES/(rotation_duration/1000)
+            torrent["rotationEvidence"] += "；从上一平台方向起转，完整引导扫过约270度"
     for torrent in torrents:torrent.pop("_rotationSamples",None)
 
 
@@ -1105,9 +1233,9 @@ def _replay_animation_units(fight, events, raw, players):
     heads, channels = {}, []
     for e in events:
         ts=int(e["timestamp"])
-        if e.get("type")=="cast" and ability_id(e) in TANK_CHANNELS:
+        if e.get("type")=="cast" and ability_id(e) in {*TANK_CHANNELS, 1290516}:
             death=next((int(row["timestamp"]) for row in events if row.get("type")=="death" and row.get("targetID")==e["sourceID"] and ts<=int(row["timestamp"])<ts+4000),end)
-            channels.append({"actorID":e["sourceID"],"targetID":e.get("targetID"),"spellID":ability_id(e),"spellName":TANK_CHANNELS[ability_id(e)],"startTimeMs":ts-start,"endTimeMs":min(ts+4000,end,death)-start,"outcome":"completed","phase":"channel"})
+            channels.append({"actorID":e["sourceID"],"targetID":e.get("targetID"),"spellID":ability_id(e),"spellName":TANK_CHANNELS.get(ability_id(e), "贪婪盛宴"),"startTimeMs":ts-start,"endTimeMs":min(ts+4000,end,death)-start,"outcome":"completed","phase":"channel"})
         for side in ("source","target"):
             actor=e.get(side+"ID")
             if actor not in ids:
@@ -1132,19 +1260,19 @@ def _replay_animation_units(fight, events, raw, players):
     return list(heads.values()),channels
 
 
-def _replay_feedback(fight, actor_map, players, raw):
+def _replay_feedback(fight, actor_map, players, raw, histories=None):
     start = int(fight["startTime"])
     combined=list(raw.get("replayEvents") or []) + list(raw.get("trackedActorEvents") or []) + list(raw.get("damage") or [])
     events = _unique_events(sorted(combined,key=lambda e:not any(actor_position(e,s) for s in ("source","target"))))
     wall_ids = {a["id"] for a in raw.get("actorRows") or [] if a.get("gameID") == BULWARK_NPC_ID}
     hits, controls, walls = [], [], {}
-    # Stirring Abyss is unavoidable raid damage; venom accounting still keeps it.
-    avoidable = (set(VENOM_ABNORMAL_DAMAGE) - {1292806, 1292807}) | AVOIDABLE_DEATH_DAMAGE_IDS | {1295107, 1291478, 1293295, 1293979}
+    # 1292806 is raid-wide damage; 1292807 is the avoidable travelling wave.
+    avoidable = (set(VENOM_ABNORMAL_DAMAGE) - {1292806}) | AVOIDABLE_DEATH_DAMAGE_IDS | {1295107, 1291478, 1293295, 1293979}
     for event in events:
         time = int(event.get("timestamp") or 0) - start
         if time < 0:
             continue
-        if event_type(event) == "damage" and event.get("targetID") in players and ability_id(event) in avoidable and int(event.get("amount") or 0) > 0:
+        if event_type(event) == "damage" and event.get("targetID") in players and ability_id(event) in avoidable and event.get("hitType") != 10 and int(event.get("amount") or 0)+int(event.get("absorbed") or 0) > 0:
             hits.append({"timeMs": time, "spellID": ability_id(event), **player_ref(players, actor_map, event["targetID"])})
         for side in ("source", "target"):
             actor = event.get(side+"ID")
@@ -1170,7 +1298,15 @@ def _replay_feedback(fight, actor_map, players, raw):
     for event in raw.get("friendlyCasts") or []:
         spell = ability_id(event)
         if event_type(event) == "cast" and spell in REPLAY_CONTROL_SPELLS and event.get("sourceID") in players:
-            controls.append({"timeMs": int(event["timestamp"])-start, "spellID": spell, "spell": REPLAY_CONTROL_SPELLS[spell], **player_ref(players, actor_map, event["sourceID"])})
+            controls.append({"timeMs": int(event["timestamp"])-start, "durationMs": 6000 if spell in {357210,403631} else 1200,
+                             "spellID": spell, "spell": REPLAY_CONTROL_SPELLS[spell], **player_ref(players, actor_map, event["sourceID"])})
+    # Positive venom changes prove wave contact even when the damage was immune.
+    for history in histories or []:
+        for row in history["events"]:
+            if row.get("originKey") != "wave" or row["delta"] <= 0:
+                continue
+            if not any(h["playerID"] == history["playerID"] and abs(h["timeMs"]-row["timeMs"]) < 100 for h in hits):
+                hits.append({"timeMs": row["timeMs"], "spellID": row["sourceID"], **player_ref(players, actor_map, history["playerID"])})
     _immunity_state(raw, next(iter(players), 0), start)
     immunities = [{"playerID": pid, "spellID": sid, "spell": IMMUNITY_NAMES[sid], "startTimeMs": max(0, begin-start),
                    "endTimeMs": min(int(fight["endTime"]), end)-start, "sourceID": source}
@@ -1181,7 +1317,10 @@ def _replay_feedback(fight, actor_map, players, raw):
             continue
         begin = int(event["timestamp"])
         end = next((int(e["timestamp"]) for e in events if ability_id(e)==1294293 and event_type(e)=="removebuff" and e.get("sourceID")==event.get("sourceID")==e.get("targetID") and int(e["timestamp"])>begin), None)
-        torrents.append({"actorID": event["sourceID"], "startTimeMs": begin-start, "endTimeMs": end-start if end else None, "spellID":1294293, "spellName":"邪恶洪流"})
+        windup = max((int(e["timestamp"]) for e in events if ability_id(e)==1294293 and event_type(e)=="begincast"
+                      and e.get("sourceID")==event["sourceID"] and begin-8000<=int(e["timestamp"])<begin), default=begin)
+        torrents.append({"actorID": event["sourceID"], "windupTimeMs": windup-start, "startTimeMs": begin-start,
+                         "endTimeMs": end-start if end else None, "spellID":1294293, "spellName":"邪恶洪流"})
     _torrent_rotation(torrents,events,start,players)
     strikers,channels=_replay_animation_units(fight,events,raw,players)
     return {"hits": hits, "controls": controls, "bulwarks": list(walls.values()), "immunities": immunities, "torrents": torrents,"strikers":strikers,"channels":channels}
@@ -1195,6 +1334,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
         raw["debuffs"], raw["casts"], raw["damage"], raw["friendlyBuffs"], raw["deaths"],
     )
     venom_events = [event for event in debuffs if int(ability_id(event) or 0) == 1290336]
+    source_index = _venom_source_index(damage, casts, debuffs)
     histories = []
     for player_id in (players if options["venomReviewEnabled"] or options["globulesReviewEnabled"] else []):
         current, peak, rows = 0, 0, []
@@ -1205,7 +1345,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
             death_event = None
             if kind in {"applydebuff", "applydebuffstack", "refreshdebuff"}:
                 current = int(raw_stack) if raw_stack is not None else max(1, current + (1 if "stack" in kind else 0))
-                source_label, source_id, category = _venom_attribution(damage, casts, timestamp, player_id)
+                source_label, source_id, category = _venom_attribution(damage, casts, timestamp, player_id, source_index)
                 action = "gain"
             elif kind == "removedebuffstack":
                 current = int(raw_stack) if raw_stack is not None else max(0, current - 1)
@@ -1266,6 +1406,13 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                     category = "clear"
             else:
                 continue
+            if current < before:
+                death_event = _death_near(deaths, player_id, timestamp)
+                if death_event:
+                    category = "death"
+                    action = "death_clear" if current == 0 else "death_reduce"
+                    source_label = "死亡减层"
+                    source_id = int(death_event.get("killingAbilityGameID") or 0)
             peak = max(peak, current)
             row = {
                 "timeMs": timestamp - fight["startTime"], "time": fmt_ms(timestamp - fight["startTime"]),
@@ -1275,6 +1422,12 @@ def analyze_twinfangs(fight, actor_map, players, raw):
             if death_event:
                 row["deathAtMs"] = int(death_event.get("timestamp") or 0) - fight["startTime"]
                 row["deathAbilityID"] = int(death_event.get("killingAbilityGameID") or ability_id(death_event) or 0)
+                row["expectedDeathReduction"] = min(3, before)
+            if row["delta"] > 0:
+                row["originKey"] = _venom_origin(source_id, timestamp, player_id, source_index)
+                row["originLabel"] = next(s["label"] for s in VENOM_ORIGINS if s["key"] == row["originKey"])
+                if row["originKey"] == "spitRepeat":
+                    row["category"] = "abnormal"
             rows.append(row)
         if rows:
             histories.append({**player_ref(players, actor_map, player_id), "peakStack": peak,
@@ -1353,12 +1506,12 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                     "timeMs": row["timeMs"], "time": row["time"], "delta": row["delta"], "toStack": row["toStack"],
                     "source": row["source"], "sourceID": row["sourceID"],
                 })
-    impact_damage = [event for event in damage if int(event.get("amount") or 0) > 0]
+    impact_damage = [event for event in damage if event.get("hitType") != 10 and int(event.get("amount") or 0)+int(event.get("absorbed") or 0) > 0]
     circle_hits = _avoidable_board(
         fight, actor_map, players, impact_damage, deaths, {1289994: "腐蚀洪流绿球落地直击"}
     ) if options["waveReviewEnabled"] else []
     wave_hits = _avoidable_board(
-        fight, actor_map, players, impact_damage, deaths, {1292807: "搅动深渊"}
+        fight, actor_map, players, _wave_contact_events(raw), deaths, {1292807: "中波"}
     ) if options["waveReviewEnabled"] else []
     mythic = int(fight.get("difficulty") or 0) == 5
     if mythic:
@@ -1386,8 +1539,9 @@ def analyze_twinfangs(fight, actor_map, players, raw):
                                                 "x": e.get("x"), "y": e.get("y"), "time": fmt_ms(int(e["timestamp"]) - fight["startTime"])} for e in cover]})
     venom_rounds = _venom_rounds(fight, actor_map, players, raw, histories, globule_rounds)
     return {
-        "replayFeedback": _replay_feedback(fight, actor_map, players, raw) if options["fullReplayEnabled"] else {},
+        "replayFeedback": _replay_feedback(fight, actor_map, players, raw, histories) if options["fullReplayEnabled"] else {},
         "eternalVenom": {"players": histories if options["venomReviewEnabled"] else [], "feastChecks": feast_checks,
+                         "sourceColumns": list(VENOM_ORIGINS),
                          "checkpoints": _venom_checkpoints(fight, actor_map, players, raw, histories) if options["venomReviewEnabled"] else [],
                          "abnormalGains": abnormal_gains if options["venomReviewEnabled"] else [],
                          "rounds": venom_rounds if options["venomReviewEnabled"] else []},
@@ -1437,7 +1591,7 @@ def _mechanic_overview(rendered, options=None):
             "players": nightly_player_totals(circle_hits), "events": circle_hits,
         }, {
             "key": "waveHits", "label": "命中波浪", "value": len(wave_hits), "unit": "次",
-            "tone": "warning", "description": "搅动深渊 1292807 对玩家造成正伤害的事件数。",
+            "tone": "warning", "description": "按波浪 debuff 统计接触次数；没有 debuff 记录时补充有效伤害事件，同一次接触的连续伤害合并。",
             "players": nightly_player_totals(wave_hits), "events": wave_hits,
         }],
     }

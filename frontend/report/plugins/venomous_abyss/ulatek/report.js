@@ -26,7 +26,8 @@
   }
 
   function renderTabs() {
-    const definitions = state.payload?.meta?.tabDefinitions || [{key:"survival", label:"全场存活情况"}];
+    const definitions = [...(state.payload?.meta?.tabDefinitions || [{key:"survival", label:"全场存活情况"}])];
+    if(boss().combatReplay&&!definitions.some(r=>r.key==='replay'))definitions.splice(1,0,{key:'replay',label:'场地回放'});
     if (!definitions.some(row => row.key === state.tab)) state.tab = definitions[0].key;
     $("tabs").innerHTML = definitions.map(row => `<button data-tab="${esc(row.key)}" class="${row.key === state.tab ? "active" : ""}">${esc(row.label)}</button>`).join("");
     document.querySelectorAll("[data-tab]").forEach(button => button.onclick = () => { state.tab = button.dataset.tab; renderTabs(); renderContent(); });
@@ -112,7 +113,7 @@
   }
 
   function renderContent() {
-    const renderers = { survival: renderSurvival, waves: renderWaves, heart: renderHeart, fangs: renderFangs, critical: renderCritical };
+    const renderers = { survival: renderSurvival, replay: ()=>'<div id="ulatekReplay"></div>', waves: renderWaves, heart: renderHeart, fangs: renderFangs, critical: renderCritical };
     $("content").innerHTML = (renderers[state.tab] || (() => '<div class="empty">该页暂无数据。</div>'))();
     const exemption=boss().nightlyExemption;
     if(exemption?.active)$("content").insertAdjacentHTML("afterbegin",`<section class="panel"><strong>整晚统计豁免：${esc(exemption.time)} 起已有8人死亡</strong><p>${esc(exemption.reason)}</p></section>`);
@@ -121,6 +122,7 @@
       renderContent();
     });
     refreshTooltips();
+    if(state.tab==='replay')window.UlatekReplay.mount($('ulatekReplay'),boss(),current()?.durationMs);
   }
 
   function render() { renderStats(); renderTabs(); renderContent(); }
@@ -130,7 +132,7 @@
     const requestedFight = Number(new URLSearchParams(location.search).get("fight"));
     const index = state.pulls.findIndex(row => Number(row.fightID) === requestedFight);
     state.pull = index >= 0 ? index : 0;
-    state.tab = (payload.meta?.tabDefinitions || [])[0]?.key || "survival";
+    state.tab = new URLSearchParams(location.search).get('tab') || (payload.meta?.tabDefinitions || [])[0]?.key || "survival";
     $("pullSelect").innerHTML = state.pulls.map((row,index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${esc(row.fightPhase || "阶段未记录")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage || 0).toFixed(2)}%`}，${esc(row.duration || "")}</option>`).join("");
     $("pullSelect").value = String(state.pull);
     $("error").textContent = state.pulls.length ? "" : "分析结果中没有乌拉特克战斗。";

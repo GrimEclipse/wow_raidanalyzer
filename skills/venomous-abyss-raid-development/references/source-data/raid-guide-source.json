@@ -35,7 +35,8 @@
   },
   "raids": [
     {"key": "venomous_abyss", "nameZh": "烈毒之渊", "nameEn": "The Venomous Abyss"},
-    {"key": "tidebound_grotto", "nameZh": "潮缚石窟", "nameEn": "The Tidebound Grotto"}
+    {"key": "tidebound_grotto", "nameZh": "潮缚石窟", "nameEn": "The Tidebound Grotto"},
+    {"key": "unbinding_of_kithix", "nameZh": "基希克斯破封", "nameEn": "The Unbinding of Kith'ix"}
   ],
   "extraBosses": [
     {
@@ -45,7 +46,8 @@
       "nameZh": "尼姆瑞莎·唤潮者",
       "nameEn": "Nymrissa Wavecaller",
       "encounterID": 3379
-    }
+    },
+    {"key": "kithix", "raidKey": "unbinding_of_kithix", "order": 1, "nameZh": "基希克斯", "nameEn": "Kith'ix", "encounterID": 3513, "expectedUntested": true}
   ],
   "confirmedSourceNames": {
     "Environment": "环境",
@@ -174,8 +176,7 @@
     "1282616": "催化胆汁",
     "1282931": "催化胆汁",
     "1295798": "瘟疫浪潮",
-    "1304437": "硬化肿瘤",
-    "1304459": "肿瘤爆发",
+    "1304459": "恶念",
     "1306746": "恶念图腾",
     "1306818": "恶念图腾",
     "1306819": "恶念图腾",
@@ -982,7 +983,8 @@
     },
     "vashnik": {
       "reviewStatus": "reviewed",
-      "difficulty": "英雄完整击杀 / 史诗长时间测试",
+      "difficulty": "英雄 / 史诗击杀记录",
+      "excludedSpellIDs": [1304437],
       "summary": "这场战斗围绕暗影、鲜血和火焰三座能量泉水推进，但由于数值设计失误，几乎所有团队都使用木桩打法；史诗难度的痛饮会额外召唤恶念图腾。",
       "energy": {
         "title": "战斗总览",
@@ -991,7 +993,7 @@
         "resource": "Imbibe 循环",
         "maximum": 8,
         "gaugeLabel": "已完成灌注轮次",
-        "gaugeNote": "H 击杀观察到 8 轮；M 测试长战斗在第 6 轮后因场面失控连续触发额外事件。",
+        "gaugeNote": "所选 H 击杀观察到 8 轮痛饮；所选 M 击杀观察到 6 轮。",
         "rules": [
           "场地上分别有暗影泉水、鲜血泉水和火焰泉水。",
           "Boss 每隔一段时间施放痛饮，激活距离最近的两座泉水，并召唤对应的大怪。",
@@ -1012,12 +1014,12 @@
           "leaderSpellIDs": [1284663]
         },
         {
-          "key": "mythic-tumor",
+          "key": "mythic-totem",
           "label": "史诗",
-          "title": "恶念图腾、硬化肿瘤与瘟疫波浪",
+          "title": "恶念图腾与瘟疫波浪",
           "trigger": "每次史诗痛饮完成",
-          "goal": "痛饮结束后立刻查看恶念图腾位置；瘟疫泡沫点名者按预分配位置和面向，让四道波浪分别命中对应的硬化肿瘤。",
-          "spellIDs": [1281907, 1281908, 1281913, 1281925, 1295798, 1304437, 1304459, 1306746, 1306818, 1306819, 1306820, 1309774],
+          "goal": "痛饮结束后立刻查看恶念图腾位置；瘟疫泡沫点名者按预分配位置和面向，让波浪分别命中对应的图腾。",
+          "spellIDs": [1281907, 1281908, 1281913, 1281925, 1295798, 1304459, 1306746, 1306818, 1306819, 1306820, 1309774],
           "leaderSpellIDs": [1306746, 1309774]
         }
       ],
@@ -1059,7 +1061,7 @@
           "summary": "瘟疫泡沫会点名四名玩家，效果结束时从玩家脚下沿面向发射波浪。史诗难度下，瘟疫波浪会消除因痛饮产生的图腾；每人提前认领一个目标，站好位置、对准目标后再让波浪结算。",
           "leaderSpellIDs": [1281907],
           "leaderDetails": [
-            "被点名玩家先到指定站位，再把面向对准自己负责的肿瘤。",
+            "被点名玩家先到指定站位，再把面向对准自己负责的图腾。",
             "波浪路径不要穿过大团，也不要误扫其他玩家负责的目标。",
             "点名者在每次第一轮光柱站位后提前观察哪些需要去补；结算前再次确认站位、面向和目标，避免漏掉图腾。"
           ],
@@ -1073,7 +1075,7 @@
             "实际波浪命中伤害为 1295798；Dungeon Journal 的机制入口还包含 Plague Waves 1295796。"
           ],
           "evidenceType": "assigned-directional-wave",
-          "verification": "以泡沫 removedebuff 为精确时刻，保存最近位置样本的偏移；用 facing 构造射线/扇形，再与指定肿瘤位置及 1295798 命中集合交叉验证。"
+          "verification": "以泡沫 removedebuff 为精确时刻，保存最近位置样本的偏移；用 facing 构造射线/扇形，再与指定图腾位置及 1295798 命中集合交叉验证。"
         },
         {
           "phase": "fixed-cycle",
@@ -1132,12 +1134,12 @@
           "verification": "按当前 Infusion Aura 给感染轮次分类，记录 apply/remove、周期伤害、结算伤害与死亡的相对时间。"
         },
         {
-          "phase": "mythic-tumor",
-          "title": "史诗：恶念图腾与硬化肿瘤",
+          "phase": "mythic-totem",
+          "title": "史诗：恶念图腾",
           "priority": "mythic",
           "roles": ["瘟疫泡沫组", "DPS", "团长"],
-          "tags": ["史诗专属", "图腾", "肿瘤", "立即转火"],
-          "spellIDs": [1306746, 1306818, 1306819, 1306820, 1309774, 1304437, 1304459, 1281907, 1295798],
+          "tags": ["史诗专属", "图腾", "立即转火"],
+          "spellIDs": [1306746, 1306818, 1306819, 1306820, 1309774, 1304459, 1281907, 1295798],
           "summary": "史诗难度下，痛饮会从剧毒泉水中喷出恶念图腾，必须由瘟疫波浪命中才会消失，否则图腾会施放恶念并导致灭团。",
           "leaderSpellIDs": [1306746, 1309774],
           "leaderDetails": [
@@ -1152,13 +1154,13 @@
             "按预定光柱站位处理，并在波浪结算前确认每个图腾都有对应点名者。"
           ],
           "evidenceType": "mythic-assigned-target",
-          "verification": "按痛饮轮次保存 1306746/1306818/1306819/1306820 的生成与死亡、1309774 是否施放；同时保留全部肿瘤目标、1304437 Aura 移除时刻、1304459 是否完成及各瘟疫泡沫点名者的波浪方向。"
+          "verification": "按痛饮轮次保存恶念图腾的生成与死亡、1304459/1309774 是否施放及各瘟疫泡沫点名者的波浪方向。所选 M 击杀中没有 1304437 事件。"
         }
       ]
     },
     "lostexplorers": {
       "reviewStatus": "reviewed",
-      "difficulty": "英雄击杀 / 史诗样本",
+      "difficulty": "英雄 / 史诗击杀记录",
       "summary": "三目标议会战。两名坦克负责大副纳玛和书卷贤者伊库，商人盖博不吃仇恨、会沿场地内圈移动。平时尽量保持多目标输出，但绝不能让三名 Boss 同时获得联合防御。三条鱼要依次交给三个不同目标；交鱼玩家拿到鱼后不能死亡，一旦死亡，本轮强化无法解除，可以直接宣告 Boss 战失败。",
       "energy": {
         "title": "莫尔扎希强化轮次",
@@ -1394,9 +1396,9 @@
           ],
           "details": [
             "鱼窗口中的特殊投掷可由 1306145 的成功施法与同毫秒附近的 1306137 结算稳定识别；当前 WCL 代表日志仍没有“谁捡鱼/谁交鱼”的稳定玩家事件。",
-            "英雄样本中的鱼在约 00:31.0、02:35.8、04:40.6 出现；史诗样本在约 00:31.0、02:37.4、04:42.1、06:47.3 出现，每个强化窗口各一次。",
+            "鱼随强化轮次出现；H/M 击杀记录中每一轮的实际时刻可在时间轴按 1306145 核对。",
             "成功结果可由三种莫尔扎希命令/束缚状态取证：1296975、1297022、1297024；它们分别与大副巨力重击、书卷贤者霜火连射、商人爆炸惊喜窗口相邻。",
-            "英雄击杀样本三次结果锚点约为 01:01.9、03:08.0、05:06.6；史诗样本约为 01:04.3、03:09.0、05:14.2。目标顺序可以不同，不应把样本顺序写死为职责。"
+            "H/M 击杀记录中的三次特殊选择均可在时间轴核对；目标顺序可以不同，不应把单场顺序写死为职责。"
           ],
           "evidenceType": "result-only-interaction-cycle",
           "verification": "以 1297075 建立强化窗口，以 1306145/1306137 确认鱼生成，以 1296975/1297022/1297024 确认成功结果并用后续特殊技能反推目标；缺少本地战斗日志或独立交互事件时不归责具体拾鱼者。"
@@ -1680,7 +1682,7 @@
     },
     "twinfangs": {
       "reviewStatus": "reviewed",
-      "difficulty": "英雄击杀基线 / 史诗双首领样本",
+      "difficulty": "英雄 / 史诗击杀记录",
       "summary": "固定循环的双目标战。维克苏尔的液滴、子嗣直线和波浪会不断叠加永久的永恒毒液，伊斯拉兹的贪婪盛宴是唯一稳定消层手段。团队在三个场地区域之间依次转移，第三次转场后进入中场狂暴，必须尽快完成击杀。",
       "energy": {
         "title": "永恒毒液与三处场地",
@@ -1779,7 +1781,7 @@
           ],
           "details": [
             "腐蚀洪流 Cast/Debuff 为 1289192，伤害实例为 1289237/1289994；腐蚀液滴使用 1289201/1289993，史诗超时爆发可见 1290338。",
-            "史诗样本四轮洪流开始于约 00:09、01:10、02:44、03:45；液滴处理结果必须按每一颗的命中或超时事件判断。"
+            "所选 M 击杀出现六轮洪流；液滴处理结果必须按每一颗的命中或超时事件判断。"
           ],
           "evidenceType": "assigned-globule-soak-or-raid-fail",
           "verification": "以 1289192 读条建立 10 秒液滴窗口，统计 1289201 的逐人命中与 1290338 的全团结算；没有液滴坐标时只判断数量、处理者和是否超时。"
@@ -1938,7 +1940,7 @@
             "受护孵化漏断，液滴无法及时处理并触发全团叠层。"
           ],
           "details": [
-            "鲜血洪流为 1303230/1303235，护刺壁垒的受护孵化为 1303378；史诗样本与四轮腐蚀洪流完全同秒出现。"
+            "鲜血洪流为 1303230/1303235，护刺壁垒的受护孵化为 1303378；所选 M 击杀共观察到六轮，逐轮对齐时间轴。"
           ],
           "evidenceType": "mythic-interrupt-to-unlock-globule",
           "verification": "把 1303230 与同轮 1289192 对齐，逐个检查 1303378 的 interrupt 结果、壁垒 Aura 移除和随后液滴命中/超时。"
@@ -1955,15 +1957,15 @@
           "leaderDetails": [
             "每轮召唤前固定远程打断组，按场边目标逐只打断，不要把常规子嗣的腐蚀唾液和幼体的内脏爆裂混为一组。",
             "打断成功就是该目标的处理方式，不需要把打断资源留到读条末端；越早让蛇头退场越安全。",
-            "史诗样本中每轮约持续 14 秒并出现大量约 1 秒一次的读条，需要明确打断清单而不是临场抢断。"
+            "所选 M 击杀出现六轮蛇群；每轮约持续 14 秒并出现密集读条，需要明确打断清单。"
           ],
           "wipePoints": [
             "任意内脏爆裂完成读条，造成全团爆发伤害并附带持续伤害。",
             "打断组只盯维克苏尔的常规子嗣，漏掉场边幼体。"
           ],
           "details": [
-            "唤醒蛇群 1308356 与召唤子嗣 1291404 在史诗样本四轮均同秒完成；幼体随后使用内脏爆裂 1308385。",
-            "代表史诗样本记录到 56 次内脏爆裂 begincast，并在 Interrupts 表中记录到逐次真实打断；没有一条成功 cast，支持“打断令其退场”的处理方式。"
+            "所选 M 击杀中唤醒蛇群 1308356 出现六轮；幼体随后使用内脏爆裂 1308385。",
+            "旧样本记录到 56 次内脏爆裂 begincast 且没有成功 cast；新选 M 击杀记录到 60 次 begincast，同样没有成功 cast，需用 Interrupts 表逐次核对。"
           ],
           "evidenceType": "mythic-repeating-interrupt-retreat",
           "verification": "以 1308356 建立每轮蛇群窗口，按幼体实体分组 1308385 begincast 与 Interrupts.extraAbilityGameID；完成 cast 即为明确漏断。"
@@ -1994,7 +1996,7 @@
     },
     "bargained": {
       "reviewStatus": "reviewed",
-      "difficulty": "英雄完整流程样本 / 史诗样本",
+      "difficulty": "英雄 / 史诗击杀记录",
       "summary": "P1 先打祖尔加，P2 再打玛拉卡斯，两人都降到 1 点生命后进入 35 秒转场，随后开始双目标 P3。两侧祭坛会不断吃掉可用场地；P3 同时出现前两阶段的机制，必须同步压低两个 Boss，并在场地彻底崩溃前完成击杀。",
       "energy": {
         "title": "首领生命与场地污染",
@@ -2097,7 +2099,7 @@
             "一次撕裂摧毁过多凝结的毒液，毒液爆裂多层叠加并与祭坛之牙或处斩组合压垮治疗。"
           ],
           "details": [
-            "撕裂 Cast 为 1299684，坦克易伤为 1301690；英雄样本 P1 共观察到 8 次完成读条。"
+            "撕裂 Cast 为 1299684，坦克易伤为 1301690；所选 H 击杀共观察到 7 次完成读条。"
           ],
           "evidenceType": "tank-frontal-venom-detonation",
           "verification": "按 1299684 完成时刻关联 1299838 的伤害次数和受害者；同一窗口爆裂层数明显增加时记录为清理数量过多，不根据缺失实体坐标猜测具体哪一团毒液。"
@@ -2290,7 +2292,7 @@
             "残片漏进 Boss 造成额外治疗，或连续踩片让灵魂抹除在低血线时连锁致死。"
           ],
           "details": [
-            "英雄样本死亡守卫 1304028 于约 08:07.8 出现，灵魂绑定 1304032 于 08:11.2 开始，08:46.2 结束，持续约 35 秒。",
+            "所选 H/M 击杀的转场分别开始于约 04:56.7 和 06:29.1；灵魂绑定 1304032/1304033 与随后 P3 的实际锚点见时间轴。",
             "当前版本按用户确认采用“残片到达治疗 3%、史诗踩片易伤 20% 持续 5 秒”的处理口径。"
           ],
           "evidenceType": "fixed-regeneration-fragment-intermission",
@@ -2316,7 +2318,7 @@
             "经过修改，当P3这两个boss一方死亡后，另外一方会在10秒后对所有玩家释放死亡进军，这意味着直接会发生脱战灭团。"
           ],
           "evidenceType": "linked-dual-boss-execute",
-          "verification": "按两名 Boss 的 1289798 Aura 与生命曲线对齐，记录首个死亡和幸存首领强化；页面不把未观测的后续循环写成实测时间。"
+          "verification": "按两名 Boss 的 1289798 Aura 与生命曲线对齐，记录首个死亡和幸存首领强化；P3 轮次仅采用对应击杀日志中实际观察到的事件。"
         },
         {
           "phase": "p3",
@@ -2336,7 +2338,7 @@
             "残酷断头台治疗吸收未清除，与盘卷祭坛亵渎持续伤害叠加造成减员。"
           ],
           "details": [
-            "英雄样本 P3 开场于 08:48.6 观察到盘卷祭坛亵渎 1298381，随后可见 1298395/1298594 与腐化毒素伤害；完整 P3 循环尚无该样本证据。"
+            "所选 H/M 完整击杀均覆盖 P3；H 记录首次盘卷祭坛亵渎 1298381 约在 05:37.0，后续轮次和其他技能按时间轴核对。"
           ],
           "evidenceType": "p3-combined-arena-compression",
           "verification": "以 1298381 的施加/层数追踪污染扩大，关联 1307279 的清理结果、墓缚和 1299267/1307652 的分摊者治疗吸收；只报告实际命中与状态。"
@@ -2602,7 +2604,7 @@
           "title": "常态阶段：放球与消球",
           "trigger": "开场 → 固定时间轴转场",
           "goal": "治疗按深渊之雨安排团减，坦克处理持续引导；冰霜弹幕点名者沿固定路线放球，指定玩家按血线逐个撞掉，不能让冰球超时爆炸。",
-          "spellIDs": [1260837, 1277386, 1257614, 1257644, 1257651, 1282937, 1281951]
+          "spellIDs": [1260837, 1277386, 1313393, 1257644, 1257651, 1282937, 1281951]
         },
         {
           "key": "intermission",
@@ -2618,7 +2620,7 @@
           "title": "返回常态阶段",
           "trigger": "水泡破裂、转场结束",
           "goal": "迅速回到常态站位，继续放球、消球和处理对坦技能；浸湿层数不会清除，后续每轮治疗压力都会更高。",
-          "spellIDs": [1260837, 1277386, 1257614, 1257651]
+          "spellIDs": [1260837, 1277386, 1313393, 1257651]
         }
       ],
       "mechanics": [
@@ -2649,7 +2651,7 @@
           "roles": ["被点名玩家", "消球组", "治疗"],
           "tags": ["点名 DOT", "连续放球", "撞球", "场地管理"],
           "spellIDs": [1257614, 1257608, 1257644, 1257651, 1281393, 1282537, 1257654, 1313393, 1313402, 1313456, 1313450],
-          "leaderSpellIDs": [1257614],
+          "leaderSpellIDs": [1313393],
           "summary": "冰霜弹幕点名者会连续在脚下放出漂流冰球。点名者沿固定路线拉开间距，指定消球玩家按治疗节奏逐个碰掉；任何冰球留满 30 秒都会爆炸并给全团挂上高额持续伤害。",
           "leaderDetails": [
             "点名者沿预定方向移动，按间距依次放球，禁止把球留在转场集合点或坦克路线。",
@@ -2666,7 +2668,7 @@
             "放球位置错误，残留冰霜封锁下一轮转场与鱼人转火路线。"
           ],
           "evidenceType": "timed-orb-placement-and-consumption",
-          "verification": "WCL 实测链：Frost Barrage cast 1257614、点名 1257608、DOT 1257644 → Drifting Globules 1257651（英雄）/1281393、1282537（史诗）→ Lingering Frost 1257654。手册新版候选链 1313393/1313402/1313456/1313450 保留作版本对照。"
+          "verification": "旧 H/M 样本中放球起点是 Frost Barrage 1257614；2026-09-30 的较长击杀样本改为 Chilling Frost 1313393（H/M 均观察到 8 次 cast）。其余点名、碰球与伤害 ID 需按新日志分别复核，不能把旧样本字段直接解释为当前版本没有放球。"
         },
         {
           "phase": "p1",
@@ -2743,7 +2745,7 @@
         "1281393": {"nameEn": "Drifting Globules", "categories": ["damageAbilities"], "tags": ["史诗", "撞球 AOE"]},
         "1282537": {"nameEn": "Drifting Globules", "categories": ["playerDebuffs"], "tags": ["史诗", "撞球者 DOT"]},
         "1257654": {"nameEn": "Lingering Frost", "categories": ["playerDebuffs", "damageAbilities"], "tags": ["残留冰霜", "滑行"]},
-        "1313393": {"nameEn": "Chilling Frost", "categories": ["journalOnly"], "tags": ["手册新版候选"]},
+        "1313393": {"nameEn": "Chilling Frost", "categories": ["enemyCasts"], "tags": ["正式服施法", "点名放球"]},
         "1313402": {"nameEn": "Frost Orb", "categories": ["journalOnly"], "tags": ["手册新版候选"]},
         "1313456": {"nameEn": "Shatter", "categories": ["journalOnly"], "tags": ["手册新版候选"]},
         "1313450": {"nameEn": "Frost Burst", "categories": ["journalOnly"], "tags": ["手册新版候选", "史诗"]},
@@ -2768,6 +2770,394 @@
 
         "1294867": {"nameEn": "Unending Tides", "categories": ["enemyCasts"], "tags": ["硬狂暴附属施法"]},
         "1295086": {"nameEn": "Unending Tides", "categories": ["enemyCasts", "damageAbilities"], "tags": ["硬狂暴", "WCL 实测"], "observedIn": {"heroic": {"eventCount": 2, "uniqueTargetCount": 0, "firstMs": 356052, "lastMs": 360063, "eventTypes": {"begincast": 1, "cast": 1}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "zpRDdcafg7hCrT9Y", "fightID": 1}}, "mythic": {"eventCount": 2, "uniqueTargetCount": 0, "firstMs": 356061, "lastMs": 360057, "eventTypes": {"begincast": 1, "cast": 1}, "sourceNames": ["Nymrissa Wavecaller"], "provenance": {"reportID": "ZmYa6M2QV4hbLCry", "fightID": 10}}}}
+      }
+    },
+    "kithix": {
+      "reviewStatus": "draft",
+      "difficulty": "PTR 冒险指南；正式服 H/M 日志待核对",
+      "summary": "基希克斯破封是单 Boss 团本。基希克斯召唤虚空虫群并持续压缩安全区域，莉亚德琳提供圣光协助；25% 生命值转入终局阶段。以下技能来自 PTR 冒险指南，暂不提供未经实战验证的时间轴。",
+      "energy": {
+        "title": "PTR 战斗总览",
+        "description": "基于 PTR 冒险指南，正式服施法与时间尚待核对。",
+        "displayMode": "rules",
+        "rules": [
+          "这是一场单 Boss 战；P1 处理虚空虫群、窒息黑暗与莉亚德琳的圣光协助。",
+          "25% 生命值触发终局阶段，因此转场秒数随队伍输出改变。",
+          "H/M 技能差异和固定施法轮次需等可公开核对的击杀日志。"
+        ]
+      },
+      "phases": [
+        {
+          "key": "p1",
+          "label": "P1",
+          "title": "虫群与窒息黑暗",
+          "trigger": "起战至 25% 生命值",
+          "goal": "分配小怪打断和转火，利用莉亚德琳的圣光控制黑暗扩散；分散处理恐惧点名，并为熄灭安排团队减伤。",
+          "spellIDs": [
+            1301511,
+            1302951,
+            1303169,
+            1304424,
+            1304930,
+            1304045,
+            1304046
+          ]
+        },
+        {
+          "key": "adds",
+          "label": "小怪",
+          "title": "虚空虫群处理",
+          "trigger": "虫群召唤期间",
+          "goal": "躲开大怪正面，打断织虚者，避免炸弹甲虫碰人或超时引爆。",
+          "spellIDs": [
+            1302884,
+            1302333,
+            1302705,
+            1302117,
+            1302319
+          ]
+        },
+        {
+          "key": "p2",
+          "label": "P2",
+          "title": "八重蚀与最终圣光",
+          "trigger": "Boss 达到 25% 生命值",
+          "goal": "在莉亚德琳的最后圣光下处理虚无之门与否定点名，完成最终击杀。血量转场的绝对秒数随团队输出变化。",
+          "spellIDs": [
+            1301110,
+            1301479,
+            1305427,
+            1308873,
+            1308875,
+            1318467,
+            1318472
+          ]
+        }
+      ],
+      "mechanics": [
+        {
+          "phase": "p1",
+          "title": "虚空虫群与窒息黑暗",
+          "priority": "critical",
+          "roles": [
+            "全团",
+            "DPS",
+            "打断组"
+          ],
+          "tags": [
+            "PTR 技能",
+            "小怪波次",
+            "转火"
+          ],
+          "spellIDs": [
+            1301511,
+            1302951,
+            1302884,
+            1302333,
+            1302705,
+            1302117,
+            1302319
+          ],
+          "leaderSpellIDs": [
+            1301511
+          ],
+          "summary": "虚空虫群是小怪波次信号。窒息黑暗推进场地压力；大怪正面、织虚者施法及炸弹甲虫都需要分组处理。",
+          "leaderDetails": [
+            "虫群出现后优先确认需要打断的织虚者和大怪正面方向。",
+            "炸弹甲虫碰人或超时均可能触发爆炸与持续伤害；PTR 数值和实际处理窗口待日志验证。"
+          ],
+          "verification": "PTR 技能 ID；正式服需逐一核对施法、目标和伤害事件。"
+        },
+        {
+          "phase": "p1",
+          "title": "莉亚德琳的圣光与熄灭",
+          "priority": "critical",
+          "roles": [
+            "团长",
+            "治疗",
+            "全团"
+          ],
+          "tags": [
+            "PTR 技能",
+            "团队减伤"
+          ],
+          "spellIDs": [
+            1303169,
+            1304424
+          ],
+          "leaderSpellIDs": [
+            1304424
+          ],
+          "summary": "莉亚德琳的圣光可清除黑暗并短暂控制 Boss；熄灭是需要预留团队减伤的高额团伤。",
+          "verification": "PTR 冒险指南描述；团队技能时间需等待 H/M 击杀日志。"
+        },
+        {
+          "phase": "p1",
+          "title": "黑暗毁灭与难以言说的恐怖",
+          "priority": "high",
+          "roles": [
+            "坦克",
+            "被点名玩家",
+            "治疗"
+          ],
+          "tags": [
+            "PTR 技能",
+            "坦克",
+            "恐惧"
+          ],
+          "spellIDs": [
+            1304930,
+            1304045,
+            1304046
+          ],
+          "leaderSpellIDs": [
+            1304930,
+            1304045
+          ],
+          "summary": "黑暗毁灭对坦克造成范围伤害；恐怖点名会产生恐惧，需要规划分散与驱散。英雄及以上难度的坦克机制还会留下虚空创痕。",
+          "verification": "PTR 冒险指南描述；史诗额外效果和具体触发顺序待正式服日志。"
+        },
+        {
+          "phase": "p2",
+          "title": "八重蚀与最后圣光",
+          "priority": "critical",
+          "roles": [
+            "全团",
+            "团长"
+          ],
+          "tags": [
+            "PTR 技能",
+            "25% 血量转场"
+          ],
+          "spellIDs": [
+            1301110,
+            1301479,
+            1305427
+          ],
+          "leaderSpellIDs": [
+            1301110
+          ],
+          "summary": "25% 血量时以冥河嚎叫进入终局，随后出现八重蚀；莉亚德琳的最后圣光提供最终爆发机会。转场时刻由血量决定。",
+          "verification": "PTR 冒险指南阶段说明；绝对时间不作为固定排轴。"
+        },
+        {
+          "phase": "p2",
+          "title": "虚无之门与否定",
+          "priority": "high",
+          "roles": [
+            "坦克",
+            "全团"
+          ],
+          "tags": [
+            "PTR 技能",
+            "场地",
+            "史诗差异"
+          ],
+          "spellIDs": [
+            1308873,
+            1308875,
+            1318467,
+            1318472
+          ],
+          "leaderSpellIDs": [
+            1308873,
+            1318467
+          ],
+          "summary": "虚无之门产生需要避让的门与碎片；坦克的否定点名需要借助门处理，史诗难度涉及多层效果。",
+          "verification": "PTR 冒险指南技能链；门、碎片和解层的实战判定待 H/M 日志。"
+        }
+      ],
+      "spellOverrides": {
+        "1301511": {
+          "nameEn": "Voidswarm",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1302951": {
+          "nameEn": "Suffocating Darkness",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1303169": {
+          "nameEn": "Divine Radiance",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1304424": {
+          "nameEn": "Extinguish",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1304930": {
+          "nameEn": "Dark Devastation",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1304045": {
+          "nameEn": "Unspeakable Horrors",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1304046": {
+          "nameEn": "Overwhelming Fear",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1302884": {
+          "nameEn": "Venom Roar",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1302333": {
+          "nameEn": "Voidweave",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1302705": {
+          "nameEn": "Nightfall",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1302117": {
+          "nameEn": "Gut Reaction",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1302319": {
+          "nameEn": "Digestive Juices",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1301110": {
+          "nameEn": "Stygian Howl",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1301479": {
+          "nameEn": "Eightfold Eclipse",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1305427": {
+          "nameEn": "Last Light",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1308873": {
+          "nameEn": "Null Gate",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1308875": {
+          "nameEn": "Nullify",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1318467": {
+          "nameEn": "Negation",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        },
+        "1318472": {
+          "nameEn": "Explosive Restabilization",
+          "categories": [
+            "journalOnly"
+          ],
+          "tags": [
+            "PTR 冒险指南",
+            "正式服待核对"
+          ]
+        }
       }
     }
   }

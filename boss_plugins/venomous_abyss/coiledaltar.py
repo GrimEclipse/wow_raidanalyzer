@@ -329,6 +329,7 @@ TABS = [
     ("p2", "P2 篡权者的报复"),
     ("intermission", "转阶段 被夺取的宿体"),
     ("p3", "P3 盘卷联合"),
+    ("replay", "战斗回放"),
     ("field", "场地示意图"),
     ("explore", "机制工作台"),
 ]
@@ -1800,7 +1801,8 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 continue
             player_pos = _position_sample(position_index, target_id, timestamp)
             player_xy = _position_xy(player_pos)
-            puddle = _match_puddle_for_pickup(ground, player_xy, kinds={carry_kind})
+            available = [p for p in ground if p.get("groundedFromMs") is not None and p["groundedFromMs"] <= rel_ms]
+            puddle = _match_puddle_for_pickup(available, player_xy, kinds={carry_kind})
             if puddle is not None and puddle in ground:
                 ground.remove(puddle)
                 # 固化这一段「在地」区间，供撕裂时刻回放
@@ -1834,6 +1836,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 "applyTimeMs": rel_ms,
                 "applyTime": fmt_ms(rel_ms),
                 "removeTimeMs": None,
+                "pickupPosition": player_pos,
                 "removeTime": None,
                 "carryDurationMs": None,
                 "dropPosition": None,
@@ -1865,6 +1868,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             "removeTime": fmt_ms(rel_ms),
             "carryDurationMs": (rel_ms - apply_rel) if apply_rel is not None else None,
             "dropPosition": drop_position,
+            "pickupPosition": (puddle.get("carriers") or [{}])[-1].get("pickupPosition") if puddle else None,
             "puddleID": (puddle or {}).get("puddleID"),
             "transferCount": (puddle or {}).get("transferCount") or 0,
             "venomKind": drop_kind,
@@ -5181,7 +5185,7 @@ def build_aggregated_json(report_ids, options=None):
             "analyzedReports": report_id_list,
             "mechanicVersion": "coiledaltar-heroic-2026-08-29",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
-                               if (key != "field" or options["fieldReplayEnabled"])
+                               if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],
             "analysisConfig": options,
             "skippedAnalyses": [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]],

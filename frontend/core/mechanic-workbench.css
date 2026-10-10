@@ -9,3 +9,9 @@
 .mw [data-replay-field]{position:relative}.mw-map [data-managed=players] circle{fill:revert-layer;stroke-width:2px}.mw-map [data-managed=players] text{font-size:11px;stroke-width:0}
 
  .mw-boss-status{position:absolute;right:12px;top:22%;z-index:12;display:grid;gap:8px;width:clamp(155px,20%,240px);pointer-events:none}.mw-boss-card{box-sizing:border-box;height:90px;padding:10px 12px;border:1px solid #475569aa;border-radius:8px;background:#0b1424e8;color:#e2e8f0;font-size:12px;box-shadow:0 2px 10px #02061766}.mw-boss-card>div:first-child{display:flex;justify-content:space-between;gap:8px;white-space:nowrap}.mw-boss-card b{overflow:hidden;text-overflow:ellipsis;max-width:65%}.mw-boss-card span{flex-shrink:0}.mw-health,.mw-cast{position:relative;height:6px;overflow:hidden;border-radius:4px;background:#253247;margin-top:8px}.mw-health i,.mw-cast i{display:block;height:100%;background:#8ccd6c}.mw-cast{height:22px}.mw-cast i{background:#4d7795}.mw-cast span{position:absolute;inset:0;line-height:22px;text-align:center;font-size:11px}.mw-cast:not(.active) span{color:#7e91aa}@media(max-width:600px){.mw-boss-status{width:155px;right:6px;top:6px}.mw-boss-card{height:76px;padding:6px 8px}}
+
+.mw-cast:not(.active){visibility:hidden}
+
+.mw-energy{position:relative;height:20px;margin:5px 0;background:#151d2b;border-radius:3px;overflow:hidden}.mw-energy i{position:absolute;left:0;top:0;bottom:0;background:#ccaa43;opacity:.65}.mw-energy span{position:relative;z-index:1;display:block;text-align:center;font-size:11px;line-height:20px;color:#fff}
+
+.mw-boss-card.mw-has-energy{height:120px}

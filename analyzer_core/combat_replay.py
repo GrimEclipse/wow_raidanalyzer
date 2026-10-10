@@ -1,23 +1,45 @@
 """Generic full-fight position transport and compact, instance-local actor tracks."""
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, Counter
+import json
 from analyzer_core.concurrency import run_parallel_indexed
 from analyzer_core.event_evidence import actor_position
 
 POSITION_FILTER = 'resources.actor.id > 0'
 
 
-def fetch_replay_events(client, report_id, fight):
+def fetch_replay_events(client, report_id, fight, *, position_filter=True, include_metadata=True, max_workers=4, filter_expression=None):
     # Independent time windows paginate sequentially; the shared semaphore caps
     # total requests. Boundaries deduplicate while preserving actor instances.
     start, end = int(fight['startTime']), int(fight['endTime'])
     windows = [(t, min(t+45000, end)) for t in range(start, end, 45000)]
     def fetch(item):
         i, (a, b) = item
+        expression = filter_expression or (POSITION_FILTER if position_filter else None)
+        kwargs = {'filter_expression': expression} if expression else {}
         return i, client.events(report_id, 'All', fight, start_time=a, end_time=b,
-                               include_resources=True, filter_expression=POSITION_FILTER)
-    rows = [event for _, page in run_parallel_indexed(enumerate(windows), fetch, max_workers=4) for event in page]
+                               include_resources=True, **kwargs)
+    pages = run_parallel_indexed(enumerate(windows), fetch, max_workers=max_workers)
+    rows, previous_boundary = [], Counter()
+    for i, page in pages:
+        a, b = windows[i]
+        boundary, next_boundary = Counter(), Counter()
+        for event in page:
+            timestamp = event.get('timestamp')
+            if timestamp in {a, b}:
+                signature = json.dumps(event, sort_keys=True, separators=(',', ':'))
+                if timestamp == a:
+                    boundary[signature] += 1
+                    if boundary[signature] <= previous_boundary[signature]:
+                        continue
+                if timestamp == b:
+                    next_boundary[signature] += 1
+            rows.append(event)
+        previous_boundary = next_boundary
+    if not include_metadata:
+        # Full event pages already contain casts and death boundaries.
+        return rows
     # Cast starts often have no position resource, so the position filter alone
     # cannot supply an honest cast bar. This small stream covers enemy casts.
     rows.extend(client.events(report_id, 'Casts', fight, hostility_type='Enemies', include_resources=True))
@@ -29,7 +51,7 @@ def fetch_replay_events(client, report_id, fight):
 def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), deaths=(), resurrections=(), survival_timeline=(), spell_names=None):
     start, end = int(fight['startTime']), int(fight['endTime'])
     metadata = {int(row['id']): row for row in actor_rows}
-    samples, states, health = defaultdict(dict), defaultdict(list), defaultdict(dict)
+    samples, states, health, energy = defaultdict(dict), defaultdict(list), defaultdict(dict), defaultdict(dict)
     boss_ids = {actor for actor, row in metadata.items() if row.get('subType') == 'Boss'}
     boss_events = defaultdict(list)
     for event in events:
@@ -57,6 +79,10 @@ def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), dea
             hp, maximum = resource.get('hitPoints'), resource.get('maxHitPoints')
             if actor in boss_ids and hp is not None and maximum and maximum > 0:
                 health[actor][t//100] = [t, int(hp), int(maximum)]
+            if actor in boss_ids:
+                for power in resource.get('classResources') or []:
+                    if power.get('type') == 3 and power.get('max', 0) > 0:
+                        energy[actor][t//100] = [t, power.get('amount', 0), power['max']]
     for event, state in [(e, 'dead') for e in deaths]+[(e, 'alive') for e in resurrections]:
         actor = event.get('targetID')
         if actor is not None:
@@ -96,7 +122,7 @@ def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), dea
                 pending['endTimeMs'], pending['outcome'] = time, 'completed'
                 pending = None
         bosses.append({'actorID': actor, 'gameID': metadata[actor].get('gameID'), 'name': actor_map.get(actor) or metadata[actor].get('name'),
-                       'health': sorted(health[actor].values()), 'casts': casts,
+                       'health': sorted(health[actor].values()), 'energy': sorted(energy[actor].values()), 'casts': casts,
                        'states': [list(row) for row in sorted(set(map(tuple,states[actor]))) ]})
     return {'version': 2, 'durationMs': end-start, 'units': units, 'bosses': bosses,
             'rosterSize': len(players), 'positionedPlayers': len(positioned),

@@ -10,7 +10,7 @@ from analyzer_core.event_evidence import actor_position, build_event_scene
 CONFIG_SCHEMA = [{'key': 'avoidableReviewEnabled', 'type': 'boolean', 'label': '可规避伤害复盘', 'description': '', 'default': True}, {'key': 'infectionReviewEnabled', 'type': 'boolean', 'label': '适应性感染与接圈', 'description': '', 'default': True}]
 CONFIG_SCHEMA.append({'key': 'infectionBatchWindowSeconds', 'type': 'number', 'label': '感染光环记录合并窗口', 'description': '日志没有感染施法时，将邻近光环首次应用汇成记录批次；不视为已确认机制轮次。', 'unit': '秒', 'min': 0.25, 'max': 5, 'step': 0.25, 'default': 1.5, 'visibleWhen': {'field': 'infectionReviewEnabled', 'equals': True}})
 CONFIG_SCHEMA.append({'key': 'waveReviewEnabled', 'type': 'boolean', 'label': '泡沫与波浪方向参考', 'default': True})
-CONFIG_SCHEMA.append({'key': 'fullReplayEnabled', 'type': 'boolean', 'label': '完整场地回放', 'description': '显示整场所有玩家与有位置记录的场地单位。', 'default': True})
+CONFIG_SCHEMA.append({'key': 'fullReplayEnabled', 'type': 'boolean', 'label': '场地推演', 'description': '显示整场所有玩家与有位置记录的场地单位；关闭后不读取整场回放数据。', 'default': True})
 
 # NSRT's removed WavesLine display used the minimap compass to draw an
 # orthogonal world-axis reference, not a recorded player-facing or lock time.

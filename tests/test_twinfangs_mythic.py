@@ -441,8 +441,21 @@ def test_replay_striker_windup_and_death_are_instance_local():
     assert heads[0]["casts"][0]["targetID"]==1
 
 
+def test_feast_channel_stops_on_boss_death_instead_of_running_past_it():
+    rows = [
+        {"timestamp": 2000, "type": "cast", "sourceID": 9, "abilityGameID": 1290516},
+        {"timestamp": 5000, "type": "death", "targetID": 9},
+    ]
+    _, channels = boss._replay_animation_units(
+        {"startTime": 0, "endTime": 10000}, rows, {"actorRows": []}, {}
+    )
+    assert len(channels) == 1
+    assert channels[0]["phase"] == "channel"
+    assert (channels[0]["startTimeMs"], channels[0]["endTimeMs"]) == (2000, 5000)
+
+
 def test_rotation_uses_paladin_path_and_separated_hits():
-    from math import sin,cos,radians
+    from math import sin,cos,radians,degrees
     rows=[{"timestamp":1000,"type":"cast","sourceID":9,"abilityGameID":1,"resourceActor":1,"x":-1616,"y":69157},
           {"timestamp":10000,"type":"cast","sourceID":9,"abilityGameID":1294293,"resourceActor":1,"x":0,"y":61155}]
     for time,angle in [(10500,80),(18000,-70)]:
@@ -453,5 +466,73 @@ def test_rotation_uses_paladin_path_and_separated_hits():
     torrents=[{"actorID":9,"startTimeMs":10000,"endTimeMs":24000}]
     boss._torrent_rotation(torrents,rows,0,{1:{"specID":66},2:{"specID":62}})
     assert torrents[0]["rotationDirection"]==-1
-    assert abs(torrents[0]["angularSpeedDegrees"]-20)<.1
+    assert abs(torrents[0]["fittedAngularSpeedDegrees"]-20)<.1
+    assert abs(torrents[0]["angularSpeedDegrees"]*14-270)<.001
+    assert abs(degrees(torrents[0]["initialAngleRadians"])-90)<.2
     assert torrents[0]["previousArena"]=="north"
+
+
+def test_venom_sources_use_head_instance_order_and_do_not_count_raid_tick_as_wave():
+    fight, actor_map, players, raw = fixture()
+    raw['casts'] = [event(10000,1291478,sourceID=70,sourceInstance=1,targetID=1),
+                    event(11000,1291478,sourceID=70,sourceInstance=2,targetID=2),
+                    event(20000,1291478,sourceID=70,sourceInstance=1,targetID=2)]
+    raw['damage'] = [event(10005,1293295,'damage',sourceID=70,sourceInstance=1,targetID=1,amount=1),
+                     event(11005,1293295,'damage',sourceID=70,sourceInstance=2,targetID=2,amount=1),
+                     event(20005,1292806,'damage',targetID=2,amount=1),
+                     event(20005,1293295,'damage',sourceID=70,sourceInstance=1,targetID=2,amount=1)]
+    raw['debuffs'] = [event(10006,1290336,'applydebuff',targetID=1),
+                      event(11006,1290336,'applydebuff',targetID=2),
+                      event(20006,1290336,'applydebuffstack',targetID=2,stack=2)]
+    histories = boss.analyze_twinfangs(fight,actor_map,players,raw)['eternalVenom']['players']
+    second = next(p for p in histories if p['playerID']==2)
+    assert [e['originKey'] for e in second['events']] == ['spitFirst','spitRepeat']
+    assert second['events'][1]['category'] == 'abnormal'
+
+
+def test_death_reduction_to_nonzero_stack_has_own_source_and_is_not_double_subtracted():
+    fight, actor_map, players, raw = fixture()
+    raw['damage'] = [event(1000,1289201,'damage',targetID=1,amount=1)]
+    raw['debuffs'] = [event(1000,1290336,'applydebuffstack',targetID=1,stack=7),
+                      event(19999,1290336,'removedebuffstack',targetID=1,stack=4)]
+    raw['deaths'] = [event(20000,0,'death',targetID=1)]
+    raw['trackedActorEvents'] = [event(30000,1294293,'applybuff',sourceID=90,targetID=90),
+                                event(44000,1294293,'removebuff',sourceID=90,targetID=90)]
+    out = boss.analyze_twinfangs(fight,actor_map,players,raw)
+    checkpoint = next(p for p in out['eternalVenom']['checkpoints'][0]['players'] if p['playerID']==1)
+    assert checkpoint['sourceStacks'] == {'orb':7}
+    assert checkpoint['deathReduction'] == checkpoint['observedDeathReduction'] == 3
+    assert checkpoint['stacks'] == 4 and checkpoint['reconciliationDelta'] == 0
+    assert checkpoint['otherReduction'] == 0
+
+
+def test_immune_wave_that_adds_venom_is_visible_but_raid_pulse_is_not():
+    fight, actor_map, players, raw = fixture()
+    raw['damage'] = [event(1000,1292807,'damage',targetID=1,amount=0,hitType=10),
+                     event(2000,1292806,'damage',targetID=1,amount=1)]
+    raw['debuffs'] = [event(1001,1290336,'applydebuff',targetID=1)]
+    out = boss.analyze_twinfangs(fight,actor_map,players,raw)
+    assert out['eternalVenom']['players'][0]['events'][0]['originKey'] == 'wave'
+    assert [h['spellID'] for h in out['replayFeedback']['hits']] == [1292807]
+
+
+def test_wave_aura_without_damage_proves_source_and_contact_is_counted_once():
+    fight, actor_map, players, raw = fixture()
+    raw['debuffs'] = [event(10000,1292807,'applydebuff',targetID=1),
+                      event(10009,1290336,'applydebuff',targetID=1),
+                      event(10200,1292807,'removedebuff',targetID=1)]
+    raw['casts'] = [event(10008,1290336,targetID=1),event(13000,1291404)]
+    out = boss.analyze_twinfangs(fight,actor_map,players,raw)
+    assert out['eternalVenom']['players'][0]['events'][0]['originKey'] == 'wave'
+    assert out['waveHits']['players'][0]['hitCount'] == 1
+    assert out['waveHits']['players'][0]['totalDamage'] == 0
+    raw['damage'] = [event(10100,1292807,'damage',targetID=1,amount=10),
+                     event(10150,1292807,'damage',targetID=1,amount=20)]
+    assert len(boss._wave_contact_events(raw)) == 1
+    assert boss._wave_contact_events(raw)[0]['amount'] == 30
+
+
+def test_future_emergence_is_not_misattributed_to_an_earlier_stack():
+    idx = boss._venom_source_index([event(13000,1308122,'damage',targetID=1,amount=1)], [], [])
+    _,sid,category = boss._venom_attribution([], [event(13000,1291404)],10000,1,idx)
+    assert sid is None and category == 'unknown'

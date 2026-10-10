@@ -6,7 +6,7 @@ def event(t, kind, spell):
     return {'timestamp': t, 'type': kind, 'abilityGameID': spell, 'targetID': 99, 'sourceID': 99}
 
 
-@pytest.mark.parametrize('end,expected', [(15, 'P1'), (20, 'P1'), (25, 'P2'), (35, 'P2'), (42, 'P2.5'), (60, 'P2.5'), (400, 'P3')])
+@pytest.mark.parametrize('end,expected', [(15, 'P1'), (20, 'P1'), (25, 'P2'), (35, 'P2'), (42, 'P2.5'), (60, 'P2.5'), (400, 'P2.5'), (5500, 'P3')])
 def test_wipe_phase_tracks_completed_rage_and_p25_including_open_windows(end, expected):
     events = [event(10,'applybuff',u.RAGE_ID), event(20,'removebuff',u.RAGE_ID),
               event(30,'applybuff',u.RAGE_ID), event(40,'removebuff',u.RAGE_ID)]
