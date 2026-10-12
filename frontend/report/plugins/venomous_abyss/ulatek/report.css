@@ -7,9 +7,9 @@
   margin-bottom: 12px;
 }
 .summary-item {
-  border: 1px solid #2a4145;
+  border: 1px solid #43382c;
   border-radius: 8px;
-  background: #0a1214;
+  background: #130f0b;
   padding: 10px;
 }
 .summary-item strong { display: block; font-size: 20px; }
@@ -22,11 +22,11 @@
 .rage-view-panel { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .rage-view-panel h2 { margin: 0 0 4px; }
 .rage-view-panel p { margin: 0; }
-.rage-view-toggle { display: inline-flex; flex: none; gap: 4px; padding: 4px; border: 1px solid #294044; border-radius: 9px; background: #081012; }
+.rage-view-toggle { display: inline-flex; flex: none; gap: 4px; padding: 4px; border: 1px solid #42372b; border-radius: 9px; background: #110d09; }
 .rage-view-toggle button { min-height: 36px; padding: 7px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; font: inherit; font-weight: 700; }
-.rage-view-toggle button.active { background: #1b4f58; color: #eaffff; box-shadow: inset 0 0 0 1px #39717b; }
+.rage-view-toggle button.active { background: #523a21; color: #eaffff; box-shadow: inset 0 0 0 1px #765a3e; }
 .compact-list { display: flex; flex-wrap: wrap; gap: 6px; }
-.compact-list > span { border: 1px solid #294044; border-radius: 7px; padding: 5px 7px; }
+.compact-list > span { border: 1px solid #42372b; border-radius: 7px; padding: 5px 7px; }
 .flow-status { display: inline-flex; gap: 5px; flex-wrap: wrap; }
 .flow-status .yes { color: var(--good); }
 .flow-status .no { color: var(--bad); }

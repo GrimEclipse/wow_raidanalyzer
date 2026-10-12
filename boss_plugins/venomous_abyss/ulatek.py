@@ -97,6 +97,7 @@ ULATEK_SPELL_NAMES = {
     1303410: "缺陷：虚弱",
     1303414: "石化钉刺",
     1304012: "毒蛇呼唤",
+    1315541: "毒蛇呼唤",
     1305650: "痛苦哀嚎",
     1305709: "痛苦挣扎",
     1305775: "恐怖咆哮",
@@ -208,7 +209,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-replay-2026-10-12-v23",
+    "mechanicVersion": "ulatek-replay-music-2026-10-12-v25",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -1823,6 +1824,47 @@ def _replay_coil_soaks(fight, raw):
     return result
 
 
+ULATEK_MUSIC_TRACKS = {
+    'p1': {'src':'/frontend/assets/audio/ulatek/p1.mp3','sourceStartSeconds':0,'durationMs':505000},
+    'p2': {'src':'/frontend/assets/audio/ulatek/p2.mp3','sourceStartSeconds':509,'durationMs':242000},
+    'p25': {'src':'/frontend/assets/audio/ulatek/p25.mp3','sourceStartSeconds':1471,'durationMs':34000},
+    'p3': {'src':'/frontend/assets/audio/ulatek/p3.mp3','sourceStartSeconds':1087,'durationMs':381000},
+}
+P25_EGG_SUMMON_IDS = {1304012,1315541}
+P3_MUSIC_LEAD_MS = 5000
+
+
+def _replay_music_profile(fight, events, boss_positions):
+    start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
+    rages = sorted([e for e in events if e.get('kind')=='rage'],key=lambda e:e['timeMs'])
+    phases = []
+    def add(key, begin, end):
+        finish = min(duration,end,begin+ULATEK_MUSIC_TRACKS[key]['durationMs'])
+        if begin < finish:
+            phases.append({'key':key,'startTimeMs':begin,'endTimeMs':finish})
+    egg_start, returned = None, None
+    if len(rages)>1:
+        second_end = rages[1]['endTimeMs']
+        egg_start = min([e['timeMs'] for e in events if e.get('kind')=='egg-summon'
+                         and e['timeMs']>=second_end],default=None)
+        shattered = min([e['timeMs'] for e in events if e.get('kind')=='shatter'
+                         and e['timeMs']>=second_end],default=None)
+        returned = min([int(p['timestamp'])-start for p in boss_positions
+                        if shattered is not None and int(p['timestamp'])-start>=shattered],default=None)
+    first_end = rages[0]['endTimeMs'] if rages else duration
+    add('p1',0,first_end)
+    p3_start = max(0,returned-P3_MUSIC_LEAD_MS) if returned is not None else None
+    if rages:
+        add('p2',first_end,egg_start if egg_start is not None else p3_start if p3_start is not None else duration)
+    if egg_start is not None:
+        add('p25',egg_start,p3_start if p3_start is not None else duration)
+    if p3_start is not None:
+        add('p3',p3_start,duration)
+    return {'tracks':deepcopy(ULATEK_MUSIC_TRACKS),'phases':phases,'crossfadeMs':1500,
+            'defaultVolume':.3,'p3Evidence':'first-boss-position-after-intermission-floor-break',
+            'p3LeadMs':P3_MUSIC_LEAD_MS}
+
+
 def _replay_effects(fight, players, raw, changes):
     start, end = int(fight['startTime']), int(fight['endTime'])
     casts = sorted(raw.get('casts') or [], key=lambda e: int(e['timestamp']))
@@ -1959,6 +2001,9 @@ def _replay_effects(fight, players, raw, changes):
                         'lengthYards': DESPERATE_THRASH_LENGTH_YARDS,
                         'directionEvidence': 'tank-hit' if impact else 'nearest-tank'})
     boss_id = raw.get('bossID')
+    changes.extend({'kind':'egg-summon','label':'毒蛇呼唤','timeMs':int(e['timestamp'])-start}
+                   for e in casts if event_type(e)=='cast' and ability_id(e) in P25_EGG_SUMMON_IDS
+                   and e.get('sourceID')==boss_id)
     for row in rage:
         channels.append({'actorID': boss_id, 'spellID': RAGE_ID, 'spellName': '受缚之怒',
                          'startTimeMs': row['start']-start, 'endTimeMs': row['end']-start,
@@ -2001,6 +2046,7 @@ def _replay_effects(fight, players, raw, changes):
         if c['kind'] == 'coil-soak':
             changes.append({'kind':'coil-soak','label':'幽魂盘卷分摊','timeMs':c['startTimeMs']})
     return {'circles': circles, 'channels': channels, 'npcCasts': npc_casts, 'cones': cones,
+            'musicReplay':_replay_music_profile(fight,changes,position_index.get(boss_id,[])),
             'phaseWindows': phase_windows, 'lostPlatforms': lost_platforms, 'maps': deepcopy(REPLAY_MAPS),
             'arena': {'centerX': 0, 'centerY': 155367, 'pixelsPerYard': 1188/85,
                       'imageCenterX': 2123/2, 'imageCenterY': 1188/2, 'estimated': False}}

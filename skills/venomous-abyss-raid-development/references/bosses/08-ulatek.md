@@ -1,5 +1,7 @@
 # Boss 8 · Ula'tek
 
+Replay soundtrack uses the owner's prepared local clips: P1 0:00–8:25, P2 8:29–12:31, P2.5 24:31–25:05, P3 18:07–24:28 in the source recording. P2 starts after the first Bound Fury finishes; P2.5 starts on the completed Boss egg summon (1304012/1315541) after the second Fury, not at Fury completion. Its 34-second clip finishes before the final return cue. P3 starts five seconds before the first observed Boss position after the intermission floor break, per the owner's timing adjustment. Crossfade phase changes over 1.5 seconds. Only replay playback starts audio; pause/end stop it immediately. Native mute retains volume and progress. Reuse existing casts/position samples without extra WCL requests.
+
 Nightly egg-duty participation and carried-egg wave contacts are restricted to P1 and P2.5. Count distinct carry-aura intervals by application time; refreshes are not additional assignments. Use the confirmed second Bound Fury ending through the sixth soak on Normal/Heroic or eighth soak on Mythic, followed by about five seconds of falling, as P2.5, bounded by the next platform transition when incomplete. Show carry and contact counts together, including zero-duty roster players. Keep P2/P3 out of this comparison.
 
 Ula'tek is the final Boss. Live Normal, Heroic, and Mythic evidence exists in WCL

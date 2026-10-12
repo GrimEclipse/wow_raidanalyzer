@@ -15,3 +15,4 @@
 .mw-energy{position:relative;height:20px;margin:5px 0;background:#151d2b;border-radius:3px;overflow:hidden}.mw-energy i{position:absolute;left:0;top:0;bottom:0;background:#ccaa43;opacity:.65}.mw-energy span{position:relative;z-index:1;display:block;text-align:center;font-size:11px;line-height:20px;color:#fff}
 
 .mw-boss-card.mw-has-energy{height:120px}
+.mw-audio{display:inline-flex;align-items:center;gap:8px;margin-left:auto;font-size:12px}.mw-audio input[type=range]{width:76px;min-width:0;margin:0}.mw-audio [data-audio-status]{font-size:11px}

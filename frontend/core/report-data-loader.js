@@ -212,12 +212,12 @@
       const overlay = document.createElement('div');
       overlay.style.cssText = [
         'position:fixed', 'inset:0', 'z-index:99999', 'display:grid', 'place-items:center',
-        'padding:24px', 'background:rgba(2,6,23,.88)', 'font-family:system-ui,sans-serif',
+        'padding:24px', 'background:rgba(16,12,9,.88)', 'font-family:system-ui,sans-serif',
       ].join(';');
       const panel = document.createElement('div');
       panel.style.cssText = [
         'width:min(520px,100%)', 'padding:24px', 'border:1px solid #334155', 'border-radius:8px',
-        'background:#0f172a', 'color:#e2e8f0', 'box-shadow:0 24px 70px rgba(0,0,0,.55)',
+        'background:#251c14', 'color:#e2e8f0', 'box-shadow:0 24px 70px rgba(0,0,0,.55)',
       ].join(';');
       panel.innerHTML = `
         <div style="font-size:18px;font-weight:700;margin-bottom:8px">选择复盘 JSON</div>
@@ -229,7 +229,7 @@
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.json,application/json';
-      input.style.cssText = 'display:block;width:100%;padding:10px;border:1px solid #475569;border-radius:6px;background:#020617;color:#e2e8f0';
+      input.style.cssText = 'display:block;width:100%;padding:10px;border:1px solid #475569;border-radius:6px;background:#100c09;color:#e2e8f0';
       input.addEventListener('change', async () => {
         const file = input.files && input.files[0];
         if (!file) return;

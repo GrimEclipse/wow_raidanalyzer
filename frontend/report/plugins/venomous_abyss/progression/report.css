@@ -1,9 +1,9 @@
 :root {
   color-scheme: dark;
-  --bg: #070a0b;
-  --panel: #101719;
-  --line: #2a3e42;
-  --muted: #91a4a7;
+  --bg: #0b0907;
+  --panel: #181411;
+  --line: #40362c;
+  --muted: #afa69b;
   --text: #edf3f1;
   --accent: #63cad0;
   --gold: #edbd63;
@@ -15,7 +15,7 @@
 }
 body {
   margin: 0;
-  background: radial-gradient(circle at 48% -20%, #183037, var(--bg) 44%);
+  background: radial-gradient(circle at 48% -20%, #35281a, var(--bg) 44%);
   color: var(--text);
   font:
     14px/1.5 system-ui,
@@ -64,9 +64,9 @@ a {
 .button,
 select,
 .tabs button {
-  border: 1px solid #3a5559;
+  border: 1px solid #574a3c;
   border-radius: 7px;
-  background: #111d20;
+  background: #1f1812;
   padding: 7px 11px;
   cursor: pointer;
 }
@@ -90,7 +90,7 @@ main {
 .tabs {
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: linear-gradient(145deg, #111c1f, #0b1214);
+  background: linear-gradient(145deg, #1e1812, #13100c);
 }
 .stat {
   padding: 11px;
@@ -117,8 +117,8 @@ main {
 }
 .tabs button.active {
   color: #fff;
-  background: #1a292c;
-  border-color: #58767b;
+  background: #2b231b;
+  border-color: #786a5b;
 }
 .panel {
   padding: 15px;
@@ -135,7 +135,7 @@ main {
 }
 .badge {
   display: inline-flex;
-  border: 1px solid #53676a;
+  border: 1px solid #685e55;
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 11px;
@@ -159,7 +159,7 @@ main {
 }
 .empty {
   padding: 23px;
-  border: 1px dashed #3b5558;
+  border: 1px dashed #564a3d;
   border-radius: 8px;
   color: var(--muted);
 }
@@ -171,12 +171,12 @@ table {
 th,
 td {
   padding: 8px 7px;
-  border-bottom: 1px solid #213236;
+  border-bottom: 1px solid #342c23;
   text-align: left;
   vertical-align: top;
 }
 th {
-  color: #bfd0d2;
+  color: #dcd5cd;
   white-space: nowrap;
 }
 .cards {
@@ -185,9 +185,9 @@ th {
   gap: 9px;
 }
 .card {
-  border: 1px solid #2a4145;
+  border: 1px solid #43382c;
   border-radius: 8px;
-  background: #0a1214;
+  background: #130f0b;
   padding: 11px;
 }
 .event-list {
@@ -196,10 +196,10 @@ th {
   flex-wrap: wrap;
 }
 .event-chip {
-  border: 1px solid #355156;
+  border: 1px solid #544637;
   border-radius: 7px;
   padding: 6px 8px;
-  background: #0b1517;
+  background: #16110c;
 }
 .replay-layout {
   display: grid;
@@ -212,8 +212,8 @@ th {
   align-content: start;
 }
 .round-button {
-  border: 1px solid #355156;
-  background: #0b1517;
+  border: 1px solid #544637;
+  background: #16110c;
   border-radius: 8px;
   padding: 9px;
   text-align: left;
@@ -237,7 +237,7 @@ th {
   height: 22px;
   border: 2px solid var(--color);
   border-radius: 50%;
-  background: #071013;
+  background: #120d08;
   box-shadow: 0 0 0 2px #0008;
   overflow: hidden;
   z-index: 5;
@@ -289,7 +289,7 @@ th {
   height: 34px;
   border: 2px solid #edbd63;
   border-radius: 50%;
-  background: #071013;
+  background: #120d08;
   box-shadow: 0 0 0 2px #0008;
   overflow: hidden;
   z-index: 4;
@@ -389,12 +389,12 @@ th {
   margin: 8px 0;
 }
 .crosswind-group {
-  border: 1px solid #355156;
+  border: 1px solid #544637;
   border-radius: 7px;
   padding: 8px;
 }
 .crosswind-group.group-a {
-  border-color: #367aa0;
+  border-color: #986b3e;
   background: #123246;
 }
 .crosswind-group.group-b {
@@ -471,7 +471,7 @@ th {
 }
 
 .venom-picker{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12px;color:var(--muted)}
-.venom-picker select{border:1px solid #2a4145;border-radius:8px;background:#0a1214;color:var(--ink);padding:6px 10px;font-size:12px}
+.venom-picker select{border:1px solid #43382c;border-radius:8px;background:#130f0b;color:var(--ink);padding:6px 10px;font-size:12px}
 tr.abnormal-row td{background:rgba(255,107,107,.13)}
 tr.abnormal-row td:first-child{border-left:3px solid #ff6b6b}
 .abnormal-panel{border-color:#93434b !important;background:#150e11}
