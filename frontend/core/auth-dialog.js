@@ -13,12 +13,12 @@
         <button type="button" data-auth-mode="register" role="tab" aria-selected="false">注册</button>
       </div>
       <form data-auth-form="login">
-        <label>用户名<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label>
+        <label>用户名<input name="username" autocomplete="username" minlength="3" maxlength="64" required></label>
         <label>密码<input name="password" type="password" autocomplete="current-password" required></label>
         <button class="auth-dialog__submit" type="submit">登录并继续</button>
       </form>
       <form data-auth-form="register" hidden>
-        <label>用户名<input name="username" autocomplete="username" minlength="3" maxlength="32" required></label>
+        <label>用户名<input name="username" autocomplete="username" minlength="3" maxlength="64" required></label>
         <label>密码<input name="password" type="password" autocomplete="new-password" required></label>
         <label data-auth-invite hidden>邀请码<input name="inviteCode" autocomplete="off"></label>
         <p class="auth-dialog__hint">普通账户可以绑定自己的 WCL 凭据并运行分析。</p>

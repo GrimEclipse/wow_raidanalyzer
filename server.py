@@ -962,8 +962,15 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         return parsed.netloc.lower() == self.headers.get("Host", "").lower()
 
     def remote_address(self):
-        forwarded = self.headers.get("CF-Connecting-IP", "").strip()
-        return forwarded or str(self.client_address[0])
+        # 站点经本机 nginx 反代（灰云，不过 Cloudflare），真实访客 IP 在 X-Real-IP；
+        # 只信任来自本机回环的转发头，否则所有访客都会被当成 127.0.0.1、共用一份注册/登录限流。
+        peer = str(self.client_address[0])
+        if peer in {"127.0.0.1", "::1"}:
+            for header in ("CF-Connecting-IP", "X-Real-IP"):
+                value = self.headers.get(header, "").strip()
+                if value:
+                    return value
+        return peer
 
     def login_rate_limited(self, username):
         now = time.time()

@@ -21,7 +21,7 @@ from analyzer_core.wcl_context import WclCredentials
 
 ROOT = Path(__file__).resolve().parents[1]
 AUTH_DIR = Path(os.getenv("APP_AUTH_DIR") or (ROOT / "auth"))
-USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.@+-]{3,64}$")
 PASSWORD_MIN_LENGTH = 1
 SESSION_HOURS = max(1, int(os.getenv("APP_SESSION_HOURS", "24") or 24))
 ROLES = {"viewer", "editor", "admin"}
@@ -34,7 +34,7 @@ class AuthError(ValueError):
 def normalize_username(username: str) -> str:
     value = str(username or "").strip().lower()
     if not USERNAME_RE.fullmatch(value):
-        raise AuthError("用户名只能包含字母、数字、点、下划线或横线，长度为 3–32。")
+        raise AuthError("用户名只能包含字母、数字、点、下划线、横线、@ 或 +（可直接用邮箱），长度为 3–64。")
     return value
 
 
