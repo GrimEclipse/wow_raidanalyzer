@@ -144,7 +144,7 @@ REPLAY_WAVE_SPEED_YARDS_PER_SECOND = 20
 REPLAY_WAVE_TRAVEL_YARDS = 65
 REPLAY_WAVE_WIDTH_YARDS = 3
 DESPERATE_THRASH_ID = 1305709
-DESPERATE_THRASH_ANGLE_DEGREES = 30
+DESPERATE_THRASH_ANGLE_DEGREES = 60
 DESPERATE_THRASH_LENGTH_YARDS = 30
 RATTLER_SLAM_ID = 1299206
 WAVE_ID = 1292403
@@ -173,8 +173,19 @@ P25_MYTHIC_COIL_COUNT = 8
 P25_FLOOR_BREAK_DELAY_MS = 5000
 P25_EGG_SETTLE_MS = 250
 SPECTRAL_COIL_GAME_ID = 267679
-COIL_SOAK_RADIUS_YARDS = 10
-COIL_REGION_RING_YARDS = 32  # Approximate eight fixed regions from the user's diagram.
+# Visual geometry follows the owner's annotated intermission diagram. These
+# regions are not a hit classifier; keep real Coil coordinates as evidence.
+FESTER_SAFE_RADIUS_YARDS = 10
+COIL_SOAK_RADIUS_YARDS = FESTER_SAFE_RADIUS_YARDS
+COIL_DIAGRAM_RADIUS_YARDS = 8
+COIL_PLATFORM_IMAGE_BOUNDARY = (
+    (.398, .05), (.602, .05), (.75, .315), (.75, .685),
+    (.602, .95), (.398, .95), (.25, .685), (.25, .315),
+)
+COIL_REGION_IMAGE_CENTERS = (
+    (.6915, .3568), (.5757, .1686), (.4220, .1686), (.3154, .3527),
+    (.3142, .6309), (.4186, .8273), (.5757, .8273), (.6915, .6309),
+)
 REPLAY_INTERRUPT_IDS = {1766,47528,57994,147362,2139,183752,97547,6552}
 
 BOSS_CONFIG = {
@@ -197,7 +208,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-replay-2026-10-10-v21",
+    "mechanicVersion": "ulatek-replay-2026-10-12-v23",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -1752,6 +1763,32 @@ REPLAY_MAPS = {
 }
 
 
+def _coil_region_position(slot, arena):
+    """Enlarge the diagram's circle by moving its center inward, retaining clearance."""
+    image_x, image_y = COIL_REGION_IMAGE_CENTERS[slot]
+    scale = arena['height'] / arena['yards']
+    px, py = (image_x-.5)*arena['width']/scale, (image_y-.5)*arena['height']/scale
+    distance = math.hypot(px, py)
+    inward = (-px/distance, -py/distance)
+    boundary = [((x-.5)*arena['width']/scale, (y-.5)*arena['height']/scale)
+                for x, y in COIL_PLATFORM_IMAGE_BOUNDARY]
+    edges = []
+    for i, a in enumerate(boundary):
+        b = boundary[(i+1) % len(boundary)]
+        dx, dy = b[0]-a[0], b[1]-a[1]
+        length = math.hypot(dx, dy)
+        normal = (-dy/length, dx/length)
+        clearance = (px-a[0])*normal[0]+(py-a[1])*normal[1]
+        approach = inward[0]*normal[0]+inward[1]*normal[1]
+        edges.append((clearance, approach))
+    target = min(d for d, _ in edges)+COIL_SOAK_RADIUS_YARDS-COIL_DIAGRAM_RADIUS_YARDS
+    shift = max([0]+[(target-d)/approach for d, approach in edges if approach > 0])
+    px, py = px+inward[0]*shift, py+inward[1]*shift
+    yaw = math.radians(arena['yaw'])
+    return {'x':arena['centerX']+(px*math.cos(yaw)+py*math.sin(yaw))*100,
+            'y':arena['centerY']-(-px*math.sin(yaw)+py*math.cos(yaw))*100}
+
+
 def _replay_coil_soaks(fight, raw):
     """Identify one of eight fixed regions from the Spectral Coil's corner."""
     start = int(fight['startTime'])
@@ -1771,9 +1808,7 @@ def _replay_coil_soaks(fight, raw):
             continue
         angle = math.atan2(dy,dx)
         slot = round((angle-math.pi/8)/(math.pi/4)) % 8
-        direction = math.pi/8+slot*math.pi/4
-        position = {'x':center['centerX']+COIL_REGION_RING_YARDS*100*math.cos(direction),
-                    'y':center['centerY']+COIL_REGION_RING_YARDS*100*math.sin(direction)}
+        position = _coil_region_position(slot, center)
         ts = int(e['timestamp'])
         begins = [int(b['timestamp']) for b in casts if event_type(b) == 'begincast'
             and ability_id(b) == P25_COIL_CAST_ID and b.get('sourceID') == e.get('sourceID')
@@ -1782,7 +1817,7 @@ def _replay_coil_soaks(fight, raw):
         result.append({'kind':'coil-soak','sourceID':e.get('sourceID'),
             'sourceInstance':e.get('sourceInstance',0),'regionIndex':slot,'sourcePosition':origin,
             'position':position,'positionEvidence':'spectral-coil-corner',
-            'regionGeometryEvidence':'user-diagram-estimate',
+            'regionGeometryEvidence':'user-diagram-floor-landmarks',
             'startTimeMs':(begins[-1] if begins else ts-4000)-start,
             'impactTimeMs':ts-start,'endTimeMs':ts-start+450,'radiusYards':COIL_SOAK_RADIUS_YARDS})
     return result
@@ -1897,7 +1932,7 @@ def _replay_effects(fight, players, raw, changes):
                     circles.append({'kind': 'fester-safe', 'sourceID': e.get('sourceID'),
                         'sourceInstance': e.get('sourceInstance', 0), 'startTimeMs': ts-start,
                         'impactTimeMs': finish-start, 'endTimeMs': finish-start,
-                        'position': origin, 'radiusYards': 10})
+                        'position': origin, 'radiusYards': FESTER_SAFE_RADIUS_YARDS})
                     changes.append({'kind': 'fester', 'label': '腐败爆发', 'timeMs': ts-start})
             if sid == DESPERATE_THRASH_ID:
                 # Reconstruct aim from this exact instance's tank hit; the

@@ -57,7 +57,7 @@ BOSS_CONFIG = {
         ["crosswinds", "狂怒侧风"],
         ["fury", "毒蛇之怒"],
     ],
-    "mechanicVersion": "sszorak-replay-mark-energy-2026-10-09",
+    "mechanicVersion": "sszorak-replay-virulence-cones-2026-10-12",
     "features": {"survival": True, "fieldReplay": True},
     "bossGameID": 257347,
     "bossNameKeywords": ["Sszorak", "斯索拉克"],
@@ -82,6 +82,12 @@ UNBOUND_FEROCITY_ID = 1296898
 FURY_SOAK_RADIUS_YARDS = 8
 FURY_REQUIRED_PLAYERS = 14
 FURY_POSITION_WINDOW_MS = 500
+VIRULENCE_DIRECTIONS = {1297707: 0, 1299899: 45}
+VIRULENCE_BURST_ID = 1300089
+VIRULENCE_HALF_LENGTH_YARDS = 6
+VIRULENCE_WIDTH_YARDS = 3
+PREDATOR_CONE_LENGTH_YARDS = 30
+PREDATOR_CONE_ANGLE_DEGREES = 60  # Visual preview; not a hit classifier.
 
 # 团队战术板要求的六次集合时点；06:00 是硬狂暴，不再建立集合检查。
 # 每轮实际时间会跟随该轮顶级掠食者（剑技）Combo 的首个实测技能漂移，
@@ -1447,6 +1453,10 @@ def analyze_sszorak(fight, actor_map, players, raw):
         "fieldReplay": {
             "enabled": options["fieldReplayEnabled"],
             "marks": _replay_marks(fight, raw) if options['fieldReplayEnabled'] else [],
+            "virulence": _replay_virulence(fight, raw) if options['fieldReplayEnabled'] else [],
+            "predatorCones": _replay_predator_cones(fight, players, raw, position_index) if options['fieldReplayEnabled'] else [],
+            "burstHits": [{'playerID':e.get('targetID'), 'timeMs':int(e['timestamp'])-int(fight['startTime'])}
+                          for e in damage if ability_id(e) == VIRULENCE_BURST_ID] if options['fieldReplayEnabled'] else [],
             "arena": arena,
             "arenaImage": BOSS_CONFIG["arena"],
             "bossIcon": BOSS_CONFIG["bossIcon"],
@@ -1458,6 +1468,89 @@ def analyze_sszorak(fight, actor_map, players, raw):
         },
         "fallDeaths": fall_deaths,
     }
+
+def _replay_virulence(fight, raw):
+    """Keep both directional auras, including propagation and refreshes."""
+    active, result = {}, []
+    start, end = int(fight['startTime']), int(fight['endTime'])
+    events = sorted(raw.get('debuffs') or [], key=lambda e:int(e['timestamp']))
+    events += [{'timestamp':e['timestamp'], 'type':'death', 'targetID':e.get('targetID')}
+               for e in raw.get('deaths') or [] if event_type(e) == 'death']
+    for e in sorted(events, key=lambda e:int(e['timestamp'])):
+        pid, sid, ts, kind = e.get('targetID'), ability_id(e), int(e['timestamp']), event_type(e)
+        if kind == 'death':
+            for key in [k for k in active if k[0] == pid]:
+                row = active.pop(key)
+                row.update(endTimeMs=ts-start, endEvidence='death')
+                result.append(row)
+            continue
+        if sid not in VIRULENCE_DIRECTIONS or pid is None:
+            continue
+        key = (pid, sid)
+        if kind in {'applydebuff', 'refreshdebuff', 'applydebuffstack'}:
+            if key not in active:
+                active[key] = {'playerID':pid, 'spellID':sid, 'startTimeMs':ts-start,
+                    'screenAngleDegrees':VIRULENCE_DIRECTIONS[sid],
+                    'directionEvidence':'entrance-axis-initial-mapping',
+                    'halfLengthYards':VIRULENCE_HALF_LENGTH_YARDS,
+                    'widthYards':VIRULENCE_WIDTH_YARDS, 'refreshTimesMs':[]}
+            elif kind == 'refreshdebuff':
+                active[key]['refreshTimesMs'].append(ts-start)
+        elif kind == 'removedebuff' and key in active:
+            row = active.pop(key)
+            row.update(endTimeMs=ts-start, endEvidence='aura-remove')
+            result.append(row)
+    for row in active.values():
+        row.update(endTimeMs=end-start, endEvidence='fight-end')
+        result.append(row)
+    return sorted(result, key=lambda row:(row['startTimeMs'], row['playerID'], row['spellID']))
+
+
+def _replay_predator_cones(fight, players, raw, positions):
+    start, end = int(fight['startTime']), int(fight['endTime'])
+    tanks = {pid for pid, row in players.items() if row.get('role') == 'tank'}
+    boss_id = raw.get('bossID')
+    casts = sorted(raw.get('casts') or [], key=lambda e:int(e['timestamp']))
+    damage_by_spell = defaultdict(list)
+    for e in raw.get('damage') or []:
+        damage_by_spell[ability_id(e)].append(e)
+    pending, result = {}, []
+    for e in casts:
+        sid, ts, kind = ability_id(e), int(e['timestamp']), event_type(e)
+        if sid not in {1277002, 1277027} or boss_id is not None and e.get('sourceID') != boss_id:
+            continue
+        key = (e.get('sourceID'), e.get('sourceInstance', 0), sid)
+        if kind == 'begincast':
+            pending[key] = ts
+            continue
+        if kind != 'cast':
+            continue
+        begin = pending.pop(key, max(start, ts-3000))
+        hits = sorted([h for spell in PREDATOR_DAMAGE[sid] for h in damage_by_spell[spell]
+                       if ts-200 <= int(h['timestamp']) <= ts+1500
+                       and h.get('sourceID') == e.get('sourceID')], key=lambda h:int(h['timestamp']))
+        target = e.get('targetID') if e.get('targetID') in tanks else next(
+            (h.get('targetID') for h in hits if h.get('targetID') in tanks), None)
+        origin, reliable = _position_state(positions, e.get('sourceID'), ts)
+        if not origin or not reliable:
+            continue
+        evidence = 'tank-hit' if target is not None else 'nearest-tank'
+        if target is None:
+            candidates = [(pid, _position_state(positions, pid, ts)) for pid in sorted(tanks)]
+            candidates = [(pid, point) for pid, (point, valid) in candidates if point and valid]
+            if candidates:
+                target = min(candidates, key=lambda item:math.hypot(item[1]['x']-origin['x'], item[1]['y']-origin['y']))[0]
+        aim, reliable = _position_state(positions, target, ts)
+        if not aim or not reliable or math.hypot(aim['x']-origin['x'], aim['y']-origin['y']) < 1:
+            continue
+        result.append({'spellID':sid, 'actorID':e.get('sourceID'), 'targetID':target,
+            'startTimeMs':begin-start, 'impactTimeMs':ts-start,
+            'endTimeMs':min(end, max([ts+650]+[int(h['timestamp'])+450 for h in hits]))-start,
+            'position':origin, 'targetPosition':aim, 'directionEvidence':evidence,
+            'angleDegrees':PREDATOR_CONE_ANGLE_DEGREES, 'lengthYards':PREDATOR_CONE_LENGTH_YARDS,
+            'color':'#f4f8ff' if sid == 1277002 else '#a0ff69'})
+    return result
+
 
 def _replay_marks(fight, raw):
     active, result = {}, []
@@ -1552,7 +1645,7 @@ def build_aggregated_json(report_ids, options=None):
     if options['fieldReplayEnabled']:
         config['unifiedEventFilter'] = ('resources.actor.id > 0 OR '
             'type IN ("damage", "cast", "begincast", "combatantinfo", "death", "resurrect", "interrupt", "dispel") '
-            'OR ability.id IN (' + ', '.join(map(str, sorted(GUIDE_SPELLS))) + ')')
+            'OR ability.id IN (' + ', '.join(map(str, sorted(set(GUIDE_SPELLS) | set(VIRULENCE_DIRECTIONS)))) + ')')
         config['replayActorGameIDs'] = {BOSS_CONFIG['bossGameID']}
         config['trackedActorEventTypes'] = {'dispel'} if options['tempestReviewEnabled'] else set()
     config["fetchEventResources"] = spatial

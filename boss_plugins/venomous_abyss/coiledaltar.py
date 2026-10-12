@@ -25,6 +25,8 @@ CONFIG_SCHEMA = [
 
 import math
 from collections import Counter, defaultdict
+from bisect import bisect_right
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from analyzer_core.analysis_scope import filter_fights
@@ -267,8 +269,12 @@ INTERMISSION_POTION_LOOKBACK_MS = 2_000
 
 P2_SIGNAL_SPELL = 1307184
 INTERMISSION_MS = 35_000
-CONE_RADIUS_YARDS = 35
-CONE_HALF_ANGLE_DEG = 30.0  # 总宽约 60° 的正面锥形
+CONE_RADIUS_YARDS = 45  # Replay reach calibrated against observed clear positions and stack gains.
+CONE_HALF_ANGLE_DEG = 30.0  # Preserve the 60-degree frontal angle.
+MANIFEST_REPLAY_STEP_MS = 100
+MANIFEST_REPLAY_SPEED_YARDS = 3.0  # Walking speed confirmed by the owner.
+MANIFEST_WATCH_HALF_ANGLE_DEG = 30.0  # Owner: must look closely toward the ghost.
+MANIFEST_FACING_MAX_AGE_MS = 1000
 GLOOMBOMB_RADIUS_YARDS = 15
 # 史诗怨毒盘魂者：灵魂之盾 2 层，需两枚幽暗炸弹；打断恐惧哀嚎会传送换位。
 SPIRIT_SHIELD = 1309105
@@ -1269,6 +1275,8 @@ def _npc_actor_point(event, actor_id):
         resource_actor = event.get("resourceActor")
         if resource_actor in {2, "2", "Target"}:
             return _xy_from_node(event) or _xy_from_node(event.get("resources"))
+        if resource_actor in {1, "1", "Source"}:
+            return None
         # WCL includeResources 对 damage/healing 只记录目标资源；坐标通常就在
         # 事件顶层，即使没有 targetResources/resourceActor 也属于受击 NPC。
         if kind in {"damage", "death"}:
@@ -1801,7 +1809,9 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 continue
             player_pos = _position_sample(position_index, target_id, timestamp)
             player_xy = _position_xy(player_pos)
-            available = [p for p in ground if p.get("groundedFromMs") is not None and p["groundedFromMs"] <= rel_ms]
+            phase_floor = max([m['timeMs'] for m in markers if m.get('key') == 'p2' and m['timeMs'] <= rel_ms]+[-1])
+            available = [p for p in ground if p.get("groundedFromMs") is not None
+                         and phase_floor <= p["groundedFromMs"] <= rel_ms]
             puddle = _match_puddle_for_pickup(available, player_xy, kinds={carry_kind})
             if puddle is not None and puddle in ground:
                 ground.remove(puddle)
@@ -3838,6 +3848,7 @@ def analyze_gloombomb(
                 **player_ref(players, actor_map, target_id),
                 "applyTimeMs": apply_ts - fight_start,
                 "applyTime": fmt_ms(apply_ts - fight_start),
+                "removeTimeMs": int(remove_event['timestamp'])-fight_start if remove_event else None,
                 "explodeTimeMs": (explode_ts - fight_start) if explode_ts else None,
                 "explodeTime": fmt_ms(explode_ts - fight_start) if explode_ts else None,
                 "position": position,
@@ -4748,8 +4759,8 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     soulcoiler_ids = soulcoiler_actor_ids(actor_rows)
     npc_position_events = _npc_position_events(raw, set(manifest_ids) | set(mutation_ids) | set(soulcoiler_ids)) if field_enabled else []
     npc_position_index = build_npc_position_index(npc_position_events) if field_enabled else {}
-    zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
-    malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
+    zuljan_id = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
+    malacrass_id = resolve_boss_actor_id(actor_rows, 259854, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
     boss_id = zuljan_id or malacrass_id
     boss_ids = {actor_id for actor_id in (zuljan_id, malacrass_id) if actor_id is not None}
     markers = build_phase_markers(
@@ -4778,6 +4789,8 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         damage_events=list(raw.get("damage") or []),
     ) if needs["toxicDelugeReviewEnabled"] else {}
+    if toxic_deluge:
+        _merge_venom_drop_spawns(toxic_deluge)
     venom_points = build_active_venom_points(toxic_deluge) if field_enabled else []
     manifestations = analyze_manifestations(
         fight, raw["debuffs"], npc_position_index, actor_map, players, actor_catalog, markers,
@@ -4796,6 +4809,7 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     ) if options["blightedSeverReviewEnabled"] else {}
     if int(fight.get("difficulty") or 0) == MYTHIC_DIFFICULTY:
         annotate_mythic_sever_deluge_pairs(fight, toxic_deluge, sever, blighted_sever, venom_points)
+    _reconcile_venom_severs(fight, raw, venom_points, sever, blighted_sever)
     guillotine = analyze_guillotine(
         fight, raw["casts"], raw["damage"], raw["debuffs"], position_index, actor_map, players, markers,
         GUILLOTINE_CAST_IDS, "处斩",
@@ -4892,6 +4906,401 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     }
 
 
+def _merge_venom_drop_spawns(venom):
+    """A carried globule's observed respawn is its drop, not another globule."""
+    drops = [c for c in venom.get('carriers', []) if c.get('removeTimeMs') is not None and c.get('dropPosition')]
+    aliases = {}
+    for p in venom.get('groundPuddles', []):
+        t, pos = p.get('groundedFromMs'), p.get('position')
+        if t is None or not pos:
+            continue
+        matches = [c for c in drops if c.get('puddleID') != p.get('puddleID')
+                   and c.get('venomKind') == p.get('venomKind')
+                   and abs(c['removeTimeMs']-t) <= 300
+                   and math.hypot(pos['x']-c['dropPosition']['x'], pos['y']-c['dropPosition']['y']) <= 100]
+        if len(matches) == 1:
+            aliases[p['puddleID']] = matches[0]['puddleID']
+    def resolve(key):
+        seen = set()
+        while key in aliases and key not in seen:
+            seen.add(key)
+            key = aliases[key]
+        return key
+    def remap(value):
+        if isinstance(value, dict):
+            if 'puddleID' in value:
+                value['puddleID'] = resolve(value['puddleID'])
+            for child in value.values():
+                remap(child)
+        elif isinstance(value, list):
+            for child in value:
+                remap(child)
+    remap(venom)
+    for round_row in venom.get('rounds', []):
+        for spawn in round_row.get('spawns', []):
+            pos = spawn.get('position')
+            if not pos:
+                continue
+            matches = [c for c in drops if c.get('venomKind') == spawn.get('venomKind')
+                       and abs(c['removeTimeMs']-spawn['spawnTimeMs']) <= 300
+                       and math.hypot(pos['x']-c['dropPosition']['x'], pos['y']-c['dropPosition']['y']) <= 100]
+            if len(matches) == 1:
+                spawn.update(dropRespawn=True, puddleID=matches[0]['puddleID'])
+        round_row['spawnCount'] = sum(not s.get('dropRespawn') for s in round_row.get('spawns', []))
+    venom['mergedDropSpawnCount'] = len(aliases)
+
+
+def _reconcile_venom_severs(fight, raw, venom_points, *sections):
+    """Cross-check real stack changes and unique ground-object geometry."""
+    start = int(fight['startTime'])
+    if not any(section.get('rounds') for section in sections):
+        return
+    stacks = defaultdict(list)
+    for e in sorted(raw.get('debuffs', []), key=lambda e:int(e['timestamp'])):
+        if ability_id(e) != VENOM_RUPTURE:
+            continue
+        kind = event_type(e)
+        value = 0 if kind in {'removedebuff', 'removebuff'} else int(e.get('stack') or 1)
+        stacks[e.get('targetID')].append((int(e['timestamp']), value))
+    rows = sorted([r for section in sections for r in section.get('rounds', [])], key=lambda r:r['timeMs'])
+    cleared = {}
+    phase_cleanups = [int(p['startTime'])-start for p in fight.get('phaseTransitions', [])
+                      if p.get('id') == 2]
+    for row in rows:
+        ts = start+row['timeMs']
+        next_phase = min([int(p['startTime']) for p in fight.get('phaseTransitions', []) if int(p['startTime']) > ts]+[ts+750])
+        deltas = []
+        for pid, changes in stacks.items():
+            before = next((v for t, v in reversed(changes) if t < ts), 0)
+            values = [v for t, v in changes if ts <= t < min(ts+751, next_phase)]
+            if values and max(values) > before:
+                deltas.append((pid, max(values)-before))
+        observed = Counter(v for _, v in deltas).most_common(1)
+        actual = observed[0][0] if observed else None
+        candidates = {}
+        for p in venom_points:
+            grounded = p.get('groundedFromMs', p.get('timeMs'))
+            picked = p.get('pickedUpAtMs')
+            key = p.get('puddleID')
+            if key is None or grounded is None or grounded > row['timeMs'] or picked is not None and picked <= row['timeMs']:
+                continue
+            if any(grounded < boundary <= row['timeMs'] for boundary in phase_cleanups):
+                continue
+            if grounded <= cleared.get(key, -1):
+                continue
+            if key not in candidates or grounded > candidates[key].get('groundedFromMs', -1):
+                candidates[key] = p
+        origin = _position_xy(row.get('origin'))
+        if not origin or row.get('facingRadians') is None:
+            continue
+        angles = [row['facingRadians']]
+        cast = next((e for e in raw.get('casts', []) if is_cast_complete(e) and ability_id(e) == row['spellID'] and int(e['timestamp']) == ts), None)
+        own_facing = normalize_facing_radians((cast.get('sourceResources') or {}).get('facing', cast.get('facing'))) if cast else None
+        if own_facing is not None:
+            angles.append(own_facing)
+        alternatives = []
+        for angle in angles:
+            hits = [p for p in candidates.values() if p.get('position') and in_frontal_cone(origin, angle, _position_xy(p['position']))]
+            alternatives.append((angle, hits))
+        matching = [(a, h) for a, h in alternatives if actual is not None and len(h) == actual]
+        sets = {tuple(sorted(p['puddleID'] for p in h)) for _, h in matching}
+        verified = len(sets) == 1
+        angle, hits = matching[0] if verified else alternatives[0]
+        row['stackClearCheck'] = {'observedCount':actual, 'geometryCount':len(hits),
+            'samplePlayers':len(deltas), 'status':'matched' if verified else 'unresolved',
+            'matchingSubsetUnique':verified}
+        if angle != row['facingRadians']:
+            row.update(facingRadians=angle, facingRule='caster-facing-stack-verified',
+                       conePolygon=cone_polygon(origin, angle))
+        non_venom = [p for p in row.get('targetsInCone', []) if not _is_ground_venom_point(p)]
+        row['targetsInCone'] = non_venom+hits
+        row['clearedByGeometry'] = len(row['targetsInCone'])
+        row['inferredClearedCount'] = actual if actual is not None else len(hits)
+        for p in hits:
+            cleared[p['puddleID']] = row['timeMs']
+
+
+def _replay_pose(unit, t):
+    rows = unit.get('samples', [])
+    if not rows:
+        return None
+    times = unit['_positionTimes']
+    i = bisect_right(times, t)-1
+    if i < 0 or t-times[i] > 1500:
+        return None
+    row = rows[i]
+    x, y = row[1], row[2]
+    if i+1 < len(rows) and times[i+1]-times[i] <= 1500:
+        f = (t-times[i])/(times[i+1]-times[i] or 1)
+        x, y = x+(rows[i+1][1]-x)*f, y+(rows[i+1][2]-y)*f
+    fi = bisect_right(unit['_facingTimes'], t)-1
+    face = unit.get('facingSamples', [])[fi] if fi >= 0 else None
+    return {'x':x, 'y':y, 'facing':normalize_facing_radians(face[1]) if face and t-face[0] <= MANIFEST_FACING_MAX_AGE_MS else None}
+
+
+def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
+    """Face-aware estimates, with observed spawns and aura/death lifetimes."""
+    start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
+    units = {u['actorID']:{**u, '_positionTimes':[r[0] for r in u['samples']],
+                          '_facingTimes':[r[0] for r in u.get('facingSamples', [])]}
+             for u in mechanics.get('combatReplay', {}).get('units', []) if u['kind'] == 'player'}
+    grouped = defaultdict(list)
+    for row in mechanics.get('manifestations', {}).get('fixations', []):
+        m = row['manifest']
+        grouped[(m['sourceID'], int(m.get('sourceInstance') or 0))].append(row)
+    anchors = defaultdict(list)
+    for e in raw.get('casts', []):
+        key = (e.get('sourceID'), int(e.get('sourceInstance') or 0))
+        if key in grouped and ability_id(e) == FIXATION and is_cast_complete(e):
+            p = _npc_actor_point(e, e.get('sourceID'))
+            if p:
+                anchors[key].append((int(e['timestamp'])-start, p))
+    ghosts = []
+    for key, assignments in grouped.items():
+        assignments.sort(key=lambda r:r['applyTimeMs'])
+        begins = assignments[0]['applyTimeMs']
+        ends = max(r.get('despawnTimeMs', r.get('removeTimeMs')) or duration for r in assignments)
+        samples = sorted(anchors[key])
+        known = [r for r in samples if r[0] <= begins]
+        if not known:
+            continue  # Never initialize a ghost with its future or player's position.
+        x, y = known[-1][1]
+        previous_anchor, last_move = known[-1][0], None
+        trajectory = []
+        for t in range(begins, min(ends, duration)+1, MANIFEST_REPLAY_STEP_MS):
+            fresh = [a for a in samples if previous_anchor < a[0] <= t]
+            if fresh:
+                previous_anchor, (x, y) = fresh[-1]
+            assignment = next((r for r in reversed(assignments) if r['applyTimeMs'] <= t and t < (r.get('removeTimeMs') or duration)), None)
+            pid = assignment['playerID'] if assignment else None
+            pose = _replay_pose(units.get(pid, {}), t)
+            moving, known_facing = False, bool(pose and pose['facing'] is not None)
+            if known_facing:
+                dx, dy = x-pose['x'], y-pose['y']
+                bearing = math.atan2(-dy, dx)
+                watched = math.cos(bearing-pose['facing']) >= math.cos(math.radians(MANIFEST_WATCH_HALF_ANGLE_DEG))
+                distance = math.hypot(dx, dy)
+                moving = not watched and distance > 100 and t > max(begins,previous_anchor)
+                if moving:
+                    amount = min(distance-100, MANIFEST_REPLAY_SPEED_YARDS*100*MANIFEST_REPLAY_STEP_MS/1000)
+                    x, y = x-dx/distance*amount, y-dy/distance*amount
+                    last_move = t
+            trajectory.append([t, round(x, 2), round(y, 2), pid, int(moving), int(known_facing), last_move])
+        ghosts.append({'key':f'{key[0]}:{key[1]}', 'actorID':key[0], 'instance':key[1],
+            'startTimeMs':begins, 'endTimeMs':ends, 'samples':trajectory,
+            'assignments':[{'playerID':r['playerID'], 'startTimeMs':r['applyTimeMs'],
+                            'endTimeMs':r.get('removeTimeMs') or duration} for r in assignments],
+            'positionEvidence':'observed-spawn-facing-estimate'})
+    triggers = []
+    for e in sorted(raw.get('debuffs', []), key=lambda e:int(e['timestamp'])):
+        if ability_id(e) in MANIFEST_COLLISION_DEBUFF_IDS and event_type(e) == 'applydebuff':
+            t = int(e['timestamp'])-start
+            if not triggers or t-triggers[-1]['timeMs'] > 300:
+                triggers.append({'timeMs':t, 'playerIDs':[]})
+            if e.get('targetID') in players and e['targetID'] not in triggers[-1]['playerIDs']:
+                triggers[-1]['playerIDs'].append(e['targetID'])
+    for hit in triggers:
+        t, movements = hit['timeMs'], []
+        for ghost in ghosts:
+            s = next((r for r in reversed(ghost['samples']) if r[0] <= t), None)
+            if s and ghost['startTimeMs'] <= t < ghost['endTimeMs'] and s[3] in hit['playerIDs']:
+                movements.append({'ghostKey':ghost['key'], 'playerID':s[3], 'moving':bool(s[4]),
+                    'facingKnown':bool(s[5]), 'lastMovementTimeMs':s[6],
+                    'estimatedPosition':{'x':s[1], 'y':s[2]}})
+        movers = [m for m in movements if m['facingKnown'] and m['lastMovementTimeMs'] is not None and t-m['lastMovementTimeMs'] <= 1000]
+        stationary = [m for m in movements if m['facingKnown'] and not m['moving']]
+        separation = None
+        if len(movements) == 2:
+            a, b = (m['estimatedPosition'] for m in movements)
+            separation = math.hypot(a['x']-b['x'], a['y']-b['y'])/100
+        unique = (len(movers) == 1 and separation is not None and separation <= 5
+                  and any(m['playerID'] != movers[0]['playerID'] for m in stationary)
+                  and all(m['facingKnown'] for m in movements))
+        hit.update(phase=phase_at(t, mechanics.get('phaseTimeline', [])),
+                   movements=movements, estimatedSeparationYards=separation,
+                   responsiblePlayerID=movers[0]['playerID'] if unique else None,
+                   confidence='facing-inferred' if unique else 'insufficient-or-both-moving',
+                   players=[player_ref(players, actor_map, pid) for pid in hit['playerIDs']],
+                   responsiblePlayer=player_ref(players, actor_map, movers[0]['playerID']) if unique else None,
+                   deaths=[player_ref(players, actor_map, e['targetID']) for e in raw.get('deaths', [])
+                           if e.get('targetID') in hit['playerIDs'] and t <= int(e['timestamp'])-start <= t+6000
+                           and e.get('killingAbilityGameID') in MANIFEST_COLLISION_DEBUFF_IDS])
+        if unique:
+            mover = next(g for g in ghosts if g['key'] == movers[0]['ghostKey'])
+            other = next(m for m in stationary if m['playerID'] != movers[0]['playerID'])
+            endpoint = other['estimatedPosition']
+            if _constrain_manifest_endpoint(mover, t, (endpoint['x'], endpoint['y'])):
+                hit['contactPosition'] = endpoint
+                hit['contactEvidence'] = 'observed-resonance-constrained-estimate'
+    clear_rows = sorted([*mechanics.get('soulSever', {}).get('rounds', []),
+                         *mechanics.get('blightedSever', {}).get('rounds', [])], key=lambda r:r['timeMs'])
+    for ghost in ghosts:
+        clear = next((r for r in clear_rows if abs(r['timeMs']-ghost['endTimeMs']) <= 200), None)
+        if not clear or not ghost['samples'] or not clear.get('origin') or clear.get('facingRadians') is None:
+            continue
+        s = ghost['samples'][-1]
+        point = _closest_clear_point(clear, (s[1],s[2]))
+        distance = math.hypot(point[0]-s[1],point[1]-s[2])/100
+        adjusted = distance <= 8 and _constrain_manifest_endpoint(ghost, ghost['endTimeMs']-1, point)
+        ghost['terminalConstraint'] = {'timeMs':clear['timeMs'], 'spellID':clear['spellID'],
+             'correctionYards':round(distance,2), 'status':'constrained-estimate' if adjusted else 'unresolved',
+             'hasObservedDespawnPosition':False}
+    _exclude_unrecorded_manifest_contacts(ghosts,triggers)
+    return {'ghosts':ghosts, 'resonanceCollisions':triggers,
+            'stepMs':MANIFEST_REPLAY_STEP_MS, 'speedYardsPerSecond':MANIFEST_REPLAY_SPEED_YARDS,
+            'watchHalfAngleDegrees':MANIFEST_WATCH_HALF_ANGLE_DEG,
+            'evidenceNote':'出生位置和凝视关系来自日志；后续轨迹按玩家面向估算。只有一只近期移动且另一只面对玩家停住时，标注推测移动方；缺少面向或双方移动不确定单人责任。'}
+
+
+def _closest_clear_point(row, point):
+    """Nearest point strictly inside the observed clearing cast's sector."""
+    ox, oy = row['origin']['x'], row['origin']['y']
+    dx, dy = point[0]-ox, point[1]-oy
+    distance, angle = math.hypot(dx,dy), math.atan2(-dy,dx)
+    face = row['facingRadians']
+    delta = math.atan2(math.sin(angle-face),math.cos(angle-face))
+    half = math.radians(row.get('coneHalfAngleDeg',CONE_HALF_ANGLE_DEG))
+    radius = row.get('coneRadiusYards',CONE_RADIUS_YARDS)*100-25
+    if abs(delta) < half and distance < radius:
+        return point
+    bearing = face+max(-half+.02,min(half-.02,delta))
+    length = max(0,min(radius,distance*math.cos(angle-bearing)))
+    return ox+math.cos(bearing)*length, oy-math.sin(bearing)*length
+
+
+def _constrain_manifest_endpoint(ghost, time_ms, point):
+    """Fit a confirmed contact/clear within prior moving segments only.
+
+    Keep the observed spawn and watched (stationary) intervals intact. The
+    result is explicitly constrained inference, never an observed coordinate.
+    """
+    rows = ghost['samples']
+    end = bisect_right([s[0] for s in rows],time_ms)-1
+    if end < 0:
+        return False
+    dx, dy = point[0]-rows[end][1], point[1]-rows[end][2]
+    if math.hypot(dx,dy) < 1:
+        return True
+    moving = [i for i in range(1,end+1) if rows[i][4]][-30:]
+    if not moving:
+        return False
+    count, eligible = 0, set(moving)
+    for i in range(moving[0],len(rows)):
+        if i in eligible:
+            count += 1
+        weight = min(1,count/len(moving))
+        rows[i][1] = round(rows[i][1]+dx*weight,2)
+        rows[i][2] = round(rows[i][2]+dy*weight,2)
+    ghost['positionEvidence'] = 'observed-spawn-facing-and-clear-constrained-estimate'
+    return True
+
+
+def _exclude_unrecorded_manifest_contacts(ghosts, collisions):
+    """Fit sparse facing paths to the observed absence of resonance.
+
+    This is an offline positional constraint, not NPC avoidance behavior.
+    Never alter observed spawns or attribute movement from this correction.
+    """
+    if not ghosts:
+        return
+    ticks = range(min(g['startTimeMs'] for g in ghosts),max(g['endTimeMs'] for g in ghosts),100)
+    times = {g['key']:[s[0] for s in g['samples']] for g in ghosts}
+    for t in ticks:
+        active = [(g,bisect_right(times[g['key']],t)-1) for g in ghosts
+                  if g['startTimeMs']+2000 <= t < g['endTimeMs']-100]
+        for i,(a,ai) in enumerate(active):
+            sa = a['samples'][ai]
+            for b,bi in active[i+1:]:
+                sb = b['samples'][bi]
+                if not sa[5] or not sb[5] or sa[3] == sb[3]:
+                    continue
+                if any(e['timeMs']-150 <= t <= e['timeMs']+5000
+                       and {sa[3],sb[3]} == set(e['playerIDs']) for e in collisions):
+                    continue
+                dx,dy = sa[1]-sb[1],sa[2]-sb[2]
+                distance = math.hypot(dx,dy)
+                if distance >= 150:
+                    continue
+                recent_a, recent_b = sa[6] or -1,sb[6] or -1
+                mover,at,other = (a,ai,sb) if recent_a >= recent_b else (b,bi,sa)
+                own = mover['samples'][at]
+                vx,vy = own[1]-other[1],own[2]-other[2]
+                length = math.hypot(vx,vy)
+                if not length:
+                    vx,vy,length = 1,0,1
+                desired = (other[1]+vx/length*151,other[2]+vy/length*151)
+                if _constrain_manifest_endpoint(mover,t,desired):
+                    mover['contactExclusionCorrections'] = mover.get('contactExclusionCorrections',0)+1
+                    mover['positionEvidence'] = 'observed-spawn-facing-clear-and-resonance-constrained-estimate'
+
+
+def _apply_altar_boss_lifetimes(mechanics, actor_rows):
+    replay = mechanics['combatReplay']
+    zuljan = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
+    revive = next((p['timeMs'] for p in mechanics.get('phaseTimeline', []) if p['key'] == 'intermission'), None)
+    for row in replay['bosses']:
+        row['portrait'] = "/boss_plugins/assets/Zul'jan.png" if row['actorID'] == zuljan else '/boss_plugins/assets/HexLord_Malacrass.png'
+    if revive is not None and zuljan is not None:
+        for row in [*replay['bosses'], *replay['units']]:
+            if row['actorID'] == zuljan:
+                row['states'] = sorted([*row['states'], [revive, 'alive']])
+
+
+def _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map):
+    """Instance-local positions, health, shields and interrupted cast windows."""
+    start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
+    actors = {u['key']:{**u, 'casts':[], 'health':[], 'shield':[], 'teleports':[],
+              'startTimeMs':u['samples'][0][0], 'icon':'/assets/spells/1286399.jpg'}
+              for u in mechanics['combatReplay']['units']
+              if u.get('gameID') == SOULCOILER_NPC_GAME_ID and u['samples']}
+    by_key = {(a['actorID'], a['instance']):a for a in actors.values()}
+    pending = {}
+    rows = sorted(raw.get('replayEvents', []), key=lambda e:int(e['timestamp']))
+    for e in rows:
+        t, kind = int(e['timestamp'])-start, event_type(e)
+        source = (e.get('sourceID'), int(e.get('sourceInstance') or 0))
+        target = (e.get('targetID'), int(e.get('targetInstance') or 0))
+        if source not in by_key and target not in by_key:
+            continue
+        if kind == 'begincast' and source in by_key and ability_id(e) in WAIL_OF_TERROR_IDS:
+            old = pending.get(source)
+            if old:
+                old.update(endTimeMs=t, outcome='unconfirmed')
+            cast = {'startTimeMs':t, 'endTimeMs':min(duration,t+10000), 'spellID':ability_id(e),
+                    'spellName':'恐惧哀嚎', 'outcome':'unconfirmed'}
+            by_key[source]['casts'].append(cast)
+            pending[source] = cast
+        elif kind == 'interrupt' and target in by_key:
+            cast = pending.pop(target, None)
+            if cast and t <= cast['endTimeMs']:
+                spell = int(ability_id(e) or 0)
+                icon = next((f'/assets/spells/{spell}.{ext}' for ext in ('png','jpg')
+                             if Path(__file__).resolve().parents[2].joinpath('assets','spells',f'{spell}.{ext}').is_file()), None)
+                cast.update(endTimeMs=t, outcome='interrupted', interruptSpellID=spell,
+                            interruptIcon=icon, interruptedBy=player_ref(players, actor_map, e.get('sourceID')))
+        elif kind == 'cast' and source in by_key:
+            if ability_id(e) == 1308011:
+                by_key[source]['teleports'].append(t)
+            cast = pending.get(source)
+            if cast and ability_id(e) == cast['spellID']:
+                cast.update(endTimeMs=t, outcome='completed')
+                pending.pop(source, None)
+        if target in by_key and ability_id(e) == SPIRIT_SHIELD and 'buff' in kind:
+            amount = 0 if kind == 'removebuff' else int(e.get('stack') or (2 if kind == 'applybuff' else 1))
+            by_key[target]['shield'].append([t,amount])
+        for side, key in [('source',source),('target',target)]:
+            if key not in by_key:
+                continue
+            resource = e.get(side+'Resources') or {}
+            if str(e.get('resourceActor')) == ('1' if side == 'source' else '2'):
+                resource = e
+            if resource.get('hitPoints') is not None and resource.get('maxHitPoints'):
+                by_key[key]['health'].append([t,resource['hitPoints'],resource['maxHitPoints']])
+    for actor in actors.values():
+        actor['endTimeMs'] = next((t for t,s in actor['states'] if s == 'dead'), duration)
+    return {'actors':list(actors.values())}
+
+
 def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
     needs = _analysis_needs(options)
@@ -4899,8 +5308,47 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     phase_enabled = options["eternalNightfallReviewEnabled"]
     intermission_enabled = options["intermissionReviewEnabled"]
     actor_rows = actor_rows or []
-    zuljan_id = resolve_boss_actor_id(actor_rows, None, ("Zul'jan", "祖尔加"))
-    malacrass_id = resolve_boss_actor_id(actor_rows, None, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
+    if options['fieldReplayEnabled']:
+        # One complete replay transport also supplies mechanic streams. Avoid
+        # fetching the same coordinates again for each individual mechanic.
+        from boss_plugins.venomous_abyss.runtime import _unified_payload
+        zuljan = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
+        ids = set(MECHANIC_CAST_IDS) | set(MECHANIC_DAMAGE_IDS) | set(MECHANIC_DEBUFF_IDS)
+        ids |= set(MECHANIC_ENEMY_BUFF_IDS) | set(INTERMISSION_POTIONS) | {RECLAIM_ESSENCE}
+        cfg = {'fetchCombatReplay':True, 'fetchPositionResources':True,
+               'unifiedEventFilter':('resources.actor.id > 0 OR type IN '
+                   '("cast", "begincast", "combatantinfo", "death", "resurrect", "interrupt") '
+                   'OR ability.id IN ('+', '.join(map(str, sorted(ids)))+')'
+                   +(f' OR (type = "heal" AND target.id = {zuljan})' if zuljan else ''))}
+        transition = next((p for p in fight.get('phaseTransitions', []) if p.get('id') == 3), None)
+        damage_window = None
+        if transition and zuljan and options['intermissionReviewEnabled']:
+            begin = int(transition['startTime'])
+            end = min([int(p['startTime']) for p in fight['phaseTransitions'] if int(p['startTime']) > begin]+[int(fight['endTime'])])
+            damage_window = begin,end
+        def fetch_stream(index):
+            if index == 2:
+                return index,client.events(report_id, 'DamageDone', fight, target_id=zuljan,
+                    start_time=damage_window[0],end_time=damage_window[1])
+            value = (_unified_payload(client, report_id, fight, cfg, None, actor_rows, (), {}, (), {}, {})
+                     if index == 0 else client.events(report_id, 'Deaths', fight))
+            return index,value
+        streams = run_parallel_indexed([0,1]+([2] if damage_window else []),fetch_stream,max_workers=3)
+        payload, deaths = streams[0][1], streams[1][1]
+        rows = payload['replayEvents']
+        npc_ids = {a['id'] for a in actor_rows if a.get('type') not in {'Player', 'Pet'} and a.get('petOwner') is None}
+        # All-events death rows omit killingAbilityGameID. Keep the compact
+        # dedicated stream so cause-of-death adjudication remains lossless.
+        payload.update({'heals':[e for e in rows if event_type(e) == 'heal' and ability_id(e) == RECLAIM_ESSENCE],
+                        'buffs':payload['friendlyBuffs'],
+                        'npcPositionEvents':[e for e in rows if e.get('sourceID') in npc_ids or e.get('targetID') in npc_ids],
+                        'enemyDeaths':payload['deaths'][:],
+                        'deaths':deaths,
+                        'bossDamage':streams[2][1] if damage_window else [e for e in rows if event_type(e) == 'damage' and e.get('targetID') == zuljan],
+                        'analysisOptions':options})
+        return payload
+    zuljan_id = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
+    malacrass_id = resolve_boss_actor_id(actor_rows, 259854, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
     manifest_ids = set(manifest_actor_ids(actor_rows))
     mutation_ids = set(virulent_mutation_actor_ids(actor_rows))
     soulcoiler_ids = set(soulcoiler_actor_ids(actor_rows))
@@ -4968,7 +5416,11 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
     started = datetime.fromtimestamp((report_start + fight["startTime"]) / 1000, tz=CN_TZ)
     survival = build_survival_timeline(fight, actor_map, players, raw["deaths"], raw["friendlyCasts"], SPELLS)
     if raw.get("replayEvents"):
-        mechanics["combatReplay"] = build_replay_tracks(fight, players, actor_map, raw["replayEvents"], actor_rows=actor_rows, spell_names=SPELLS, deaths=raw["deaths"], survival_timeline=survival["timeline"])
+        mechanics["combatReplay"] = build_replay_tracks(fight, players, actor_map, raw["replayEvents"], actor_rows=actor_rows, spell_names=SPELLS, deaths=raw["deaths"], survival_timeline=survival["timeline"], include_facing=True)
+        _apply_altar_boss_lifetimes(mechanics, actor_rows)
+        mechanics['soulcoilerReplay'] = _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map)
+        mechanics['manifestReplay'] = _build_manifest_replay(fight, mechanics, raw, players, actor_map)
+        mechanics.setdefault('manifestations', {})['resonanceCollisions'] = mechanics['manifestReplay']['resonanceCollisions']
     end_phase = mechanics["phaseTimeline"][-2]["label"] if len(mechanics["phaseTimeline"]) > 1 else "P1"
     return {
         "reportID": report_id,
@@ -5183,7 +5635,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-heroic-2026-08-29",
+            "mechanicVersion": "coiledaltar-facing-ghosts-2026-10-12-v4",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
                                if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],

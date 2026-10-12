@@ -8,10 +8,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-# These reports were selected after the owner authorized Avalon examples.
+# Explicitly selected Avalon examples and public Mythic kills authorized by the owner.
 DEMOS = [
     {"key": "sszorak", "boss": "sszorak", "label": "斯索拉克", "report": "ZFDWvrfqd6ygMKY2", "fight": 38, "raid": "venomous_abyss", "renderer": "progression", "tab": "replay"},
-    {"key": "coiledaltar", "boss": "coiledaltar", "label": "盘卷祭坛", "report": "H1LdCx4hNG6jW2FT", "fight": 16, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
+    {"key": "coiledaltar", "boss": "coiledaltar", "label": "盘卷祭坛", "report": "mDcP2prKBwFMxLH4", "fight": 35, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
     {"key": "twinfangs", "boss": "twinfangs", "label": "双子毒牙", "report": "BZKtqb6wyTnAHGRV", "fight": 37, "raid": "venomous_abyss", "renderer": "progression", "tab": "brood"},
     {"key": "ulatek", "homepageVisible": False, "boss": "ulatek", "label": "乌拉特克（英雄）", "report": "ZFDWvrfqd6ygMKY2", "fight": 12, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
     {"key": "ulatek_mythic", "boss": "ulatek", "label": "乌拉特克", "report": "r19Gk7PJfVvmnFgM", "fight": 3, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},

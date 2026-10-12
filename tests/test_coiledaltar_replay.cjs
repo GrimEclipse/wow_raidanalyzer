@@ -31,3 +31,32 @@ assert.equal(replay.orbAt(phaseClear.find(o=>o.puddleID===2),5500,current),null)
 assert.deepEqual(replay.coneWindow({spellID:1,timeMs:4000},[{spellID:1,startTimeMs:1000,endTimeMs:4000}]),{start:1000,end:4650});
 assert.deepEqual(replay.runoutWindow({timeMs:4000,participants:[{shareTimeMs:5500},{shareTimeMs:5501}]}),{start:5500,end:11500});
 console.log('Coiled Altar simultaneous ground/carry/drop, cast warning and post-hit runout timing passed');
+// Carry history counts actual pickups through the current cursor, not future
+// pickups or duplicate copies of the same application in another stream.
+const carried={playerID:7,applyTimeMs:100,venomKind:'virulent-mutation'};
+const history=replay.carryHistory({carriers:[carried,{playerID:7,applyTimeMs:500,venomKind:'normal'}],pickups:[carried]});
+assert.deepEqual(replay.carryCounts(history.get(7),300),{small:0,large:1});
+assert.deepEqual(replay.carryCounts(history.get(7),600),{small:1,large:1});
+const bomb={playerID:7,applyTimeMs:100,explodeTimeMs:2000,position:{x:99,y:99}};
+assert.deepEqual(replay.bombAt(bomb,500,()=>({x:5,y:6})).point,{x:5,y:6});
+assert.equal(replay.bombAt(bomb,500,()=>null),null); // Never reveal final location early.
+assert.deepEqual(replay.bombAt(bomb,2100,()=>null).point,{x:99,y:99});
+assert.equal(replay.bombAt({...bomb,explodeTimeMs:null,removeTimeMs:700},800,current),null);
+assert.equal(replay.facingAt({facingSamples:[[100,0]]},50),null);
+assert.equal(replay.facingAt({facingSamples:[[100,0]]},100).angle,0);
+assert.equal(replay.facingAt({facingSamples:[[100,0]]},1200).stale,true);
+const ghost={startTimeMs:100,endTimeMs:500,samples:[[100,0,0,7,1,1]]};
+assert.equal(replay.ghostAt(ghost,50,()=>({x:0,y:0})),null);
+assert.equal(replay.ghostAt(ghost,700,()=>({x:0,y:0})).targetID,7);
+assert.equal(replay.ghostAt(ghost,1500,()=>({x:0,y:0})),null);
+console.log('Facing, ghost lifetime, bomb movement and cursor carry totals passed');
+const coiler={startTimeMs:100,endTimeMs:2000,samples:[[100,0,0],[300,5000,0]],teleports:[200],states:[],
+  casts:[{startTimeMs:100,endTimeMs:500,outcome:'interrupted'}],health:[[100,80,100]],shield:[[100,2]]};
+const coilerAPI={lifeState:()=>({opacity:1,positionTime:150}),trackPosition:()=>({x:2500,y:0})};
+assert.equal(replay.soulcoilerAt(coiler,50,coilerAPI),null);
+assert.equal(replay.soulcoilerAt(coiler,150,coilerAPI).point.x,0); // Teleport does not drift across the room.
+assert.equal(replay.soulcoilerAt(coiler,150,coilerAPI).health,80);
+assert.equal(replay.soulcoilerAt(coiler,150,coilerAPI).shield,2);
+assert.equal(replay.soulcoilerAt(coiler,600,coilerAPI).cast,undefined);
+assert.equal(replay.soulcoilerAt(coiler,600,coilerAPI).interrupt.outcome,'interrupted');
+console.log('Soulcoiler spawn, teleport, health, shield and interruption passed');

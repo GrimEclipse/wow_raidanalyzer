@@ -30,6 +30,20 @@ function sszBossPosition(data,cursor){
   if(unit){const point=MechanicWorkbench.trackPosition(unit,cursor,replay.interpolateMaxGapMs);return point?{...point,y:point.y+Number(data.arena?.coordinateOffsetYards||0)*100}:null;}
   return data.bossCenter||null;
 }
+function sszCrossPolygons(effect,origin,arena,project){
+  const angle=-(Number(effect.screenAngleDegrees||0)+Number(arena.rotationDegrees||0))*Math.PI/180;
+  const length=Number(effect.halfLengthYards)*100,halfWidth=Number(effect.widthYards)*50;
+  return [0,Math.PI/2].map(turn=>{
+    const a=angle+turn;
+    return [[-length,-halfWidth],[length,-halfWidth],[length,halfWidth],[-length,halfWidth]].map(([x,y])=>project({x:origin.x+x*Math.cos(a)-y*Math.sin(a),y:origin.y+x*Math.sin(a)+y*Math.cos(a)}));
+  });
+}
+function sszConePoints(effect,origin,target,project,inner=0,outer=effect.lengthYards){
+  if(!origin||!target||Math.hypot(target.x-origin.x,target.y-origin.y)<1)return [];
+  const angle=Math.atan2(target.y-origin.y,target.x-origin.x),half=Number(effect.angleDegrees)*Math.PI/360;
+  const arc=radius=>Array.from({length:17},(_,i)=>{const a=angle-half+i*half/8;return project({x:origin.x+Math.cos(a)*radius*100,y:origin.y+Math.sin(a)*radius*100});});
+  return inner>0?[...arc(outer),...arc(inner).reverse()]:[project(origin),...arc(outer)];
+}
 function sszAnimatedMap(data,cursor){
   if(!data.arena)return '<div class="empty">缺少场地坐标。</div>';
   const width=1000,height=562,project=p=>{const q=pct(p,data.arena);return q?{x:q.left*10,y:q.top*height/100}:null;};
@@ -55,12 +69,26 @@ function sszAnimatedMap(data,cursor){
     const l=byID.get(p.left.playerID)?.position,r=byID.get(p.right.playerID)?.position,q=project(lerpPoint(l,r,.5));if(!q)return '';
     return `<circle data-key="collision:${p.timeMs}:${i}" cx="${q.x}" cy="${q.y}" r="${12+age/800*50}" fill="#e3caff" fill-opacity="${.2*(1-age/800)}" stroke="#efd9ff" stroke-width="3" opacity="${1-age/800}"/>`;
   }).join('');
-  const hits=(data.crosswindWaves||[]).flatMap(w=>w.collateralHits||[]).filter(h=>cursor>=h.timeMs&&cursor-h.timeMs<650);
+  const hits=[...(data.crosswindWaves||[]).flatMap(w=>w.collateralHits||[]),...(data.burstHits||[])].filter(h=>cursor>=h.timeMs&&cursor-h.timeMs<650);
+  const virulence=(data.virulence||[]).filter(a=>a.startTimeMs<=cursor&&cursor<a.endTimeMs).map(a=>{
+    const p=byID.get(a.playerID);if(!p?.position||p.dead)return '';
+    const paths=sszCrossPolygons(a,p.position,data.arena,project),color=a.screenAngleDegrees===0?'#c7ff69':'#77eadf';
+    return `<g data-key="virulence:${a.playerID}:${a.spellID}:${a.startTimeMs}" data-effect="virulence-cross">${paths.map(points=>`<polygon points="${points.map(q=>`${q.x},${q.y}`).join(' ')}" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="1.5"/>`).join('')}</g>`;
+  }).join('');
+  const cones=(data.predatorCones||[]).filter(c=>c.startTimeMs<=cursor&&cursor<c.endTimeMs).map(c=>{
+    const firing=cursor>=c.impactTimeMs,progress=firing?(cursor-c.impactTimeMs)/(c.endTimeMs-c.impactTimeMs):0;
+    const origin=firing?c.position:sszBossPosition(data,cursor)||c.position;
+    const target=firing?c.targetPosition:byID.get(c.targetID)?.position||c.targetPosition;
+    const outer=firing?Math.max(.5,progress*c.lengthYards):c.lengthYards,inner=firing?Math.max(0,outer-5):0;
+    const points=sszConePoints(c,origin,target,project,inner,outer);if(!points.length)return '';
+    return `<polygon data-key="predator:${c.actorID}:${c.spellID}:${c.startTimeMs}" data-effect="${firing?'predator-shockwave':'predator-warning'}" points="${points.map(q=>`${q.x},${q.y}`).join(' ')}" fill="${c.color}" fill-opacity="${firing?.3*(1-progress):.09}" stroke="${c.color}" stroke-width="${firing?3:1.5}" opacity="${firing?1-progress:1}"/>`;
+  }).join('');
   const marks=(data.marks||[]).filter(m=>m.startTimeMs<=cursor&&cursor<m.endTimeMs).map(m=>{const p=byID.get(m.playerID);if(!p?.position||p.dead)return '';const q=project(p.position),r=pctSize(m.radiusYards||8,data.arena);return `<g data-key="mark:${m.playerID}:${m.startTimeMs}"><title>毒蛇之怒印记</title><ellipse cx="${q.x}" cy="${q.y}" rx="${r.width*10}" ry="${r.height*height/100}" fill="#ffc45a" fill-opacity=".10" stroke="#ffe9a2" stroke-width="2"/><path d="M ${q.x} ${q.y-33} l 7 9 -7 9 -7 -9 Z" fill="#ffd65f" stroke="#302014" stroke-width="2"/></g>`;}).join('');
   const actors=rows.filter(p=>p.position).map(p=>MechanicWorkbench.avatar({...p,name:p.player,color:p.classColor,key:p.key||p.playerID}, {...project(p.position),stale:p.position.stale},12,hits.some(h=>h.playerID===p.playerID),p.dead,p.opacity)).join('');
   const bossLife=MechanicWorkbench.lifeState(boss().combatReplay?.bosses?.[0]||{},cursor),center=project(sszBossPosition(data,bossLife.positionTime)),bossIcon=center&&bossLife.opacity?`<image data-key="boss" href="/${esc(String(data.bossIcon||'').replace(/^\//,''))}" x="${center.x-24}" y="${center.y-24}" width="48" height="48" opacity="${.8*bossLife.opacity}" style="${bossLife.dead?'filter:grayscale(1)':''}"/>`:'';
   const windFx=wind?`<g data-key="wind" transform="translate(500 281) rotate(${Number(wind.angleDegrees||0)})" opacity=".55">${[-160,-80,0,80,160].map((y,i)=>{const phase=((cursor-round.timeMs)/1200+i*.17)%1,x=-380+phase*760;return `<path d="M ${x-90} ${y} L ${x} ${y} m -12 -7 l 12 7 -12 7" fill="none" stroke="#c6f5fc" stroke-width="${i===2?3:2}" opacity="${Math.sin(phase*Math.PI)}"/>`;}).join('')}</g>`:'';
-  return `<div data-key="field" class="replay-map ssz-map" style="background-image:url('/${esc(String(data.arenaImage||'').replace(/^\//,''))}')"><svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="斯索拉克场地回放"><g data-key="boss-layer">${bossIcon}</g><g data-key="cysts">${cysts}</g><g data-key="wind-layer">${windFx}</g><g data-key="targets">${rings}${collisions}</g><g data-key="marks">${marks}</g><g data-key="players">${actors}</g></svg></div>`;
+  const castBar=center&&!bossLife.dead?MechanicWorkbench.castBar(boss().combatReplay?.bosses?.[0]||{},cursor,{x:center.x,y:center.y-24}):'';
+  return `<div data-key="field" class="replay-map ssz-map" style="background-image:url('/${esc(String(data.arenaImage||'').replace(/^\//,''))}')"><svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="斯索拉克场地回放"><g data-key="cysts">${cysts}</g><g data-key="wind-layer">${windFx}</g><g data-key="targets">${rings}${collisions}</g><g data-key="marks">${marks}</g><g data-key="virulence">${virulence}</g><g data-key="predator">${cones}</g><g data-key="boss-layer">${bossIcon}${castBar}</g><g data-key="players">${actors}</g></svg></div>`;
 }
 function updateReplayStage(){
   const data=boss().fieldReplay||{},w=sszWindow(data),cursor=sszReplay.cursor??w.start,stage=$('replayStage');
@@ -117,3 +145,5 @@ function fieldMap(data,{round=null,wave=null,framePlayers:players=[],frameTimeMs
 function mobilityUses(rows){return(rows||[]).map(row=>`${player(row.source)} ${spellLink(row.spellID,row.spellName)}（${esc(row.timingLabel)}）`).join('、')||'<span class="muted">未记录主动位移技能</span>'}
 function renderCrosswindMap(data,wave){const directionGroups=(wave.directionGroups||[]).map(group=>`<div class="crosswind-group group-${esc(String(group.key||'').toLowerCase())}"><strong>${esc(group.label)}，${group.targetCount||0} 人</strong><div>${players(group.targets)}</div></div>`).join('');const pairRows=(wave.pairings||[]).map(pair=>[esc(pair.time),`${player(pair.left)} ↔ ${player(pair.right)}`,`${pair.leftAirborneMs==null?'—':(pair.leftAirborneMs/1000).toFixed(2)+'s'} / ${pair.rightAirborneMs==null?'—':(pair.rightAirborneMs/1000).toFixed(2)+'s'}`,mobilityUses(pair.mobilityUses)]);const unresolved=(wave.targets||[]).filter(row=>!row.collisionPartner),collateral=(wave.collateralHits||[]);return`<article class="card crosswind-card"><h3>狂怒侧风 #${wave.index||'—'}，点名 ${esc(wave.applyTime)}，起飞 ${esc(wave.launchTime||'—')}，${wave.targetCount||0} 人</h3><div class="crosswind-groups">${directionGroups}</div>${fieldMap(data,{wave,showWind:false})}<h4>对撞解除</h4>${table(["时间","对撞玩家","起飞后耗时","主动位移技能"],pairRows)}${unresolved.length?`<div class="crosswind-unresolved"><strong>未确认正常对撞：</strong>${unresolved.map(row=>`<div>${player(row)}（${esc(row.resolution)}），${mobilityUses([...(row.mobilityUses||[]),...(row.immunityUses||[])])}</div>`).join('')}</div>`:''}${collateral.length?`<h4>6 码群体击飞误伤</h4>${table(["时间","被误伤玩家","附近点名玩家","距离","伤害"],collateral.map(row=>[esc(row.time),player(row),row.sourceTarget?player(row.sourceTarget):'—',row.distanceYards==null?'—':`${row.distanceYards} 码`,num(row.amount)]))}`:''}</article>`}
 function renderSszorak(tab){const data=boss();const replay=data.fieldReplay||{};if(tab==='fury')return renderSszorakFury();if(tab==='predator')return renderPredator();if(tab==='cysts')return`<section class="panel"><h2>腐蚀囊肿放置（按掘地轮次）</h2><p class="muted">每次剧毒涌动施法点名两名玩家；同一批两人属于同一次放置，目标先后仅作为 WCL 证据展示。</p>${(data.cysts?.rounds||[]).map(round=>`<article class="card"><h3>掘地固守 #${round.index}，${esc(round.time)}</h3>${table(["放置批次","放置","激活","玩家","放置侧","激活证据","判定"],(round.placements||[]).map(row=>{const evidence=row.activationEvidence,activation=evidence?`${player(evidence.nearestPlayer)} 距离 ${evidence.nearestDistanceYards}码，光环${evidence.auraApplyCount}/伤害${evidence.damageHitCount}/位移${evidence.forcedMovementCount}`:'—',batch=row.placementWave??row.slot??'—',order=row.volleyTargetOrder?`<div class="muted">同批第 ${row.volleyTargetOrder} 名目标</div>`:'';return[`第 ${batch} 次${order}`,esc(row.time),row.activatedTime?esc(row.activatedTime):'—',player(row),esc(row.windSideLabel||'待定'),activation,row.placementOk===false?`<span class="badge bad">位置错误</span><div class="muted">${esc(row.expected||'')}</div>`:row.placementOk?'<span class="badge good">符合</span>':row.placementStatus==='exempt'?`<span class="badge warn">豁免</span><div class="muted">${esc(row.exemptionReason||row.expected||'')}</div>`:row.placementStatus==='unverified'?`<span class="badge warn">未取证</span><div class="muted">${esc(row.expected||'')}</div>`:'<span class="muted">不归责</span>']}))}</article>`).join('')||table(["序号","放置","激活","玩家","坐标"],(data.cysts?.placements||[]).map((row,index)=>[`#${index+1}`,esc(row.time),row.activatedTime?esc(row.activatedTime):'—',player(row),row.position?`${(row.position.x/100).toFixed(1)}, ${(row.position.y/100).toFixed(1)}`:'无坐标']))}</section>`;if(tab==='crosswinds')return`<section class="panel"><h2>狂怒侧风</h2><p class="muted">同一轮次汇总全部点名。1285425/1285453 记录两个方向；起飞后 1285447 在 120ms 内由相反方向两人同时移除，判定为对撞消除。</p><div class="cards crosswind-rounds">${(data.crosswinds?.waves||replay.crosswindWaves||[]).map(wave=>renderCrosswindMap(replay,wave)).join('')||'<div class="empty">没有狂怒侧风记录。</div>'}</div></section>`;if(tab==='replay')return renderReplay()}
+
+if(typeof module!=='undefined')module.exports={sszCrossPolygons,sszConePoints};

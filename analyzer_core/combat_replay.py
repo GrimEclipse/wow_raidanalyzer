@@ -48,12 +48,13 @@ def fetch_replay_events(client, report_id, fight, *, position_filter=True, inclu
     return rows
 
 
-def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), deaths=(), resurrections=(), survival_timeline=(), spell_names=None):
+def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), deaths=(), resurrections=(), survival_timeline=(), spell_names=None, include_facing=False):
     start, end = int(fight['startTime']), int(fight['endTime'])
     metadata = {int(row['id']): row for row in actor_rows}
     samples, states, health, energy = defaultdict(dict), defaultdict(list), defaultdict(dict), defaultdict(dict)
     boss_ids = {actor for actor, row in metadata.items() if row.get('subType') == 'Boss'}
     boss_events = defaultdict(list)
+    facing_samples = defaultdict(dict)
     for event in events:
         timestamp = int(event.get('timestamp') or 0)
         if not start <= timestamp <= end:
@@ -76,6 +77,10 @@ def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), dea
             resource = event.get(side+'Resources') or {}
             if str(event.get('resourceActor')) == ('1' if side == 'source' else '2'):
                 resource = event
+            if include_facing and resource.get('facing') is not None:
+                # The facing belongs to this side's resource owner, just as
+                # coordinates do. A target sample never becomes source facing.
+                facing_samples[(actor, instance)][t//100] = [t, resource['facing']]
             hp, maximum = resource.get('hitPoints'), resource.get('maxHitPoints')
             if actor in boss_ids and hp is not None and maximum and maximum > 0:
                 health[actor][t//100] = [t, int(hp), int(maximum)]
@@ -103,6 +108,8 @@ def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), dea
                       'color': (player or {}).get('classColor') or '#d1a77a',
                       'samples': sorted(buckets.values(), key=lambda row: row[0]),
                       'states': [list(row) for row in sorted(set(map(tuple,states[actor if player or actor in boss_ids else (actor,instance)]))) ]})
+        if include_facing:
+            units[-1]['facingSamples'] = sorted(facing_samples[(actor, instance)].values())
     positioned = {u['actorID'] for u in units if u['kind'] == 'player'}
     bosses = []
     for actor in sorted(boss_ids & (set(health) | set(boss_events))):

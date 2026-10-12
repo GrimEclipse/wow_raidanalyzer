@@ -207,10 +207,14 @@ function mythicSeverCells(row) {
 function renderMythicVenomSeverTable(rounds) {
   const paired = (rounds || []).filter((row) => row.mythicDelugePair);
   if (!paired.length) return "";
-  return `<h3>剧毒洪流清场</h3><p class="muted">每两轮撕裂处理一轮剧毒洪流的凝结毒液和烈毒变异体。默认第一下劈场地南侧，第二下劈场地北侧。未覆盖表示应清的球没有进入这一下的锥形。</p>${table(["轮次", "时间", "清场侧", "洪流", "应清", "锥内", "未覆盖"], paired.map((row) => [`#${row.index}`, esc(row.time), ...mythicSeverCells(row)]))}`;
+  const check = row => {const c=row.stackClearCheck;return c ? `实测 ${c.observedCount ?? "—"}，推演 ${c.geometryCount}${c.status === "matched" ? "，一致" : "，待核对"}` : "—";};
+  return `<h3>剧毒洪流清场</h3><p class="muted">新增毒液爆裂层数用于核对撕裂清球数量。位置不足以确定清理对象时保留待核对提示。</p>${table(["轮次", "时间", "清场侧", "洪流", "应清", "锥内", "未覆盖", "清球核对"], paired.map((row) => [`#${row.index}`, esc(row.time), ...mythicSeverCells(row), check(row)]))}`;
 }
 function renderManifestations(fixations) {
-  return `<section class="panel" data-analysis-option="manifestationsReviewEnabled"><h2>恐惧具象 / 凝视</h2><p class="muted">具象坐标为恐惧具象 NPC；玩家坐标为被凝视者。</p>${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section>`;
+  const phases = new Set((fixations || []).map(row => row.phase));
+  const collisions = (boss().manifestReplay?.resonanceCollisions || []).filter(row => phases.has(row.phase));
+  const collisionTable = collisions.length ? `<h3>恶毒共鸣</h3><p class="muted">按共鸣前的玩家面向推测具象移动；双方都移动或采样不足时，不指定责任玩家。</p>${table(["时间", "受影响玩家", "推测移动方", "共鸣致死"], collisions.map(row => [esc(fmtPhase(row.timeMs)), players(row.players), row.responsiblePlayer ? player(row.responsiblePlayer) : "无法唯一确定", players(row.deaths)]))}` : "";
+  return `<section class="panel" data-analysis-option="manifestationsReviewEnabled"><h2>恐惧具象与凝视</h2><p class="muted">生成点来自日志。移动轨迹依据被点名玩家的面向推算，面对具象偏角在 30° 内时停止。</p>${collisionTable}${table(["玩家", "阶段", "开始", "结束", "NPC 实例", "具象坐标", "玩家坐标"], (fixations || []).map((row) => [player(row), esc(row.phase), esc(row.applyTime), esc(row.removeTime || "—"), esc(row.manifest?.sourceInstance ?? "—"), posLabel(row.manifestPosition), posLabel(row.playerPosition)]))}</section>`;
 }
 function nightfallInterrupt(row) {
   if (!row.interrupted) return '<span class="badge warn">无打断</span>';

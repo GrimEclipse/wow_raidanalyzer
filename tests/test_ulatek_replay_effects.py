@@ -1,3 +1,4 @@
+import math
 import pytest
 from boss_plugins.venomous_abyss import ulatek as u
 from boss_plugins.venomous_abyss import sszorak as s
@@ -95,12 +96,48 @@ def test_coil_corner_selects_fixed_region_and_preserves_observed_sequence():
     circles=u._replay_coil_soaks({'startTime':0},raw)
     assert [c['regionIndex'] for c in circles]==[7,0]
     assert [c['startTimeMs'] for c in circles]==[1000,6000]
-    assert all(c['radiusYards']==10 for c in circles)
+    assert all(c['radiusYards']==u.FESTER_SAFE_RADIUS_YARDS for c in circles)
     raw['casts'][1].update(x=4500,y=153700)
     raw['resources']=[event(5000,'damage',0,sourceID=1,resourceActor=1,x=-2000,y=154000)]
     assert u._replay_coil_soaks({'startTime':0},raw)[0]['position']==circles[0]['position']
     raw['casts'][1]['resourceActor']=2
     assert len(u._replay_coil_soaks({'startTime':0},raw))==1
+
+
+def test_eight_soaks_follow_diagram_landmarks_with_clearance_not_a_regular_ring():
+    m = u.REPLAY_MAPS['platform']
+    casts = []
+    for slot in range(8):
+        angle = math.pi/8+slot*math.pi/4
+        casts.append(event(5000+slot*10000, 'cast', u.P25_COIL_CAST_ID,
+                           sourceInstance=slot, resourceActor=1,
+                           x=5000*math.cos(angle), y=m['centerY']+5000*math.sin(angle)))
+    rows = u._replay_coil_soaks({'startTime':0}, {'casts':casts})
+    assert len(rows) == 8
+    a = math.radians(m['yaw'])
+    scale = m['height']/m['yards']
+    for slot, row in enumerate(rows):
+        p = row['position']
+        dx, dy = (p['x']-m['centerX'])/100, (m['centerY']-p['y'])/100
+        x = m['width']/2+(dx*math.cos(a)-dy*math.sin(a))*scale
+        y = m['height']/2+(dx*math.sin(a)+dy*math.cos(a))*scale
+        reference_x, reference_y = u.COIL_REGION_IMAGE_CENTERS[slot]
+        reference = (reference_x*m['width'], reference_y*m['height'])
+        boundary = [(bx*m['width'], by*m['height']) for bx, by in u.COIL_PLATFORM_IMAGE_BOUNDARY]
+        def edge_clearance(point, radius):
+            distances = []
+            for i, aa in enumerate(boundary):
+                bb = boundary[(i+1) % len(boundary)]
+                dx, dy = bb[0]-aa[0], bb[1]-aa[1]
+                distances.append((dx*(point[1]-aa[1])-dy*(point[0]-aa[0]))/math.hypot(dx, dy)/scale)
+            return min(distances)-radius
+        assert math.dist((x, y), (m['width']/2, m['height']/2)) < math.dist(reference, (m['width']/2, m['height']/2))
+        assert edge_clearance((x, y), row['radiusYards']) == pytest.approx(edge_clearance(reference, 8))
+        assert row['radiusYards'] == u.FESTER_SAFE_RADIUS_YARDS
+        radius = row['radiusYards']*scale
+        assert .25*m['width'] < x-radius < x+radius < .75*m['width']
+        assert .05*m['height'] < y-radius < y+radius < .95*m['height']
+        assert row['sourcePosition'] != row['position']
 
 
 def test_fullscreen_impact_requires_raid_damage_and_not_nine_tank_hits():
@@ -303,7 +340,7 @@ def test_thrashing_cone_uses_matching_instance_tank_hit_and_ends_on_completion()
                          targetID=1, resourceActor=2, x=1000, y=155367)]}
     scene = u._replay_effects({'startTime': 0, 'endTime': 5000}, {1: {'role': 'tank'}}, raw, [])
     cone = scene['cones'][0]
-    assert (cone['instance'], cone['angleDegrees'], cone['lengthYards']) == (2, 30, 30)
+    assert (cone['instance'], cone['angleDegrees'], cone['lengthYards']) == (2, 60, 30)
     assert cone['targetPosition']['x'] == 1000
     assert cone['directionEvidence'] == 'tank-hit'
     assert (cone['startTimeMs'], cone['endTimeMs']) == (1000, 4000)
