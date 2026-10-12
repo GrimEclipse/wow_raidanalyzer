@@ -25,3 +25,18 @@ assert.deepEqual(api.projectGuides({guides:[{origin:{x:0,y:0},axis:{x:0,y:0}}]},
 assert.deepEqual(api.projectGuides({guides:[{origin:{x:0,y:0},axis:{x:1,y:0}}]},()=>null),[]);
 assert.equal(api.cleanConfig({rowKey:'role',columns:['role']},100,[]).rowKey,'role');
 console.log('mechanic-workbench filters, matrix and preset validation passed');
+const fixed={actorID:9,casts:[{startTimeMs:0,endTimeMs:11000,expectedEndTimeMs:15000,durationMs:15000,
+  spellName:'永恒夜幕',outcome:'interrupted',interruptFeedbackMs:650,interruptIcon:'/assets/spells/6552.jpg'}]};
+assert.equal(api.castDisplay(fixed,7500).progress,.5);
+assert.equal(api.castDisplay(fixed,11000).progress,11000/15000);
+assert.equal(api.castDisplay(fixed,11000).interrupted,true);
+assert.equal(api.castDisplay(fixed,11650),null);
+assert(api.castBar(fixed,11000,{x:0,y:0}).includes('已打断'));
+assert(api.bossStatus({bosses:[fixed]},7500).includes('永恒夜幕 7.5s'));
+assert(!api.bossStatus({bosses:[fixed]},12000).includes('未施法'));
+const unknown={casts:[{startTimeMs:0,endTimeMs:15000,durationMs:15000,outcome:'unconfirmed'}]};
+assert.equal(api.castDisplay(unknown,1000).progress,1/15);
+assert.equal(api.castDisplay(unknown,15000),null);
+const legacy={casts:[{startTimeMs:0,endTimeMs:5000,outcome:'completed'}]};
+assert.equal(api.castDisplay(legacy,2500).progress,.5);
+console.log('Fixed cast duration, interruption feedback and legacy cast rendering passed');

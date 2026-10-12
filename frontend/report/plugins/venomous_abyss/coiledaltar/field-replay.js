@@ -85,11 +85,9 @@
   function castProgress(c,t){const segments=c.progressSegments||[[c.startTimeMs,0,c.durationMs||10000]],i=lastSample(segments,t);if(i<0)return 0;const s=segments[i];return Math.max(0,Math.min(1,s[1]+(t-s[0])/s[2]));}
   function groundAt(scene,t){
     const rows=scene?.rounds||[],row=rows.findLast(r=>r.startTimeMs<=t&&t<r.endTimeMs);if(!row)return null;
-    const elapsed=t-row.startTimeMs,channel=row.channelEndTimeMs-row.startTimeMs,progress=Math.max(0,Math.min(1,elapsed/(channel||1))),purple=row.kind==='purple';
-    let radius;
-    if(!purple){const recede=Math.max(0,Math.min(1,(elapsed-channel)/(row.endTimeMs-row.channelEndTimeMs||1)));radius=row.peakRadiusYards*(elapsed<channel?1-Math.pow(1-progress,3):1-recede*recede);}
-    else {const previous=rows.filter(r=>r.kind==='purple'&&r.startTimeMs<row.startTimeMs).at(-1),base=previous?.restRadiusYards||0;radius=elapsed<channel?base+(row.peakRadiusYards-base)*progress:row.peakRadiusYards+(row.restRadiusYards-row.peakRadiusYards)*Math.min(1,(elapsed-channel)/8000);}
-    return {kind:row.kind,radiusYards:radius,fullCoverage:row.fullCoverage&&elapsed>=channel,ordinal:row.ordinal};
+    const elapsed=t-row.startTimeMs,channel=row.channelEndTimeMs-row.startTimeMs,progress=Math.max(0,Math.min(1,elapsed/(channel||1))),recedeStart=row.recedeStartTimeMs??row.channelEndTimeMs+15000;
+    const recede=Math.max(0,Math.min(1,(t-recedeStart)/(scene.recedeDurationMs||24000))),radius=row.peakRadiusYards*(elapsed<channel?1-Math.pow(1-progress,3):1-recede*recede);
+    return {kind:row.kind,radiusYards:radius,fullCoverage:row.fullCoverage&&elapsed>=channel&&t<=recedeStart,ordinal:row.ordinal};
   }
   function mount(host,mechanics,durationMs,project){
     const api=root.MechanicWorkbench,replay=mechanics.combatReplay||{},arena=mechanics.fieldAudit?.arena||{},cones=[...(mechanics.sever?.rounds||[]),...(mechanics.soulSever?.rounds||[]),...(mechanics.blightedSever?.rounds||[])],orbs=orbTracks(mechanics.toxicDeluge||{},cones,mechanics.phaseTimeline||[]),runouts=[...(mechanics.guillotine?.rounds||[]),...(mechanics.grimGuillotine?.rounds||[])];

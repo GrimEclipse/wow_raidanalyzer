@@ -192,8 +192,41 @@ def test_altar_channels_anchor_ground_and_fourth_purple_covers_floor():
     assert scene['rounds'][0]['kind'] == 'green'
     assert scene['rounds'][0]['channelEndTimeMs'] == 8000
     assert scene['rounds'][-1]['fullCoverage']
-    assert [r['restRadiusYards'] for r in scene['rounds'][1:]] == [42.5,55,67.5,80]
+    assert [r['peakRadiusYards'] for r in scene['rounds'][1:]] == [50,60,70,80]
+    assert scene['rounds'][0]['recedeStartTimeMs'] == 23000
+    assert scene['rounds'][0]['endTimeMs'] == 47000
+    assert scene['rounds'][1]['endTimeMs'] == 147000
     assert all(c['phase'] == 'channel' for c in mechanics['combatReplay']['bosses'][0]['casts'])
+
+
+def test_nightfall_replay_uses_fixed_duration_and_real_interrupt_not_next_cast():
+    mechanics = {'combatReplay':{'bosses':[dict(actorID=9,casts=[
+        dict(spellID=boss.ETERNAL_NIGHTFALL,startTimeMs=0,endTimeMs=20000,outcome='unconfirmed')])]}}
+    rows = [dict(type='begincast',timestamp=0,sourceID=9,abilityGameID=boss.ETERNAL_NIGHTFALL),
+            dict(type='interrupt',timestamp=5000,sourceID=1,targetID=8,
+                 abilityGameID=6552,extraAbilityGameID=boss.ETERNAL_NIGHTFALL),
+            dict(type='interrupt',timestamp=6000,sourceID=1,targetID=9,
+                 abilityGameID=6552,extraAbilityGameID=999),
+            dict(type='interrupt',timestamp=11000,sourceID=1,targetID=9,
+                 abilityGameID=6552,extraAbilityGameID=boss.ETERNAL_NIGHTFALL),
+            dict(type='begincast',timestamp=20000,sourceID=9,abilityGameID=boss.ETERNAL_NIGHTFALL),
+            dict(type='cast',timestamp=35000,sourceID=9,abilityGameID=boss.ETERNAL_NIGHTFALL),
+            dict(type='begincast',timestamp=40000,sourceID=9,abilityGameID=boss.ETERNAL_NIGHTFALL)]
+    # The same transport row may occur in more than one fetched page.
+    rows.append(dict(rows[0]))
+    boss._apply_altar_nightfall_replay({'startTime':0,'endTime':60000},mechanics,
+        {'replayEvents':rows},{1:{'name':'A'}},{1:'A'})
+    casts = mechanics['combatReplay']['bosses'][0]['casts']
+    assert len(casts) == 3
+    assert casts[0]['durationMs'] == 15000
+    assert casts[0]['expectedEndTimeMs'] == 15000
+    assert casts[0]['endTimeMs'] == 11000
+    assert casts[0]['outcome'] == 'interrupted'
+    assert casts[0]['interruptedBy']['playerID'] == 1
+    assert casts[1]['endTimeMs'] == 35000
+    assert casts[1]['outcome'] == 'completed'
+    assert casts[2]['endTimeMs'] == 55000
+    assert casts[2]['outcome'] == 'unconfirmed'
 
 
 def test_clear_constraint_preserves_spawn_and_stationary_intervals():

@@ -293,7 +293,9 @@ WAIL_CURSED_CAST_MS = 12000
 ALTAR_FANGS_ID = 1282487
 ALTAR_DEFILEMENT_ID = 1298381
 ALTAR_CHANNEL_MS = 8000
-ALTAR_GREEN_GROUND_MS = 32000  # Visual recession estimate; never a hit classifier.
+ALTAR_GROUND_HOLD_MS = 15000
+ALTAR_GROUND_RECEDE_MS = 24000  # Visual recession estimate; never a hit classifier.
+ETERNAL_NIGHTFALL_CAST_MS = 15000
 POSITION_RELIABLE_MS = 2_500
 
 # 拉取时只向 WCL 要机制相关技能，避免整场友伤/治疗/带坐标的团员施法。
@@ -5343,11 +5345,11 @@ def _build_altar_ground_replay(fight, mechanics, raw):
         if purple:
             purple_count += 1
         rounds.append({'startTimeMs':t,'channelEndTimeMs':min(duration,t+ALTAR_CHANNEL_MS),
-            'endTimeMs':duration if purple else min(duration,t+ALTAR_GREEN_GROUND_MS),
+            'recedeStartTimeMs':t+ALTAR_CHANNEL_MS+ALTAR_GROUND_HOLD_MS,
+            'endTimeMs':min(duration,t+ALTAR_CHANNEL_MS+ALTAR_GROUND_HOLD_MS+ALTAR_GROUND_RECEDE_MS),
             'spellID':spell,'casterID':e.get('sourceID'),'kind':'purple' if purple else 'green',
             'ordinal':purple_count if purple else len([r for r in rounds if r['kind']=='green'])+1,
             'peakRadiusYards':45 if not purple else min(80,40+purple_count*10),
-            'restRadiusYards':0 if not purple else min(80,30+purple_count*12.5),
             'fullCoverage':purple and purple_count>=4})
     replay = mechanics['combatReplay']
     for row in rounds:
@@ -5359,7 +5361,55 @@ def _build_altar_ground_replay(fight, mechanics, raw):
             boss['casts'].sort(key=lambda c:c['startTimeMs'])
     return {'rounds':rounds,'sideCenters':[{'x':-5500,'y':115800},{'x':5500,'y':115800}],
             'floorBounds':{'minX':-5500,'maxX':5500,'minY':110300,'maxY':121300},
-            'positionEvidence':'fixed-mouths-and-estimated-radius','greenDurationMs':ALTAR_GREEN_GROUND_MS}
+            'positionEvidence':'fixed-mouths-and-estimated-radius',
+            'holdDurationMs':ALTAR_GROUND_HOLD_MS,'recedeDurationMs':ALTAR_GROUND_RECEDE_MS}
+
+
+def _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map):
+    """Boss-owned fixed cast length with actual completion/interrupt boundaries."""
+    start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
+    bosses = {b['actorID']:b for b in mechanics['combatReplay']['bosses']}
+    for b in bosses.values():
+        b['casts'] = [c for c in b['casts'] if c['spellID'] not in NIGHTFALL_INTERRUPTED_SPELLS]
+    pending, seen = {}, set()
+    rows = [e for e in raw.get('replayEvents', [])
+            if (e.get('sourceID') in bosses and
+                (event_type(e) == 'begincast' or
+                 event_type(e) == 'cast' and ability_id(e) in NIGHTFALL_INTERRUPTED_SPELLS))
+            or (e.get('targetID') in bosses and event_type(e) == 'interrupt' and _is_nightfall_interrupt(e))]
+    for e in sorted(rows,key=lambda e:int(e['timestamp'])):
+        t, kind, source, spell = int(e['timestamp'])-start, event_type(e), e.get('sourceID'), ability_id(e)
+        signature = (t,kind,source,e.get('targetID'),spell,e.get('extraAbilityGameID'))
+        if signature in seen:
+            continue
+        seen.add(signature)
+        if kind == 'begincast' and source in bosses:
+            old = pending.pop(source,None)
+            if old and t < old['endTimeMs']:
+                old['endTimeMs'] = t
+            if spell in NIGHTFALL_INTERRUPTED_SPELLS:
+                cast = {'startTimeMs':t,'endTimeMs':min(duration,t+ETERNAL_NIGHTFALL_CAST_MS),
+                        'expectedEndTimeMs':t+ETERNAL_NIGHTFALL_CAST_MS,
+                        'durationMs':ETERNAL_NIGHTFALL_CAST_MS,'spellID':spell,
+                        'spellName':'永恒夜幕','outcome':'unconfirmed','interruptFeedbackMs':650}
+                bosses[source]['casts'].append(cast)
+                pending[source] = cast
+        elif kind == 'interrupt' and _is_nightfall_interrupt(e):
+            cast = pending.get(e.get('targetID'))
+            if cast and cast['startTimeMs'] <= t <= cast['endTimeMs']:
+                sid = ability_id(e)
+                from pathlib import Path
+                icon = f'/assets/spells/{sid}.jpg' if Path(f'assets/spells/{sid}.jpg').is_file() else None
+                cast.update(endTimeMs=t,outcome='interrupted',interruptSpellID=sid,
+                            interruptIcon=icon,interruptedBy=player_ref(players,actor_map,source))
+                pending.pop(e.get('targetID'),None)
+        elif kind == 'cast' and spell in NIGHTFALL_INTERRUPTED_SPELLS:
+            cast = pending.get(source)
+            if cast and cast['startTimeMs'] <= t <= cast['endTimeMs']:
+                cast.update(endTimeMs=t,outcome='completed')
+                pending.pop(source,None)
+    for b in bosses.values():
+        b['casts'].sort(key=lambda c:c['startTimeMs'])
 
 
 def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
@@ -5482,6 +5532,7 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
         _apply_altar_boss_lifetimes(mechanics, actor_rows)
         mechanics['soulcoilerReplay'] = _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map)
         mechanics['altarGroundReplay'] = _build_altar_ground_replay(fight, mechanics, raw)
+        _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map)
         mechanics['manifestReplay'] = _build_manifest_replay(fight, mechanics, raw, players, actor_map)
         mechanics.setdefault('manifestations', {})['resonanceCollisions'] = mechanics['manifestReplay']['resonanceCollisions']
     end_phase = mechanics["phaseTimeline"][-2]["label"] if len(mechanics["phaseTimeline"]) > 1 else "P1"
@@ -5698,7 +5749,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-ground-cast-rates-2026-10-12-v5",
+            "mechanicVersion": "coiledaltar-ground-nightfall-2026-10-12-v6",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
                                if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],
