@@ -295,6 +295,7 @@ ALTAR_DEFILEMENT_ID = 1298381
 ALTAR_CHANNEL_MS = 8000
 ALTAR_GROUND_HOLD_MS = 15000
 ALTAR_GROUND_RECEDE_MS = 24000  # Visual recession estimate; never a hit classifier.
+ALTAR_GROUND_PEAK_RADII = (40, 50, 65, 80)  # Team screenshot estimate, per-phase ordinal.
 ETERNAL_NIGHTFALL_CAST_MS = 15000
 POSITION_RELIABLE_MS = 2_500
 
@@ -5332,7 +5333,7 @@ def _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map):
 def _build_altar_ground_replay(fight, mechanics, raw):
     start = int(fight['startTime'])
     duration = int(fight['endTime'])-start
-    rounds, seen, purple_count = [],set(),0
+    rounds, seen, purple_count, green_count = [],set(),0,0
     for e in sorted(raw.get('casts', []),key=lambda e:int(e['timestamp'])):
         spell = ability_id(e)
         if spell not in {ALTAR_FANGS_ID,ALTAR_DEFILEMENT_ID} or not is_cast_complete(e):
@@ -5344,12 +5345,15 @@ def _build_altar_ground_replay(fight, mechanics, raw):
         purple = spell == ALTAR_DEFILEMENT_ID
         if purple:
             purple_count += 1
+        else:
+            green_count += 1
+        ordinal = purple_count if purple else green_count
         rounds.append({'startTimeMs':t,'channelEndTimeMs':min(duration,t+ALTAR_CHANNEL_MS),
             'recedeStartTimeMs':t+ALTAR_CHANNEL_MS+ALTAR_GROUND_HOLD_MS,
             'endTimeMs':min(duration,t+ALTAR_CHANNEL_MS+ALTAR_GROUND_HOLD_MS+ALTAR_GROUND_RECEDE_MS),
             'spellID':spell,'casterID':e.get('sourceID'),'kind':'purple' if purple else 'green',
-            'ordinal':purple_count if purple else len([r for r in rounds if r['kind']=='green'])+1,
-            'peakRadiusYards':45 if not purple else min(80,40+purple_count*10),
+            'ordinal':ordinal,
+            'peakRadiusYards':ALTAR_GROUND_PEAK_RADII[min(ordinal,len(ALTAR_GROUND_PEAK_RADII))-1],
             'fullCoverage':purple and purple_count>=4})
     replay = mechanics['combatReplay']
     for row in rounds:
@@ -5398,8 +5402,8 @@ def _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map):
             cast = pending.get(e.get('targetID'))
             if cast and cast['startTimeMs'] <= t <= cast['endTimeMs']:
                 sid = ability_id(e)
-                from pathlib import Path
-                icon = f'/assets/spells/{sid}.jpg' if Path(f'assets/spells/{sid}.jpg').is_file() else None
+                icon = next((f'/assets/spells/{sid}.{ext}' for ext in ('png','jpg')
+                             if Path(__file__).resolve().parents[2].joinpath('assets','spells',f'{sid}.{ext}').is_file()), None)
                 cast.update(endTimeMs=t,outcome='interrupted',interruptSpellID=sid,
                             interruptIcon=icon,interruptedBy=player_ref(players,actor_map,source))
                 pending.pop(e.get('targetID'),None)
@@ -5749,7 +5753,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-ground-nightfall-2026-10-12-v6",
+            "mechanicVersion": "coiledaltar-ground-icons-2026-10-12-v7-assets",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
                                if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],

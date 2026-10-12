@@ -1505,7 +1505,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path in demo_assets:
             return True
         return (
-            (path.startswith("/assets/raids/") or path.startswith("/assets/specs/") or path.startswith("/boss_plugins/assets/"))
+            (path.startswith("/assets/raids/") or path.startswith("/assets/specs/")
+             or path.startswith("/assets/spells/") or path.startswith("/boss_plugins/assets/"))
             and Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".gif"}
         ) or path in {"/", "/index.html", "/raid-guide", "/frontend/tools/raid-guide",
                         "/frontend/tools/raid-guide/index.html",

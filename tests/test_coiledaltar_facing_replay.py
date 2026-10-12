@@ -185,17 +185,18 @@ def test_wail_duration_is_independent_of_early_interrupt_and_curse_adjusts_rate(
 
 def test_altar_channels_anchor_ground_and_fourth_purple_covers_floor():
     casts = [dict(type='cast',timestamp=t,abilityGameID=spell,sourceID=9)
-             for t,spell in [(0,1282487),(100000,1298381),(200000,1298381),
+             for t,spell in [(0,1282487),(50000,1282487),(100000,1298381),(200000,1298381),
                              (300000,1298381),(400000,1298381)]]
     mechanics = {'combatReplay':{'bosses':[dict(actorID=9,casts=[])]}}
     scene = boss._build_altar_ground_replay({'startTime':0,'endTime':500000},mechanics,{'casts':casts})
     assert scene['rounds'][0]['kind'] == 'green'
     assert scene['rounds'][0]['channelEndTimeMs'] == 8000
     assert scene['rounds'][-1]['fullCoverage']
-    assert [r['peakRadiusYards'] for r in scene['rounds'][1:]] == [50,60,70,80]
+    assert [r['peakRadiusYards'] for r in scene['rounds'] if r['kind']=='green'] == [40,50]
+    assert [r['peakRadiusYards'] for r in scene['rounds'] if r['kind']=='purple'] == [40,50,65,80]
     assert scene['rounds'][0]['recedeStartTimeMs'] == 23000
     assert scene['rounds'][0]['endTimeMs'] == 47000
-    assert scene['rounds'][1]['endTimeMs'] == 147000
+    assert scene['rounds'][2]['endTimeMs'] == 147000
     assert all(c['phase'] == 'channel' for c in mechanics['combatReplay']['bosses'][0]['casts'])
 
 
@@ -223,6 +224,7 @@ def test_nightfall_replay_uses_fixed_duration_and_real_interrupt_not_next_cast()
     assert casts[0]['endTimeMs'] == 11000
     assert casts[0]['outcome'] == 'interrupted'
     assert casts[0]['interruptedBy']['playerID'] == 1
+    assert casts[0]['interruptIcon'] == '/assets/spells/6552.png'
     assert casts[1]['endTimeMs'] == 35000
     assert casts[1]['outcome'] == 'completed'
     assert casts[2]['endTimeMs'] == 55000
