@@ -17,6 +17,7 @@ from analyzer_core.mythic_dungeon_timeline import (  # noqa: E402
     build_dungeon_document,
 )
 from analyzer_core.mythic_dungeon_configs import dungeon_config  # noqa: E402
+from analyzer_core.mythic_dungeon_rulings import apply_rulings  # noqa: E402
 from analyzer_core.wcl_api import WclClient  # noqa: E402
 
 warnings.filterwarnings("ignore", message="Unverified HTTPS request")
@@ -291,9 +292,7 @@ def annotate_skill_candidates(document: dict) -> None:
         row["npcNameZh"] = npc_names.get(row["npcId"], row["npcName"])
 
 
-def main() -> None:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", default="xpYfcXrBnkP8W1Ka")
     parser.add_argument("--fight", type=int, default=2)
@@ -309,6 +308,24 @@ def main() -> None:
         type=Path,
         default=None,
     )
+    parser.add_argument(
+        "--rulings",
+        type=Path,
+        default=ROOT / "assets" / "samples" / "mythic_dungeon_s2_skill_rulings.json",
+        help="Declarative key-skill rulings merged into an observed-skill preview",
+    )
+    parser.add_argument(
+        "--no-rulings",
+        action="store_true",
+        help="Skip ruling merge entirely (export the raw observed preview)",
+    )
+    return parser
+
+
+def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    parser = build_parser()
     args = parser.parse_args()
     if args.list_fights:
         client = WclClient()
@@ -336,12 +353,16 @@ def main() -> None:
     if args.season:
         document["dungeon"]["season"] = args.season
         output.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not args.no_rulings and isinstance(document.get("skillSelection"), dict):
+        apply_rulings(document, str(args.rulings))
+        output.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({
         "output": str(output),
         "dungeon": document["dungeon"],
         "team": document["team"],
         "pulls": len(document["pulls"]),
         "timelineEvents": sum(len(row["timeline"]) for row in document["pulls"]),
+        "skillSelection": document.get("skillSelection"),
     }, ensure_ascii=False, indent=2))
 
 

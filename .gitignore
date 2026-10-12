@@ -57,3 +57,6 @@ tools/tmp/
 
 # Local runtime venv.
 .venv/
+
+# Local S2 key-skill rulings data (same policy as S2 samples; schema + example live in specs/).
+assets/samples/mythic_dungeon_s2_skill_rulings.json

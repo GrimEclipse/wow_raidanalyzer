@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill-rulings.schema.json",
+  "title": "Mythic Dungeon S2 Skill Rulings",
+  "description": "Declarative key-skill rulings keyed by dungeon, boss context, and spell id. Actual data files are local-only (same policy as S2 samples); this schema and the bundled example are committed to the repo.",
+  "type": "object",
+  "patternProperties": {
+    "^[a-z0-9_]+$": {
+      "description": "dungeonKey",
+      "type": "object",
+      "patternProperties": {
+        "^(encounter:[0-9]+|trash)$": {
+          "description": "bossContext: encounter:<encounterId> for boss fights, trash for trash pulls",
+          "type": "object",
+          "patternProperties": {
+            "^[1-9][0-9]*$": {
+              "description": "spellId",
+              "type": "object",
+              "required": ["category"],
+              "properties": {
+                "category": {
+                  "enum": ["key", "trash", "unreviewed"]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["metric", "value"],
+                    "properties": {
+                      "metric": { "type": "string" },
+                      "value": { "type": "string" },
+                      "source": { "type": "string" }
+                    }
+                  }
+                },
+                "notes": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

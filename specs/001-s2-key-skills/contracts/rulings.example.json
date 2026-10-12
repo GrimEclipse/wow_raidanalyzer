@@ -1,0 +1,21 @@
+{
+  "_comment": " rulings.example.json — 示例判定数据（假数据，仅演示结构）。实际数据文件 assets/samples/mythic_dungeon_s2_skill_rulings.json 不随代码提交，口径同 S2 样本（docs/mythic-dungeon-s2-samples.md）。Schema: skill-rulings.schema.json",
+  "altar_of_fangs": {
+    "encounter:421": {
+      "442504": {
+        "category": "key",
+        "evidence": [
+          {"metric": "totalDamage", "value": "average 38% of raid health per cast", "source": "WCL 9n2r3JATCDZGkaVN fight13"},
+          {"metric": "affectedPlayers", "value": "4/5 players hit", "source": "same fight"}
+        ],
+        "notes": "例：Boss 开场读条技能"
+      }
+    },
+    "trash": {
+      "442512": {
+        "category": "trash",
+        "notes": "例：小怪普通攻击，不构成机制威胁"
+      }
+    }
+  }
+}

@@ -86,9 +86,13 @@ function setDocument(document) {
 
 function renderRun() {
   const { dungeon, team, source, pulls } = state.document;
-  $("#season-notice").textContent = state.document.skillSelection?.status === "needs-review"
-    ? `S${dungeon.season || 2} 正式服样本，${team.map(member => `${member.spec}${member.className}`).join("、")}。当前展示实际施法候选，Boss 与小怪的关键技能筛选尚待确认。`
-    : dungeon.season ? `S${dungeon.season} 样本，已配置技能时间轴。` : "S1 历史样本，已配置技能时间轴。";
+  const selection = state.document.skillSelection;
+  const seasonLabel = `S${dungeon.season || 2} 正式服样本 · ${team.map(member => `${member.spec}${member.className}`).join("、")}。`;
+  $("#season-notice").textContent = selection?.status === "curated"
+    ? `${seasonLabel}已按判定数据完成关键技能筛选。`
+    : selection?.status === "needs-review"
+      ? `${seasonLabel}当前展示实际施法候选，Boss 与小怪的关键技能筛选尚待确认${selection.rulingsError ? "（判定数据不可用）" : ""}。`
+      : dungeon.season ? `S${dungeon.season} 样本 · 已配置技能时间轴。` : "S1 历史样本 · 已配置技能时间轴。";
   $("#dungeon-name").textContent = dungeon.nameZh || dungeon.name;
   $("#key-level").textContent = `+${dungeon.keystoneLevel}`;
   $("#run-meta").textContent = `${dungeon.completed ? "限时完成" : "未完成"}，${dungeon.keystoneTime || dungeon.duration}，${source.reportCode} / Fight ${source.fightId}`;
@@ -188,7 +192,83 @@ function renderPull() {
       <td>${opener ? openerEvidence(opener) : "—"}</td>
     </tr>`;
   }).join("");
+  renderSkillGroups(pull);
   renderTimeline();
+}
+
+function candidateContext(row) {
+  return row.encounterId ? `encounter:${row.encounterId}` : "trash";
+}
+
+function pullSkillContext(pull) {
+  return pull.type === "boss" && pull.encounterId ? `encounter:${pull.encounterId}` : "trash";
+}
+
+const SKILL_GROUPS = [
+  ["key", "关键技能"],
+  ["trash", "小怪或其他"],
+  ["unreviewed", "未判定"],
+];
+
+function candidateEntry(row, showEvidence) {
+  const counts = Object.entries(row.eventCounts || {})
+    .map(([kind, count]) => `${kind === "begincast" ? "读条" : "施放"} ×${count}`)
+    .join(" · ");
+  const notes = row.ruling?.notes || row.notes || "";
+  const evidence = showEvidence && Array.isArray(row.ruling?.evidence)
+    ? `<ul class="ruling-evidence">${row.ruling.evidence.map((item) => {
+        const source = item.source ? ` · ${escapeHtml(item.source)}` : "";
+        return `<li>${escapeHtml(item.metric)}：${escapeHtml(item.value)}${source}</li>`;
+      }).join("")}</ul>`
+    : "";
+  return `<li class="skill-row">
+      <span class="skill-name">${escapeHtml(row.nameZh || row.nameEn || String(row.spellId))}</span>
+      <span class="spell-id">${escapeHtml(String(row.spellId))}</span>
+      ${counts ? `<span class="skill-counts">${escapeHtml(counts)}</span>` : ""}
+      ${notes ? `<p class="ruling-notes">${escapeHtml(notes)}</p>` : ""}
+      ${evidence}
+    </li>`;
+}
+
+function renderSkillGroups(pull) {
+  const container = $("#skill-groups");
+  if (!container) return;
+  const document_ = state.document;
+  const selection = document_.skillSelection || {};
+  const note = $("#skill-panel-note");
+  const candidates = (Array.isArray(document_.skillCandidates) ? document_.skillCandidates : [])
+    .filter((row) => candidateContext(row) === pullSkillContext(pull));
+  if (!candidates.length) {
+    container.innerHTML = '<p class="unknown">本段没有敌方施法记录。</p>';
+    if (note) note.textContent = "本段没有敌方施法记录。";
+    return;
+  }
+  const curated = selection.status === "curated";
+  if (note) {
+    if (curated) {
+      const applied = selection.rulings?.applied ?? 0;
+      note.textContent = `已按判定数据筛选（${applied} 条判定生效）。关键技能附判定依据。`;
+    } else if (selection.rulingsError) {
+      note.textContent = `判定数据不可用（${selection.rulingsError}），回退为实际施法候选列表。`;
+    } else {
+      note.textContent = "S2 实际施法候选：关键技能筛选尚未确认。";
+    }
+  }
+  const buckets = new Map(SKILL_GROUPS.map(([key]) => [key, []]));
+  candidates.forEach((row) => {
+    const category = curated ? (row.ruling?.category || "unreviewed") : "unreviewed";
+    (buckets.get(category) || buckets.get("unreviewed")).push(row);
+  });
+  const sections = SKILL_GROUPS.map(([key, label]) => {
+    const rows = buckets.get(key);
+    if (!rows.length) return "";
+    const showEvidence = curated && key === "key";
+    return `<section class="skill-group">
+        <h4>${label}<span class="skill-group-count">×${rows.length}</span></h4>
+        <ul class="skill-list">${rows.map((row) => candidateEntry(row, showEvidence)).join("")}</ul>
+      </section>`;
+  }).join("");
+  container.innerHTML = sections || '<p class="unknown">本段没有敌方施法记录。</p>';
 }
 
 function openerEvidence(opener) {
