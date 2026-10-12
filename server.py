@@ -1488,6 +1488,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/assets/demos/ulatek_mythic.json",
             "/assets/spells/1022.jpg", "/assets/spells/642.jpg", "/assets/spells/45438.jpg", "/assets/spells/186265.jpg",
             "/assets/spells/357210.jpg", "/assets/spells/403631.jpg",
+            "/assets/spells/1286399.jpg",
             "/assets/spells/853.jpg", "/assets/spells/192058.jpg", "/assets/spells/46968.jpg", "/assets/spells/5484.jpg", "/assets/spells/115750.jpg", "/assets/spells/31661.jpg", "/assets/spells/119381.jpg", "/assets/spells/8122.jpg", "/assets/spells/357214.jpg", "/assets/spells/107570.jpg", "/assets/spells/408.jpg",
             "/assets/spells/30283.jpg", "/assets/spells/179057.jpg", "/assets/spells/132469.jpg", "/assets/spells/51490.jpg", "/assets/spells/5211.jpg", "/assets/spells/221562.jpg", "/assets/spells/368970.jpg", "/assets/spells/108199.jpg", "/assets/spells/202137.jpg",
             "/frontend/core/home-workspace.css", "/frontend/core/home-workspace.js",

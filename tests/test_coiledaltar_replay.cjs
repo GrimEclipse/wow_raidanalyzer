@@ -60,3 +60,19 @@ assert.equal(replay.soulcoilerAt(coiler,150,coilerAPI).shield,2);
 assert.equal(replay.soulcoilerAt(coiler,600,coilerAPI).cast,undefined);
 assert.equal(replay.soulcoilerAt(coiler,600,coilerAPI).interrupt.outcome,'interrupted');
 console.log('Soulcoiler spawn, teleport, health, shield and interruption passed');
+assert.equal(replay.castProgress({startTimeMs:0,endTimeMs:1000,durationMs:10000},900),.09);
+assert.equal(replay.castProgress({startTimeMs:0,endTimeMs:1000,durationMs:12000},600),.05);
+const rates={startTimeMs:0,progressSegments:[[0,0,10000],[2000,.2,12000]]};
+assert.equal(replay.castProgress(rates,2000),.2);
+assert.equal(replay.castProgress(rates,8000),.7);
+const ground={rounds:[{kind:'green',startTimeMs:0,channelEndTimeMs:8000,endTimeMs:32000,peakRadiusYards:45,restRadiusYards:0},
+ {kind:'purple',ordinal:1,startTimeMs:100000,channelEndTimeMs:108000,endTimeMs:500000,peakRadiusYards:50,restRadiusYards:42.5},
+ {kind:'purple',ordinal:2,startTimeMs:200000,channelEndTimeMs:208000,endTimeMs:500000,peakRadiusYards:60,restRadiusYards:55},
+ {kind:'purple',ordinal:4,startTimeMs:400000,channelEndTimeMs:408000,endTimeMs:500000,peakRadiusYards:80,restRadiusYards:80,fullCoverage:true}]};
+assert.equal(replay.groundAt(ground,8000).radiusYards,45);
+assert(replay.groundAt(ground,20000).radiusYards<45);
+assert.equal(replay.groundAt(ground,33000),null);
+assert.equal(replay.groundAt(ground,190000).radiusYards,42.5);
+assert.equal(replay.groundAt(ground,200000).radiusYards,42.5);
+assert.equal(replay.groundAt(ground,409000).fullCoverage,true);
+console.log('Partial interrupted cast progress, live curse rate and green/purple ground phases passed');

@@ -166,6 +166,36 @@ def test_soulcoiler_instances_have_separate_cast_interrupt_health_and_death():
     assert result[0]['endTimeMs'] == 1500
 
 
+def test_wail_duration_is_independent_of_early_interrupt_and_curse_adjusts_rate():
+    units = [dict(key='9:1',actorID=9,instance=1,gameID=boss.SOULCOILER_NPC_GAME_ID,
+                  samples=[[0,10,20]],states=[])]
+    rows = [dict(type='begincast',timestamp=0,sourceID=9,sourceInstance=1,abilityGameID=1286399),
+            dict(type='interrupt',timestamp=1000,sourceID=1,targetID=9,targetInstance=1,abilityGameID=96231),
+            dict(type='applydebuff',timestamp=1500,targetID=9,targetInstance=1,abilityGameID=1714),
+            dict(type='begincast',timestamp=2000,sourceID=9,sourceInstance=1,abilityGameID=1286399),
+            dict(type='removedebuff',timestamp=5000,targetID=9,targetInstance=1,abilityGameID=1714)]
+    casts = boss._build_soulcoiler_replay({'startTime':0,'endTime':20000},
+        {'combatReplay':{'units':units}},{'replayEvents':rows},{1:{'name':'A'}},{1:'A'})['actors'][0]['casts']
+    assert casts[0]['durationMs'] == 10000
+    assert casts[0]['expectedEndTimeMs'] == 10000
+    assert casts[0]['endTimeMs'] == 1000
+    assert casts[1]['progressSegments'] == [[2000,0,12000],[5000,.25,10000]]
+    assert casts[1]['expectedEndTimeMs'] == 12500
+
+
+def test_altar_channels_anchor_ground_and_fourth_purple_covers_floor():
+    casts = [dict(type='cast',timestamp=t,abilityGameID=spell,sourceID=9)
+             for t,spell in [(0,1282487),(100000,1298381),(200000,1298381),
+                             (300000,1298381),(400000,1298381)]]
+    mechanics = {'combatReplay':{'bosses':[dict(actorID=9,casts=[])]}}
+    scene = boss._build_altar_ground_replay({'startTime':0,'endTime':500000},mechanics,{'casts':casts})
+    assert scene['rounds'][0]['kind'] == 'green'
+    assert scene['rounds'][0]['channelEndTimeMs'] == 8000
+    assert scene['rounds'][-1]['fullCoverage']
+    assert [r['restRadiusYards'] for r in scene['rounds'][1:]] == [42.5,55,67.5,80]
+    assert all(c['phase'] == 'channel' for c in mechanics['combatReplay']['bosses'][0]['casts'])
+
+
 def test_clear_constraint_preserves_spawn_and_stationary_intervals():
     ghost = {'samples':[[0,100,0,1,0,1,None], [100,130,0,1,1,1,100],
                          [200,130,0,1,0,1,100], [300,160,0,1,1,1,300]]}

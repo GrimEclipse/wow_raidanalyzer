@@ -287,6 +287,13 @@ SOULCOILER_INTERRUPT_LOOKBACK_MS = 5_000
 SOULCOILER_RELOCATE_YARDS = 8.0
 # 盘魂者取「点名施加 → 爆炸」这一段（约 5s）内、爆炸时刻或之前的最后一点，避免出生点/打断后传送。
 SOULCOILER_BOMB_POS_PAD_MS = 250
+CURSE_OF_TONGUES_ID = 1714
+WAIL_CAST_MS = 10000
+WAIL_CURSED_CAST_MS = 12000
+ALTAR_FANGS_ID = 1282487
+ALTAR_DEFILEMENT_ID = 1298381
+ALTAR_CHANNEL_MS = 8000
+ALTAR_GREEN_GROUND_MS = 32000  # Visual recession estimate; never a hit classifier.
 POSITION_RELIABLE_MS = 2_500
 
 # 拉取时只向 WCL 要机制相关技能，避免整场友伤/治疗/带坐标的团员施法。
@@ -5250,11 +5257,12 @@ def _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map):
     """Instance-local positions, health, shields and interrupted cast windows."""
     start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
     actors = {u['key']:{**u, 'casts':[], 'health':[], 'shield':[], 'teleports':[],
-              'startTimeMs':u['samples'][0][0], 'icon':'/assets/spells/1286399.jpg'}
+              'startTimeMs':u['samples'][0][0], 'icon':'/boss_plugins/assets/Spiteful_Soulcoiler.png'}
               for u in mechanics['combatReplay']['units']
               if u.get('gameID') == SOULCOILER_NPC_GAME_ID and u['samples']}
     by_key = {(a['actorID'], a['instance']):a for a in actors.values()}
     pending = {}
+    cursed = set()
     rows = sorted(raw.get('replayEvents', []), key=lambda e:int(e['timestamp']))
     for e in rows:
         t, kind = int(e['timestamp'])-start, event_type(e)
@@ -5262,11 +5270,29 @@ def _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map):
         target = (e.get('targetID'), int(e.get('targetInstance') or 0))
         if source not in by_key and target not in by_key:
             continue
+        if target in by_key and ability_id(e) == CURSE_OF_TONGUES_ID and 'debuff' in kind:
+            applied = kind != 'removedebuff'
+            changed = applied != (target in cursed)
+            if applied:
+                cursed.add(target)
+            else:
+                cursed.discard(target)
+            cast = pending.get(target)
+            if changed and cast and t < cast['endTimeMs']:
+                previous = cast['progressSegments'][-1]
+                progress = min(1,previous[1]+(t-previous[0])/previous[2])
+                duration_ms = WAIL_CURSED_CAST_MS if applied else WAIL_CAST_MS
+                cast['progressSegments'].append([t,progress,duration_ms])
+                cast.update(durationMs=duration_ms,expectedEndTimeMs=t+(1-progress)*duration_ms,
+                            endTimeMs=min(duration,t+(1-progress)*duration_ms))
         if kind == 'begincast' and source in by_key and ability_id(e) in WAIL_OF_TERROR_IDS:
             old = pending.get(source)
             if old:
                 old.update(endTimeMs=t, outcome='unconfirmed')
-            cast = {'startTimeMs':t, 'endTimeMs':min(duration,t+10000), 'spellID':ability_id(e),
+            duration_ms = WAIL_CURSED_CAST_MS if source in cursed else WAIL_CAST_MS
+            cast = {'startTimeMs':t, 'endTimeMs':min(duration,t+duration_ms),
+                    'expectedEndTimeMs':t+duration_ms,'durationMs':duration_ms,
+                    'progressSegments':[[t,0,duration_ms]],'spellID':ability_id(e),
                     'spellName':'恐惧哀嚎', 'outcome':'unconfirmed'}
             by_key[source]['casts'].append(cast)
             pending[source] = cast
@@ -5301,6 +5327,41 @@ def _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map):
     return {'actors':list(actors.values())}
 
 
+def _build_altar_ground_replay(fight, mechanics, raw):
+    start = int(fight['startTime'])
+    duration = int(fight['endTime'])-start
+    rounds, seen, purple_count = [],set(),0
+    for e in sorted(raw.get('casts', []),key=lambda e:int(e['timestamp'])):
+        spell = ability_id(e)
+        if spell not in {ALTAR_FANGS_ID,ALTAR_DEFILEMENT_ID} or not is_cast_complete(e):
+            continue
+        t = int(e['timestamp'])-start
+        if (spell,t,e.get('sourceID')) in seen:
+            continue
+        seen.add((spell,t,e.get('sourceID')))
+        purple = spell == ALTAR_DEFILEMENT_ID
+        if purple:
+            purple_count += 1
+        rounds.append({'startTimeMs':t,'channelEndTimeMs':min(duration,t+ALTAR_CHANNEL_MS),
+            'endTimeMs':duration if purple else min(duration,t+ALTAR_GREEN_GROUND_MS),
+            'spellID':spell,'casterID':e.get('sourceID'),'kind':'purple' if purple else 'green',
+            'ordinal':purple_count if purple else len([r for r in rounds if r['kind']=='green'])+1,
+            'peakRadiusYards':45 if not purple else min(80,40+purple_count*10),
+            'restRadiusYards':0 if not purple else min(80,30+purple_count*12.5),
+            'fullCoverage':purple and purple_count>=4})
+    replay = mechanics['combatReplay']
+    for row in rounds:
+        boss = next((b for b in replay['bosses'] if b['actorID']==row['casterID']),None)
+        if boss is not None:
+            boss['casts'].append({'startTimeMs':row['startTimeMs'],'endTimeMs':row['channelEndTimeMs'],
+                'spellID':row['spellID'],'spellName':'盘卷祭坛亵渎' if row['kind']=='purple' else '盘卷祭坛之牙',
+                'phase':'channel','outcome':'completed'})
+            boss['casts'].sort(key=lambda c:c['startTimeMs'])
+    return {'rounds':rounds,'sideCenters':[{'x':-5500,'y':115800},{'x':5500,'y':115800}],
+            'floorBounds':{'minX':-5500,'maxX':5500,'minY':110300,'maxY':121300},
+            'positionEvidence':'fixed-mouths-and-estimated-radius','greenDurationMs':ALTAR_GREEN_GROUND_MS}
+
+
 def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
     needs = _analysis_needs(options)
@@ -5315,6 +5376,7 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         zuljan = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
         ids = set(MECHANIC_CAST_IDS) | set(MECHANIC_DAMAGE_IDS) | set(MECHANIC_DEBUFF_IDS)
         ids |= set(MECHANIC_ENEMY_BUFF_IDS) | set(INTERMISSION_POTIONS) | {RECLAIM_ESSENCE}
+        ids |= {CURSE_OF_TONGUES_ID,ALTAR_FANGS_ID,ALTAR_DEFILEMENT_ID}
         cfg = {'fetchCombatReplay':True, 'fetchPositionResources':True,
                'unifiedEventFilter':('resources.actor.id > 0 OR type IN '
                    '("cast", "begincast", "combatantinfo", "death", "resurrect", "interrupt") '
@@ -5419,6 +5481,7 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
         mechanics["combatReplay"] = build_replay_tracks(fight, players, actor_map, raw["replayEvents"], actor_rows=actor_rows, spell_names=SPELLS, deaths=raw["deaths"], survival_timeline=survival["timeline"], include_facing=True)
         _apply_altar_boss_lifetimes(mechanics, actor_rows)
         mechanics['soulcoilerReplay'] = _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map)
+        mechanics['altarGroundReplay'] = _build_altar_ground_replay(fight, mechanics, raw)
         mechanics['manifestReplay'] = _build_manifest_replay(fight, mechanics, raw, players, actor_map)
         mechanics.setdefault('manifestations', {})['resonanceCollisions'] = mechanics['manifestReplay']['resonanceCollisions']
     end_phase = mechanics["phaseTimeline"][-2]["label"] if len(mechanics["phaseTimeline"]) > 1 else "P1"
@@ -5635,7 +5698,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-facing-ghosts-2026-10-12-v4",
+            "mechanicVersion": "coiledaltar-ground-cast-rates-2026-10-12-v5",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
                                if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],
