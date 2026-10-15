@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
+import re
+import threading
 import time
 import warnings
 from pathlib import Path
@@ -13,8 +16,8 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from analyzer_core.concurrency import MAX_REQUEST_RETRIES, REQUEST_RETRY_BASE_SECONDS, request_post
 from analyzer_core.progress import emit_progress
-from analyzer_core.wcl_context import resolve_wcl_credentials
-from analyzer_core.evidence_cache import query_cache_path, read_cached, write_cached, record_network
+from analyzer_core.wcl_context import resolve_wcl_credentials, current_wcl_observer
+from analyzer_core.evidence_cache import query_cache_path, read_cached, write_cached, record_network, record_wcl_points
 
 
 def load_project_env() -> None:
@@ -48,6 +51,8 @@ def _is_loopback_proxy(proxy_url: str) -> bool:
 
 
 class WclClient:
+    _shared_tokens = {}
+    _token_lock = threading.Lock()
     def __init__(self) -> None:
         self.base_url = os.getenv("WCL_BASE_URL", "https://www.warcraftlogs.com").rstrip("/")
         proxy_url = os.getenv("WCL_PROXY", "http://127.0.0.1:7890").strip()
@@ -79,11 +84,24 @@ class WclClient:
             return request_post(*args, **kwargs)
 
     def token(self) -> str:
-        if self._token:
+        if self._token and not current_wcl_observer():
             return self._token
         credentials = resolve_wcl_credentials(self.client_id, self.client_secret)
         if not credentials.client_id or not credentials.client_secret:
             raise RuntimeError("请先配置 WCL_CLIENT_ID 和 WCL_CLIENT_SECRET。")
+        if current_wcl_observer():
+            key = hashlib.sha256((self.base_url+'\0'+credentials.client_id+'\0'+credentials.client_secret).encode()).hexdigest()
+            with self._token_lock:
+                cached = self._shared_tokens.get(key)
+                if cached and cached[1] > time.time():
+                    return cached[0]
+                token, expires = self._fetch_token(credentials)
+                self._shared_tokens[key] = (token, expires)
+                return token
+        self._token, _ = self._fetch_token(credentials)
+        return self._token
+
+    def _fetch_token(self, credentials):
         response = self._post(
             f"{self.base_url}/oauth/token",
             data={"grant_type": "client_credentials"},
@@ -94,28 +112,55 @@ class WclClient:
         if response.status_code == 401:
             raise RuntimeError("WCL API Client ID / Secret 无效。")
         response.raise_for_status()
-        self._token = response.json()["access_token"]
-        return self._token
+        data = response.json()
+        return data['access_token'], time.time()+max(1,int(data.get('expires_in') or 3600)-60)
 
     def graphql_data(self, query: str, variables: dict) -> dict:
-        cache_path = query_cache_path(self.base_url, resolve_wcl_credentials(self.client_id, self.client_secret), query, variables)
+        credentials = resolve_wcl_credentials(self.client_id, self.client_secret)
+        observer = current_wcl_observer()
+        cache_path = query_cache_path(self.base_url, credentials, query, variables)
         # Discovery is short-lived so an ongoing report can acquire new fights.
         cached = read_cached(cache_path, max_age=1800 if "events(" in query else 30)
         if cached is not None:
             return cached
+        sent_query = query
+        injected = bool(observer and 'rateLimitData' not in query and not query.lstrip().startswith('mutation'))
+        if injected:
+            body, tail = query.rsplit('}', 1)
+            sent_query = body+' rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn currentRequest } }'+tail
+        elif observer and 'currentRequest' not in query:
+            sent_query = re.sub(r'(rateLimitData\s*\{)', r'\1 currentRequest ', query, count=1)
         started = time.perf_counter()
         response = self._post(
             f"{self.base_url}/api/v2/client",
-            json={"query": query, "variables": variables},
+            json={"query": sent_query, "variables": variables},
             headers={"Authorization": f"Bearer {self.token()}"},
             proxies=self.proxies,
             timeout=90,
         )
+        if observer:
+            observer(credentials, status=response.status_code)
+        if response.status_code == 401 and observer:
+            key = hashlib.sha256((self.base_url+'\0'+credentials.client_id+'\0'+credentials.client_secret).encode()).hexdigest()
+            with self._token_lock:
+                self._shared_tokens.pop(key, None)
+            response = self._post(f'{self.base_url}/api/v2/client',
+                json={'query':sent_query,'variables':variables},
+                headers={'Authorization':f'Bearer {self.token()}'},proxies=self.proxies,timeout=90)
+            observer(credentials, status=response.status_code)
         response.raise_for_status()
         record_network(time.perf_counter() - started)
         payload = response.json()
+        record_wcl_points((payload.get('data') or {}).get('rateLimitData'))
+        if observer:
+            observer(credentials, (payload.get('data') or {}).get('rateLimitData'))
         if payload.get("errors"):
+            if observer and any('rate limit' in str(e.get('message','')).lower() or
+                                'RATE_LIMIT' in str(e.get('extensions',{})) for e in payload['errors']):
+                observer(credentials, status=429)
             raise RuntimeError(json.dumps(payload["errors"], ensure_ascii=False))
+        if injected:
+            payload['data'].pop('rateLimitData', None)
         write_cached(cache_path, payload["data"])
         return payload["data"]
 

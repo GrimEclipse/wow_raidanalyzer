@@ -73,6 +73,7 @@
             },
             {
               "key": "crown_of_the_cosmos",
+              "homepageVisible": false,
               "name": "宇宙之冕",
               "encounterIds": [3181],
               "plugin": "boss_plugins.void_spire.crown_of_the_cosmos",

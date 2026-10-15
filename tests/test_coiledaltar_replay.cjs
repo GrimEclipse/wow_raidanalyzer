@@ -81,3 +81,31 @@ assert.equal(replay.groundAt(ground,409000).fullCoverage,true);
 assert.equal(replay.groundAt(ground,435000).fullCoverage,false);
 assert.equal(replay.groundAt(ground,447000),null);
 console.log('Partial interrupted cast progress, live curse rate and green/purple hold and complete recession passed');
+
+// Verify both ground and carried mutation circles in the actual scene renderer.
+let sceneAdapter;
+global.MechanicWorkbench={
+ mount(_host,_data,adapter){sceneAdapter=adapter;return {seek(){}};},
+ trackPosition(u){return {x:u.samples[0][1],y:u.samples[0][2]};},
+ lifeState(_u,t){return {dead:false,opacity:1,positionTime:t};},
+ escape(v){return String(v??'');},avatar(){return '';}
+};
+const sceneHost={insertAdjacentHTML(){},querySelector(){return {};}};
+for(const radius of [8,6]){
+ const mechanics={tuning:{mutationRadiusYards:radius},
+  fieldAudit:{arena:{unitsPerYard:100,radius:100,plotScaleX:1/19.97}},
+  toxicDeluge:{rounds:[{timeMs:0}],
+   groundPuddles:[{puddleID:1,venomKind:'virulent-mutation',groundedFromMs:0,position:{x:0,y:0}}],
+   carriers:[{puddleID:1,playerID:1,venomKind:'virulent-mutation',applyTimeMs:1000,removeTimeMs:2500,pickupPosition:{x:0,y:0},dropPosition:{x:100,y:0}}]},
+  combatReplay:{units:[{kind:'player',actorID:1,name:'A',samples:[[0,0,0]],color:'#fff'}],bosses:[]},
+  manifestReplay:{immediateRedGlow:radius===6,ghosts:[{key:'ghost',startTimeMs:0,endTimeMs:5000,samples:[[0,100,0,1,0,1,null]]}]}};
+ replay.mount(sceneHost,mechanics,10000,p=>p);
+ for(const time of [500,1500]){
+  const html=sceneAdapter.renderMap([],[],time);
+  assert(html.includes('data-effect="mutation-radius"'));
+  assert(html.includes('r="'+radius+'"'));
+  assert.equal(html.includes('data-effect="fixation-red-glow"'),radius===6);
+ }
+}
+delete global.MechanicWorkbench;
+console.log('Old/new ground and carried mutation radii and immediate fixation glow passed');

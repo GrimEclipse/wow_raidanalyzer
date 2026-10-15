@@ -18,15 +18,22 @@ _CURRENT_WCL_CREDENTIALS: ContextVar[Optional[WclCredentials]] = ContextVar(
     "current_wcl_credentials",
     default=None,
 )
+_WCL_OBSERVER = ContextVar('wcl_response_observer', default=None)
+
+
+def current_wcl_observer():
+    return _WCL_OBSERVER.get()
 
 
 @contextmanager
-def use_wcl_credentials(credentials: WclCredentials) -> Iterator[None]:
+def use_wcl_credentials(credentials: WclCredentials, *, observer=None) -> Iterator[None]:
     token = _CURRENT_WCL_CREDENTIALS.set(credentials)
+    observer_token = _WCL_OBSERVER.set(observer)
     try:
         yield
     finally:
         _CURRENT_WCL_CREDENTIALS.reset(token)
+        _WCL_OBSERVER.reset(observer_token)
 
 
 def resolve_wcl_credentials(

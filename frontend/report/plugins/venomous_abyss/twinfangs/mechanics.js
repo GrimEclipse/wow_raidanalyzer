@@ -65,14 +65,19 @@ function twinCheckpoints(checkpoints) {
   if (!checkpoints?.length) return '<section class="panel"><h2>层数超过预期</h2><p class="muted">未观测到完整转圈结束，未生成层数检查点。</p></section>';
   return `<section class="panel"><h2>层数超过预期</h2><p class="muted">按转圈实际结束检查，第一轮最多4层、第二轮最多7层，每人每个检查点最多计一次；检查前任何玩家阵亡则全团该次检查豁免，战复不取消。来源表为此前累计增加，扣除移除层数得到当前层数；不推测被消掉的具体来源。</p>${checkpoints.map(c=>`<article class="card"><h3>第 ${c.index} 次，${esc(c.time)}，上限 ${c.limit} 层，计数 ${c.count} 人${c.exempt?'（已豁免）':''}</h3>${c.exemption?`<p class="muted">${esc(c.exemption.time)} ${player(c.exemption)} 阵亡；${esc(c.exemption.reason)}</p>`:''}<p class="muted">${esc(c.evidence)}</p>${c.players.map(p=>`<details ${p.exceeded?'open':''}><summary>${player(p)}：${p.stacks} 层 ${p.exceeded?(p.exempt?'<span class="badge warn">超限但豁免，不计数</span>':'<span class="badge bad">超过预期 +1</span>'):''}${!p.alive?'（已死亡）':''}</summary><p>${p.gainsBySource.map(s=>`${esc(s.source)} +${s.stacks}`).join('；')||'无新增记录'}；共移除 ${p.removedStacks} 层</p>${table(['时间','来源','变化','结果'],p.history.map(e=>[esc(e.time),esc(e.source),`${e.delta>0?'+':''}${e.delta}`,`${e.fromStack} → ${e.toStack}`]))}</details>`).join('')}</article>`).join('')}</section>`;
 }
-function twinVenomSourceRows(checkpoint,columns,scope='cumulative') {
+function twinVenomSourceRows(checkpoint,columns,scope='cumulative',intervalStart=-1) {
   const rows=[...(checkpoint.players||[])].sort((a,b)=>b.stacks-a.stacks||a.playerID-b.playerID);
+  const bySource=Object.fromEntries(columns.map(c=>[c.key,c]));
   return rows.map(p=>{
-    const counts=scope==='interval'?p.intervalSourceStacks||{}:p.sourceStacks||{},description=columns.map(c=>`${c.label} ${counts[c.key]||0}层`).join('；');
-    const bits=columns.map(c=>Array.from({length:Math.min(60,counts[c.key]||0)},()=>`<i style="background:${c.color}" title="${esc(c.label)}：${counts[c.key]}层"></i>`).join('')).join('');
-    const accounting=[`累计新增 +${p.gainTotal||0}`,p.feastReduction?`盛宴 −${p.feastReduction}`:'',p.deathReduction?`死亡 −${p.deathReduction}`:'',p.otherReduction?`其他移除 −${p.otherReduction}`:''].filter(Boolean).join('，');
+    const since=scope==='interval'?(checkpoint.intervalStartTimeMs??intervalStart):-1;
+    const history=(p.history||[]).filter(e=>e.timeMs>since&&(checkpoint.timeMs==null||e.timeMs<=checkpoint.timeMs)).slice().sort((a,b)=>a.timeMs-b.timeMs);
+    const gains=history.filter(e=>e.delta>0),losses=history.filter(e=>e.delta<0);
+    const description=gains.map(e=>`${e.time} ${bySource[e.originKey]?.label||e.originLabel||e.source||'来源待确认'} +${e.delta}`).join('；');
+    const bits=gains.map(e=>{const source=bySource[e.originKey]||{color:'#9a94a6',label:e.originLabel||e.source||'来源待确认'};return Array.from({length:e.delta},()=>`<i data-time-ms="${e.timeMs}" data-source="${esc(e.originKey||'unknown')}" style="background:${source.color}" title="${esc(e.time)} ${esc(source.label)} +${e.delta}层，${e.fromStack} → ${e.toStack}"></i>`).join('');}).join('');
+    const removals=losses.map(e=>{const label=e.category==='feast'?'盛宴':e.category==='death'?'死亡':'其他移除',color=e.category==='death'?'#fb7185':e.category==='feast'?'#f9c267':'#9a94a6';return Array.from({length:-e.delta},()=>`<i data-time-ms="${e.timeMs}" data-removal="${esc(e.category||'remove')}" style="background:${color}" title="${esc(e.time)} ${label} ${e.delta}层，${e.fromStack} → ${e.toStack}"></i>`).join('');}).join('');
+    const accounting=`${scope==='interval'?'本段':'累计'}新增 +${gains.reduce((n,e)=>n+e.delta,0)}，移除 ${-losses.reduce((n,e)=>n+e.delta,0)}`;
     const discrepancy=p.reconciliationDelta?`<span class="twin-source-discrepancy" title="死亡按最多减3层计入；日志净变化可能混合了同批次叠层。当前值采用实际光环，不推测缺失来源。">来源待核对 ${p.reconciliationDelta>0?'+':''}${p.reconciliationDelta}</span>`:'';
-    return `<div class="twin-source-row" role="listitem"><div class="twin-source-person">${player(p)}${!p.alive?'<small>已死亡</small>':''}</div><div class="twin-source-values"><div class="twin-source-bits" role="img" aria-label="${esc(description)}" title="${esc(description)}">${bits||'<span class="muted">—</span>'}</div><small>${esc(accounting)} ${discrepancy}</small></div><b class="twin-source-current" title="检查点实际永恒毒液层数">${p.stacks}</b></div>`;
+    return `<div class="twin-source-row" role="listitem"><div class="twin-source-person">${player(p)}${!p.alive?'<small>已死亡</small>':''}</div><div class="twin-source-values"><div class="twin-source-bits" role="img" aria-label="${esc(description)}">${bits||'<span class="muted">—</span>'}</div><div class="twin-source-removals" role="img" aria-label="按时间排列的消层记录">${removals?`<span>消层</span>${removals}`:''}<small>${esc(accounting)} ${discrepancy}</small></div></div><b class="twin-source-current" title="检查点实际永恒毒液层数">${p.stacks}</b></div>`;
   }).join('');
 }
 function twinVenomSources(venom) {
@@ -81,9 +86,9 @@ function twinVenomSources(venom) {
   const selected=Math.min(state.venomCheckpoint||0,checkpoints.length-1),scope=state.venomSourceScope||'cumulative';
   setTimeout(()=>{
     const picker=document.getElementById('twinVenomCheckpoint'),scopePicker=document.getElementById('twinVenomScope'),chart=document.getElementById('twinVenomSources');if(!picker||!scopePicker||!chart)return;
-    const update=()=>{state.venomCheckpoint=Number(picker.value);state.venomSourceScope=scopePicker.value;chart.innerHTML=twinVenomSourceRows(checkpoints[state.venomCheckpoint],columns,state.venomSourceScope);};picker.onchange=update;scopePicker.onchange=update;
+    const update=()=>{state.venomCheckpoint=Number(picker.value);state.venomSourceScope=scopePicker.value;chart.innerHTML=twinVenomSourceRows(checkpoints[state.venomCheckpoint],columns,state.venomSourceScope,checkpoints[state.venomCheckpoint-1]?.timeMs??-1);};picker.onchange=update;scopePicker.onchange=update;
   },0);
-  return `<section class="panel twin-source-panel"><div class="twin-source-heading"><h2>永恒毒液来源</h2><label>检查点 <select id="twinVenomCheckpoint" aria-label="毒液层数检查点">${checkpoints.map((c,i)=>`<option value="${i}" ${i===selected?'selected':''}>第${c.index}次邪恶洪流结束，${esc(c.time)}</option>`).join('')}</select></label><select id="twinVenomScope" aria-label="毒液来源统计范围"><option value="cumulative" ${scope==='cumulative'?'selected':''}>全场累计来源</option><option value="interval" ${scope==='interval'?'selected':''}>本段新增来源</option></select></div><p class="muted">每个色块为1层；右侧为检查点实际层数。盛宴与死亡减层单列；死亡最多减3层，不推测被移除的具体来源。</p><div class="twin-source-legend">${columns.map(c=>`<span><i style="background:${c.color}"></i>${esc(c.label)}</span>`).join('')}</div><div id="twinVenomSources" role="list" aria-label="全团毒液来源与实际层数">${twinVenomSourceRows(checkpoints[selected],columns,scope)}</div></section>`;
+  return `<section class="panel twin-source-panel"><div class="twin-source-heading"><h2>永恒毒液来源</h2><label>检查点 <select id="twinVenomCheckpoint" aria-label="毒液层数检查点">${checkpoints.map((c,i)=>`<option value="${i}" ${i===selected?'selected':''}>第${c.index}次邪恶洪流结束，${esc(c.time)}</option>`).join('')}</select></label><select id="twinVenomScope" aria-label="毒液来源统计范围"><option value="cumulative" ${scope==='cumulative'?'selected':''}>全场累计来源</option><option value="interval" ${scope==='interval'?'selected':''}>本段新增来源</option></select></div><p class="muted">每块为1层，从左到右按时间叠加；消层在第二行，悬停查看发生时间。右侧为检查点实际层数，不推测被移除的具体来源。</p><div class="twin-source-legend">${columns.map(c=>`<span><i style="background:${c.color}"></i>${esc(c.label)}</span>`).join('')}<span><i style="background:#f9c267"></i>盛宴消层</span><span><i style="background:#fb7185"></i>死亡消层</span></div><div id="twinVenomSources" role="list" aria-label="全团毒液来源与实际层数">${twinVenomSourceRows(checkpoints[selected],columns,scope,checkpoints[selected-1]?.timeMs??-1)}</div></section>`;
 }
 // WCL positions are hundredths of a yard. The six fixed Boss positions align
 // with the three corners of the original 1997x1118 encounter image at this scale.
@@ -228,8 +233,15 @@ function twinBroodPoint(head){
   return p.slot<=2?twinPlatformAnchor(p.arena,'brood',p.side,p.slot)||twinMapPoint([p.x,p.y]):twinMapPoint([p.x,p.y]);
 }
 function twinFloodAngle(t,cursor){
-  const duration=t.endTimeMs-t.startTimeMs,progress=duration>0?Math.max(0,Math.min(1,(cursor-t.startTimeMs)/duration)):0;
-  return t.initialAngleRadians+(t.rotationDirection||0)*(t.sweepDegrees||270)*Math.PI/180*progress;
+  const duration=t.rotationDurationMs??t.endTimeMs-t.startTimeMs,progress=duration>0?Math.max(0,Math.min(1,(cursor-t.startTimeMs)/duration)):0;
+  const elapsed=Math.max(0,Math.min(cursor,t.endTimeMs??cursor)-t.startTimeMs),sweep=t.angularSpeedDegrees!=null?Math.min(t.sweepDegrees??270,t.angularSpeedDegrees*elapsed/1000):(t.sweepDegrees??270)*progress;
+  return t.initialAngleRadians+(t.rotationDirection||0)*sweep*Math.PI/180;
+}
+function twinFloodCone(t,p,cursor){
+  if(!p||cursor<t.startTimeMs||cursor>=Math.min(t.endTimeMs??Infinity,t.rotationEndTimeMs??t.endTimeMs??Infinity))return '';
+  const angle=twinFloodAngle(t,cursor),half=(t.coneDegrees??30)*Math.PI/360,length=1200;
+  const a=[p[0]+Math.cos(angle-half)*length,p[1]-Math.sin(angle-half)*length],b=[p[0]+Math.cos(angle+half)*length,p[1]-Math.sin(angle+half)*length];
+  return `<g data-key="vile-flood" pointer-events="none"><path d="M ${p[0]} ${p[1]} L ${a[0]} ${a[1]} A ${length} ${length} 0 0 0 ${b[0]} ${b[1]} Z" fill="#b7fa79" fill-opacity=".24" stroke="#d7ffa3" stroke-opacity=".75" stroke-width="2"/>${twinBeam('flood-core',p,[p[0]+Math.cos(angle)*length,p[1]-Math.sin(angle)*length],'#dbffae',cursor)}</g>`;
 }
 function twinFloodWarning(t,p,cursor){
   if(!p||!t.rotationDirection)return '';
@@ -271,7 +283,7 @@ function mountTwinBroodWorkbench(){
       }));
       lastBossPoints=bossPoints;
       const bossDots=bosses.map(b=>{const p=bossPoints[b.actorID];if(!p)return '';const red=b.gameID===257368,color=red?'#ff5e72':'#8bdca8',died=(b.states||[]).findLast(s=>s[0]<=cursor&&s[1]==='dead')||(b.health||[]).find(h=>h[1]===0&&h[0]<=cursor),portrait=TWIN_BOSS_PORTRAITS[red?'Ithraz':'Vexhul'];return twinPortrait('boss:'+b.actorID,p,radius*1.8,portrait.image,color,died?cursor-died[0]:null,b.name);}).join('');
-      const flood=torrent&&torrent.rotationDirection?(()=>{const p=bossPoints[torrent.actorID];if(cursor<torrent.startTimeMs)return twinFloodWarning(torrent,p,cursor);const angle=twinFloodAngle(torrent,cursor);return p?twinBeam('vile-flood',p,[p[0]+Math.cos(angle)*1200,p[1]-Math.sin(angle)*1200],'#b7fa79',cursor):'';})():'';
+      const flood=torrent&&torrent.rotationDirection?(()=>{const p=bossPoints[torrent.actorID];return cursor<torrent.startTimeMs?twinFloodWarning(torrent,p,cursor):twinFloodCone(torrent,p,cursor);})():'';
       const tankBeams=(feedback.channels||[]).filter(c=>[1289192,1303230].includes(c.spellID)&&cursor>=c.startTimeMs&&cursor<c.endTimeMs).map(c=>twinTether('channel:'+c.actorID,bossPoints[c.actorID],position(c.targetID),c.spellID===1289192?'#b4f48a':'#ff8c9c',cursor)).join('');
       const strikers=(feedback.strikers||[]).map(h=>{if(!h.position||cursor<h.spawnTimeMs||h.endTimeMs!=null&&cursor>=h.endTimeMs+900)return '';const p=twinPlatformAnchor(h.arena,'heads',h.slot)||twinMapPoint([h.position.x,h.position.y]),cast=(h.casts||[]).findLast(c=>c.startTimeMs<=cursor&&c.endTimeMs!=null&&cursor<c.endTimeMs+550),aim=cast&&(cast.targetPosition?twinMapPoint([cast.targetPosition.x,cast.targetPosition.y]):position(cast.targetID)),firing=cast&&cursor>=cast.endTimeMs;return `<g data-key="striker:${h.key}">${cast?twinBeam('spit-ray:'+h.key,p,aim,firing?'#ddffaf':'#ffde9e',cursor,!firing):''}${twinPortrait('striker-avatar:'+h.key,p,radius*1.3,'/assets/raids/venomous_abyss/portraits/143971.png','#e7b4ff',h.endTimeMs!=null&&cursor>=h.endTimeMs?cursor-h.endTimeMs:null,'转火蛇头')}${cast?`<rect x="${p[0]-18}" y="${p[1]+radius*1.3+7}" width="36" height="4" rx="2" fill="#28344a"/><rect x="${p[0]-18}" y="${p[1]+radius*1.3+7}" width="${firing?36:36*(cursor-cast.startTimeMs)/(cast.endTimeMs-cast.startTimeMs)}" height="4" rx="2" fill="#f8d79b"/>`:''}</g>`;}).join('');
       const feast=(boss().feast?.rounds||[]).find(r=>cursor>=(r.castStartTimeMs??r.timeMs-4000)&&cursor<(r.channelEndTimeMs??r.timeMs+4000));

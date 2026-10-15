@@ -24,7 +24,7 @@
 
   <main>
     <form id="wcl-run-form" class="wcl-run-form">
-      <div><strong>分析自己的大秘境日志</strong><p>登录并绑定 WCL Client 凭据后，输入 Report 与大秘境 Fight ID。未配置的副本可先查看公开完成日志的实际施法预览。</p></div>
+      <div><strong>分析自己的大秘境日志</strong><p>登录后使用共享 WCL 服务，输入 Report 与大秘境 Fight ID。未配置的副本可先查看公开完成日志的实际施法预览。</p></div>
       <label>Report 链接或编号<input name="reportCode" required placeholder="WCL Report 链接或编号"></label>
       <label>Fight ID<input name="fightID" type="number" min="1" required placeholder="例如 13"></label>
       <label>副本规则<select name="dungeonKey" id="dungeon-rule"><option value="">实际施法预览（公开完成日志）</option></select></label>
@@ -115,5 +115,5 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/frontend/tools/mythic-dungeon/app.js"></script>
-<script src="/frontend/core/home-button.js?v=1"></script><script src="/frontend/core/azeroth-shell.js?v=20261012-field-music"></script></body>
+<script src="/frontend/core/home-button.js?v=1"></script><script src="/frontend/core/azeroth-shell.js?v=20261013-shared"></script></body>
 </html>

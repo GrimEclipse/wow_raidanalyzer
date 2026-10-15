@@ -22,6 +22,16 @@ class AnalysisScope:
 _CURRENT_SCOPE: ContextVar[AnalysisScope | None] = ContextVar(
     "mythic_analyzer_analysis_scope", default=None
 )
+_FIGHT_ACCOUNTING = ContextVar('fight_accounting_callback', default=None)
+
+
+@contextmanager
+def fight_accounting_scope(callback):
+    token = _FIGHT_ACCOUNTING.set(callback)
+    try:
+        yield
+    finally:
+        _FIGHT_ACCOUNTING.reset(token)
 
 
 @contextmanager
@@ -37,8 +47,10 @@ def single_fight_scope(report_id: str, fight_id: int):
 def filter_fights(report_id: str, fights: Iterable[dict]) -> list[dict]:
     rows = list(fights)
     scope = _CURRENT_SCOPE.get()
-    if scope is None:
-        return rows
-    if str(report_id).strip() != scope.report_id:
-        return []
-    return [row for row in rows if int(row.get("id") or 0) == scope.fight_id]
+    if scope is not None:
+        rows = [] if str(report_id).strip() != scope.report_id else [
+            row for row in rows if int(row.get("id") or 0) == scope.fight_id]
+    callback = _FIGHT_ACCOUNTING.get()
+    if callback:
+        callback(report_id, rows)
+    return rows

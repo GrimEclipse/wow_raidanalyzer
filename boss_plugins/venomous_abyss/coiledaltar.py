@@ -269,6 +269,7 @@ INTERMISSION_POTION_LOOKBACK_MS = 2_000
 
 P2_SIGNAL_SPELL = 1307184
 INTERMISSION_MS = 35_000
+INTERMISSION_SOULBIND = 1304032
 CONE_RADIUS_YARDS = 45  # Replay reach calibrated against observed clear positions and stack gains.
 CONE_HALF_ANGLE_DEG = 30.0  # Preserve the 60-degree frontal angle.
 MANIFEST_REPLAY_STEP_MS = 100
@@ -299,10 +300,70 @@ ALTAR_GROUND_PEAK_RADII = (40, 50, 65, 80)  # Team screenshot estimate, per-phas
 ETERNAL_NIGHTFALL_CAST_MS = 15000
 POSITION_RELIABLE_MS = 2_500
 
+# Owner's cutoff is the encounter's local 2026-10-13 date, not analysis time.
+TUNING_CUTOFF = datetime(2026, 10, 13, tzinfo=timezone(timedelta(hours=8)))
+TUNING_SOURCE = 'https://us.forums.blizzard.com/en/wow/t/dungeon-and-raid-tuning-october-13/2380514'
+
+
+def encounter_tuning(fight):
+    report_start = fight.get('reportStartTime')
+    absolute = int(report_start)+int(fight['startTime']) if report_start is not None else None
+    updated = absolute is not None and absolute >= int(TUNING_CUTOFF.timestamp()*1000)
+    if fight.get('observedTuning') is not None:
+        updated = bool(fight['observedTuning'])
+    mythic = int(fight.get('difficulty') or 0) == 5
+    return {'key':'2026-10-13' if updated else 'before-2026-10-13',
+            'evidence':fight.get('tuningEvidence') or ('fight-start-date-Asia-Shanghai' if absolute is not None else 'date-missing-legacy-fallback'),
+            'observedMechanics':fight.get('observedMechanics',{}),
+            'source':TUNING_SOURCE, 'mutationRadiusYards':6 if updated else 8,
+            'p1InitialOrbCount':(8 if updated else 10) if mythic else None,
+            'p1MutationCount':(4 if updated else 5) if mythic else None,
+            'dreadmarchTargetCount':(3 if updated else 4) if mythic else None,
+            'manifestWatchHalfAngleDegrees':MANIFEST_WATCH_HALF_ANGLE_DEG+(10 if updated else 0),
+            'manifestAngleEvidence':'owner-calibrated-angle-plus-hotfix-increase',
+            'manifestDespawnOnTargetDeath':updated, 'manifestImmediateRedGlow':updated,
+            'nightfallCastMs':ETERNAL_NIGHTFALL_CAST_MS+(2000 if updated else 0)}
+
+
+def _with_observed_tuning(fight, raw):
+    """A same-day pre-maintenance fight must not inherit future tuning."""
+    fight = dict(fight)
+    if encounter_tuning(fight)['key'] != '2026-10-13' or int(fight.get('difficulty') or 0) != 5:
+        return fight
+    casts = sorted(raw.get('casts') or [], key=lambda r:int(r['timestamp']))
+    deluges = [r for r in casts if ability_id(r)==TOXIC_DELUGE and is_cast_complete(r)]
+    normals = []
+    for i, cast in enumerate(deluges[:2]):
+        end = deluges[i+1]['timestamp'] if i+1<len(deluges) else fight['endTime']
+        rows = [r for r in casts if ability_id(r)==COALESCED_VENOM_CAST and is_cast_complete(r)
+                and cast['timestamp']<=r['timestamp']<end]
+        if rows:
+            first = rows[0]['timestamp']
+            initial = [r for r in rows if r['timestamp']<=first+1000]
+            # Count observed actor instances, excluding recycled drop casts.
+            if all(r.get('sourceID') is not None and r.get('sourceInstance') is not None for r in initial):
+                normals.append(len({(r['sourceID'],r['sourceInstance']) for r in initial}))
+    march = next((r for r in casts if ability_id(r) in DREADMARCH_CAST_IDS and is_cast_complete(r)),None)
+    targets = None
+    if march:
+        hits = [r for r in raw.get('debuffs') or [] if ability_id(r) in DREADMARCH_DEBUFF_IDS
+                and event_type(r)=='applydebuff' and march['timestamp']<=r['timestamp']<=march['timestamp']+2000]
+        first = min((r['timestamp'] for r in hits),default=None)
+        if first is not None:
+            targets = len({r['targetID'] for r in hits if r['timestamp']<=first+250})
+    observed = {'initialNormalOrbCounts':normals,'firstDreadmarchTargets':targets}
+    if any(n>=5 for n in normals) or targets is not None and targets>=4:
+        fight.update(observedTuning=False,tuningEvidence='observed-pre-hotfix-counts',observedMechanics=observed)
+    elif normals and all(n==4 for n in normals) and targets==3:
+        fight.update(observedTuning=True,tuningEvidence='observed-post-hotfix-counts',observedMechanics=observed)
+    else:
+        fight.update(tuningEvidence='date-candidate-not-event-confirmed',observedMechanics=observed)
+    return fight
+
 # 拉取时只向 WCL 要机制相关技能，避免整场友伤/治疗/带坐标的团员施法。
 MECHANIC_CAST_IDS = (
     {TOXIC_DELUGE, COALESCED_VENOM_CAST, VIRULENT_MUTATION_CAST, ETERNAL_NIGHTFALL, ETERNAL_NIGHTFALL_AURA,
-     P2_SIGNAL_SPELL, MANIFEST_CAST, FIXATION, RECLAIM_ESSENCE}
+     P2_SIGNAL_SPELL, MANIFEST_CAST, FIXATION, RECLAIM_ESSENCE, INTERMISSION_SOULBIND}
     | SEVER_IDS | BLIGHTED_SEVER_IDS | SOUL_SEVER_IDS
     | GUILLOTINE_CAST_IDS | GRIM_GUILLOTINE_CAST_IDS
     | DREADMARCH_CAST_IDS | GLOOMBOMB_CAST_IDS | WAIL_OF_TERROR_IDS | {SPIRIT_SHIELD}
@@ -1692,8 +1753,8 @@ def _venom_kind_from_spell(spell_id):
     return VENOM_KIND_NORMAL
 
 
-def _venom_blast_yards(kind):
-    return VIRULENT_BLAST_RADIUS_YARDS if kind == VENOM_KIND_MUTATION else None
+def _venom_blast_yards(kind, radius=VIRULENT_BLAST_RADIUS_YARDS):
+    return radius if kind == VENOM_KIND_MUTATION else None
 
 
 def _venom_map_kind(kind, *, grounded=True):
@@ -1727,6 +1788,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
     - 掉落后短窗口内再被捡起视为接力，不把中间落点当成最终场上位置
     - 有 1282408 伤害源坐标时刷新地上毒液位置
     """
+    blast_radius = encounter_tuning(fight)["mutationRadiusYards"]
     fight_start = int(fight["startTime"])
     deluge_casts = [event for event in casts if int(ability_id(event) or 0) == TOXIC_DELUGE and is_cast_complete(event)]
     spawn_events = [
@@ -1748,7 +1810,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 "sourceInstance": event.get("sourceInstance") or event.get("sourceInstanceID"),
                 "spellID": int(ability_id(event) or 0),
                 "venomKind": venom_kind,
-                "blastRadiusYards": _venom_blast_yards(venom_kind),
+                "blastRadiusYards": _venom_blast_yards(venom_kind, blast_radius),
                 "position": point_dict(spawn_point, timestamp=int(event["timestamp"])) if spawn_point else None,
             })
         rounds.append({
@@ -1779,7 +1841,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
         return {
             "puddleID": puddle_seq,
             "venomKind": kind,
-            "blastRadiusYards": _venom_blast_yards(kind),
+            "blastRadiusYards": _venom_blast_yards(kind, blast_radius),
             "position": point_dict(position, timestamp=grounded_from_abs) if isinstance(position, tuple) else position,
             "groundedFromMs": grounded_from_abs - fight_start,
             "pickedUpAtMs": None,
@@ -1840,7 +1902,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 puddle["pickedUpAtMs"] = rel_ms
                 puddle["groundedFromMs"] = None
             puddle["venomKind"] = carry_kind
-            puddle["blastRadiusYards"] = _venom_blast_yards(carry_kind)
+            puddle["blastRadiusYards"] = _venom_blast_yards(carry_kind, blast_radius)
             puddle.setdefault("carriers", []).append({
                 **player_ref(players, actor_map, target_id),
                 "applyTimeMs": rel_ms,
@@ -1863,7 +1925,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
                 "puddleID": puddle["puddleID"],
                 "transferCount": puddle.get("transferCount") or 0,
                 "venomKind": carry_kind,
-                "blastRadiusYards": _venom_blast_yards(carry_kind),
+                "blastRadiusYards": _venom_blast_yards(carry_kind, blast_radius),
                 "spellID": int(ability_id(event) or 0),
                 "kind": "pickup",
             })
@@ -1892,7 +1954,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             "puddleID": (puddle or {}).get("puddleID"),
             "transferCount": (puddle or {}).get("transferCount") or 0,
             "venomKind": drop_kind,
-            "blastRadiusYards": _venom_blast_yards(drop_kind),
+            "blastRadiusYards": _venom_blast_yards(drop_kind, blast_radius),
             "spellID": int(ability_id(event) or 0),
             "kind": "drop",
             "finalDrop": True,
@@ -1906,7 +1968,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             puddle["groundedFromMs"] = rel_ms
             puddle["pickedUpAtMs"] = None
             puddle["venomKind"] = drop_kind
-            puddle["blastRadiusYards"] = _venom_blast_yards(drop_kind)
+            puddle["blastRadiusYards"] = _venom_blast_yards(drop_kind, blast_radius)
             if puddle.get("carriers"):
                 puddle["carriers"][-1].update({
                     "removeTimeMs": rel_ms,
@@ -1984,13 +2046,13 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
             for round_row in rounds
             for spawn in round_row.get("spawns") or []
         ),
-        "virulentBlastRadiusYards": VIRULENT_BLAST_RADIUS_YARDS,
+        "virulentBlastRadiusYards": blast_radius,
         "evidenceNote": (
             "凝结毒液按落地/拾取状态机追踪，支持多次接力；"
             f"掉落后 {VENOM_TRANSFER_WINDOW_MS}ms 内再捡起记为搬运中转；"
             f"捡球时用玩家位置与放球点是否 ≤{VENOM_PICKUP_MAX_YARDS:g} 码判断同一球；"
             "史诗烈毒变异体（1310544）与诱变毒液（1310498/1310691）单独成团，"
-            f"最终落点绘制 {VIRULENT_BLAST_RADIUS_YARDS:g} 码引爆圈；"
+            f"最终落点绘制 {blast_radius:g} 码引爆圈；"
             "撕裂几何只用「释放前仍在地上」的区间，优先 1282408 伤害源坐标。"
         ),
     }
@@ -1998,6 +2060,7 @@ def analyze_toxic_deluge(fight, casts, debuffs, position_index, actor_map, playe
 
 def build_active_venom_points(toxic_deluge):
     """撕裂几何用「某时刻仍在地上」的凝结毒液，不是每一次 debuff 消失落点。"""
+    blast_radius = toxic_deluge.get("virulentBlastRadiusYards", VIRULENT_BLAST_RADIUS_YARDS)
     points = []
     for puddle in toxic_deluge.get("groundPuddles") or []:
         position = puddle.get("position")
@@ -2008,7 +2071,7 @@ def build_active_venom_points(toxic_deluge):
         points.append({
             "kind": _venom_map_kind(kind, grounded=True),
             "venomKind": kind,
-            "blastRadiusYards": _venom_blast_yards(kind),
+            "blastRadiusYards": _venom_blast_yards(kind, blast_radius),
             "puddleID": puddle.get("puddleID"),
             "position": position,
             "groundedFromMs": grounded_from,
@@ -2031,7 +2094,7 @@ def build_active_venom_points(toxic_deluge):
                 points.append({
                     "kind": _venom_map_kind(drop_kind, grounded=True),
                     "venomKind": drop_kind,
-                    "blastRadiusYards": _venom_blast_yards(drop_kind) if drop.get("finalDrop") else None,
+                    "blastRadiusYards": _venom_blast_yards(drop_kind, blast_radius) if drop.get("finalDrop") else None,
                     "carrier": drop.get("player"),
                     "player": drop.get("player"),
                     "playerID": drop.get("playerID"),
@@ -2857,6 +2920,7 @@ def analyze_manifestations(
     markers,
     enemy_deaths=None,
     position_index=None,
+    player_deaths=None,
 ):
     fixations = []
     active = {}
@@ -2897,14 +2961,27 @@ def analyze_manifestations(
             row["removeTimestamp"] = timestamp
 
     fight_end = int(fight["endTime"])
+    tuning = encounter_tuning(fight)
+    retired, surviving_rows = {}, []
     for row in fixations:
         manifest = row.get("manifest") or {}
         source_id = manifest.get("sourceID")
         source_instance = manifest.get("sourceInstance")
         apply_abs = int(fight["startTime"]) + int(row["applyTimeMs"])
+        key = (source_id, source_instance)
+        if source_id is not None and key in retired and apply_abs >= retired[key]:
+            continue
         remove_abs = fight["startTime"] + row["removeTimeMs"] if row.get("removeTimeMs") is not None else None
         death_ts = _npc_instance_death_ts(enemy_deaths, source_id, source_instance)
-        despawn_ts = min(ts for ts in (remove_abs, death_ts, fight_end) if ts is not None)
+        target_death = min((int(e['timestamp']) for e in player_deaths or []
+            if e.get('targetID') == row['playerID'] and apply_abs <= int(e['timestamp']) <= (remove_abs or fight_end)),
+            default=None) if tuning['manifestDespawnOnTargetDeath'] else None
+        despawn_ts = min(ts for ts in (remove_abs, death_ts, target_death, fight_end) if ts is not None)
+        if target_death is not None and target_death == despawn_ts:
+            retired[key] = target_death
+            row.update(removeTimeMs=target_death-int(fight['startTime']),
+                       removeTime=fmt_ms(target_death-int(fight['startTime'])),
+                       despawnReason='fixated-target-death')
         # 具象坐标：消失前最后一次 NPC 自身采样（不是被点名玩家）
         position = _position_last_at_or_before(npc_position_index, source_id, source_instance, despawn_ts)
         if not position:
@@ -2924,6 +3001,8 @@ def analyze_manifestations(
                     offset_ms=player_state.get("sampleOffsetMs"),
                 )
 
+        surviving_rows.append(row)
+    fixations = surviving_rows
     manifestation_points = []
     for row in fixations:
         manifestation_points.append({
@@ -4470,6 +4549,7 @@ def build_field_audit(
     manifestations=None, guillotine=None, grim_guillotine=None,
 ):
     """场地示意图：撕裂锥形清场 + 处斩跑离 + 幽暗炸弹分散 + 史诗毒液/烈毒变异体落点。"""
+    blast_radius = toxic_deluge.get("virulentBlastRadiusYards", VIRULENT_BLAST_RADIUS_YARDS)
     diagrams = []
 
     def append_cone_diagram(row, mechanic, primary_key):
@@ -4534,7 +4614,7 @@ def build_field_audit(
             mutation_n = sum(1 for point in targets if point.get("venomKind") == VENOM_KIND_MUTATION)
             annotation = annotation or (
                 f"推断清理 {row.get('inferredClearedCount')} 团，几何命中 {row.get('clearedByGeometry')}"
-                + (f"；烈毒变异体 {mutation_n} 团（紫圈 {VIRULENT_BLAST_RADIUS_YARDS:g} 码）" if mutation_n else "")
+                + (f"；烈毒变异体 {mutation_n} 团（紫圈 {blast_radius:g} 码）" if mutation_n else "")
             )
         diagrams.append({
             "kind": "cone-clear",
@@ -4622,7 +4702,7 @@ def build_field_audit(
                 "venomKind": kind,
                 "position": drop["dropPosition"],
                 "timeMs": drop.get("removeTimeMs"),
-                "blastRadiusYards": _venom_blast_yards(kind) if mutation else None,
+                "blastRadiusYards": _venom_blast_yards(kind, blast_radius) if mutation else None,
                 "finalDrop": True,
             })
         if not targets:
@@ -4636,12 +4716,12 @@ def build_field_audit(
             "time": row["time"],
             "timeMs": row.get("timeMs"),
             "targets": targets,
-            "virulentBlastRadiusYards": VIRULENT_BLAST_RADIUS_YARDS,
+            "virulentBlastRadiusYards": blast_radius,
             "annotation": (
                 f"生成 {row.get('spawnCount', 0)} 团"
                 + (f"，其中烈毒变异体 {row.get('mutationSpawnCount', 0)} 团" if row.get("mutationSpawnCount") else "")
                 + f"；最终落点 {len(last_drops)} 团"
-                + (f"；紫圈为烈毒变异体 {VIRULENT_BLAST_RADIUS_YARDS:g} 码引爆范围（{mutation_n} 团）" if mutation_n else "")
+                + (f"；紫圈为烈毒变异体 {blast_radius:g} 码引爆范围（{mutation_n} 团）" if mutation_n else "")
             ),
         })
 
@@ -4737,7 +4817,7 @@ def build_field_audit(
         "diagrams": diagrams,
         "evidenceNote": (
             f"场地中心 ({ARENA_CENTER_X_UNITS:g}, {ARENA_CENTER_Y_UNITS:g}) 码，石台边长 {int(ARENA_SIDE_YARDS)} 码（WCL 坐标=码×100）。"
-            f"史诗烈毒变异体最终落点按 {VIRULENT_BLAST_RADIUS_YARDS:g} 码紫圈绘制引爆范围。"
+            f"史诗烈毒变异体最终落点按 {blast_radius:g} 码紫圈绘制引爆范围。"
         ),
     }
 
@@ -4756,6 +4836,7 @@ def _analysis_needs(options):
 
 
 def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
+    fight = _with_observed_tuning(fight, raw)
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     needs = _analysis_needs(options)
     field_enabled = needs["positions"]
@@ -4794,17 +4875,21 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     )
     position_index = build_position_index(position_events) if field_enabled else {}
     arena = coiledaltar_arena(position_index, list(players), boss_id=boss_id) if field_enabled else {}
+    if arena:
+        arena["virulentBlastRadiusYards"] = encounter_tuning(fight)["mutationRadiusYards"]
 
     toxic_deluge = analyze_toxic_deluge(
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         damage_events=list(raw.get("damage") or []),
     ) if needs["toxicDelugeReviewEnabled"] else {}
     if toxic_deluge:
+        toxic_deluge["expectedP1InitialOrbCount"] = encounter_tuning(fight)["p1InitialOrbCount"]
+        toxic_deluge["expectedP1MutationCount"] = encounter_tuning(fight)["p1MutationCount"]
         _merge_venom_drop_spawns(toxic_deluge)
     venom_points = build_active_venom_points(toxic_deluge) if field_enabled else []
     manifestations = analyze_manifestations(
         fight, raw["debuffs"], npc_position_index, actor_map, players, actor_catalog, markers,
-        enemy_deaths=enemy_deaths, position_index=position_index,
+        enemy_deaths=enemy_deaths, position_index=position_index, player_deaths=deaths,
     ) if needs["manifestationsReviewEnabled"] else {}
     active_points = venom_points + (manifestations.get("activePoints") or [])
 
@@ -4842,6 +4927,8 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         fight, raw["casts"], raw["debuffs"], raw["damage"], [],
         deaths, actor_map, players, markers,
     ) if options["dreadmarchReviewEnabled"] else {}
+    if dreadmarch:
+        dreadmarch["expectedInitialTargetCount"] = encounter_tuning(fight)["dreadmarchTargetCount"]
     soul_sever = analyze_soul_sever(
         fight, raw["casts"], enemy_deaths, position_index, actor_map, markers, manifestations.get("activePoints") or [],
         boss_actor_id=malacrass_id, origin_index=caster_index, debuffs=raw["debuffs"],
@@ -5050,6 +5137,8 @@ def _replay_pose(unit, t):
 
 def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
     """Face-aware estimates, with observed spawns and aura/death lifetimes."""
+    tuning = encounter_tuning(fight)
+    watch_angle = tuning['manifestWatchHalfAngleDegrees']
     start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
     units = {u['actorID']:{**u, '_positionTimes':[r[0] for r in u['samples']],
                           '_facingTimes':[r[0] for r in u.get('facingSamples', [])]}
@@ -5088,7 +5177,7 @@ def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
             if known_facing:
                 dx, dy = x-pose['x'], y-pose['y']
                 bearing = math.atan2(-dy, dx)
-                watched = math.cos(bearing-pose['facing']) >= math.cos(math.radians(MANIFEST_WATCH_HALF_ANGLE_DEG))
+                watched = math.cos(bearing-pose['facing']) >= math.cos(math.radians(watch_angle))
                 distance = math.hypot(dx, dy)
                 moving = not watched and distance > 100 and t > max(begins,previous_anchor)
                 if moving:
@@ -5098,6 +5187,7 @@ def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
             trajectory.append([t, round(x, 2), round(y, 2), pid, int(moving), int(known_facing), last_move])
         ghosts.append({'key':f'{key[0]}:{key[1]}', 'actorID':key[0], 'instance':key[1],
             'startTimeMs':begins, 'endTimeMs':ends, 'samples':trajectory,
+            'endReason':next((r.get('despawnReason') for r in assignments if r.get('despawnTimeMs')==ends),None),
             'assignments':[{'playerID':r['playerID'], 'startTimeMs':r['applyTimeMs'],
                             'endTimeMs':r.get('removeTimeMs') or duration} for r in assignments],
             'positionEvidence':'observed-spawn-facing-estimate'})
@@ -5145,6 +5235,8 @@ def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
     clear_rows = sorted([*mechanics.get('soulSever', {}).get('rounds', []),
                          *mechanics.get('blightedSever', {}).get('rounds', [])], key=lambda r:r['timeMs'])
     for ghost in ghosts:
+        if ghost.get('endReason') == 'fixated-target-death':
+            continue  # A target's death is not evidence that a frontal cleared its ghost.
         clear = next((r for r in clear_rows if abs(r['timeMs']-ghost['endTimeMs']) <= 200), None)
         if not clear or not ghost['samples'] or not clear.get('origin') or clear.get('facingRadians') is None:
             continue
@@ -5158,7 +5250,7 @@ def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
     _exclude_unrecorded_manifest_contacts(ghosts,triggers)
     return {'ghosts':ghosts, 'resonanceCollisions':triggers,
             'stepMs':MANIFEST_REPLAY_STEP_MS, 'speedYardsPerSecond':MANIFEST_REPLAY_SPEED_YARDS,
-            'watchHalfAngleDegrees':MANIFEST_WATCH_HALF_ANGLE_DEG,
+            'watchHalfAngleDegrees':watch_angle, 'immediateRedGlow':tuning['manifestImmediateRedGlow'],
             'evidenceNote':'出生位置和凝视关系来自日志；后续轨迹按玩家面向估算。只有一只近期移动且另一只面对玩家停住时，标注推测移动方；缺少面向或双方移动不确定单人责任。'}
 
 
@@ -5371,6 +5463,7 @@ def _build_altar_ground_replay(fight, mechanics, raw):
 
 def _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map):
     """Boss-owned fixed cast length with actual completion/interrupt boundaries."""
+    nightfall_ms = encounter_tuning(fight)['nightfallCastMs']
     start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
     bosses = {b['actorID']:b for b in mechanics['combatReplay']['bosses']}
     for b in bosses.values():
@@ -5392,9 +5485,9 @@ def _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map):
             if old and t < old['endTimeMs']:
                 old['endTimeMs'] = t
             if spell in NIGHTFALL_INTERRUPTED_SPELLS:
-                cast = {'startTimeMs':t,'endTimeMs':min(duration,t+ETERNAL_NIGHTFALL_CAST_MS),
-                        'expectedEndTimeMs':t+ETERNAL_NIGHTFALL_CAST_MS,
-                        'durationMs':ETERNAL_NIGHTFALL_CAST_MS,'spellID':spell,
+                cast = {'startTimeMs':t,'endTimeMs':min(duration,t+nightfall_ms),
+                        'expectedEndTimeMs':t+nightfall_ms,
+                        'durationMs':nightfall_ms,'spellID':spell,
                         'spellName':'永恒夜幕','outcome':'unconfirmed','interruptFeedbackMs':650}
                 bosses[source]['casts'].append(cast)
                 pending[source] = cast
@@ -5414,6 +5507,45 @@ def _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map):
                 pending.pop(source,None)
     for b in bosses.values():
         b['casts'].sort(key=lambda c:c['startTimeMs'])
+
+
+def _apply_altar_soulbind_replay(fight, mechanics, raw):
+    """35-second Malacrass channel, anchored to his self aura/cast."""
+    start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
+    bosses = {b['actorID']:b for b in mechanics['combatReplay']['bosses'] if b.get('gameID')==259854}
+    rows = sorted([*(raw.get('replayEvents') or []),*(raw.get('casts') or []),*(raw.get('enemyBuffs') or [])],
+                  key=lambda e:int(e['timestamp']))
+    channels, seen = [], {}
+    for event in rows:
+        source, target, kind, spell = event.get('sourceID'), event.get('targetID'), event_type(event), ability_id(event)
+        if source not in bosses or spell!=INTERMISSION_SOULBIND:
+            continue
+        if not (kind=='cast' or kind=='applybuff' and target==source):
+            continue
+        ts = int(event['timestamp'])
+        if source in seen and ts-seen[source]<500:
+            continue
+        seen[source] = ts
+        stops = [int(e['timestamp']) for e in rows if int(e['timestamp'])>ts and
+                 ((event_type(e)=='removebuff' and ability_id(e)==INTERMISSION_SOULBIND and e.get('targetID')==source)
+                  or (event_type(e)=='applybuff' and ability_id(e)==P3_SOULBOUND and e.get('targetID')==source))]
+        actual = min(stops,default=None)
+        death = min((int(e['timestamp']) for e in raw.get('enemyDeaths') or []
+                     if e.get('targetID')==source and int(e['timestamp'])>=ts),default=None)
+        end = min(actual if actual is not None else ts+INTERMISSION_MS,
+                  death if death is not None else start+duration,start+duration)
+        if end<=ts:
+            continue
+        outcome = 'completed' if actual is not None and end>=ts+INTERMISSION_MS-250 else 'cancelled' if end<ts+INTERMISSION_MS else 'unconfirmed'
+        cast = {'startTimeMs':ts-start,'endTimeMs':end-start,'expectedEndTimeMs':ts-start+INTERMISSION_MS,
+                'durationMs':INTERMISSION_MS,'spellID':INTERMISSION_SOULBIND,'spellName':'灵魂绑定',
+                'phase':'channel','outcome':outcome,'evidence':'self-aura' if kind=='applybuff' else 'observed-cast'}
+        channels.append({'casterID':source,**cast})
+    for actor, boss in bosses.items():
+        boss['casts'] = [c for c in boss['casts'] if c['spellID']!=INTERMISSION_SOULBIND]
+        boss['casts'].extend({k:v for k,v in c.items() if k!='casterID'} for c in channels if c['casterID']==actor)
+        boss['casts'].sort(key=lambda c:c['startTimeMs'])
+    return {'channels':channels,'durationMs':INTERMISSION_MS}
 
 
 def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
@@ -5525,8 +5657,11 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
 
 
 def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fight, raw):
+    fight = {**fight, "reportStartTime":report_start}
+    fight = _with_observed_tuning(fight, raw)
     players = build_player_catalog(actor_map, actor_type, raw["combatants"])
     mechanics = analyze_fight(fight, actor_map, actor_type, actor_rows, raw)
+    mechanics["tuning"] = encounter_tuning(fight)
 
     duration_ms = int(fight["endTime"] - fight["startTime"])
     started = datetime.fromtimestamp((report_start + fight["startTime"]) / 1000, tz=CN_TZ)
@@ -5537,6 +5672,7 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
         mechanics['soulcoilerReplay'] = _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map)
         mechanics['altarGroundReplay'] = _build_altar_ground_replay(fight, mechanics, raw)
         _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map)
+        mechanics['soulbindReplay'] = _apply_altar_soulbind_replay(fight, mechanics, raw)
         mechanics['manifestReplay'] = _build_manifest_replay(fight, mechanics, raw, players, actor_map)
         mechanics.setdefault('manifestations', {})['resonanceCollisions'] = mechanics['manifestReplay']['resonanceCollisions']
     end_phase = mechanics["phaseTimeline"][-2]["label"] if len(mechanics["phaseTimeline"]) > 1 else "P1"
@@ -5718,6 +5854,7 @@ def build_aggregated_json(report_ids, options=None):
                 {
                     **fight,
                     "wclPhaseMetadata": phase_metadata,
+                    "reportStartTime": report["startTime"],
                 }
                 for fight in report["fights"]
                 if int(fight.get("encounterID") or 0) in ENCOUNTER_IDS
@@ -5753,7 +5890,7 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-ground-icons-2026-10-12-v7-assets",
+            "mechanicVersion": "coiledaltar-observed-tuning-soulbind-2026-10-13-v9",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
                                if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],

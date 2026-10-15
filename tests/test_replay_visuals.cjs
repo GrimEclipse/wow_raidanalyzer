@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 require('../frontend/core/mechanic-workbench.js');
-const api=globalThis.MechanicWorkbench,context={MechanicWorkbench:api,window:{},boss:()=>({}),current:()=>({durationMs:10000})};
+const api=globalThis.MechanicWorkbench,context={MechanicWorkbench:api,window:{},boss:()=>({}),current:()=>({durationMs:10000}),esc:s=>String(s??'').replaceAll('"','&quot;')};
 vm.createContext(context);
 vm.runInContext(fs.readFileSync('frontend/report/plugins/venomous_abyss/progression/report.js','utf8').split('\n').filter(line=>line.startsWith('function lerp')).join('\n'),context);
 vm.runInContext(fs.readFileSync('frontend/report/plugins/venomous_abyss/sszorak/mechanics.js','utf8'),context);
@@ -34,4 +34,28 @@ assert.ok(Math.abs(context.twinFloodAngle(flood,18000)-Math.PI/2-1.5*Math.PI)<1e
 assert.equal(context.twinFloodAngle(flood,25000),context.twinFloodAngle(flood,18000));
 assert.ok(!context.twinFloodWarning(flood,[100,100],2000).includes('<text'));
 assert.ok(context.twinFloodWarning(flood,[100,100],2000).includes('flood-direction-warning'));
+const calibrated={...flood,angularSpeedDegrees:24,rotationDurationMs:14000,rotationEndTimeMs:18000,coneDegrees:30,sweepDegrees:336};
+assert.ok(Math.abs(context.twinFloodAngle(calibrated,18000)-Math.PI/2-336*Math.PI/180)<1e-9);
+assert.ok(context.twinFloodCone(calibrated,[100,100],8000).includes('vile-flood'));
+assert.ok(context.twinFloodCone(calibrated,[100,100],16000).includes('vile-flood'));
+assert.equal(context.twinFloodCone(calibrated,[100,100],18000),'');
+assert.equal(context.twinFloodCone(calibrated,[100,100],3000),'');
+const short={...calibrated,endTimeMs:6000,rotationEndTimeMs:6000,sweepDegrees:48};
+assert.ok(Math.abs(context.twinFloodAngle(short,6000)-Math.PI/2-48*Math.PI/180)<1e-9);
+context.esc=s=>String(s??'').replaceAll('"','&quot;');context.player=p=>p.player;
+const checkpoint={timeMs:6000,intervalStartTimeMs:2500,players:[{playerID:1,player:'Player',stacks:2,alive:true,history:[
+  {timeMs:1000,time:'00:01',delta:1,originKey:'orb',fromStack:0,toStack:1},
+  {timeMs:2000,time:'00:02',delta:1,originKey:'wave',fromStack:1,toStack:2},
+  {timeMs:3000,time:'00:03',delta:-1,category:'feast',fromStack:2,toStack:1},
+  {timeMs:4000,time:'00:04',delta:2,originKey:'orb',fromStack:1,toStack:3},
+  {timeMs:5000,time:'00:05',delta:-1,category:'death',fromStack:3,toStack:2},
+  {timeMs:7000,time:'00:07',delta:1,originKey:'wave',fromStack:2,toStack:3}]}]};
+const columns=[{key:'orb',label:'Orb',color:'#0f0'},{key:'wave',label:'Wave',color:'#00f'}];
+const chronological=context.twinVenomSourceRows(checkpoint,columns);
+assert.deepEqual([...chronological.matchAll(/data-source="([^"]+)"/g)].map(m=>m[1]),['orb','wave','orb','orb']);
+assert.ok(chronological.indexOf('twin-source-removals')>chronological.lastIndexOf('data-source='));
+assert.deepEqual([...chronological.matchAll(/data-removal="([^"]+)"/g)].map(m=>m[1]),['feast','death']);
+const interval=context.twinVenomSourceRows(checkpoint,columns,'interval');
+assert.deepEqual([...interval.matchAll(/data-source="([^"]+)"/g)].map(m=>m[1]),['orb','orb']);
+assert.ok(!interval.includes('00:01'));
 console.log('Replay identity, effect windows and fixed cast slot passed');
