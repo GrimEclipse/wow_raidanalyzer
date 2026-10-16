@@ -1,5 +1,13 @@
 # Boss 7，盘卷祭坛 / The Coiled Altar
 
+## 2026-10-13 tuning
+
+Encounter start (`report.startTime + fight.startTime`) and the owner's 2026-10-13 date establish a tuning candidate, not proof of deployment. On Mythic, observed initial ordinary-orb batches and first Dreadmarch applications take priority: five ordinary orbs or four initial targets preserve pre-hotfix rules; four ordinary orbs together with three targets confirm the post-hotfix rules. Deduplicate actor instances and take the initial application cluster, not later ghost collisions or recycled drops. Incomplete evidence remains explicitly unconfirmed. Missing dates retain legacy rules. Analysis date never changes historical mechanics; regional maintenance is not synchronized to midnight in Asia/Shanghai.
+
+After the cutoff, Mythic P1's initial total is eight orbs, including four Virulent Mutations; Dreadmarch initially targets three players. These are expected counts only: actual spawns, carriers and targets stay event-driven, without padding or truncation. All difficulties use six-yard Mutation/Mutagenic Venom visual circles and a 17-second Eternal Nightfall bar, preserving actual interrupts. Target death ends a Manifestation's lifetime; subsequent aliases of that instance cannot retarget it. Red glow begins at observed fixation. Facing-stop estimates increase the previous owner-calibrated 30-degree half-angle by ten degrees to forty; this absolute model angle remains a calibration estimate, not an official published angle.
+
+Source: [Blizzard Dungeon and Raid Tuning — October 13](https://us.forums.blizzard.com/en/wow/t/dungeon-and-raid-tuning-october-13/2380514). The original public demo remains a pre-tuning scene. Public rankings and the 30 newest Zone 53 reports yielded today's records: `8TJdnK1Rzy26gmAC` Fight 7, Incarnate Mythic kill at 2026-10-13 08:54:43 +08:00, and `4GkXAMNfh1rKV3v6` Fight 36 at 11:42:31 +08:00. Both still have five initial ordinary orbs and four first Dreadmarch targets, so neither is verified post-hotfix. The latest 30 reports contained 58 Mythic M7 fights. Do not relabel these as post-nerf merely because their calendar date is October 13.
+
 ## 战斗结构
 
 - P1「毒蛇交易」：单目标祖尔加。将其压到 1 点生命后，他会引爆场上凝结的毒液并退场。
@@ -79,3 +87,8 @@
 - 污染层按固定场地坐标裁剪到内场地板，避免盖住外侧墙壁和通道。公开击杀样本只有两次 P3 亵渎，第四次全覆盖逻辑通过独立测试验证，不补造本场不存在的施法。
 - 永恒夜幕 1286918/1310752 在完整回放中独立按 15 秒总长度构建，关闭专项统计不影响回放。实际打断以目标首领及被打断技能同时匹配为准，保存打断时刻、玩家与技能；头顶条和状态卡短暂显示断条反馈，进度不以实际打断时刻归一化。未知结果只播放有真实开始事件的 15 秒窗口，不补造施法成功。
 - 补齐该史诗击杀实际使用的复仇者之盾 31935、责难 96231、切喉手 116705、沉默 220543、镇压 351338 本地图标。来源为 Wowhead 技能元数据与 Zamimg 图标，统一保存到 assets/spells/<ID>.jpg，不使用外部图标链接。
+
+
+## 2026-10-13 Soulbinding replay
+
+Malacrass (259854) channels Soulbinding (1304032) during the intermission. Use his completed channel-start cast or self-applied aura, deduplicate the corresponding cast/aura and the separate Zul'jan target aura, and use actual self-aura removal or the permanent P3 Soulbound application to end the channel. The public Incarnate kill records start 6:28.517 and end 7:03.532, a 35.015-second lifetime. Expected channel duration is 35,000 ms; preserve observed ending, boss death and fight truncation. The permanent P3 aura 1289798 alone must never create another intermission channel. Show the bar in both Boss HUD and overhead cast display, and add a Soulbinding replay jump. This is independent of the optional intermission statistics; it reuses replay events without another full-fight stream. The original homepage M7 demo has been enriched from its actual 1304032/P3 aura events to include the same channel, retaining historical mechanics.

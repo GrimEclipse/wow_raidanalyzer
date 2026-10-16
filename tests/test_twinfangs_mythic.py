@@ -466,10 +466,64 @@ def test_rotation_uses_paladin_path_and_separated_hits():
     torrents=[{"actorID":9,"startTimeMs":10000,"endTimeMs":24000}]
     boss._torrent_rotation(torrents,rows,0,{1:{"specID":66},2:{"specID":62}})
     assert torrents[0]["rotationDirection"]==-1
-    assert abs(torrents[0]["fittedAngularSpeedDegrees"]-20)<.1
-    assert abs(torrents[0]["angularSpeedDegrees"]*14-270)<.001
-    assert abs(degrees(torrents[0]["initialAngleRadians"])-90)<.2
+    assert torrents[0]["angularSpeedDegrees"] == 24
+    assert torrents[0]["rotationFit"]["method"] == 'reviewed-speed-estimate'
+    assert abs(torrents[0]["angularSpeedDegrees"]*torrents[0]['rotationDurationMs']/1000-336)<.001
+    assert torrents[0]['coneDegrees'] == 30
     assert torrents[0]["previousArena"]=="north"
+
+
+def test_joint_cone_hit_and_blink_constraints_preserve_safe_second_round_landings():
+    from math import sin, cos, radians, degrees, atan2
+    origin = {'x': -28, 'y': 61155}
+    torrents = [dict(actorID=21,startTimeMs=140039,endTimeMs=154041,origin=origin,
+                    rotationDirection=-1,initialAngleRadians=radians(90)),
+                dict(actorID=21,startTimeMs=295089,endTimeMs=309093,origin=origin,
+                    rotationDirection=1,initialAngleRadians=radians(-30))]
+    def hit(time, x, y, pid):
+        return dict(timestamp=time,type='damage',sourceID=21,targetID=pid,
+                    abilityGameID=1294605,amount=1,resourceActor=2,x=x,y=y)
+    events = [hit(140740,1339,62614,15),hit(147947,-231,58685,13),
+              hit(295143,2294,58913,1),hit(295143,1530,59089,7),
+              hit(295143,1839,58875,8),hit(295143,1778,58737,19),
+              hit(295143,3488,57714,10),hit(295323,1736,58751,6)]
+    blinks = [dict(playerID=3,timeMs=142861,arrivalTimeMs=143134,
+                   before={'x':3615,'y':61138},
+                   after={'x':-28+4000*cos(radians(31.39274)),'y':61155+4000*sin(radians(31.39274))}),
+              dict(playerID=3,timeMs=305317,arrivalTimeMs=305619,
+                   before={'x':-2871,'y':58696},after={'x':-4042,'y':60416}),
+              dict(playerID=13,timeMs=306771,arrivalTimeMs=306984,
+                   before={'x':-1508,'y':57501},after={'x':-2942,'y':58904})]
+    boss._fit_torrent_cones(torrents, events, 0, blinks)
+    a,b=torrents
+    assert a['angularSpeedDegrees'] == b['angularSpeedDegrees']
+    assert b['angularSpeedDegrees'] == 24
+    assert b['rotationFit']['speedRangeDegrees'][0] > 23
+    assert b['sweepDegrees'] > 336
+    assert b['rotationEndTimeMs'] == b['endTimeMs']
+    assert b['rotationFit']['crossingPlayers'] == [3,13]
+    for jump in blinks[1:]:
+        for key,time in [('before',jump['timeMs']),('after',jump['arrivalTimeMs'])]:
+            if time >= b['rotationEndTimeMs']:
+                continue
+            p=jump[key]; heading=degrees(atan2(p['y']-origin['y'],p['x']-origin['x']))
+            center=degrees(b['initialAngleRadians'])+b['angularSpeedDegrees']*(time-b['startTimeMs'])/1000
+            assert abs((heading-center+180)%360-180) > 14.9
+
+
+def test_blink_pairing_uses_owned_positions_and_rejects_long_sample_gaps():
+    rows=[dict(timestamp=100,type='cast',sourceID=1,targetID=9,abilityGameID=212653,
+               resourceActor=1,x=0,y=0),
+          dict(timestamp=150,type='damage',sourceID=1,targetID=9,abilityGameID=1,
+               resourceActor=2,x=3000,y=0),
+          dict(timestamp=300,type='cast',sourceID=1,targetID=9,abilityGameID=1,
+               resourceActor=1,x=2000,y=0)]
+    result=boss._torrent_blinks(rows,0,{1:{}})
+    assert len(result)==1
+    assert result[0]['arrivalTimeMs']==300
+    assert result[0]['after']['x']==2000
+    rows[-1]['timestamp']=900
+    assert boss._torrent_blinks(rows,0,{1:{}})==[]
 
 
 def test_venom_sources_use_head_instance_order_and_do_not_count_raid_tick_as_wave():

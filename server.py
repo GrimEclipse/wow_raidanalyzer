@@ -13,6 +13,7 @@ import uuid
 import warnings
 import webbrowser
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,6 +28,9 @@ from analyzer_core import raid_calendar_store
 from analyzer_core.wcl_context import WclCredentials, use_wcl_credentials
 from analyzer_core.wcl_paths import iter_wcl_json_files, list_wcl_data_files, write_data_manifest
 from analyzer_core.wcl_report_ids import normalize_wcl_report_ids
+from analyzer_core.wcl_service import SharedWclService, AdmissionError
+from analyzer_core.analysis_admission import AnalysisUsage
+from analyzer_core.analysis_scope import fight_accounting_scope
 
 
 ROOT = Path(__file__).resolve().parent
@@ -59,6 +63,8 @@ EXPORT_DIR = DATA_DIR / "exports"
 _DESKTOP = Path.home() / "Desktop"
 DEFAULT_EXPORT_EXCEL_DIR = _DESKTOP if _DESKTOP.is_dir() else EXPORT_DIR
 AUTH = default_auth_store()
+WCL_SERVICE = SharedWclService.from_settings(environment_setting)
+ANALYSIS_USAGE = AnalysisUsage(DATA_DIR / 'analysis_usage.db')
 SESSION_COOKIE = "wra_session"
 MAX_JSON_BODY = 10 * 1024 * 1024
 LOGIN_ATTEMPTS: Dict[str, List[float]] = {}
@@ -109,6 +115,31 @@ class Job:
 JOBS: Dict[str, Job] = {}
 JOBS_LOCK = threading.Lock()
 JOB_SEMAPHORE = JobSlots(MAX_JOB_THREADS, MAX_USER_JOB_THREADS)
+
+
+def admitted_job(user):
+    job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user['id'])
+    ANALYSIS_USAGE.admit(user, job.id)
+    return job
+
+
+@contextmanager
+def job_wcl_scope(job, credentials):
+    with use_wcl_credentials(credentials, observer=WCL_SERVICE.observe), fight_accounting_scope(
+            lambda report, fights: ANALYSIS_USAGE.record(job.id, report, fights)):
+        yield
+
+
+def service_status(user=None):
+    state = WCL_SERVICE.snapshot()
+    state['analysisLimit'] = ANALYSIS_USAGE.limit
+    if user:
+        state['analysisUsage'] = ANALYSIS_USAGE.snapshot(user['id'], admin=user.get('isAdmin', False))
+        state['canAnalyze'] = bool((state['adminAvailable'] if user.get('isAdmin') else state['available'])
+                                   and state['analysisUsage']['available'])
+    else:
+        state['canAnalyze'] = False
+    return state
 
 
 def job_result_url(job_id: str, *, download=False) -> str:
@@ -372,7 +403,7 @@ def run_job(job: Job, payload: dict, credentials: WclCredentials):
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with use_wcl_credentials(credentials):
+        with job_wcl_scope(job, credentials):
             analyze_report(
                 version=version,
                 raid_key=raid,
@@ -408,6 +439,7 @@ def run_job(job: Job, payload: dict, credentials: WclCredentials):
             "stage": "error",
         })
     finally:
+        ANALYSIS_USAGE.finish(job.id, job.status)
         if acquired:
             JOB_SEMAPHORE.release(job.owner_user_id)
 
@@ -423,7 +455,7 @@ def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
         set_job_progress(job, status="running", percent=2, message="读取单场战斗", stage="discovery", force=True)
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with use_wcl_credentials(credentials):
+        with job_wcl_scope(job, credentials):
             callback = lambda event: translate_plugin_progress(job, event)
             with progress_scope(callback):
                 result = analyze_single_fight(
@@ -454,6 +486,7 @@ def run_single_fight_job(job: Job, payload: dict, credentials: WclCredentials):
             "message": str(exc), "stage": "error",
         })
     finally:
+        ANALYSIS_USAGE.finish(job.id, job.status)
         if acquired:
             JOB_SEMAPHORE.release(job.owner_user_id)
 
@@ -470,7 +503,7 @@ def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredent
         set_job_progress(job, status="running", percent=3, message="查找公会最新 Boss 战", stage="discovery", force=True)
         output_path = JOB_DIR / str(job.owner_user_id) / f"{job.id}.json"
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with use_wcl_credentials(credentials):
+        with job_wcl_scope(job, credentials):
             latest = latest_guild_fight(
                 WclClient(), guild_id=int(payload["guildID"]), report_limit=5
             )
@@ -523,6 +556,7 @@ def run_latest_single_fight_job(job: Job, payload: dict, credentials: WclCredent
             "message": str(exc), "stage": "error",
         })
     finally:
+        ANALYSIS_USAGE.finish(job.id, job.status)
         if acquired:
             JOB_SEMAPHORE.release(job.owner_user_id)
 
@@ -685,6 +719,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.send_response_body(*json_bytes({
                 "registrationRequiresInvite": bool(INVITE_CODE),
             }))
+        if path == '/api/wcl/status':
+            return self.send_response_body(*json_bytes(service_status(self.current_user())))
 
         if self.is_public_page(path):
             return self.handle_static(path, public=True)
@@ -714,7 +750,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/me":
             return self.send_response_body(*json_bytes({
                 "user": user,
-                "wcl": AUTH.wcl_summary(user["id"]),
+                "wcl": service_status(user),
                 "guilds": user_guilds(user["id"]),
             }))
         if path == "/api/auth/guilds":
@@ -754,7 +790,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 )
             except AuthError as error:
                 return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
-            with use_wcl_credentials(credentials):
+            with use_wcl_credentials(credentials, observer=WCL_SERVICE.observe):
                 return self.send_response_body(*json_bytes(recent_guild_reports(
                     selected_date=selected_date, limit=limit, guild_id=selected_guild["id"],
                 )))
@@ -765,7 +801,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             credentials = self.require_wcl_credentials(user)
             if not credentials:
                 return None
-            with use_wcl_credentials(credentials):
+            with use_wcl_credentials(credentials, observer=WCL_SERVICE.observe):
                 return self.send_response_body(*json_bytes(report_overview(single_report.group(1))))
         if path == "/api/raid-cooldowns/options":
             from analyzer_core.raid_cooldowns import options_document
@@ -848,7 +884,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if admin_reset_match:
             return self.handle_admin_reset_password(user, int(admin_reset_match.group(1)))
         if path == "/api/auth/wcl-credentials/test":
-            return self.handle_wcl_credentials_test(user)
+            return self.json_error('个人 WCL 凭据接口已停用，分析统一使用共享服务。', HTTPStatus.GONE)
         return self.handle_write(path, user)
 
     def do_PUT(self):
@@ -861,7 +897,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path == "/api/auth/password":
             return self.handle_change_password(user)
         if path == "/api/auth/wcl-credentials":
-            return self.handle_wcl_credentials(user)
+            return self.json_error('个人 WCL 凭据接口已停用，分析统一使用共享服务。', HTTPStatus.GONE)
         if path == "/api/auth/guilds":
             return self.handle_guild_upsert(user)
         default_guild_match = re.fullmatch(r"/api/auth/guilds/(\d+)/default", path)
@@ -887,8 +923,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if not user:
             return None
         if path == "/api/auth/wcl-credentials":
-            AUTH.delete_wcl_credentials(user["id"])
-            return self.send_response_body(*json_bytes({"ok": True}))
+            return self.json_error('个人 WCL 凭据接口已停用，分析统一使用共享服务。', HTTPStatus.GONE)
         guild_match = re.fullmatch(r"/api/auth/guilds/(\d+)", path)
         if guild_match:
             try:
@@ -1080,33 +1115,18 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         except (AuthError, ValueError, json.JSONDecodeError) as error:
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
 
-    def handle_wcl_credentials(self, user):
-        try:
-            payload = self.read_json_body()
-            AUTH.set_wcl_credentials(
-                user["id"],
-                str(payload.get("clientId") or ""),
-                str(payload.get("clientSecret") or ""),
-            )
-            return self.send_response_body(*json_bytes({"ok": True, "wcl": AUTH.wcl_summary(user["id"])}))
-        except (AuthError, ValueError, json.JSONDecodeError) as error:
-            return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
-
     def handle_guild_upsert(self, user):
         try:
             payload = self.read_json_body()
             guild_id = int(payload.get("guildId") or payload.get("id") or 0)
             if guild_id <= 0:
                 raise AuthError("WCL 公会 ID 必须是正整数。")
-            credentials = AUTH.get_wcl_credentials(user["id"])
+            credentials = self.require_wcl_credentials(user)
             if not credentials:
-                return self.json_error(
-                    "请先保存 WCL Client ID 与 Client Secret，再添加公会。",
-                    HTTPStatus.BAD_REQUEST,
-                )
+                return None
             from analyzer_core.wcl_api import WclClient
 
-            with use_wcl_credentials(credentials):
+            with use_wcl_credentials(credentials, observer=WCL_SERVICE.observe):
                 data = WclClient().graphql_data(
                     "query($guildID: Int!) { guildData { guild(id: $guildID) { id name } } }",
                     {"guildID": guild_id},
@@ -1127,36 +1147,6 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             return self.json_error(str(error), HTTPStatus.BAD_REQUEST)
         except Exception as error:
             return self.json_error(f"无法验证公会：{error}", HTTPStatus.BAD_REQUEST)
-
-    def handle_wcl_credentials_test(self, user):
-        try:
-            credentials = AUTH.get_wcl_credentials(user["id"])
-            if not credentials:
-                return self.json_error("尚未配置 WCL 凭据，请先保存再测试。", HTTPStatus.BAD_REQUEST)
-            from analyzer_core.wcl_api import WclClient
-            client = WclClient()
-            with use_wcl_credentials(credentials):
-                client.token()
-                guild_id = int(selected_user_guild(user["id"])["id"])
-                data = client.graphql_data(
-                    """
-                    query($guildID: Int!) {
-                      reportData { reports(guildID: $guildID, limit: 1) { data { code title startTime } } }
-                      rateLimitData { limitPerHour pointsSpentThisHour }
-                    }
-                    """,
-                    {"guildID": guild_id},
-                )
-            reports = ((data.get("reportData") or {}).get("reports") or {}).get("data") or []
-            last = reports[0] if reports else None
-            return self.send_response_body(*json_bytes({
-                "ok": True,
-                "clientIdHint": AUTH.wcl_summary(user["id"]).get("clientIdHint", ""),
-                "guildReport": ({k: last.get(k) for k in ("code", "title", "startTime")}) if last else None,
-                "rateLimit": data.get("rateLimitData") or {},
-            }))
-        except Exception as error:
-            return self.json_error(f"API 不可用：{error}", HTTPStatus.BAD_REQUEST)
 
     def handle_admin_update(self, actor, target_user_id):
         if not actor["isAdmin"]:
@@ -1230,14 +1220,19 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                     raise ValueError("请输入有效的 WCL Report 与大秘境 Fight ID。")
                 if dungeon_key and dungeon_key not in DUNGEON_CONFIGS:
                     raise ValueError("请选择有效的副本配置。")
-                with tempfile.TemporaryDirectory(prefix="mythic-run-") as temp_dir:
-                    with use_wcl_credentials(credentials):
-                        document = export(
-                            report_code, fight_id, Path(temp_dir) / "run.json",
-                            dungeon_key or "observed",
-                            config=None if dungeon_key else {"key": "observed", "officialNameZh": "大秘境"},
-                            observed_skills=not bool(dungeon_key),
-                        )
+                job = admitted_job(user)
+                ANALYSIS_USAGE.record(job.id, report_code, [{'id':fight_id}])
+                try:
+                    with tempfile.TemporaryDirectory(prefix="mythic-run-") as temp_dir:
+                        with job_wcl_scope(job, credentials):
+                            document = export(
+                                report_code, fight_id, Path(temp_dir) / "run.json",
+                                dungeon_key or "observed",
+                                config=None if dungeon_key else {"key": "observed", "officialNameZh": "大秘境"},
+                                observed_skills=not bool(dungeon_key),
+                            )
+                finally:
+                    ANALYSIS_USAGE.finish(job.id, 'finished')
                 return self.send_response_body(*json_bytes(document))
             if path == "/api/single-fight/latest":
                 credentials = self.require_wcl_credentials(user)
@@ -1247,7 +1242,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 guild = selected_user_guild(user["id"], payload.get("guildID"))
                 payload["guildID"] = guild["id"]
                 prune_analysis_storage()
-                job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user["id"])
+                job = admitted_job(user)
                 with JOBS_LOCK:
                     JOBS[job.id] = job
                 thread = threading.Thread(
@@ -1282,7 +1277,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 credentials = self.require_wcl_credentials(user)
                 if not credentials:
                     return None
-                with use_wcl_credentials(credentials):
+                with use_wcl_credentials(credentials, observer=WCL_SERVICE.observe):
                     result = search_raid_cooldowns(self.read_json_body())
                 return self.send_response_body(*json_bytes(result))
             if path == "/api/single-fight/analyze":
@@ -1297,7 +1292,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 payload["reportCode"] = report_code
                 payload["fightID"] = fight_id
                 prune_analysis_storage()
-                job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user["id"])
+                job = admitted_job(user)
                 with JOBS_LOCK:
                     JOBS[job.id] = job
                 thread = threading.Thread(
@@ -1334,7 +1329,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             if not entry.supported:
                 raise ValueError(f"{entry.boss_name} {entry.disabled_reason or '暂未接入在线分析'}")
 
-            job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user["id"])
+            job = admitted_job(user)
             with JOBS_LOCK:
                 JOBS[job.id] = job
             thread = threading.Thread(target=run_job, args=(job, payload, credentials), daemon=True)
@@ -1352,14 +1347,21 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 "requiresConfirmation": True,
                 "warnings": warning.warnings,
             }, HTTPStatus.CONFLICT))
+        except AdmissionError as exc:
+            return self.send_admission_error(exc)
         except Exception as exc:
             return self.json_error(str(exc), HTTPStatus.BAD_REQUEST)
 
     def require_wcl_credentials(self, user):
-        credentials = AUTH.get_wcl_credentials(user["id"])
-        if not credentials:
-            self.json_error("请先在账号设置中保存你自己的 WCL API 凭据。", HTTPStatus.PRECONDITION_REQUIRED)
-        return credentials
+        try:
+            return WCL_SERVICE.acquire(admin=bool(user.get('isAdmin')))
+        except AdmissionError as error:
+            self.send_admission_error(error)
+            return None
+
+    def send_admission_error(self, error):
+        return self.send_response_body(*json_bytes({'error':str(error), 'retryAfter':error.retry_after}, error.status),
+                                       headers={'Retry-After':str(error.retry_after)})
 
     def handle_export_verdict_excel(self):
         try:
@@ -1493,6 +1495,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/boss_catalog.json", "/demos", "/frontend/tools/mechanic-demos/index.html",
             "/assets/demos/manifest.json", "/assets/demos/twinfangs.json", "/assets/demos/coiledaltar.json",
             "/assets/demos/coiledaltar_progression.json",
+            "/assets/demos/coiledaltar_today_check.json",
             "/assets/demos/vashnik.json", "/assets/demos/nymrissa_wavecaller.json",
             "/assets/demos/sszorak.json",
             "/assets/demos/ulatek.json",
@@ -1526,6 +1529,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                         "/frontend/core/report-plugin-runtime.js", "/frontend/core/home-button.js",
                         "/frontend/core/azeroth-shell.js", "/frontend/core/azeroth-skin.css",
                         "/frontend/core/replay-audio.js",
+                        "/frontend/core/wcl-status.js",
                         "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"}
 
     def handle_static(self, path, public=False):
@@ -1570,6 +1574,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                                 "/frontend/core/report-plugin-runtime.js", "/frontend/core/home-button.js",
                                 "/frontend/core/azeroth-shell.js", "/frontend/core/azeroth-skin.css",
                                 "/frontend/core/replay-audio.js",
+                                "/frontend/core/wcl-status.js",
                                 "/assets/vendor/wow-tooltips.js", "/assets/vendor/zone54-raid-guide-data.js"} \
                 and not path.startswith(PUBLIC_THEME_PREFIXES):
             allowed = False
@@ -1626,12 +1631,14 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         self.send_header("Referrer-Policy", "same-origin")
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
-    def send_response_body(self, status, content_type, body, cookie=None):
+    def send_response_body(self, status, content_type, body, cookie=None, headers=None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         if cookie:
             self.send_header("Set-Cookie", cookie)
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Cache-Control", "no-store" if "html" in content_type or "json" in content_type else "private, max-age=300")
         self.send_security_headers()
         self.end_headers()

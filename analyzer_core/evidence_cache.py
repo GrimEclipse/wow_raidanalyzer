@@ -18,7 +18,8 @@ _scope = ContextVar("wcl_evidence_cache", default=None)
 class EvidenceScope:
     def __init__(self, force=False):
         self.force = force
-        self.stats = {"cacheHits": 0, "networkRequests": 0, "networkSeconds": 0.0}
+        self.stats = {"cacheHits": 0, "networkRequests": 0, "networkSeconds": 0.0,
+                      "wclPoints": 0.0, "pointsMeasuredRequests": 0}
         self.lock = threading.Lock()
 
     def record(self, **values):
@@ -40,7 +41,14 @@ def with_evidence_cache(function):
 
 def current_stats():
     scope = _scope.get()
-    return {key: round(value, 3) if isinstance(value, float) else value for key, value in scope.stats.items()} if scope else {}
+    if not scope:
+        return {}
+    with scope.lock:
+        result = {key: round(value, 3) if isinstance(value, float) else value for key, value in scope.stats.items()}
+    result['wclPointsComplete'] = result['pointsMeasuredRequests'] == result['networkRequests']
+    if not result['wclPointsComplete']:
+        result['measuredWclPoints'], result['wclPoints'] = result['wclPoints'], None
+    return result
 
 
 def query_cache_path(base_url, credentials, query, variables):
@@ -95,3 +103,11 @@ def record_network(seconds):
     scope = _scope.get()
     if scope:
         scope.record(networkRequests=1, networkSeconds=seconds)
+
+
+def record_wcl_points(rate):
+    cost = (rate or {}).get('currentRequest')
+    if isinstance(cost, dict) and isinstance(cost.get('total'), (int, float)):
+        scope = _scope.get()
+        if scope:
+            scope.record(wclPoints=float(cost['total']), pointsMeasuredRequests=1)

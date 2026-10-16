@@ -44,4 +44,9 @@
     document.head.appendChild(s);
   }
   addCss(); addFonts();
+  if (window.top === window) {
+    var statusScript = document.createElement('script');
+    statusScript.src = abs('frontend/core/wcl-status.js?v=20261013-shared');
+    document.head.appendChild(statusScript);
+  }
 })();

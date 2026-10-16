@@ -93,7 +93,7 @@ BOSS_CONFIG = {
         ["venomDeaths", "带毒死亡"], ["stone", "裂石击"], ["earlyDeaths", "提前死亡"],
         ["explore", "机制工作台"],
     ],
-    "mechanicVersion": "twinfangs-checkpoint-death-exempt-five-kicks-2026-09-27",
+    "mechanicVersion": "twinfangs-cone-chronological-venom-2026-10-13",
     "features": {"survival": True, "fieldReplay": False},
 }
 
@@ -143,7 +143,12 @@ BULWARK_NPC_ID = 269194
 STRIKER_NPC_ID = 264023
 TANK_CHANNELS = {1289192: "腐蚀洪流", 1303230: "鲜血洪流"}
 # Replay calibration from the reviewed tank movement, separate from hit fitting.
-TORRENT_REPLAY_SWEEP_DEGREES = 270
+TORRENT_REPLAY_CONE_DEGREES = 30
+# Reviewed BZKtqb6wyTnAHGRV / 37: joint hit/teleport constraints yield
+# 23.14–24.63 degrees/sec. This is a replay estimate, not hit adjudication.
+TORRENT_REPLAY_SPEED_DEGREES = 24
+TORRENT_POSITION_TOLERANCE_DEGREES = 3
+TWIN_BLINK_IDS = {1953, 212653}
 REPLAY_CONTROL_SPELLS = {119381: "扫堂腿", 192058: "电能图腾", 30283: "暗影之怒", 179057: "混乱新星",
     46968: "震荡波", 132469: "台风", 51490: "雷霆风暴", 853: "制裁之锤", 408: "肾击", 5211: "蛮力猛击",
     107570: "风暴之锤", 221562: "窒息", 5484: "恐惧嚎叫", 8122: "心灵尖啸", 31661: "龙息术",
@@ -992,6 +997,7 @@ def _venom_checkpoints(fight, actor_map, players, raw, histories):
                          "observedDeathReduction": observed_death_loss, "feastReduction": feast_loss, "otherReduction": other_loss,
                          "reconciliationDelta": stack-(gained-death_loss-feast_loss-other_loss)})
         checkpoints.append({"index": index, "timeMs": ts - fight["startTime"],
+                            "intervalStartTimeMs": previous_checkpoint,
                             "time": fmt_ms(ts - fight["startTime"]), "limit": limit,
                             "players": rows, "count": sum(p["count"] for p in rows),
                             "exempt": exemption is not None, "exemption": exemption,
@@ -1150,11 +1156,132 @@ def _spit_review(fight, actor_map, players, raw):
             "evidenceNote": "取完成读条时的目标；坐标样本距完成不超过250ms。三只蛇头共用左蛇头→左Boss、右蛇头→右Boss两条固定边界的禁射方向夹角（含边界）；同时禁止朝生成线背离Boss一侧射击。每条完成射线最多计一次。误伤按同一蛇头实例、完成后750ms内实际伤害对应；额外受击不单独证明点名玩家走错。"}
 
 
-def _torrent_rotation(torrents, events, start, players):
-    """Fit one constant angular speed; sparse rounds do not invent a direction."""
+def _torrent_blinks(events, start, players):
+    """Pair a real Blink cast with its next owned position, never a target's."""
+    tracks = defaultdict(dict)
+    casts = []
+    for event in events:
+        timestamp = int(event["timestamp"])
+        for side in ("source", "target"):
+            actor = event.get(side+"ID")
+            if actor in players:
+                point = actor_position(event, side)
+                if point:
+                    tracks[actor][timestamp] = point
+        if event_type(event) == "cast" and ability_id(event) in TWIN_BLINK_IDS and event.get("sourceID") in players:
+            casts.append(event)
+    ordered = {actor: sorted(track.items()) for actor, track in tracks.items()}
+    times = {actor: [row[0] for row in track] for actor, track in ordered.items()}
+    result = []
+    for event in casts:
+        actor, timestamp = event["sourceID"], int(event["timestamp"])
+        before = actor_position(event, "source")
+        index = bisect_right(times.get(actor, []), timestamp)
+        track = ordered.get(actor, [])
+        if not before or index >= len(track):
+            continue
+        arrival, after = track[index]
+        if arrival-timestamp > 500 or hypot(after["x"]-before["x"], after["y"]-before["y"]) < 1000:
+            continue
+        result.append({"playerID": actor, "timeMs": timestamp-start, "arrivalTimeMs": arrival-start,
+                       "before": before, "after": after})
+    return result
+
+
+def _fit_torrent_cones(torrents, events, start, blinks):
+    """Intersect positive cone hits and observed reverse Blink crossings.
+
+    Position snapshots and damage ticks are not simultaneous: keep a three
+    degree evidence tolerance, and expose the feasible interval instead of
+    claiming one exact game-server speed. No blame is inferred from this fit.
+    """
+    models = []
+    half = TORRENT_REPLAY_CONE_DEGREES/2
+    tolerance = TORRENT_POSITION_TOLERANCE_DEGREES
+    for torrent in torrents:
+        direction, origin = torrent.get("rotationDirection"), torrent.get("origin")
+        if not direction or not origin or torrent.get("endTimeMs") is None:
+            continue
+        reference = direction*degrees(torrent["initialAngleRadians"])
+        def angle(point):
+            oriented = direction*degrees(atan2(point["y"]-origin["y"], point["x"]-origin["x"]))
+            return reference+(oriented-reference+180)%360-180
+        hits, crossings = [], []
+        begin, end = torrent["startTimeMs"], torrent["endTimeMs"]
+        damage = [event for event in events if event.get("sourceID") == torrent["actorID"]
+                  and ability_id(event) in {1293749, 1294605} and event_type(event) == "damage"
+                  and event.get("hitType") != 10 and float(event.get("amount") or 0)+float(event.get("absorbed") or 0) > 0
+                  and begin <= int(event["timestamp"])-start < end]
+        for event in damage:
+            point = actor_position(event, "target")
+            if point:
+                heading = angle(point)
+                if heading < reference-60:
+                    heading += 360
+                hits.append(((int(event["timestamp"])-start-begin)/1000, heading))
+        for blink in blinks:
+            if not begin <= blink["timeMs"] < blink["arrivalTimeMs"] < end:
+                continue
+            before, after = angle(blink["before"]), angle(blink["after"])
+            delta = (after-before+180)%360-180
+            if not -80 < delta < -20:
+                continue
+            if before < reference:
+                before += 360
+            if not reference+30 < before < reference+330:
+                continue
+            if any(event.get("targetID") == blink["playerID"] and
+                   blink["timeMs"]-500 <= int(event["timestamp"])-start <= blink["arrivalTimeMs"]+500 for event in damage):
+                continue
+            crossings.append(((blink["timeMs"]-begin)/1000, before,
+                              (blink["arrivalTimeMs"]-begin)/1000, before+delta, blink["playerID"]))
+        models.append((torrent, reference, hits, crossings))
+    # One tick's victim angles cannot uniquely establish a speed. Require both
+    # separated positive evidence and a crossing; otherwise use reviewed speed.
+    separated = any(hits and max(t for t,_ in hits)-min(t for t,_ in hits) >= 1.5 for _,_,hits,_ in models)
+    has_crossing = any(crossings for _,_,_,crossings in models)
+    def bounds(model, speed):
+        torrent, reference, hits, crossings = model
+        low, high = reference-60, reference+60
+        for time, heading in hits:
+            low = max(low, heading-speed*time-half-tolerance)
+            high = min(high, heading-speed*time+half+tolerance)
+        for before_time, before, after_time, after, _ in crossings:
+            high = min(high, before-half+tolerance-speed*before_time)
+            low = max(low, after+half-tolerance-speed*after_time)
+        return low, high
+    feasible = [i/100 for i in range(1000, 6001)
+                if all(low <= high for low, high in (bounds(model, i/100) for model in models))] if separated and has_crossing else []
+    speed = TORRENT_REPLAY_SPEED_DEGREES
+    for model in models:
+        torrent, reference, hits, crossings = model
+        low, high = bounds(model, speed)
+        if low <= high and hits:
+            # Prefer maximum clearance at the observed teleport boundaries.
+            # Clamp to the positive-hit feasible interval; never move the cone
+            # arbitrarily just to accommodate a player with no damage record.
+            preferred = (low+high)/2
+            if crossings:
+                behind = max(after+half-speed*after_time for _,_,after_time,after,_ in crossings)
+                ahead = min(before-half-speed*before_time for before_time,before,_,_,_ in crossings)
+                preferred = max(low, min(high, (behind+ahead)/2))
+            torrent["initialAngleRadians"] = radians(torrent["rotationDirection"]*preferred)
+        torrent["rotationFit"] = {"method": "cone-hits-and-blink-crossings" if feasible else "reviewed-speed-estimate",
+                                  "speedRangeDegrees": [min(feasible), max(feasible)] if feasible else None,
+                                  "speedSelection": "confirmed-24-degrees-per-second",
+                                  "positionToleranceDegrees": tolerance, "hitSamples": len(hits),
+                                  "crossingPlayers": [row[4] for row in crossings]}
+    for torrent in torrents:
+        duration = max(0, (torrent.get("endTimeMs") or torrent["startTimeMs"])-torrent["startTimeMs"])
+        torrent.update(coneDegrees=TORRENT_REPLAY_CONE_DEGREES, angularSpeedDegrees=speed,
+                       rotationDurationMs=duration, rotationEndTimeMs=torrent.get("endTimeMs"),
+                       sweepDegrees=speed*duration/1000)
+
+
+def _torrent_rotation(torrents, events, start, players, blinks=None):
+    """Infer direction from tank movement, then fit one shared cone speed."""
     def wrap(angle):
         return (angle+pi) % (2*pi)-pi
-    candidates = []
     for torrent in torrents:
         begin, end, actor = torrent["startTimeMs"]+start, (torrent["endTimeMs"] or 0)+start, torrent["actorID"]
         origin = next((actor_position(e, "source") for e in events if e.get("sourceID")==actor and e.get("abilityGameID")==1294293 and e.get("type")=="cast" and int(e["timestamp"])==begin and actor_position(e,"source")), None)
@@ -1193,38 +1320,10 @@ def _torrent_rotation(torrents, events, start, players):
             if len(angles)>=4 and abs(delta)>radians(15):votes.append(1 if delta>0 else -1)
         direction=1 if votes and sum(votes)>0 else -1 if votes and sum(votes)<0 else None
         torrent.update(origin=origin,previousArena=arena["key"],initialAngleRadians=initial,rotationDirection=direction,angularSpeedDegrees=None,rotationEvidence="防骑连续绕场跑位确定方向" if direction else "命中跨度不足，旋转方向待确认")
-        # Collapse simultaneous raid hits so one tick does not outweigh a later hit.
-        buckets = defaultdict(list)
-        for time, angle in hit_rows:
-            buckets[round(time,1)].append(angle)
-        samples = [(time,atan2(sum(sin(a) for a in angles),sum(cos(a) for a in angles))) for time,angles in sorted(buckets.items())]
         torrent["rotationHitCount"] = len(hit_rows)
-        torrent["_rotationSamples"]=samples
-        if not direction or len(samples)<2 or samples[-1][0]-samples[0][0]<1.5:
-            continue
-        unwrapped=[samples[0][1]]
-        for (_,a),(_,b) in zip(samples,samples[1:]):
-            delta=wrap(b-a)
-            if direction*delta<0:delta+=direction*2*pi
-            unwrapped.append(unwrapped[-1]+delta)
-        mean_time=sum(t for t,_ in samples)/len(samples);mean_angle=sum(unwrapped)/len(samples)
-        slope=sum((t-mean_time)*(a-mean_angle) for (t,_),a in zip(samples,unwrapped))/sum((t-mean_time)**2 for t,_ in samples)
-        speed=abs(degrees(slope));phase=mean_angle-slope*mean_time
-        error=sum(wrap(a-phase-slope*t)**2 for (t,_),a in zip(samples,unwrapped))/len(samples)
-        if 1<speed<180 and error<radians(12)**2 and abs(wrap(phase-initial))<radians(50):
-            candidates.append(speed)
-            torrent["fittedInitialAngleRadians"] = phase
     for torrent in torrents:
-        if candidates:
-            torrent["fittedAngularSpeedDegrees"] = median(candidates)
-        duration = (torrent.get("endTimeMs") or torrent["startTimeMs"])-torrent["startTimeMs"]
-        rotation_duration = max(14000, duration)
-        torrent["rotationDurationMs"] = rotation_duration
-        torrent["sweepDegrees"] = TORRENT_REPLAY_SWEEP_DEGREES*min(1, max(0, duration)/rotation_duration)
-        if duration > 0 and torrent.get("rotationDirection"):
-            torrent["angularSpeedDegrees"] = TORRENT_REPLAY_SWEEP_DEGREES/(rotation_duration/1000)
-            torrent["rotationEvidence"] += "；从上一平台方向起转，完整引导扫过约270度"
-    for torrent in torrents:torrent.pop("_rotationSamples",None)
+        torrent["rotationEvidence"] = torrent.get("rotationEvidence", "缺少施法者坐标，方向待确认")+"；30度锥形，按确认的24度/秒转到引导结束，快照约束起始朝向"
+    _fit_torrent_cones(torrents, events, start, blinks if blinks is not None else _torrent_blinks(events, start, players))
 
 
 def _replay_animation_units(fight, events, raw, players):
@@ -1321,7 +1420,8 @@ def _replay_feedback(fight, actor_map, players, raw, histories=None):
                       and e.get("sourceID")==event["sourceID"] and begin-8000<=int(e["timestamp"])<begin), default=begin)
         torrents.append({"actorID": event["sourceID"], "windupTimeMs": windup-start, "startTimeMs": begin-start,
                          "endTimeMs": end-start if end else None, "spellID":1294293, "spellName":"邪恶洪流"})
-    _torrent_rotation(torrents,events,start,players)
+    blinks = _torrent_blinks(events, start, players)
+    _torrent_rotation(torrents,events,start,players,blinks)
     strikers,channels=_replay_animation_units(fight,events,raw,players)
     return {"hits": hits, "controls": controls, "bulwarks": list(walls.values()), "immunities": immunities, "torrents": torrents,"strikers":strikers,"channels":channels}
 

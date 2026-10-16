@@ -209,7 +209,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-replay-music-2026-10-12-v25",
+    "mechanicVersion": "ulatek-continuous-music-cast-completion-2026-10-13-v26",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -1830,7 +1830,18 @@ ULATEK_MUSIC_TRACKS = {
     'p25': {'src':'/frontend/assets/audio/ulatek/p25.mp3','sourceStartSeconds':1471,'durationMs':34000},
     'p3': {'src':'/frontend/assets/audio/ulatek/p3.mp3','sourceStartSeconds':1087,'durationMs':381000},
 }
-P25_EGG_SUMMON_IDS = {1304012,1315541}
+# Silence-only intervals verified against the owner's source recording. Keep
+# the opening fades and musical quiet passages; join only these internal gaps.
+ULATEK_MUSIC_SILENCE_CUTS = {
+    'p1': [(136.781202,140.402993),(298.767551,301.568027),(417.400227,420.916712)],
+    'p3': [(145.569705,148.582381),(252.234286,255.126621)],
+}
+for _key, _cuts in ULATEK_MUSIC_SILENCE_CUTS.items():
+    _track = ULATEK_MUSIC_TRACKS[_key]
+    _track.update(sourceDurationMs=_track['durationMs'],silenceCutsSeconds=_cuts,
+                  joinCrossfadeMs=120,assetVersion='20261013-continuous')
+    _track['durationMs'] = round(_track['sourceDurationMs']-sum((b-a)*1000 for a,b in _cuts)-120*len(_cuts))
+P25_EGG_SUMMON_IDS = {1300751,1304012,1315541}
 P3_MUSIC_LEAD_MS = 5000
 
 
@@ -1845,8 +1856,11 @@ def _replay_music_profile(fight, events, boss_positions):
     egg_start, returned = None, None
     if len(rages)>1:
         second_end = rages[1]['endTimeMs']
-        egg_start = min([e['timeMs'] for e in events if e.get('kind')=='egg-summon'
-                         and e['timeMs']>=second_end],default=None)
+        # Music follows the completed Call, never its cast start or an alias
+        # that started before the second Fury actually finished.
+        egg_start = min([e.get('endTimeMs',e['timeMs']) for e in events if e.get('kind')=='egg-summon'
+                         and e.get('castStartTimeMs',e['timeMs'])>=second_end
+                         and e.get('outcome','completed')=='completed'],default=None)
         shattered = min([e['timeMs'] for e in events if e.get('kind')=='shatter'
                          and e['timeMs']>=second_end],default=None)
         returned = min([int(p['timestamp'])-start for p in boss_positions
@@ -1862,7 +1876,7 @@ def _replay_music_profile(fight, events, boss_positions):
         add('p3',p3_start,duration)
     return {'tracks':deepcopy(ULATEK_MUSIC_TRACKS),'phases':phases,'crossfadeMs':1500,
             'defaultVolume':.3,'p3Evidence':'first-boss-position-after-intermission-floor-break',
-            'p3LeadMs':P3_MUSIC_LEAD_MS}
+            'p3LeadMs':P3_MUSIC_LEAD_MS,'p25Evidence':'completed-serpent-call-after-second-bound-fury'}
 
 
 def _replay_effects(fight, players, raw, changes):
@@ -2001,7 +2015,9 @@ def _replay_effects(fight, players, raw, changes):
                         'lengthYards': DESPERATE_THRASH_LENGTH_YARDS,
                         'directionEvidence': 'tank-hit' if impact else 'nearest-tank'})
     boss_id = raw.get('bossID')
-    changes.extend({'kind':'egg-summon','label':'毒蛇呼唤','timeMs':int(e['timestamp'])-start}
+    changes.extend({'kind':'egg-summon','label':'毒蛇呼唤','timeMs':int(e['timestamp'])-start,
+                    'endTimeMs':int(e['timestamp'])-start,'castStartTimeMs':cast_start(e,0)-start,
+                    'spellID':ability_id(e),'outcome':'completed'}
                    for e in casts if event_type(e)=='cast' and ability_id(e) in P25_EGG_SUMMON_IDS
                    and e.get('sourceID')==boss_id)
     for row in rage:

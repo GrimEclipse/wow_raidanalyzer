@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 DEMOS = [
     {"key": "sszorak", "boss": "sszorak", "label": "斯索拉克", "report": "ZFDWvrfqd6ygMKY2", "fight": 38, "raid": "venomous_abyss", "renderer": "progression", "tab": "replay"},
     {"key": "coiledaltar", "boss": "coiledaltar", "label": "盘卷祭坛", "report": "mDcP2prKBwFMxLH4", "fight": 35, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
+    {"key": "coiledaltar_today_check", "homepageVisible": False, "boss": "coiledaltar", "label": "盘卷祭坛（10月13日记录）", "report": "8TJdnK1Rzy26gmAC", "fight": 7, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
     {"key": "twinfangs", "boss": "twinfangs", "label": "双子毒牙", "report": "BZKtqb6wyTnAHGRV", "fight": 37, "raid": "venomous_abyss", "renderer": "progression", "tab": "brood"},
     {"key": "ulatek", "homepageVisible": False, "boss": "ulatek", "label": "乌拉特克（英雄）", "report": "ZFDWvrfqd6ygMKY2", "fight": 12, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
     {"key": "ulatek_mythic", "boss": "ulatek", "label": "乌拉特克", "report": "r19Gk7PJfVvmnFgM", "fight": 3, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},

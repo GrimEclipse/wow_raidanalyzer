@@ -455,6 +455,7 @@ def analyze_single_fight(
         single_meta = result.setdefault("meta", {}).setdefault("singleFight", {})
         single_meta["cacheHit"] = True
         single_meta["sourceElapsedSeconds"] = single_meta.get("elapsedSeconds")
+        single_meta['sourceEvidenceFetch'] = single_meta.get('sourceEvidenceFetch') or single_meta.get('evidenceFetch')
         single_meta["elapsedSeconds"] = round(time.perf_counter() - started, 3)
         single_meta["evidenceFetch"] = current_stats()
         output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")

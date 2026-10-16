@@ -21,7 +21,7 @@
         <label>用户名<input name="username" autocomplete="username" minlength="3" maxlength="64" required></label>
         <label>密码<input name="password" type="password" autocomplete="new-password" required></label>
         <label data-auth-invite hidden>邀请码<input name="inviteCode" autocomplete="off"></label>
-        <p class="auth-dialog__hint">普通账户可以绑定自己的 WCL 凭据并运行分析。</p>
+        <p class="auth-dialog__hint">普通账户登录后即可使用共享 WCL 服务运行分析。</p>
         <button class="auth-dialog__submit" type="submit">创建普通账户</button>
       </form>
       <div class="auth-dialog__message" role="alert" aria-live="polite"></div>
