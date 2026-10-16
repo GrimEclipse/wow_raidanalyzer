@@ -94,7 +94,7 @@
   function descriptorUrl(identity) {
     const raidKey = assertPluginKey(identity.raidKey, "raidKey");
     const bossKey = assertPluginKey(identity.bossKey, "bossKey");
-    return `${ROOT_PREFIX}/${raidKey}/${bossKey}/plugin.js`;
+    return `${ROOT_PREFIX}/${raidKey}/${bossKey}/plugin.js?v=20261016-tab`;
   }
 
   async function loadDescriptor(payload) {
@@ -136,7 +136,8 @@
   function detailUrl(descriptor, sourcePath, fightID) {
     const page = descriptor && descriptor.reportPage;
     if (!page) throw new Error("该 Boss 尚未提供专属报告页面");
-    return appendQuery(page, { json: sourcePath, fight: fightID });
+    // 单场/整场结果默认打开与首页演示相同的页签（战斗回放等），保证两边看到的是同一视图
+    return appendQuery(page, { json: sourcePath, fight: fightID, tab: descriptor.defaultTab });
   }
 
   function reportUrl(_descriptor, sourcePath) {

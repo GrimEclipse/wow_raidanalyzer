@@ -2,5 +2,6 @@ window.MythicReportPlugin = {
   id: "venomous_abyss/twinfangs",
   renderer: "venomous-progression",
   reportPage: "frontend/report/plugins/venomous_abyss/progression/report.html",
+  defaultTab: "brood",
   sections: ["survival", "venom", "globules", "feast", "spit", "brood", "venomDeaths", "stone", "earlyDeaths"]
 };
