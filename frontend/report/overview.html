@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <base href="../../">
   <title>全场战斗概览</title>
-  <link rel="stylesheet" href="frontend/report/overview.css?v=20260921-player-filter-az1">
+  <link rel="stylesheet" href="frontend/report/overview.css?v=20261019-v150c">
 </head>
 <body>
   <main class="shell">
@@ -30,6 +30,7 @@
         <button id="pullsTab" class="overview-tab active" type="button" role="tab" aria-selected="true">战斗列表</button>
         <button id="mechanicsTab" class="overview-tab" type="button" role="tab" aria-selected="false">机制统计</button>
       </div>
+      <div id="reportModules"></div>
       <div id="pullsPanel" class="overview-panel" role="tabpanel">
         <div class="overview-tools">
           <div class="toolbar">
@@ -43,14 +44,16 @@
           </div>
         </div>
         <div id="pullBoard" class="pull-board"><div class="empty">正在读取整场 Pull…</div></div>
+        <p class="progress-legend" aria-label="全程完成度配色"><span style="--tier:#999999">&lt;25% 灰</span><span style="--tier:#1eff00">25%–50% 绿</span><span style="--tier:#0070ff">50%–75% 蓝</span><span style="--tier:#a335ee">75%–95% 紫</span><span style="--tier:#ff8000">95%–99% 橙</span><span style="--tier:#e268a8">≥99% 粉</span>颜色按全程完成度；卡片数值保留当前 Boss 剩余血量。</p>
       </div>
       <div id="mechanicsPanel" class="overview-panel" role="tabpanel" hidden>
         <div id="mechanicOverview" class="mechanic-overview"></div>
       </div>
     </section>
   </main>
-  <script src="frontend/core/report-plugin-runtime.js?v=20261016-tab"></script>
-  <script src="frontend/report/overview.js?v=20260921-player-filter"></script>
+  <script src="frontend/core/report-plugin-runtime.js?v=20261019-merge"></script>
+  <script src="frontend/core/pull-progress.js?v=20261019-v150c"></script>
+  <script src="frontend/report/overview.js?v=20261019-v150c"></script>
   <script src="/frontend/core/home-button.js?v=1"></script>
 <script src="frontend/core/azeroth-shell.js?v=20261013-shared"></script></body>
 </html>

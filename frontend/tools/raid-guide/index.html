@@ -13,7 +13,7 @@
         };
     </script>
     <script src="assets/vendor/wow-tooltips.js?v=3"></script>
-    <script src="assets/vendor/zone54-raid-guide-data.js?v=11"></script>
+    <script src="assets/vendor/zone54-raid-guide-data.js?v=20261019-altar"></script>
     <link rel="stylesheet" href="/frontend/core/auth-dialog.css?v=1.4.0">
     <style>
         :root {
@@ -766,13 +766,16 @@
     }
 
     const state = {
-        bossKey: (location.hash.match(/boss=([^&]+)/) || [])[1] || guide.bosses[0].key,
+        bossKey: new URLSearchParams(location.hash.slice(1)).get('boss') || guide.bosses[0].key,
         category: "all",
         query: "",
         reviewedOnly: false,
         timelineDifficulty: "heroic"
     };
     const byKey = Object.fromEntries(guide.bosses.map(boss => [boss.key, boss]));
+    for (const boss of guide.bosses) {
+        for (const alias of boss.aliases || []) byKey[alias] = boss;
+    }
     const $ = id => document.getElementById(id);
     const escapeHtml = value => String(value ?? "")
         .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
@@ -1220,6 +1223,11 @@
     function render() {
         const boss = byKey[state.bossKey] || guide.bosses[0];
         state.bossKey = boss.key;
+        const hash = new URLSearchParams(location.hash.slice(1));
+        if (hash.get('boss') && byKey[hash.get('boss')] && hash.get('boss') !== boss.key) {
+            hash.set('boss', boss.key);
+            history.replaceState(null, '', `${location.pathname}${location.search}#${hash}`);
+        }
         renderBossList();
         renderHero(boss);
         renderEnergy(boss);
@@ -1233,7 +1241,7 @@
 
     function selectBoss(key) {
         if (!byKey[key]) return;
-        state.bossKey = key;
+        state.bossKey = byKey[key].key;
         state.query = "";
         state.category = "all";
         state.reviewedOnly = false;
@@ -1243,7 +1251,7 @@
             button.classList.toggle("active", button.dataset.category === "all");
         });
         $("reviewedOnly").classList.remove("active");
-        history.replaceState(null, "", `#boss=${encodeURIComponent(key)}`);
+        history.replaceState(null, "", `${location.pathname}${location.search}#boss=${encodeURIComponent(state.bossKey)}`);
         render();
         window.scrollTo({top: 0, behavior: "smooth"});
     }
@@ -1273,9 +1281,9 @@
         });
     });
     window.addEventListener("hashchange", () => {
-        const key = (location.hash.match(/boss=([^&]+)/) || [])[1];
-        if (key && byKey[decodeURIComponent(key)] && decodeURIComponent(key) !== state.bossKey) {
-            selectBoss(decodeURIComponent(key));
+        const key = new URLSearchParams(location.hash.slice(1)).get('boss');
+        if (key && byKey[key] && key !== state.bossKey) {
+            selectBoss(key);
         }
     });
 

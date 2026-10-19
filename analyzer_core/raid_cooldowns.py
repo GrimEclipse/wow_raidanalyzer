@@ -384,8 +384,9 @@ def _reference_phase_data(
     raid_key: str | None = None,
 ) -> dict:
     difficulty_key = "mythic" if int(difficulty) == 5 else "heroic"
+    reference_key = "the_coiler_altar" if boss_key in {"coiledaltar", "bargained", "the_coiler_altar"} else boss_key
     reference = (
-        ((_reference_timelines().get("bosses") or {}).get(boss_key) or {}).get(difficulty_key)
+        ((_reference_timelines().get("bosses") or {}).get(reference_key) or {}).get(difficulty_key)
         or {}
     )
     if raid_key:

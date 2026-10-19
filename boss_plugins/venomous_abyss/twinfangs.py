@@ -7,9 +7,10 @@ from math import atan2, degrees, hypot, radians, sin, cos, pi
 from statistics import median
 from bisect import bisect_left, bisect_right
 from analyzer_core.config import resolve_analysis_options
+from analyzer_core.analysis_profile import profile_schema, resolve_profile
 from analyzer_core.event_evidence import actor_position
 
-CONFIG_SCHEMA = [
+CONFIG_SCHEMA = profile_schema([
     {"key":"fullReplayEnabled", "type":"boolean", "default":True, "label":"场地推演", "description":"读取整场所有玩家的位置记录；关闭后不读取整场回放数据。"},
     {"key": "spitReviewEnabled", "type": "boolean", "label": "蛇头射线方向与误伤", "default": False},
     {"key": "venomReviewEnabled", "type": "boolean", "label": "永恒毒液叠层与来源", "default": True},
@@ -45,7 +46,7 @@ CONFIG_SCHEMA = [
      "visibleWhen": {"field": "broodReviewEnabled", "equals": True}},
     {"key": "earlyDeathGapSeconds", "type": "number", "label": "提前死亡与后续死亡间隔（秒）", "default": 8, "min": 3, "max": 60,
      "visibleWhen": {"field": "earlyDeathReviewEnabled", "equals": True}},
-]
+])
 
 
 from collections import Counter, defaultdict
@@ -262,6 +263,8 @@ def _boss_for_side(raw, position, timestamp):
 def _brood_review(fight, actor_map, players, raw, options):
     if int(fight.get("difficulty") or 0) != 5:
         return {"enabled": False, "reason": "仅适用于史诗难度", "events": []}
+    profile = resolve_profile(raw.get("reportGuild"), options)
+    assignments_enabled = profile["key"] == "avalon" and any(options["broodGroups"].values())
     start = int(fight["startTime"])
     casts = _unique_events(raw.get("casts", []) + raw.get("trackedActorEvents", []))
     summons = [e for e in casts if ability_id(e) == BROOD_SUMMON_ID and event_type(e) == "cast"]
@@ -310,6 +313,11 @@ def _brood_review(fight, actor_map, players, raw, options):
         row["groupLabel"] = ("左侧" if side == "left" else "右侧") + ("近战组" if group == "melee" else "远程组")
         row["leakLabel"] = f"{row['groupLabel']}第{row['groupOrder']}个蛇头漏断脏腑爆裂" if row["successfulCasts"] else None
         timestamp = start + (min(row["successTimesMs"]) if row["successTimesMs"] else row["timeMs"])
+        if not assignments_enabled:
+            row["responsibilitySlot"] = row["groupLabel"] + str(row["groupOrder"])
+            row["responsiblePlayers"] = []
+            row["assignmentNote"] = "未启用公会打断安排，仅展示实际打断玩家与点位"
+            continue
         backup, _ = _match_names(options["broodGroups"].get(side + "Backup"), players)
         assigned = []
         if position["slot"] <= 2:
@@ -357,6 +365,7 @@ def _brood_review(fight, actor_map, players, raw, options):
         first["successfulCasts"] = 1
     output = [first] if first else []
     return {"enabled": True, "events": output, "replayEvents": replay_events,
+            "assignmentEnabled": assignments_enabled, "analysisProfile": profile,
             "headCount": len(replay_events), "summonCount": len(summons),
             "interruptCount": sum(len(row["interrupts"]) for row in replay_events),
             "observedSuccessfulCastCount": sum(row["successfulCasts"] for row in replay_events),
@@ -505,6 +514,8 @@ def _protection_pairs(options, index, players):
 
 
 def _feast_review(fight, actor_map, players, raw, options):
+    if resolve_profile(raw.get("reportGuild"), options)["key"] != "avalon":
+        options = {**options, "feastStrategy": "normal", "feastGroups": {}, "protectionPairs": {}}
     if int(fight.get("difficulty") or 0) != 5:
         return {"enabled": False, "reason": "英雄消层检查见永恒毒液页", "rounds": []}
     start = int(fight["startTime"])
@@ -1650,6 +1661,7 @@ def analyze_twinfangs(fight, actor_map, players, raw):
         "circleHits": {"spellID": 1289994, "players": circle_hits},
         "waveHits": {"spellID": 1292807, "players": wave_hits},
         "isMythic": mythic,
+        "analysisProfile": resolve_profile(raw.get("reportGuild"), options),
         "tankGlobules": {"enabled": mythic and options["globulesReviewEnabled"], "rounds": tank_globules},
         "feast": _feast_review(fight, actor_map, players, raw, options) if options["feastReviewEnabled"] else {"enabled": False},
         "brood": _brood_review(fight, actor_map, players, raw, options) if options["broodReviewEnabled"] else {"enabled": False},

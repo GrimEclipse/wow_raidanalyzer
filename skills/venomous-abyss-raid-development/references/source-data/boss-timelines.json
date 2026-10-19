@@ -2693,7 +2693,7 @@
         ]
       }
     },
-    "bargained": {
+    "the_coiler_altar": {
       "heroic": {
         "reportID": "gLGrH8JTVKFf4zWQ",
         "fightID": 8,
@@ -3232,7 +3232,384 @@
               392805
             ]
           }
-        ]
+        ],
+        "comparisonTimeline": {
+          "ruleVersion": "boss-starts-phase-auras-v1",
+          "phaseTimeline": [
+            {
+              "key": "p1",
+              "timeMs": 0,
+              "signal": "fight-start"
+            },
+            {
+              "key": "p2",
+              "timeMs": 177991,
+              "spellID": 1288624,
+              "signal": "applybuff"
+            },
+            {
+              "key": "intermission",
+              "timeMs": 389099,
+              "spellID": 1304028,
+              "signal": "applybuff"
+            },
+            {
+              "key": "p3",
+              "timeMs": 427666,
+              "spellID": 1289798,
+              "signal": "applybuff"
+            }
+          ],
+          "events": [
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 20001,
+              "endTimeMs": 20001,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 37018,
+              "endTimeMs": 37018,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "guillotine",
+              "label": "处斩",
+              "spellID": 1283489,
+              "timeMs": 43013,
+              "endTimeMs": 43013,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 57005,
+              "endTimeMs": 57005,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 73999,
+              "endTimeMs": 73999,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 105039,
+              "endTimeMs": 105039,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 122038,
+              "endTimeMs": 122038,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "guillotine",
+              "label": "处斩",
+              "spellID": 1283489,
+              "timeMs": 128039,
+              "endTimeMs": 128039,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 142040,
+              "endTimeMs": 142040,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "sever",
+              "label": "撕裂",
+              "spellID": 1299684,
+              "timeMs": 159037,
+              "endTimeMs": 159037,
+              "phase": "p1",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 191038,
+              "endTimeMs": 191038,
+              "phase": "p2",
+              "sourceType": "cast"
+            },
+            {
+              "key": "gloom",
+              "label": "幽暗炸弹",
+              "spellID": 1310882,
+              "timeMs": 195985,
+              "endTimeMs": 195985,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "soul",
+              "label": "灵魂裂劈",
+              "spellID": 1286620,
+              "timeMs": 212026,
+              "endTimeMs": 212026,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 223993,
+              "endTimeMs": 223993,
+              "phase": "p2",
+              "sourceType": "cast"
+            },
+            {
+              "key": "gloom",
+              "label": "幽暗炸弹",
+              "spellID": 1310882,
+              "timeMs": 233015,
+              "endTimeMs": 233015,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "soul",
+              "label": "灵魂裂劈",
+              "spellID": 1286620,
+              "timeMs": 243006,
+              "endTimeMs": 243006,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "night",
+              "label": "永恒夜幕",
+              "spellID": 1286918,
+              "timeMs": 248004,
+              "endTimeMs": 248004,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 276051,
+              "endTimeMs": 276051,
+              "phase": "p2",
+              "sourceType": "cast"
+            },
+            {
+              "key": "gloom",
+              "label": "幽暗炸弹",
+              "spellID": 1310882,
+              "timeMs": 281042,
+              "endTimeMs": 281042,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "soul",
+              "label": "灵魂裂劈",
+              "spellID": 1286620,
+              "timeMs": 297051,
+              "endTimeMs": 297051,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 309014,
+              "endTimeMs": 309014,
+              "phase": "p2",
+              "sourceType": "cast"
+            },
+            {
+              "key": "gloom",
+              "label": "幽暗炸弹",
+              "spellID": 1310882,
+              "timeMs": 318037,
+              "endTimeMs": 318037,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "soul",
+              "label": "灵魂裂劈",
+              "spellID": 1286620,
+              "timeMs": 328023,
+              "endTimeMs": 328023,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "night",
+              "label": "永恒夜幕",
+              "spellID": 1286918,
+              "timeMs": 333048,
+              "endTimeMs": 333048,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 361069,
+              "endTimeMs": 361069,
+              "phase": "p2",
+              "sourceType": "cast"
+            },
+            {
+              "key": "gloom",
+              "label": "幽暗炸弹",
+              "spellID": 1310882,
+              "timeMs": 366059,
+              "endTimeMs": 366059,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "soul",
+              "label": "灵魂裂劈",
+              "spellID": 1286620,
+              "timeMs": 382045,
+              "endTimeMs": 382045,
+              "phase": "p2",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "bind",
+              "label": "灵魂绑定",
+              "spellID": 1304032,
+              "timeMs": 389099,
+              "endTimeMs": 427666,
+              "phase": "intermission",
+              "sourceType": "phase"
+            },
+            {
+              "key": "defile",
+              "label": "盘卷祭坛亵渎",
+              "spellID": 1298381,
+              "timeMs": 430318,
+              "endTimeMs": 430318,
+              "phase": "p3",
+              "sourceType": "cast"
+            },
+            {
+              "key": "grim",
+              "label": "冷酷处斩",
+              "spellID": 1299267,
+              "timeMs": 446994,
+              "endTimeMs": 446994,
+              "phase": "p3",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "night",
+              "label": "永恒夜幕",
+              "spellID": 1286918,
+              "timeMs": 468097,
+              "endTimeMs": 468097,
+              "phase": "p3",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 492555,
+              "endTimeMs": 492555,
+              "phase": "p3",
+              "sourceType": "cast"
+            },
+            {
+              "key": "grim",
+              "label": "冷酷处斩",
+              "spellID": 1299267,
+              "timeMs": 511427,
+              "endTimeMs": 511427,
+              "phase": "p3",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "defile",
+              "label": "盘卷祭坛亵渎",
+              "spellID": 1298381,
+              "timeMs": 532564,
+              "endTimeMs": 532564,
+              "phase": "p3",
+              "sourceType": "cast"
+            },
+            {
+              "key": "night",
+              "label": "永恒夜幕",
+              "spellID": 1286918,
+              "timeMs": 564770,
+              "endTimeMs": 564770,
+              "phase": "p3",
+              "sourceType": "begincast"
+            },
+            {
+              "key": "cackle",
+              "label": "精魂狂笑",
+              "spellID": 1286441,
+              "timeMs": 589224,
+              "endTimeMs": 589224,
+              "phase": "p3",
+              "sourceType": "cast"
+            },
+            {
+              "key": "grim",
+              "label": "冷酷处斩",
+              "spellID": 1299267,
+              "timeMs": 611433,
+              "endTimeMs": 611433,
+              "phase": "p3",
+              "sourceType": "begincast"
+            }
+          ],
+          "counts": {
+            "sever": 8,
+            "guillotine": 2,
+            "cackle": 7,
+            "soul": 5,
+            "gloom": 5,
+            "night": 4,
+            "bind": 1,
+            "defile": 2,
+            "grim": 3
+          },
+          "reportID": "Qh8XMfKGTmLJtk2r",
+          "fightID": 1,
+          "source": "data/timeline-kill-casts.json / original enemy Casts and Buffs"
+        }
       }
     },
     "ulatek": {

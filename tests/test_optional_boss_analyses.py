@@ -70,7 +70,7 @@ def test_sszorak_field_off_skips_coordinates_and_replay_computation():
 def test_coiledaltar_field_off_skips_npc_fetches_and_all_spatial_adjudication():
     client = Client(3429)
     with patch.object(coiledaltar,'WclClient',return_value=client), patch.object(coiledaltar,'build_position_index',side_effect=AssertionError('positions called')), patch.object(coiledaltar,'build_field_audit',side_effect=AssertionError('field called')), patch.object(coiledaltar,'analyze_cone_sever',side_effect=AssertionError('cone called')):
-        options = {row['key']: False for row in coiledaltar.CONFIG_SCHEMA}
+        options = {row['key']: False for row in coiledaltar.CONFIG_SCHEMA if row['type'] == 'boolean'}
         options.update(dreadmarchReviewEnabled=True,graveboundReviewEnabled=True,eternalNightfallReviewEnabled=True)
         result = coiledaltar.build_aggregated_json('A'*16,options)
     assert not any(kind in {'Resources','All','DamageDone','Healing'} for kind,_ in client.requests)
@@ -107,7 +107,7 @@ def test_single_fight_normalizes_options_and_keeps_selected_and_full_caches_sepa
 
     with patch.object(single_fight,'CACHE_DIR',tmp_path/'cache'), patch.object(single_fight,'WclClient'), patch.object(single_fight,'report_overview',return_value=overview), patch.object(single_fight,'analyze_report',side_effect=analyze):
         light = single_fight.analyze_single_fight(report_code='A'*16,fight_id=1,output_path=tmp_path/'light.json',options={'fieldReplayEnabled':False})
-        assert calls[-1] == {row['key']: row['key'] != 'fieldReplayEnabled' for row in sszorak.CONFIG_SCHEMA}
+        assert calls[-1] == resolve_analysis_options(sszorak.CONFIG_SCHEMA, {'fieldReplayEnabled': False})
         repeated = single_fight.analyze_single_fight(report_code='A'*16,fight_id=1,output_path=tmp_path/'same.json',options={'fieldReplayEnabled':False})
         assert repeated['cacheHit'] is True
         assert repeated['cacheKey'] == light['cacheKey']
@@ -165,7 +165,7 @@ def test_each_analysis_can_run_alone_in_nightly_pipeline(module,encounter,key):
 
 def test_coiledaltar_soul_review_keeps_manifest_evidence_without_field_diagrams():
     client = Client(3429)
-    options = {row['key']: row['key'] == 'soulSeverReviewEnabled' for row in coiledaltar.CONFIG_SCHEMA}
+    options = {row['key']: row['key'] == 'soulSeverReviewEnabled' for row in coiledaltar.CONFIG_SCHEMA if row['type'] == 'boolean'}
     with patch.object(coiledaltar,'WclClient',return_value=client), patch.object(coiledaltar,'build_field_audit',side_effect=AssertionError('diagram called')), patch.object(coiledaltar,'analyze_gloombomb',side_effect=AssertionError('bomb called')), patch.object(coiledaltar,'analyze_manifestations',wraps=coiledaltar.analyze_manifestations) as evidence, patch.object(coiledaltar,'analyze_soul_sever',wraps=coiledaltar.analyze_soul_sever) as soul:
         result = coiledaltar.build_aggregated_json('A'*16,options)
     evidence.assert_called_once()
@@ -190,7 +190,7 @@ def test_sszorak_replay_off_keeps_cyst_wind_evidence_but_skips_replay_frames():
     fight = {'startTime':0,'endTime':60000}
     raw = {key:[] for key in ['casts','damage','debuffs','deaths','resources','friendlyCasts']}
     raw['casts'] = [{'timestamp':1000,'abilityGameID':1286033,'type':'cast'}]
-    raw['analysisOptions'] = {row['key']:row['key'] == 'cystsReviewEnabled' for row in sszorak.CONFIG_SCHEMA}
+    raw['analysisOptions'] = {row['key']:row['key'] == 'cystsReviewEnabled' for row in sszorak.CONFIG_SCHEMA if row['type'] == 'boolean'}
     with patch.object(sszorak,'_player_positions_over_window',return_value=[]) as frames, patch.object(sszorak,'_sszorak_crosswind_waves',side_effect=AssertionError('crosswind review called')):
         result = sszorak.analyze_sszorak(fight,{}, {}, raw)
     # Only the wind inference window is sampled; the separate replay window is skipped.

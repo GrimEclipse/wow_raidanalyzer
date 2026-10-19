@@ -67,8 +67,8 @@ function posLabel(position, arena) {
   const scale = Number(arena?.wclCoordScale || 100);
   return `${(position.x / scale).toFixed(1)}, ${(position.y / scale).toFixed(1)}`;
 }
-function renderStats() { const pull = current(), survival = pull?.survival || {}; $("title").textContent = `盘卷祭坛，Fight ${pull?.fightID || "-"}`; $("meta").textContent = `${pull?.difficultyName || "未知难度"}，${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`}，${pull?.date || ""} ${pull?.startClock || ""}`; if(state.payload?.meta?.skippedAnalyses?.length){$("meta").textContent += "，未分析：" + state.payload.meta.skippedAnalyses.join("、");}$("wclLink").href = pull?.wclDeepLink || "#"; const items = [["战斗时长", pull?.duration || "—"], ["结果", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`], ["难度", pull?.difficultyName || "未知"], ["阵亡", survival.deathCount || 0], ["战复", survival.combatResCount || 0], ["结束存活", `${survival.survivorCount || 0}/${survival.rosterCount || 0}`]]; $("stats").innerHTML = items.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join(""); }
-function renderTabs() { const defs = [...(state.payload?.meta?.tabDefinitions || [{ key: "survival", label: "全场存活情况" }])]; if(boss().combatReplay&&!defs.some(d=>d.key==='replay'))defs.splice(1,0,{key:'replay',label:'战斗回放'}); if (!defs.some((row) => row.key === state.tab)) state.tab = defs[0].key; $("tabs").innerHTML = defs.map((row) => `<button data-tab="${esc(row.key)}" class="${row.key === state.tab ? "active" : ""}">${esc(row.label)}</button>`).join(""); document.querySelectorAll("[data-tab]").forEach((button) => (button.onclick = () => { state.tab = button.dataset.tab; renderContent(); renderTabs(); })); }
+function renderStats() { const pull = current(), survival = pull?.survival || {}; $("title").textContent = `盘卷祭坛，Fight ${pull?.fightID || "-"}`; $("meta").textContent = `${pull?.difficultyName || "未知难度"}，${pull?.isKill ? "击杀" : `Boss 剩余 ${Number(pull?.bossPercentage || 0).toFixed(2)}%`}，${pull?.date || ""} ${pull?.startClock || ""}`; if(state.payload?.meta?.skippedAnalyses?.length){$("meta").textContent += "，未分析：" + state.payload.meta.skippedAnalyses.join("、");}if(boss().analysisProfile)$("meta").textContent+="，"+boss().analysisProfile.label;$("wclLink").href = pull?.wclDeepLink || "#"; const items = [["战斗时长", pull?.duration || "—"], ["结果", pull?.isKill ? "KILL" : `${Number(pull?.bossPercentage || 0).toFixed(2)}%`], ["难度", pull?.difficultyName || "未知"], ["阵亡", survival.deathCount || 0], ["战复", survival.combatResCount || 0], ["结束存活", `${survival.survivorCount || 0}/${survival.rosterCount || 0}`]]; $("stats").innerHTML = items.map(([label, value]) => `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join(""); }
+function renderTabs() { const defs = [...(state.payload?.meta?.tabDefinitions || [{ key: "survival", label: "全场存活情况" }])]; if(!defs.some(d=>d.key==='guildTimeline'))defs.splice(1,0,{key:'guildTimeline',label:'公会战术核对'}); if(boss().combatReplay&&!defs.some(d=>d.key==='replay'))defs.splice(1,0,{key:'replay',label:'战斗回放'}); if (!defs.some((row) => row.key === state.tab)) state.tab = defs[0].key; $("tabs").innerHTML = defs.map((row) => `<button data-tab="${esc(row.key)}" class="${row.key === state.tab ? "active" : ""}">${esc(row.label)}</button>`).join(""); document.querySelectorAll("[data-tab]").forEach((button) => (button.onclick = () => { state.tab = button.dataset.tab; renderContent(); renderTabs(); })); }
 function renderSurvival() { const s = current()?.survival || {}; return `<section class="panel"><h2>死亡原因 / 战复时间线</h2>${table(["时间", "类型", "玩家", "原因 / 技能"], (s.timeline || []).map((event) => [esc(event.time), event.kind === "combat_res" ? '<span class="badge good">战复</span>' : '<span class="badge bad">死亡</span>', player(event), event.kind === "combat_res" ? `${esc(event.source)} 使用 ${esc(event.ability)}` : event.deathCause === "fall" ? "跌落" : spellLink(event.abilityID, event.ability)]))}</section><section class="panel"><h2>阶段时间线</h2>${table(["阶段", "时间"], (boss().phaseTimeline || []).map((row) => [esc(row.label), esc(fmtPhase(row.timeMs))]))}</section>`; }
 function fmtPhase(ms) { const s = Math.max(0, Number(ms || 0)) / 1000; return `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`; }
 function stillInsideRows(round) { return round?.stillInsideRange || round?.stillInside50 || []; }
@@ -559,6 +559,82 @@ function renderField() {
   }, 0);
   return `<section class="panel"><h2>场地示意图</h2><p class="muted">${esc(data.evidenceNote || "")}</p><p class="muted">按技能收起或展开；点开某一轮查看该次示意图。</p><div class="field-mechanic-groups">${panels}</div></section>`;
 }
+function renderHoldEvidence(phase,threshold) {
+  if(!phase.healthSampleCount)return '<p class="muted">缺少 Boss 血量采样，无法计算低血量施法，不能视为零次。</p>';
+  const sort=state.holdSorts?.[phase.phase]||{key:'damage',direction:'desc'};
+  const rows=window.CoiledAltarGuildView.sortHoldRows(phase.thresholds?.[String(threshold)]||[],sort.key,sort.direction);
+  const holdWindow=phase.thresholdWindows?.[String(threshold)];
+  const range=phase.phase!=='p1'?'':holdWindow?`<p class="muted">统计窗口：${holdWindow.startTimeMs==null?`截至 ${fmtPhase(holdWindow.endTimeMs)} 未见 Boss 低于 ${threshold}%`:`${fmtPhase(holdWindow.startTimeMs)}（首次低于 ${threshold}%）→ ${fmtPhase(holdWindow.endTimeMs)} 之前`}${holdWindow.evidenceEndTimeMs<holdWindow.endTimeMs?`；本场实际取证截至 ${fmtPhase(holdWindow.evidenceEndTimeMs)}`:''}。放行后的施法与伤害不计入。</p>`:'<p class="error">旧报告未按 2:45 截断停手统计，请重新分析或导入更新后的报告。</p>';
+  return range+`<div class="hold-sort"><label>排序 <select data-hold-sort="${esc(phase.phase)}" aria-label="${esc(phase.phase.toUpperCase())} 停手排序维度">${[['damage','总伤害（含宠物）'],['playerDamage','玩家本体伤害'],['castCount','Boss 目标施法次数'],['petDamage','宠物伤害'],['player','玩家姓名']].map(([key,label])=>`<option value="${key}" ${sort.key===key?'selected':''}>${label}</option>`).join('')}</select></label><select data-hold-direction="${esc(phase.phase)}" aria-label="${esc(phase.phase.toUpperCase())} 停手排序方向"><option value="desc" ${sort.direction==='desc'?'selected':''}>降序</option><option value="asc" ${sort.direction==='asc'?'selected':''}>升序</option></select></div>`+
+    table(['玩家','Boss 目标施法次数','总伤害（含宠物）','玩家本体伤害','其中宠物伤害','施法时间'],rows.map(row=>[player(row),num(row.castCount),num(row.damage),num(Number(row.damage||0)-Number(row.petDamage||0)),num(row.petDamage),(row.casts||[]).length?`<details><summary>${row.casts.length} 条施法</summary>${row.casts.map(c=>`${fmtPhase(c.timeMs)} ${spellLink(c.spellID)}`).join('<br>')}</details>`:'—']));
+}
+const BURST_COLORS=['#70d9ef','#ffcf6b','#c7a0ff','#8de2a6','#ff9fae','#e9b780'];
+function renderBurstChart(data) {
+  return data.timelineViewVersion==='icons-v1'?'<div data-icon-timeline></div>':renderLegacyBurstChart(data);
+}
+function mountGuildIconTimeline(){
+  const data=boss().guildTimeline;if(data?.timelineViewVersion!=='icons-v1')return;
+  state.iconTimeline??={};
+  $('content').querySelectorAll('[data-icon-timeline]').forEach(host=>window.CoiledAltarIconTimeline?.mount(host,data,{pull:current(),pulls:state.pulls,scope:state.burstScope||'dps',state:state.iconTimeline}));
+}
+function renderLegacyBurstChart(data) {
+  const duration=Math.max(data.durationMs||1,1),x=t=>Math.max(0,Math.min(1000,t/duration*1000));
+  const phases=window.CoiledAltarGuildView.phaseTimings(data);
+  const colors=['#233650','#174b51','#5b4326','#452f58'];
+  const bg=phases.map((p,i)=>`<rect x="${x(p.timeMs)}" width="${Math.max(0,x(phases[i+1]?.timeMs??duration)-x(p.timeMs))}" height="30" fill="${colors[i%4]}" opacity=".6"><title>${esc(p.label+'；'+(p.advanceNote||'未确认时间轴提前'))}</title></rect>`).join('');
+  const ticks=[];for(let t=0;t<duration;t+=60000)ticks.push(t);ticks.push(duration);
+  const grid=ticks.map(t=>`<path d="M ${x(t)} 0 V 30" stroke="#ffffff" opacity=".12"/>`).join('');
+  const axis=phases.map((p,i)=>`<rect x="${x(p.timeMs)}" width="${Math.max(0,x(phases[i+1]?.timeMs??duration)-x(p.timeMs))}" height="42" fill="${colors[i%4]}"><title>${esc(p.advanceNote||'未确认时间轴提前')}</title></rect><text x="${x(p.timeMs)+4}" y="10">${esc(({p1:'P1',p2:'P2',intermission:'P2.5',p3:'P3'})[p.key]||p.label)}</text><text class="phase-advance" x="${x(p.timeMs)+4}" y="23"><title>${esc(p.advanceNote)}</title>${esc(x(phases[i+1]?.timeMs??duration)-x(p.timeMs)<120&&p.advanceLabel?'早'+((p.endAdvanceMs||p.firstDreadmarchAdvanceMs||p.startAdvanceMs)/1000).toFixed(1)+'秒':p.advanceLabel)}</text>`).join('')+
+    ticks.filter(t=>t===duration||duration-t>20000).map(t=>`<text x="${x(t)}" y="39" text-anchor="${t===0?'start':t===duration?'end':'middle'}">${fmtPhase(t)}</text>`).join('');
+  const groups=window.CoiledAltarGuildView.groupBurstRows(data.timelines||[],current()?.players||[],data.unresolved||[],state.burstScope||'dps');
+  return `<div class="burst-chart-scroll"><div class="burst-chart"><div class="burst-axis"><span>玩家 / 技能<br><small>阶段提前量见色块</small></span><svg viewBox="0 0 1000 44" preserveAspectRatio="none" role="img" aria-label="阶段时间轴与提前秒数">${axis}</svg></div>${groups.map(row=>{
+    const skills=row.skills,step=24/Math.max(1,skills.length);
+    const marks=skills.map((skill,i)=>{
+      const color=BURST_COLORS[i%BURST_COLORS.length],y=4+i*step,h=Math.min(5,step-1),tip=label=>esc(skill.label+'，'+label);
+      const windows=(skill.windows||[]).filter(w=>w.startTimeMs<=duration).map(w=>`<rect x="${x(w.startTimeMs)}" y="${y}" width="${Math.max(1,x(w.endTimeMs)-x(w.startTimeMs))}" height="${h}" fill="${w.counted?'#ff647c':color}" fill-opacity=".15" stroke="${w.counted?'#ff647c':color}" stroke-width=".6" stroke-dasharray="2 2"><title>${tip(`要求 ${fmtPhase(w.startTimeMs)}–${fmtPhase(w.endTimeMs)}；${w.reason||''}`)}</title></rect>`).join('');
+      const effectIntervals=!data.evidenceVersion&&['mage.arcane-surge','evoker.breath-of-eons','mage.ray-of-frost'].includes(skill.ability)?[]:skill.intervals||[];
+      const intervals=effectIntervals.map(a=>`<rect x="${x(a.startTimeMs)}" y="${y}" width="${Math.max(1,x(a.endTimeMs)-x(a.startTimeMs))}" height="${h}" fill="${color}"><title>${tip(`${fmtPhase(a.startTimeMs)}–${fmtPhase(a.endTimeMs)}，${a.evidence==='configured-estimate'?'配置时长示意':a.evidence?.startsWith('enemy-debuff')?'敌方减益 '+(a.target||'目标'):'自身增益'}${a.evidence?.endsWith('-truncated')?'（战斗结束截断）':''}`)}</title></rect>`).join('');
+      const casts=(skill.casts||[]).map(t=>`<path d="M ${x(t)} ${y-1} V ${y+h+1}" stroke="${color}" stroke-width="2"><title>${tip(`${fmtPhase(t)} 实际施法`)}</title></path>`).join('');
+      return windows+intervals+casts;
+    }).join('');
+    const note=row.unresolved.map(r=>r.reason).join('；')||'未配置爆发安排，仅展示本场角色';
+    const count=(data.players||[]).find(p=>String(p.playerID)===String(row.playerID))?.count||0;
+    return `<div class="burst-player-row" data-burst-player="${esc(row.playerID??row.player)}"><div class="burst-player-label">${player(row)}${count?`<b class="burst-count">${count}</b>`:''}<div class="burst-skill-key" title="${esc(skills.length?skills.map(s=>s.label).join('、'):note)}">${skills.length?skills.map((s,i)=>`<span style="--skill:${BURST_COLORS[i%BURST_COLORS.length]}">${esc(s.label)}</span>`).join(''):`<span>${esc(note)}</span>`}</div></div><svg viewBox="0 0 1000 30" preserveAspectRatio="none" role="img" aria-label="${esc(row.player+' 全部技能爆发时间轴')}">${bg}${grid}${marks}${skills.length?'':`<text x="8" y="19">${esc(note)}</text>`}</svg></div>`;
+  }).join('')||'<p class="muted">没有可展示的 DPS 角色。</p>'}</div></div>`;
+}
+function renderGuildTimeline() {
+  const data=boss().guildTimeline;
+  if(!data||(data.enabled&&!data.phaseControl?.some(p=>p.phase==='p1'&&p.firstDreadmarchEarliestTimeMs!=null)))return '<section class="panel"><h2>公会战术核对：停手与爆发轴</h2><p>这份报告由旧版分析生成，尚未包含当前规则所需的数据。请使用 1.5 重新分析整晚日志；刷新页面不会补出缺失的取证数据。</p><p>P1 要求至少 2:50，首次恐惧行军至少 3:05 开始读条。重新分析后，在本页 P1 / P2 停手核对中调整 1%–10% 血量滑块；整晚合计位于概览的“机制统计”。</p><a class="button" href="/online">重新分析日志</a></section>';
+  if(!data.enabled)return `<section class="panel"><h2>公会战术核对</h2><p>${esc(data.reason||'当前使用基础分析；专属判断仅用于阿瓦隆史诗数据。')}</p><p>${esc(data.analysisProfile?.reason||'')}</p></section>`;
+  const status={early:'时间轴提前','on-time':'已满足时间要求','in-progress':'本阶段尚未结束',unreached:'未进入',unknown:'缺少确认事件'};
+  const controls=(data.phaseControl||[]).map(phase=>{
+    const threshold=state.holdThresholds?.[phase.phase]??data.defaultThreshold??5;
+    return `<article class="panel"><h3>${esc(phase.phase.toUpperCase())} 停手核对 <span class="badge ${phase.status==='early'?'bad':'good'}">${esc(status[phase.status]||phase.status)}</span></h3>
+      <p>最早结束 ${fmtPhase(phase.earliestEndTimeMs)}；实测末轮刀 ${phase.requiredBladeTimeMs==null?'未确认':fmtPhase(phase.requiredBladeTimeMs)}；Boss 到 1 血/死亡 ${phase.triggerTimeMs==null?'未记录':fmtPhase(phase.triggerTimeMs)}；下一阶段 ${phase.phaseEndTimeMs==null?'未进入':fmtPhase(phase.phaseEndTimeMs)}</p>
+      ${phase.phase==='p1'?`<p>首次恐惧行军须在 ${fmtPhase(phase.firstDreadmarchEarliestTimeMs)} 或之后开始读条；实测 ${phase.firstDreadmarchTimeMs==null?'未记录':fmtPhase(phase.firstDreadmarchTimeMs)}</p>`:''}
+      ${phase.status==='early'?'':'<p class="muted">本阶段未确认提前，以下仅供取证查看，不归责停手施法。</p>'}
+      ${phase.status!=='unreached'?`<label class="hold-slider">Boss 血量低于 <output>${threshold}%</output><input data-hold-phase="${esc(phase.phase)}" type="range" min="1" max="10" step="1" value="${threshold}" aria-label="${phase.phase.toUpperCase()} 停手血量阈值"></label>
+      <div data-hold-results="${esc(phase.phase)}">${renderHoldEvidence(phase,threshold)}</div>`:'<p class="muted">进入本阶段后可查看停手血量滑块。</p>'}
+      ${phase.reason?`<p class="muted">${esc(phase.reason)}</p>`:''}</article>`;
+  }).join('');
+  const label={used:'按时使用',early:'提前使用',late:'延后使用',missing:'未使用','not-reached':'未走完窗口'};
+  const checks=table(['玩家','技能','要求窗口','实际使用','上一次','下一次','结果','计数原因'],(data.checks||[]).map(row=>[player(row),esc(row.label),`${fmtPhase(row.startTimeMs)}–${fmtPhase(row.endTimeMs)}`,row.castTimeMs==null?'—':fmtPhase(row.castTimeMs),row.previousCastTimeMs==null?'—':fmtPhase(row.previousCastTimeMs),row.nextCastTimeMs==null?'—':fmtPhase(row.nextCastTimeMs),`<span class="badge ${row.counted?'bad':''}">${row.counted?'计 1 次：':''}${esc(label[row.status]||row.status)}</span>`,esc(row.reason)]));
+  const potions=boss().intermission;
+  const scopeOptions=`<option value="dps" ${state.burstScope!=='all'?'selected':''}>全部 DPS</option><option value="all" ${state.burstScope==='all'?'selected':''}>全部角色</option>`;
+  const legend=data.timelineViewVersion==='icons-v1'?'':'<p class="burst-legend">旧版爆发轴，请导入更新后的报告查看图标、预定轴及 Boss 对照。</p>';
+  return `<section class="panel burst-panel"><div class="burst-toolbar"><h2>爆发轴 <small>${data.burstSkipped?'已跳过计数':`标记 ${data.count} 次`}</small></h2><label>展示 <select data-burst-scope aria-label="爆发轴展示角色">${scopeOptions}</select></label><button class="button" type="button" data-burst-focus>专注查看</button></div>
+    ${data.evidenceVersion?'':'<p class="burst-skip">这份旧报告缺少新版技能效果取证，请重新分析或导入更新后的报告；法师和亘古吐息暂只保留施法点，不显示旧持续条。</p>'}
+    ${data.burstSkipped?`<p class="burst-skip">${esc(data.burstSkipReason)}</p>`:''}${legend}<div data-icon-home><div data-burst-chart>${renderBurstChart(data)}</div></div>
+    <details class="burst-details"><summary>展开标记次数与逐条核对</summary>${table(['玩家','标记次数'],(data.players||[]).map(r=>[player(r),num(r.count)]))}${checks}</details></section>
+    <dialog class="burst-focus" aria-label="全团爆发轴专注查看"><div class="burst-toolbar"><h2>全团爆发轴</h2><label>展示 <select data-burst-scope aria-label="专注查看角色">${scopeOptions}</select></label><button class="button" type="button" data-burst-close>关闭专注查看</button></div>${legend}${data.timelineViewVersion==='icons-v1'?'<div data-icon-focus-target></div>':`<div data-burst-chart>${renderBurstChart(data)}</div>`}</dialog>
+    <details class="panel guild-evidence"><summary>阿瓦隆战术核对取证说明</summary><p>${esc(data.evidenceNote)}</p><p class="muted">${esc(data.analysisProfile?.reason)}</p></details>${controls}
+    <details class="panel"><summary>当前系统固定轴与待确认项目</summary><p>图标轴的预定标记按原表绝对时间显示。逐条核对沿用按实际阶段平移后的判定窗口与容差，时间轴提前时不计漏爆发。原始固定轴如下。</p>
+    ${table(['玩家','技能目录 key','固定秒数'],(data.plan||[]).map(r=>[esc(r.player),esc(r.label||r.ability||(r.spellIDs||[]).join('/')),r.times.map(t=>Array.isArray(t)?t.map(s=>fmtPhase(s*1000)).join('–'):fmtPhase(t*1000)).join('、')]))}
+    ${(data.planNotes||[]).map(n=>`<p class="muted">${esc(n)}</p>`).join('')}
+    ${table(['玩家','技能','未核对原因'],(data.unresolved||[]).map(r=>[esc(r.player),esc(r.ability),esc(r.reason)]))}</details>
+    <section class="panel"><h2>易伤期爆发药水</h2>${potions?.enabled?table(['玩家','使用爆发药','使用时间'],(potions.survivors||[]).map(r=>[player(r),r.potionUsed?esc(r.potionName)+(r.potionPrecast?'（提前预开）':''):'未记录',esc(r.potionTime||'—')])):'<p class="muted">本场未进入易伤期，或未开启转阶段取证。</p>'}</section>`;
+}
+
 function mountAltarWorkbench() {
   const data=boss().fieldAudit||{},events=[];
   const venom=boss().toxicDeluge||{},carriers=venom.carriers||[],pickupPositions=new Map();
@@ -574,17 +650,47 @@ function mountAltarWorkbench() {
       evidence:`WCL 搬运光环${kind==='pickup'?'应用':'移除'}；${position?'位置快照，偏移 '+(position.sampleOffsetMs??0)+'ms':'缺少该时刻位置'}`,detail:`搬运 ${carrier.carryDurationMs==null?'时长未知':(carrier.carryDurationMs/1000).toFixed(1)+' 秒'}；转移记录 ${carrier.transferCount||0} 次`,
       diagram:{kind:'venom-field',mechanic:label,phase:carrier.phase,timeMs,targets:position?[target]:[],annotation},points:position?[{position,label:carrier.player,color:carrier.classColor}]:[]});
   }}
-  window.MechanicWorkbench?.mount(document.getElementById('altarWorkbench'),{key:'coiledaltar',combatReplay:boss().combatReplay,title:'盘卷祭坛 · 机制工作台',events,durationMs:current()?.durationMs,deaths:current()?.survival?.timeline||[],note:'时间轴联动毒液搬运、锥形清场、恐惧行军、炸弹与转场快照。筛选和矩阵在本地计算。当前展示事件时刻的场地快照；缺失的连续移动不作补造。'},
-    {project(point){const mapped=pct(point,data.arena);return mapped?{x:mapped.left,y:mapped.top}:null;},renderMap(selected,_events,cursor,config){if(!selected)return '<div class="empty">当前筛选没有事件。</div>';const diagram={...selected.diagram,targets:(selected.diagram.targets||[]).filter(x=>(x.timeMs==null||x.timeMs<=cursor)&&(!config.actor||(x.player||x.name)===config.actor))};return fieldMap(data,diagram);}});
+  if (boss().combatReplay && window.CoiledAltarReplay) {
+    return window.CoiledAltarReplay.mount(document.getElementById('altarWorkbench'), boss(), current()?.durationMs,
+      p => { const q=pct(p,data.arena);return q&&{x:q.left,y:q.top}; }, {workbench:true,events});
+  }
+  window.MechanicWorkbench?.mount(document.getElementById('altarWorkbench'),{key:'coiledaltar',title:'盘卷祭坛 机制工作台',events,durationMs:current()?.durationMs,deaths:current()?.survival?.timeline||[],note:'旧报告未保存连续场景，请重新分析后查看与首页一致的场地推演；原有机制证据保留在表格中。'},
+    {renderMap(){return '<div class="empty">本报告缺少连续场景，请重新分析。可切换证据表查看历史快照记录。</div>';}});
 }
-function renderContent() { let html = ""; if (state.tab === "survival") html = renderSurvival(); else if (state.tab === "p1") html = renderP1(); else if (state.tab === "p2") html = renderP2(); else if (state.tab === "intermission") html = renderIntermission(); else if (state.tab === "p3") html = renderP3(); else if (state.tab === "field") html = renderField(); else if(state.tab==='replay')html='<div id="altarReplay"></div>'; else if(state.tab==='explore')html='<div id="altarWorkbench"></div>'; $("content").innerHTML = html || '<div class="empty">该页暂无数据。</div>'; if(state.tab==='explore')mountAltarWorkbench(); if(state.tab==='replay')window.CoiledAltarReplay?.mount($('altarReplay'),boss(),current()?.durationMs,p=>{const q=pct(p,boss().fieldAudit?.arena);return q&&{x:q.left,y:q.top};}); $("content").querySelectorAll('[data-analysis-option]').forEach(section => {
+function renderContent() { $("content").querySelectorAll("[data-icon-timeline]").forEach(host=>host._iconTimeline?.destroy()); $("content").querySelectorAll(".mw").forEach(host=>host._workbench?.destroy()); let html = ""; if (state.tab === "guildTimeline") html=renderGuildTimeline(); else if (state.tab === "survival") html = renderSurvival(); else if (state.tab === "p1") html = renderP1(); else if (state.tab === "p2") html = renderP2(); else if (state.tab === "intermission") html = renderIntermission(); else if (state.tab === "p3") html = renderP3(); else if (state.tab === "field") html = renderField(); else if(state.tab==='replay')html='<div id="altarReplay"></div>'; else if(state.tab==='explore')html='<div id="altarWorkbench"></div>'; $("content").innerHTML = html || '<div class="empty">该页暂无数据。</div>'; if(state.tab==='explore')mountAltarWorkbench(); if(state.tab==='replay')window.CoiledAltarReplay?.mount($('altarReplay'),boss(),current()?.durationMs,p=>{const q=pct(p,boss().fieldAudit?.arena);return q&&{x:q.left,y:q.top};}); $("content").querySelectorAll('[data-analysis-option]').forEach(section => {
   if(state.payload?.meta?.analysisConfig?.[section.dataset.analysisOption] !== false) return;
   const heading = section.querySelector('h2')?.cloneNode(true);
   const note = document.createElement('p'); note.className = 'muted'; note.textContent = '本次未分析：已关闭此项目，不代表没有发生该机制。';
   section.replaceChildren(...(heading ? [heading, note] : [note]));
-}); refreshWowhead(); }
+}); if(state.tab==="guildTimeline")mountGuildIconTimeline(); refreshWowhead(); }
+$("content").addEventListener("input",event=>{const key=event.target.dataset.holdPhase;if(!key)return;state.holdThresholds??={};const value=Number(event.target.value);state.holdThresholds[key]=value;event.target.closest("label").querySelector("output").textContent=value+"%";const phase=boss().guildTimeline.phaseControl.find(p=>p.phase===key);$("content").querySelector(`[data-hold-results="${key}"]`).innerHTML=renderHoldEvidence(phase,value);refreshWowhead();});
+$("content").addEventListener("change",event=>{
+  const phaseKey=event.target.dataset.holdSort||event.target.dataset.holdDirection;
+  if(phaseKey){
+    state.holdSorts??={};const sort=state.holdSorts[phaseKey]??{key:'damage',direction:'desc'};
+    if(event.target.dataset.holdSort)sort.key=event.target.value;else sort.direction=event.target.value;
+    state.holdSorts[phaseKey]=sort;
+    const phase=boss().guildTimeline.phaseControl.find(p=>p.phase===phaseKey),threshold=state.holdThresholds?.[phaseKey]??boss().guildTimeline.defaultThreshold??5;
+    $("content").querySelector(`[data-hold-results="${phaseKey}"]`).innerHTML=renderHoldEvidence(phase,threshold);refreshWowhead();
+  }
+  if(event.target.hasAttribute('data-burst-scope')){
+    state.burstScope=event.target.value;
+    $("content").querySelectorAll('[data-burst-scope]').forEach(select=>select.value=state.burstScope);
+    $("content").querySelectorAll('[data-icon-timeline]').forEach(host=>host._iconTimeline?.destroy());
+    $("content").querySelectorAll('[data-burst-chart]').forEach(chart=>chart.innerHTML=renderBurstChart(boss().guildTimeline));
+    mountGuildIconTimeline();
+  }
+});
+$("content").addEventListener("click",event=>{
+  if(event.target.closest('[data-burst-focus]')){
+    const dialog=$('content').querySelector('.burst-focus'),target=dialog.querySelector('[data-icon-focus-target]'),chart=$('content').querySelector('[data-icon-home] [data-burst-chart]');
+    if(target&&chart){target.append(chart);dialog.addEventListener('close',()=>{$('content').querySelector('[data-icon-home]')?.append(chart);},{once:true});}
+    dialog.showModal();
+  }
+  if(event.target.closest('[data-burst-close]'))$("content").querySelector('.burst-focus').close();
+});
 function render() { renderStats(); renderTabs(); renderContent(); }
 function load(payload) { state.payload = payload; state.pulls = [...(payload.data?.page1_wipeAnalysis || [])].sort((a, b) => String(b.startTimeIso || `${b.date || ""}${b.fightID || ""}`).localeCompare(String(a.startTimeIso || `${a.date || ""}${a.fightID || ""}`))); const fight = Number(new URLSearchParams(location.search).get("fight")); const index = state.pulls.findIndex((row) => Number(row.fightID) === fight); state.pull = index >= 0 ? index : 0; state.tab = new URLSearchParams(location.search).get("tab") || (payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); $("pullSelect").innerHTML = state.pulls.map((row, index) => `<option value="${index}">Fight ${row.fightID}，${esc(row.date || "")} ${esc(row.startClock || "")}，${esc(row.difficultyName || "未知")}，${row.isKill ? "KILL" : `${Number(row.bossPercentage).toFixed(2)}%`}，${esc(row.duration)}</option>`).join(""); $("pullSelect").value = String(state.pull); $("error").textContent = state.pulls.length ? "" : "分析结果中没有该 Boss 战斗。"; render(); }
-$("pullSelect").onchange = (event) => { state.pull = Number(event.target.value); state.tab = (state.payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); render(); };
+$("pullSelect").onchange = (event) => { state.pull = Number(event.target.value); state.holdThresholds={}; state.tab = state.tab==="guildTimeline"?"guildTimeline":(state.payload.meta?.tabDefinitions || [])[0]?.key || "survival"; state.diagram = firstDiagramIndex(boss().fieldAudit?.diagrams || []); render(); };
 $("fileInput").onchange = async (event) => { try { load(await window.MythicReportRuntime.readLocalFile(event.target.files[0])); } catch (error) { $("error").textContent = `无法载入：${error.message}`; } };
 const path = new URLSearchParams(location.search).get("json"); state.sourcePath = path || ""; if (path) $("overviewLink").href = `/frontend/report/overview.html?json=${encodeURIComponent(path)}`; if (path) window.MythicReportRuntime.loadPayload(path).then(load).catch((error) => ($("error").textContent = error.message)); else $("error").textContent = "请从全场概览进入，或导入分析 JSON。";

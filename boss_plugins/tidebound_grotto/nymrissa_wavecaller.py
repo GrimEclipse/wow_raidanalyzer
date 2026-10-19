@@ -430,6 +430,7 @@ def render_fight(report_id, report_start, actors, fight, raw):
         "isKill": bool(fight.get("kill")),
         "kill": bool(fight.get("kill")),
         "bossPercentage": float(fight.get("bossPercentage") or 0),
+        "fightPercentage": fight.get("fightPercentage"),
         "durationMs": duration_ms,
         "duration": fmt_ms(duration_ms),
         "difficulty": difficulty,

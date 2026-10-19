@@ -67,6 +67,7 @@
     {"key":"druid.lunar-beam","ids":[204066,1270292],"nameZh":"明月普照","nameEn":"Lunar Beam","class":"Druid","specs":["Guardian"],"category":"personal-defensive","event":"cast"},
     {"key":"druid.well-honed-instincts","ids":[1213597],"nameZh":"精准本能","nameEn":"Perfectly-Honed Instincts","class":"Druid","specs":["Guardian"],"category":"passive-survival","event":"aura"},
     {"key":"druid.celestial-alignment","ids":[194223],"nameZh":"超凡之盟","nameEn":"Celestial Alignment","class":"Druid","specs":["Balance"],"category":"major-burst","event":"cast"},
+    {"key":"druid.incarnation-balance","ids":[102560],"nameZh":"化身：艾露恩之眷","nameEn":"Incarnation: Chosen of Elune","class":"Druid","specs":["Balance"],"category":"major-burst","event":"cast"},
     {"key":"druid.berserk","ids":[106951],"nameZh":"狂暴","nameEn":"Berserk","class":"Druid","specs":["Feral"],"category":"major-burst","event":"cast"},
     {"key":"druid.tranquility","ids":[740],"nameZh":"宁静","nameEn":"Tranquility","class":"Druid","specs":["Restoration"],"category":"party-defensive","event":"cast"},
     {"key":"druid.flourish","ids":[197721],"nameZh":"繁盛","nameEn":"Flourish","class":"Druid","specs":["Restoration"],"category":"major-burst","event":"cast"},
@@ -78,8 +79,9 @@
     {"key":"evoker.quell","ids":[351338],"nameZh":"镇压","nameEn":"Quell","class":"Evoker","specs":[],"category":"interrupt","event":"cast"},
     {"key":"evoker.tail-swipe","ids":[368970],"nameZh":"扫尾","nameEn":"Tail Swipe","class":"Evoker","specs":[],"category":"control","event":"cast"},
     {"key":"evoker.dragonrage","ids":[375087],"nameZh":"龙怒","nameEn":"Dragonrage","class":"Evoker","specs":["Devastation"],"category":"major-burst","event":"cast"},
-    {"key":"evoker.breath-of-eons","ids":[403631,409632,442204],"nameZh":"亘古吐息","nameEn":"Breath of Eons","class":"Evoker","specs":["Augmentation"],"category":"major-burst","event":"cast"},
+    {"key":"evoker.breath-of-eons","ids":[403631,409632,442204],"nameZh":"亘古吐息","nameEn":"Breath of Eons","class":"Evoker","specs":["Augmentation"],"category":"major-burst","event":"cast","auraIds":[409560,409722],"auraNameEn":"Temporal Wound","auraTarget":"enemy","effectKind":"enemy-debuff"},
     {"key":"evoker.ebon-might","ids":[395152],"nameZh":"黑檀之力","nameEn":"Ebon Might","class":"Evoker","specs":["Augmentation"],"category":"minor-burst","event":"cast"},
+    {"key":"evoker.time-skip","ids":[404977],"nameZh":"时间跳跃","nameEn":"Time Skip","class":"Evoker","specs":["Augmentation"],"category":"minor-burst","event":"cast"},
     {"key":"evoker.rewind","ids":[363534],"nameZh":"回溯","nameEn":"Rewind","class":"Evoker","specs":["Preservation"],"category":"party-defensive","event":"cast"},
     {"key":"evoker.dream-flight","ids":[359816],"nameZh":"梦境飞行","nameEn":"Dream Flight","class":"Evoker","specs":["Preservation"],"category":"major-burst","event":"cast"},
 
@@ -91,6 +93,7 @@
     {"key":"hunter.intimidation","ids":[19577],"nameZh":"胁迫","nameEn":"Intimidation","class":"Hunter","specs":[],"category":"control","event":"cast"},
     {"key":"hunter.call-of-the-wild","ids":[359844],"nameZh":"荒野的召唤","nameEn":"Call of the Wild","class":"Hunter","specs":["BeastMastery"],"category":"major-burst","event":"cast"},
     {"key":"hunter.trueshot","ids":[288613],"nameZh":"百发百中","nameEn":"Trueshot","class":"Hunter","specs":["Marksmanship"],"category":"major-burst","event":"cast"},
+    {"key":"hunter.volley","ids":[260243],"nameZh":"乱射","nameEn":"Volley","class":"Hunter","specs":["Marksmanship"],"category":"minor-burst","event":"cast"},
     {"key":"hunter.coordinated-assault","ids":[360952],"nameZh":"协同进攻","nameEn":"Coordinated Assault","class":"Hunter","specs":["Survival"],"category":"major-burst","event":"cast"},
 
     {"key":"mage.ice-block","ids":[45438],"nameZh":"寒冰屏障","nameEn":"Ice Block","class":"Mage","specs":[],"category":"personal-defensive","event":"cast"},
@@ -100,7 +103,7 @@
     {"key":"mage.time-warp","ids":[80353],"nameZh":"时间扭曲","nameEn":"Time Warp","class":"Mage","specs":[],"category":"bloodlust","event":"cast"},
     {"key":"mage.counterspell","ids":[2139],"nameZh":"法术反制","nameEn":"Counterspell","class":"Mage","specs":[],"category":"interrupt","event":"cast"},
     {"key":"mage.dragons-breath","ids":[31661],"nameZh":"龙息术","nameEn":"Dragon's Breath","class":"Mage","specs":[],"category":"control","event":"cast"},
-    {"key":"mage.arcane-surge","ids":[365350],"nameZh":"奥术涌动","nameEn":"Arcane Surge","class":"Mage","specs":["Arcane"],"category":"major-burst","event":"cast"},
+    {"key":"mage.arcane-surge","ids":[365350],"nameZh":"奥术涌动","nameEn":"Arcane Surge","class":"Mage","specs":["Arcane"],"category":"major-burst","event":"cast","auraIds":[365362],"auraTarget":"self","effectKind":"self-buff"},
     {"key":"mage.touch-of-the-magi","ids":[321507],"nameZh":"大法师之触","nameEn":"Touch of the Magi","class":"Mage","specs":["Arcane"],"category":"minor-burst","event":"cast"},
     {"key":"mage.prismatic-barrier","ids":[235450],"nameZh":"棱光护体","nameEn":"Prismatic Barrier","class":"Mage","specs":["Arcane"],"category":"personal-defensive","event":"cast"},
     {"key":"mage.combustion","ids":[190319],"nameZh":"燃烧","nameEn":"Combustion","class":"Mage","specs":["Fire"],"category":"major-burst","event":"cast"},
@@ -108,7 +111,7 @@
     {"key":"mage.blazing-barrier","ids":[235313],"nameZh":"烈焰护体","nameEn":"Blazing Barrier","class":"Mage","specs":["Fire"],"category":"personal-defensive","event":"cast"},
     {"key":"mage.cauterize","ids":[86949],"nameZh":"炙灼","nameEn":"Cauterize","class":"Mage","specs":["Fire"],"category":"passive-survival","event":"aura"},
     {"key":"mage.icy-veins","ids":[12472],"nameZh":"冰冷血脉","nameEn":"Icy Veins","class":"Mage","specs":["Frost"],"category":"major-burst","event":"cast"},
-    {"key":"mage.ray-of-frost","ids":[205021],"nameZh":"冰霜射线","nameEn":"Ray of Frost","class":"Mage","specs":["Frost"],"category":"minor-burst","event":"cast"},
+    {"key":"mage.ray-of-frost","ids":[205021],"nameZh":"冰霜射线","nameEn":"Ray of Frost","class":"Mage","specs":["Frost"],"category":"minor-burst","event":"cast","effectKind":"cast-only"},
     {"key":"mage.frozen-orb","ids":[84714],"nameZh":"寒冰宝珠","nameEn":"Frozen Orb","class":"Mage","specs":["Frost"],"category":"minor-burst","event":"cast"},
     {"key":"mage.ice-barrier","ids":[11426],"nameZh":"寒冰护体","nameEn":"Ice Barrier","class":"Mage","specs":["Frost"],"category":"personal-defensive","event":"cast"},
 
@@ -122,6 +125,8 @@
     {"key":"monk.celestial-infusion","ids":[1241059],"nameZh":"天神灌注","nameEn":"Celestial Infusion","class":"Monk","specs":["Brewmaster"],"category":"personal-defensive","event":"cast"},
     {"key":"monk.black-ox-brew","ids":[115399],"nameZh":"玄牛酒","nameEn":"Black Ox Brew","class":"Monk","specs":["Brewmaster"],"category":"utility","event":"cast"},
     {"key":"monk.invoke-xuen","ids":[123904],"nameZh":"白虎下凡","nameEn":"Invoke Xuen, the White Tiger","class":"Monk","specs":["Windwalker"],"category":"major-burst","event":"cast"},
+    {"key":"monk.zenith","ids":[1249625],"nameZh":"乾元之巅","nameEn":"Zenith","class":"Monk","specs":["Windwalker"],"category":"major-burst","event":"cast"},
+    {"key":"item.offensive-trinket","ids":[1297761,1250533,1293316,1295885],"nameZh":"爆发主动饰品","nameEn":"Voracious Heart of Ula'tek / Freightrunner's Flask / Empowering Venom / Hex Lord's Doom","class":"Any","specs":[],"category":"major-burst","event":"cast"},
     {"key":"monk.revival","ids":[115310],"nameZh":"还魂术","nameEn":"Revival","class":"Monk","specs":["Mistweaver"],"category":"party-defensive","event":"cast"},
     {"key":"monk.life-cocoon","ids":[116849],"nameZh":"作茧缚命","nameEn":"Life Cocoon","class":"Monk","specs":["Mistweaver"],"category":"external","event":"cast"},
     {"key":"monk.invoke-chi-ji","ids":[325197],"nameZh":"朱鹤下凡","nameEn":"Invoke Chi-Ji, the Red Crane","class":"Monk","specs":["Mistweaver"],"category":"major-burst","event":"cast"},
@@ -194,6 +199,7 @@
     {"key":"warrior.last-stand","ids":[12975],"nameZh":"破釜沉舟","nameEn":"Last Stand","class":"Warrior","specs":["Protection"],"category":"personal-defensive","event":"cast"},
     {"key":"warrior.battle-scarred-veteran","ids":[386394,386397],"nameZh":"历战老兵","nameEn":"Battle-Scarred Veteran","class":"Warrior","specs":["Protection"],"category":"passive-survival","event":"aura"},
     {"key":"warrior.avatar","ids":[107574],"nameZh":"天神下凡","nameEn":"Avatar","class":"Warrior","specs":[],"category":"major-burst","event":"cast"},
+    {"key":"warrior.warbreaker","ids":[262161],"nameZh":"灭战者","nameEn":"Warbreaker","class":"Warrior","specs":["Arms"],"category":"minor-burst","event":"cast"},
     {"key":"warrior.die-by-the-sword","ids":[118038],"nameZh":"剑在人在","nameEn":"Die by the Sword","class":"Warrior","specs":["Arms"],"category":"personal-defensive","event":"cast"},
     {"key":"warrior.recklessness","ids":[1719],"nameZh":"鲁莽","nameEn":"Recklessness","class":"Warrior","specs":["Fury"],"category":"major-burst","event":"cast"}
   ]

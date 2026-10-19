@@ -4,8 +4,10 @@ from __future__ import annotations
 from analyzer_core.combat_replay import fetch_replay_events, build_replay_tracks
 
 from analyzer_core.config import resolve_analysis_options
+from analyzer_core.analysis_profile import profile_schema, resolve_profile
+from analyzer_core.player_abilities import load_player_ability_catalog
 
-CONFIG_SCHEMA = [
+CONFIG_SCHEMA = profile_schema([
     {"key": "toxicDelugeReviewEnabled", "type": "boolean", "label": "剧毒洪流与毒液搬运", "default": True},
     {"key": "severReviewEnabled", "type": "boolean", "label": "撕裂清场", "default": True},
     {"key": "guillotineReviewEnabled", "type": "boolean", "label": "处斩分摊与跑离", "default": True},
@@ -21,7 +23,19 @@ CONFIG_SCHEMA = [
      "description": "为已选机制生成场地示意图。关闭后跳过制图；撕裂等位置判定仍会保留自身所需坐标与毒液、具象证据。"},
     {"key": "intermissionReviewEnabled", "type": "boolean", "label": "转阶段残片、治疗与输出复盘", "default": True,
      "description": "关闭后跳过转阶段治疗、Boss 承伤及药水光环取证。"},
-]
+    {"key": "guildTimelineEnabled", "type": "boolean", "label": "阿瓦隆停手与爆发轴检查", "default": True,
+     "description": "仅对日志归属阿瓦隆的史诗场次执行；先检查提前转阶段，再检查爆发安排。"},
+    {"key": "p1EarliestEndSeconds", "type": "number", "label": "P1 最早结束时间（秒）", "default": 170, "min": 170, "max": 600,
+     "description": "P1 须完成约 2:42 的末轮撕裂，且至少打到 2:50；首次恐惧行军还须在 3:05 或之后开始读条。"},
+    {"key": "firstDreadmarchEarliestSeconds", "type": "number", "label": "首次恐惧行军最早读条（秒）", "default": 185, "min": 185, "max": 600},
+    {"key": "p1HoldUntilSeconds", "type": "number", "label": "P1 停手统计截止（秒）", "default": 165, "min": 0, "max": 600,
+     "description": "统计 Boss 首次低于所选血量阈值后至 2:45 之前的玩家施法与含宠物伤害；2:45 起恢复输出不计入。此项不修改原 2:50 最早转阶段判定。"},
+    {"key": "p2LastBladeOffsetSeconds", "type": "number", "label": "P2 最后一刀距 P2 开始（秒）", "default": 202.790, "min": 0, "max": 600,
+     "description": "旧 M 击杀样本 6:26.052 − 3:03.262；随本场 P2 起点平移，并由首刀实测延迟校正，须有末轮刀完成事件才能确认已达要求。"},
+    {"key": "burstWindowSeconds", "type": "number", "label": "爆发时间容差（秒）", "default": 10, "min": 0, "max": 30},
+    {"key": "burstPlan", "type": "text", "multiline": True, "label": "爆发安排 JSON（留空使用截图预设）", "default": "",
+     "description": "数组，每项含 player（角色名或 actor ID）、ability（公共技能目录 key）、times（开战后秒数，可用 [开始,结束] 指定区间）。饰品可单独用 spellIDs 数组与 label 填写确认的准确技能；可选 durationSeconds 仅作持续时间示意。未解析技能不会计错。"},
+])
 
 import math
 from collections import Counter, defaultdict
@@ -363,7 +377,8 @@ def _with_observed_tuning(fight, raw):
 # 拉取时只向 WCL 要机制相关技能，避免整场友伤/治疗/带坐标的团员施法。
 MECHANIC_CAST_IDS = (
     {TOXIC_DELUGE, COALESCED_VENOM_CAST, VIRULENT_MUTATION_CAST, ETERNAL_NIGHTFALL, ETERNAL_NIGHTFALL_AURA,
-     P2_SIGNAL_SPELL, MANIFEST_CAST, FIXATION, RECLAIM_ESSENCE, INTERMISSION_SOULBIND}
+     P2_SIGNAL_SPELL, MANIFEST_CAST, FIXATION, RECLAIM_ESSENCE, INTERMISSION_SOULBIND,
+     1288624, 1304028, 1286441, 1298381, 1299266}
     | SEVER_IDS | BLIGHTED_SEVER_IDS | SOUL_SEVER_IDS
     | GUILLOTINE_CAST_IDS | GRIM_GUILLOTINE_CAST_IDS
     | DREADMARCH_CAST_IDS | GLOOMBOMB_CAST_IDS | WAIL_OF_TERROR_IDS | {SPIRIT_SHIELD}
@@ -384,7 +399,7 @@ MECHANIC_DEBUFF_IDS = (
     | SEVER_TANK_DEBUFF_IDS | BLIGHTED_SEVER_TANK_DEBUFF_IDS | SOUL_SEVER_TANK_DEBUFF_IDS
     | SPIRIT_ERASURE_DEBUFF_IDS
 )
-MECHANIC_ENEMY_BUFF_IDS = set(INTERMISSION_BUFFS) | {VEIL_SHIELD, P3_SOULBOUND, SPIRIT_SHIELD}
+MECHANIC_ENEMY_BUFF_IDS = set(INTERMISSION_BUFFS) | {VEIL_SHIELD, P3_SOULBOUND, SPIRIT_SHIELD, 1288624, 1304028}
 FRIENDLY_CAST_IDS = set(COMBAT_RES_SPELLS) | set(INTERMISSION_POTIONS) | {SPIRIT_ERASURE}
 
 
@@ -4439,6 +4454,11 @@ def analyze_intermission(
         steps.append(row)
 
     potion_start = start - INTERMISSION_POTION_LOOKBACK_MS
+    potion_ends = [int(e["timestamp"]) for e in enemy_buffs
+                   if int(e.get("timestamp") or 0) > start and (
+                       ability_id(e) in INTERMISSION_BUFFS and is_remove(e)
+                       or ability_id(e) == P3_SOULBOUND and is_apply(e))]
+    potion_end = min(min(potion_ends, default=start+INTERMISSION_MS), int(fight["endTime"]))
     potion_uses = {}
     for event in list(friendly_casts or []) + list(buffs or []):
         spell_id = int(ability_id(event) or 0)
@@ -4452,7 +4472,7 @@ def analyze_intermission(
         else:
             continue
         ts = int(event.get("timestamp") or 0)
-        if player_id not in players or not (potion_start <= ts < end):
+        if player_id not in players or not (potion_start <= ts < potion_end):
             continue
         prev = potion_uses.get(player_id)
         if prev is not None and ts >= prev["timestamp"]:
@@ -4505,6 +4525,8 @@ def analyze_intermission(
         survivors.append({
             **player_ref(players, actor_map, player_id),
             "potionUsed": bool(potion),
+            "potionDuringVulnerability": bool(potion and start <= potion["timestamp"] < potion_end),
+            "potionPrecast": bool(potion and potion["timestamp"] < start),
             "potionSpellID": potion["spellID"] if potion else None,
             "potionName": potion["spellName"] if potion else None,
             "potionTimeMs": (potion["timestamp"] - int(fight["startTime"])) if potion else None,
@@ -5548,8 +5570,591 @@ def _apply_altar_soulbind_replay(fight, mechanics, raw):
     return {'channels':channels,'durationMs':INTERMISSION_MS}
 
 
+# Comparison rows use the same event signals for historical and current logs.
+# These are encounter activity/aura boundaries, not the 1-HP thresholds used
+# independently by the guild hold/adjudication checks.
+GUILD_COMPARISON_PHASE_SIGNALS = (("p2", 1288624), ("intermission", 1304028), ("p3", 1289798))
+GUILD_COMPARISON_SPELLS = (
+    ("sever", "撕裂", {1299684}, {"p1"}),
+    ("guillotine", "处斩", {1283489}, {"p1"}),
+    ("cackle", "精魂狂笑", {1286441}, {"p2", "p3"}),
+    ("soul", "灵魂裂劈", {1286620}, {"p2"}),
+    ("gloom", "幽暗炸弹", set(GLOOMBOMB_CAST_IDS), {"p2"}),
+    ("night", "永恒夜幕", {ETERNAL_NIGHTFALL}, {"p2", "p3"}),
+    ("bind", "灵魂绑定", {INTERMISSION_SOULBIND}, {"intermission"}),
+    ("defile", "盘卷祭坛亵渎", {1298381}, {"p3"}),
+    ("grim", "冷酷处斩", {1299266, 1299267}, {"p3"}),
+)
+
+
+def build_timeline_comparison_evidence(fight, casts, enemy_buffs):
+    """One extraction path for both comparison rows; never infer missing casts.
+
+    Icons mark cast starts (begincast when available, otherwise instant cast).
+    1299266 is the start signal for 1299267, rather than a second Guillotine.
+    Nightfall needs only its observed begincast; an interrupt is not required
+    to show that the boss started it. Soulbinding spans the whole intermission.
+    """
+    start, end = int(fight["startTime"]), int(fight["endTime"])
+    duration = end-start
+    casts = sorted((e for e in casts if start <= int(e.get("timestamp", -1)) <= end), key=lambda e: e["timestamp"])
+    buffs = [e for e in enemy_buffs if start <= int(e.get("timestamp", -1)) <= end]
+    markers = [{"key": "p1", "timeMs": 0, "signal": "fight-start"}]
+    for key, sid in GUILD_COMPARISON_PHASE_SIGNALS:
+        candidates = [e for e in buffs if ability_id(e) == sid and event_type(e) == "applybuff"]
+        if not candidates:
+            candidates = [e for e in casts if ability_id(e) == sid and event_type(e) == "cast"]
+        if candidates:
+            first = min(candidates, key=lambda e: e["timestamp"])
+            markers.append({"key": key, "timeMs": int(first["timestamp"])-start,
+                            "spellID": sid, "signal": event_type(first)})
+    markers.sort(key=lambda m: m["timeMs"])
+    by_phase = {m["key"]: m["timeMs"] for m in markers}
+    events = []
+    for key, label, ids, allowed in GUILD_COMPARISON_SPELLS:
+        if key == "bind":
+            if "intermission" in by_phase:
+                events.append({"key": key, "label": label, "spellID": INTERMISSION_SOULBIND,
+                    "timeMs": by_phase["intermission"], "endTimeMs": by_phase.get("p3", duration),
+                    "phase": "intermission", "sourceType": "phase"})
+            continue
+        rows = [e for e in casts if ability_id(e) in ids]
+        begins = [e for e in rows if event_type(e) == "begincast"]
+        onsets = list(begins)
+        if key == "grim":
+            onsets += [e for e in rows if ability_id(e) == 1299266 and event_type(e) == "cast"]
+        unique, last = [], {}
+        for e in sorted(onsets, key=lambda e: e["timestamp"]):
+            source = e.get("sourceID")
+            if source not in last or int(e["timestamp"])-last[source] > 300:
+                unique.append(e)
+                last[source] = int(e["timestamp"])
+        selected, consumed = list(unique), set()
+        for e in rows:
+            if event_type(e) != "cast" or (key == "grim" and ability_id(e) == 1299266):
+                continue
+            candidates = [(i, b) for i, b in enumerate(unique) if i not in consumed and b.get("sourceID") == e.get("sourceID")
+                          and 0 <= int(e["timestamp"])-int(b["timestamp"]) <= 30000]
+            if candidates:
+                consumed.add(max(candidates, key=lambda pair: pair[1]["timestamp"])[0])
+                continue
+            selected.append(e)
+        seen = {}
+        for e in sorted(selected, key=lambda e: e["timestamp"]):
+            t = int(e["timestamp"])-start
+            source = e.get("sourceID")
+            if source in seen and t-seen[source] <= 300:
+                continue
+            seen[source] = t
+            phase = next(m["key"] for m in reversed(markers) if m["timeMs"] <= t)
+            if phase in allowed:
+                events.append({"key": key, "label": label, "spellID": ability_id(e), "timeMs": t,
+                    "endTimeMs": t, "phase": phase, "sourceType": event_type(e)})
+    events.sort(key=lambda e: e["timeMs"])
+    return {"ruleVersion": "boss-starts-phase-auras-v1", "phaseTimeline": markers, "events": events,
+            "counts": {key: sum(e["key"] == key for e in events) for key, _, _, _ in GUILD_COMPARISON_SPELLS}}
+
+
+# Guild assignments remain Boss-owned; ability identities come from the shared catalog.
+AVALON_BURST_ROWS = [
+    ("Breezeluck", "death-knight.army-of-the-dead", [0,180,395,607]),
+    ("Breezeluck", "death-knight.apocalypse", [0,180,246,331,395,469,565,607]),
+    ("飞天小喷菇", "demon-hunter.void-metamorphosis", [246,395,469,565]),
+    ("小楚唯", "druid.incarnation-balance", [0,[180,200],331,395,469,565]),
+    ("贪睡熊熊", "druid.incarnation-balance", [0,[180,200],331,395,469,565]),
+    ("若叶睦", "evoker.breath-of-eons", [0,180,270,395,469,565]),
+    ("若叶睦", "evoker.time-skip", [9,188,549]),
+    ("Superhunter", "hunter.trueshot", [0,120,246,395,565]),
+    ("Superhunter", "hunter.volley", [469]),
+    ("三坑不二", "mage.ray-of-frost", [0,120,180,246,395,469,517]),
+    ("小心胡大海", "mage.arcane-surge", [0,90,180,270,395]),
+    ("劉浩然", "monk.invoke-xuen", [0,90,180,270,395,517,607]),
+    ("劉浩然", "monk.zenith", [0,90,180,270,395,469,517,607]),
+    ("残夜将歇", "rogue.shadow-blades", [0,90,180,270,395,565]),
+    ("残夜将歇", "rogue.goremaws-bite", [0,90,180,270,395,565]),
+    ("叮咚好烦", "warlock.summon-darkglare", [0,120,246,395,517]),
+    ("茶喵不吃糖", "warlock.summon-darkglare", [0,120,246,395,517]),
+    ("染小战", "warrior.avatar", [0,180,246,331,395,565]),
+    ("雷横", "warrior.avatar", [0,180,246,331,395,565]),
+    ("染小战", "warrior.warbreaker", [469]),
+    ("雷横", "warrior.warbreaker", [469]),
+    ("小楚唯", "item.offensive-trinket", [0,[180,200],395,565]),
+    ("贪睡熊熊", "item.offensive-trinket", [0,[180,200],395,565]),
+]
+AVALON_PLAN_NOTES = [
+    "截图的巨神按确认映射天神下凡；战士按实际施法核对，不推断愤怒掌控冷却。",
+    "饰品按已确认的主动技能核对，可通过自定义安排逐人指定。",
+    "增辉时间跳跃安排为 0:09、3:08、9:09；亘古吐息与跳跃分别核对。",
+    "默认法师安排按本场专精选择奥术涌动或冰霜射线，保留该玩家原定时间点；自定义明确指定的技能不自动替换。",
+    "两名德鲁伊按本场专精核对，治疗场次不计 DPS 爆发安排。持续条取自身增益或施法者在敌方目标上的减益，不用飞行光环代替。",
+]
+
+
+def burst_plan(options):
+    import json
+    custom = options.get("burstPlan", "")
+    try:
+        rows = json.loads(custom) if custom else [
+            {"player": p, "ability": a, "times": times} for p, a, times in AVALON_BURST_ROWS]
+        if not isinstance(rows, list) or len(rows) > 200:
+            raise ValueError("安排必须为不超过 200 项的数组")
+        for row in rows:
+            if not isinstance(row, dict) or not row.get("player") or not (row.get("ability") or row.get("spellIDs")):
+                raise ValueError("每项需要 player 和 ability（或自定义 spellIDs）")
+            if "spellIDs" in row and (not isinstance(row["spellIDs"], list) or not 1 <= len(row["spellIDs"]) <= 20
+                    or any(isinstance(v, bool) or not isinstance(v, int) or not 0 < v < 100000000 for v in row["spellIDs"])):
+                raise ValueError("spellIDs 必须为 1–20 个有效整数技能 ID")
+            if not isinstance(row.get("times"), list) or len(row["times"]) > 100:
+                raise ValueError("times 必须为不超过 100 项的数组")
+            for time in row["times"]:
+                values = time if isinstance(time, list) else [time]
+                if len(values) not in (1, 2) or any(isinstance(v, bool) or not isinstance(v, (int, float))
+                        or not math.isfinite(v) or not 0 <= v <= 3600 for v in values):
+                    raise ValueError("时间必须为 0–3600 秒或 [开始,结束]")
+                if len(values) == 2 and values[0] > values[1]:
+                    raise ValueError("时间区间开始不得晚于结束")
+            duration = row.get("durationSeconds")
+            if duration is not None and (not isinstance(duration, (int, float)) or not math.isfinite(duration) or not 0 < duration <= 600):
+                raise ValueError("durationSeconds 必须为 0–600 秒")
+            tolerance = row.get("toleranceSeconds")
+            if tolerance is not None and (isinstance(tolerance, bool) or not isinstance(tolerance, (int, float))
+                    or not math.isfinite(tolerance) or not 0 <= tolerance <= 30):
+                raise ValueError("toleranceSeconds 必须为 0–30 秒")
+        return rows
+    except (ValueError, TypeError) as error:
+        raise ValueError(f"M7 爆发安排格式错误：{error}") from error
+
+
+def _guild_timeline_enabled(raw, options):
+    return options["guildTimelineEnabled"] and resolve_profile(raw.get("reportGuild"), options)["key"] == "avalon"
+
+
+def _resource_for_actor(event, actor_id):
+    for side, number in (("source", "1"), ("target", "2")):
+        if event.get(side + "ID") != actor_id:
+            continue
+        resource = event.get(side + "Resources") or {}
+        if str(event.get("resourceActor")) == number:
+            resource = event
+        if resource.get("hitPoints") is not None and resource.get("maxHitPoints", 0) > 0:
+            return resource
+    return None
+
+
+def _guild_phase_control(fight, markers, raw, actor_rows, options):
+    start = int(fight["startTime"])
+    times = {r["key"]: int(r["timeMs"]) for r in markers}
+    streams = raw.get("guildBossDamage", []) + raw.get("replayEvents", []) + raw.get("enemyDeaths", [])
+    phases = []
+    for phase, next_phase, game_id, planned in (
+        ("p1", "p2", 257911, options["p1EarliestEndSeconds"]*1000),
+        ("p2", "intermission", 259854, times.get("p2", 0)+options["p2LastBladeOffsetSeconds"]*1000),
+    ):
+        boss_id = resolve_boss_actor_id(actor_rows, game_id, ())
+        begin, end = times.get(phase), times.get(next_phase)
+        row = {"phase": phase, "bossID": boss_id, "startTimeMs": begin, "phaseEndTimeMs": end,
+               "earliestEndTimeMs": round(planned), "status": "unreached", "thresholds": {}}
+        if begin is None or boss_id is None:
+            phases.append(row)
+            continue
+        limit = end if end is not None else int(fight["endTime"])-start
+        health = {}
+        one_hp, deaths = [], []
+        for event in streams:
+            t = int(event.get("timestamp") or 0)-start
+            if not begin <= t <= limit:
+                continue
+            resource = _resource_for_actor(event, boss_id)
+            if resource:
+                health[t] = float(resource["hitPoints"])/float(resource["maxHitPoints"])*100
+                if resource["hitPoints"] <= 1:
+                    one_hp.append(t)
+            if event_type(event) == "death" and event.get("targetID") == boss_id:
+                deaths.append(t)
+        # 1-HP samples and enemy deaths locate the actual transition trigger.
+        trigger = min(one_hp+deaths, default=None)
+        observed_end = trigger if trigger is not None else end
+        row.update(triggerTimeMs=trigger, endTimeMs=observed_end,
+                   endEvidence="boss-1hp-or-death" if trigger is not None else "phase-transition" if end is not None else "fight-truncated")
+        blade_ids = SEVER_IDS if phase == "p1" else SOUL_SEVER_IDS
+        blades = sorted({int(e["timestamp"])-start for e in raw.get("casts", [])
+                         if ability_id(e) in blade_ids and is_cast_complete(e)
+                         and begin <= int(e["timestamp"])-start <= limit})
+        row["bladeTimesMs"] = blades
+        if phase == "p2" and blades:
+            # P2's first frontal can be delayed by the preceding transition.
+            # Preserve the reference fifth-minus-first spacing rather than
+            # allowing a delayed fifth frontal to be skipped by wall-clock time.
+            row["bladeDriftMs"] = blades[0]-(begin+32772)
+            planned += row["bladeDriftMs"]
+        blade_target = 162043 if phase == "p1" else planned
+        required_blade = next((t for t in blades if t >= blade_target-1000), None)
+        deadline = max(planned, required_blade or planned)
+        row["earliestEndTimeMs"] = round(deadline)
+        row["requiredBladeTimeMs"] = required_blade
+        row["status"] = "early" if observed_end is not None and observed_end < deadline else "on-time" if observed_end is not None else "in-progress"
+        if row["status"] == "on-time" and required_blade is None:
+            row["status"] = "unknown"
+            row["reason"] = "到达约定时间，但缺少最后一刀完成事件，不判漏爆发"
+        if phase == "p1":
+            march = min((int(e["timestamp"])-start for e in raw.get("casts", [])
+                         if ability_id(e) in DREADMARCH_CAST_IDS and event_type(e) == "begincast"
+                         and end is not None and end <= int(e["timestamp"])-start <= int(fight["endTime"])-start), default=None)
+            earliest_march = round(options["firstDreadmarchEarliestSeconds"]*1000)
+            row.update(firstDreadmarchTimeMs=march, firstDreadmarchEarliestTimeMs=earliest_march)
+            reasons = []
+            if observed_end is not None and observed_end < deadline:
+                reasons.append("P1 在最早结束时间 " + fmt_ms(deadline) + " 前结束")
+            if march is not None and march < earliest_march:
+                row["status"] = "early"
+                reasons.append("首次恐惧行军 " + fmt_ms(march) + " 开始读条，早于 " + fmt_ms(earliest_march))
+            elif march is None and row["status"] == "on-time":
+                row["status"] = "unknown"
+                reasons.append("尚无首次恐惧行军读条记录，暂不判漏爆发")
+            if reasons:
+                row["reason"] = "；".join(reasons)
+        samples = sorted(health.items())
+        row["thresholdWindows"] = {}
+        for threshold in range(1, 11):
+            hold_begin = next((t for t, hp in samples if hp < threshold), None)
+            hold_until = round(options["p1HoldUntilSeconds"]*1000) if phase == "p1" else None
+            if phase == "p1":
+                row["thresholdWindows"][str(threshold)] = {
+                    "startTimeMs": hold_begin if hold_begin is not None and hold_begin < hold_until else None,
+                    "endTimeMs": hold_until,
+                    "evidenceEndTimeMs": min(hold_until, observed_end if observed_end is not None else limit),
+                    "endExclusive": True,
+                }
+            # Use only the causal last HP sample, with a bounded sampling age.
+            cast_rows, damage_rows = [], []
+            for key, target, kinds in (("guildPlayerCasts", cast_rows, {"cast"}), ("guildBossDamage", damage_rows, {"damage"})):
+                for event in raw.get(key, []):
+                    t = int(event.get("timestamp") or 0)-start
+                    if event.get("targetID") != boss_id or event_type(event) not in kinds or not begin <= t <= limit:
+                        continue
+                    if phase == "p1":
+                        if hold_begin is not None and hold_begin <= t < hold_until and (observed_end is None or t <= observed_end):
+                            target.append(event)
+                        continue
+                    resource = _resource_for_actor(event, boss_id)
+                    index = bisect_right(samples, (t, float("inf")))-1
+                    hp = float(resource["hitPoints"])/float(resource["maxHitPoints"])*100 if resource else (
+                        samples[index][1] if index >= 0 and t-samples[index][0] <= 3000 else None)
+                    if hp is not None and hp < threshold and (observed_end is None or t <= observed_end):
+                        target.append(event)
+            row["thresholds"][str(threshold)] = {"casts": cast_rows, "damage": damage_rows}
+        row["healthSampleCount"] = len(samples)
+        phases.append(row)
+    return phases
+
+
+def _burst_aura_intervals(events, actor, ids, start, end, *, target="self"):
+    active, intervals = {}, []
+    def append(key, begin, finish, truncated=False):
+        if finish <= begin:
+            return
+        row = {"startTimeMs": begin, "endTimeMs": finish,
+               "evidence": ("enemy-debuff" if target == "enemy" else "aura")+("-truncated" if truncated else "")}
+        if target == "enemy":
+            row.update(targetID=key[0], targetInstance=key[1], sourceID=actor, auraSpellIDs=[key[2]])
+        intervals.append(row)
+    for event in sorted(events, key=lambda e: int(e.get("timestamp") or 0)):
+        if ability_id(event) not in ids:
+            continue
+        if target == "enemy":
+            if event.get("sourceID") != actor or event.get("targetID") in {None, -1, actor}:
+                continue
+            applies, removes = {"applydebuff", "refreshdebuff", "applydebuffstack"}, {"removedebuff"}
+        else:
+            if event.get("targetID") != actor:
+                continue
+            applies, removes = {"applybuff", "refreshbuff", "applybuffstack"}, {"removebuff"}
+        t = max(0, min(end, int(event["timestamp"])-start))
+        key = (event.get("targetID"), event.get("targetInstance") or 0, ability_id(event))
+        kind = event_type(event)
+        if kind in applies:
+            active.setdefault(key, t)
+        elif kind in removes and key in active:
+            append(key, active.pop(key), t)
+    for key, begin in active.items():
+        append(key, begin, end, True)
+    # Some effects log multiple aura IDs on the same target. Union overlapping
+    # aliases, keeping separate enemies and spawn instances independent.
+    merged = []
+    for row in sorted(intervals, key=lambda r: (r.get("targetID", actor), r.get("targetInstance", 0), r["startTimeMs"])):
+        previous = merged[-1] if merged else None
+        if (previous and previous.get("targetID") == row.get("targetID")
+                and previous.get("targetInstance", 0) == row.get("targetInstance", 0)
+                and row["startTimeMs"] <= previous["endTimeMs"]):
+            previous["endTimeMs"] = max(previous["endTimeMs"], row["endTimeMs"])
+            if target == "enemy":
+                previous["auraSpellIDs"] = sorted(set(previous["auraSpellIDs"]+row["auraSpellIDs"]))
+            if row["evidence"].endswith("-truncated"):
+                previous["evidence"] = row["evidence"]
+        else:
+            merged.append(row)
+    return sorted(merged, key=lambda r: r["startTimeMs"])
+
+
+def build_guild_icon_timelines(timelines, raw, players, actor_map, fight):
+    """Presentation evidence follows configured assignments, never all catalog spells."""
+    catalog = {a["key"]: a for a in load_player_ability_catalog()["abilities"]}
+    start, duration = int(fight["startTime"]), int(fight["endTime"])-int(fight["startTime"])
+    result = []
+    for row in timelines:
+        key = row["ability"]
+        if key.startswith("item."):
+            continue
+        ability = catalog.get(key, {})
+        ids = ability.get("ids") or row.get("spellIDs", [])
+        category = "major-burst" if key == "mage.ray-of-frost" else ability.get("category", "major-burst")
+        windows = []
+        if category == "major-burst":
+            for check in row.get("windows", []):
+                lo, hi = check["plannedStartTimeMs"], check["plannedEndTimeMs"]
+                tolerance = max(0, check["endTimeMs"]-hi-check.get("phaseShiftMs", 0))
+                windows.append({"timeMs": lo, "endTimeMs": hi,
+                                "windowStartMs": max(0, lo-tolerance), "windowEndMs": hi+tolerance})
+        result.append({**row, "category": category, "spellIDs": ids, "plannedWindows": windows,
+                       "windows": []})
+    item_ids = catalog.get("item.offensive-trinket", {}).get("ids", [])
+    item_labels = {1297761: "乌拉特克的烈毒之心", 1250533: "货运者水壶",
+                   1293316: "强化毒液", 1295885: "妖术领主的厄运神像"}
+    for pid in players:
+        for sid in item_ids:
+            casts = sorted({int(e["timestamp"])-start for e in raw.get("guildPlayerCasts", [])
+                            if event_type(e) == "cast" and e.get("sourceID") == pid and ability_id(e) == sid})
+            if not casts:
+                continue
+            result.append({**player_ref(players, actor_map, pid), "ability": "item."+str(sid),
+                "label": item_labels.get(sid, "主动饰品"), "spellIDs": [sid], "category": "trinket",
+                "casts": casts, "intervals": _burst_aura_intervals(raw.get("guildPlayerBuffs", []), pid, {sid}, start, duration),
+                "plannedWindows": [], "windows": [], "effectKind": "self-buff"})
+    return result
+
+
+GUILD_PLANNED_PHASE_STARTS = {"p1": 0, "p2": 180000, "intermission": 395000, "p3": 430000}
+
+
+def guild_phase_timings(markers, controls):
+    by_phase = {row["phase"]: row for row in controls}
+    result = []
+    for marker in markers:
+        key = marker["key"]
+        if key not in GUILD_PLANNED_PHASE_STARTS:
+            continue
+        control = by_phase.get(key, {})
+        finish = control.get("endTimeMs")
+        march = control.get("firstDreadmarchTimeMs")
+        result.append({"phase": key, "startTimeMs": marker["timeMs"],
+                       "plannedStartTimeMs": GUILD_PLANNED_PHASE_STARTS[key],
+                       "startAdvanceMs": max(0, GUILD_PLANNED_PHASE_STARTS[key]-marker["timeMs"]),
+                       "endAdvanceMs": max(0, control["earliestEndTimeMs"]-finish) if finish is not None else 0,
+                       "firstDreadmarchAdvanceMs": max(0, control["firstDreadmarchEarliestTimeMs"]-march) if march is not None else 0})
+    return result
+
+
+def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, options):
+    profile = resolve_profile(raw.get("reportGuild"), options)
+    result = {"enabled": False, "analysisProfile": profile}
+    if not _guild_timeline_enabled(raw, options) or int(fight.get("difficulty") or 0) != 5:
+        return {**result, "reason": "仅对已启用专属检查的阿瓦隆史诗日志执行"}
+    start, duration = int(fight["startTime"]), int(fight["endTime"])-int(fight["startTime"])
+    phases = _guild_phase_control(fight, markers, raw, actor_rows, options)
+    owners = {a["id"]: a.get("petOwner") for a in actor_rows if a.get("petOwner") is not None}
+    def owner(actor):
+        visited = set()
+        while actor in owners and actor not in visited:
+            visited.add(actor)
+            actor = owners[actor]
+        return actor
+    for phase in phases:
+        for threshold, evidence in phase["thresholds"].items():
+            totals = {pid: {**player_ref(players, actor_map, pid), "castCount": 0, "damage": 0,
+                           "petDamage": 0, "casts": []} for pid in players}
+            for event in evidence["casts"]:
+                pid = event.get("sourceID")
+                if pid not in players:  # Pets cannot increment a player's cast count.
+                    continue
+                row = totals[pid]
+                row["castCount"] += 1
+                row["casts"].append({"timeMs": int(event["timestamp"])-start, "spellID": ability_id(event)})
+            for event in evidence["damage"]:
+                source = event.get("sourceID")
+                pid = owner(source)
+                if pid not in players:
+                    continue
+                amount = max(0, float(event.get("amount") or 0)-float(event.get("overkill") or 0))
+                totals[pid]["damage"] += amount
+                if source != pid:
+                    totals[pid]["petDamage"] += amount
+            phase["thresholds"][threshold] = sorted(
+                [r for r in totals.values() if r["castCount"] or r["damage"]],
+                key=lambda r: (-r["castCount"], -r["damage"]))
+    early = any(p["status"] == "early" for p in phases)
+    uncertain = phases[0]["status"] not in {"on-time", "early"} or any(p["status"] == "unknown" for p in phases)
+    skip_reason = "前序阶段时间轴提前，跳过爆发缺失计数" if early else "前序阶段结束、末轮刀或首次恐惧行军读条尚未确认，不判漏爆发" if uncertain else None
+    catalog = {a["key"]: a for a in load_player_ability_catalog()["abilities"]}
+    cast_index = defaultdict(list)
+    for event in raw.get("guildPlayerCasts", []):
+        if event_type(event) == "cast" and event.get("sourceID") in players:
+            cast_index[(event["sourceID"], ability_id(event))].append(int(event["timestamp"])-start)
+    checks, unresolved, timelines = [], [], []
+    effective_plan = [dict(row) for row in burst_plan(options)]
+    tolerance = options["burstWindowSeconds"]*1000
+    phase_times = {p["key"]: p["timeMs"] for p in markers}
+    # The screenshot is an absolute plan with P2 starting at 3:00. Later P2
+    # windows shift with the actual P2 start; early transitions skip all counts.
+    for assignment in effective_plan:
+        name = str(assignment["player"])
+        key = assignment.get("ability") or "custom:"+"/".join(map(str, assignment["spellIDs"]))
+        matches = [pid for pid, p in players.items() if str(pid) == name or p.get("name") == name
+                   or p.get("name", "").lstrip("、丶` ") == name]
+        ability = ({"ids": assignment["spellIDs"], "nameZh": assignment.get("label") or key}
+                   if assignment.get("spellIDs") else catalog.get(key))
+        if len(matches) != 1 or not ability:
+            unresolved.append({"player": name, "ability": key, "reason": "角色未唯一匹配本场阵容" if len(matches) != 1 else "技能尚未验证"})
+            continue
+        pid, ids = matches[0], set(ability["ids"])
+        localization = players[pid].get("localization") or {}
+        class_name = (localization.get("class") or {}).get("enUS")
+        spec_name = (localization.get("spec") or {}).get("enUS")
+        if not options.get("burstPlan") and class_name == "Druid" and spec_name == "Restoration":
+            unresolved.append({"player": name, "ability": key, "reason": "本场为治疗专精，不计 DPS 爆发安排"})
+            continue
+        if (not options.get("burstPlan") and class_name == "Mage"
+                and key in {"mage.arcane-surge", "mage.ray-of-frost"}
+                and spec_name in {"Arcane", "Frost"}):
+            selected = {"Arcane": "mage.arcane-surge", "Frost": "mage.ray-of-frost"}[spec_name]
+            assignment["configuredAbility"] = key
+            key, ability = selected, catalog[selected]
+            assignment.update(ability=key, label=ability["nameZh"], spec=spec_name)
+            ids = set(ability["ids"])
+        normalize = lambda v: "".join(c for c in str(v).lower() if c.isalnum())
+        if (class_name and ability.get("class", "Any") != "Any" and normalize(class_name) != normalize(ability["class"])) or (
+                spec_name and ability.get("specs") and spec_name not in ability["specs"]):
+            unresolved.append({"player": name, "ability": key, "reason": "本场职业/专精与安排不匹配，未计数"})
+            continue
+        actual = sorted({t for sid in ids for t in cast_index[(pid, sid)]})
+        row_tolerance = assignment.get("toleranceSeconds", 3 if key == "evoker.time-skip" else tolerance/1000)*1000
+        used = set()
+        effect_kind = ability.get("effectKind", "self-buff")
+        aura_target = ability.get("auraTarget", "self")
+        aura_ids = set(ability.get("auraIds", ability["ids"]))
+        aura = [] if effect_kind == "cast-only" else _burst_aura_intervals(
+            raw.get("guildEnemyDebuffs" if aura_target == "enemy" else "guildPlayerBuffs", []),
+            pid, aura_ids, start, duration, target=aura_target)
+        for interval in aura:
+            if interval.get("targetID") is not None:
+                interval["target"] = actor_map.get(interval["targetID"]) or str(interval["targetID"])
+        timeline = {**player_ref(players, actor_map, pid), "ability": key, "label": ability["nameZh"],
+                    "casts": actual, "intervals": aura, "windows": [], "effectKind": effect_kind, "spellIDs": sorted(ids)}
+        for planned in assignment["times"]:
+            lo, hi = planned if isinstance(planned, list) else (planned, planned)
+            lo, hi = lo*1000, hi*1000
+            phase, nominal = ("p3", 430000) if lo >= 469000 else ("intermission", 395000) if lo >= 395000 else ("p2", 180000) if lo >= 180000 else ("p1", 0)
+            phase_reached = phase in phase_times
+            shift = phase_times.get(phase, nominal)-nominal
+            begin, end = max(0, lo+shift-row_tolerance), hi+shift+row_tolerance
+            reached = phase_reached and duration >= end
+            hit = next((t for t in actual if begin <= t <= end and t not in used), None)
+            if hit is not None:
+                used.add(hit)
+            previous = max((t for t in actual if t < begin), default=None)
+            following = min((t for t in actual if t > end), default=None)
+            premature = previous is not None and previous not in used and begin-previous <= 60000
+            status = "used" if hit is not None and phase_reached else "not-reached" if not reached else "early" if premature and (following is None or begin-previous <= following-end) else "late" if following is not None else "missing"
+            row = {**player_ref(players, actor_map, pid), "ability": key, "label": ability["nameZh"],
+                   "plannedStartTimeMs": lo, "plannedEndTimeMs": hi, "phaseShiftMs": shift,
+                   "phase": phase,
+                   "startTimeMs": begin, "endTimeMs": end, "castTimeMs": hit,
+                   "previousCastTimeMs": previous, "nextCastTimeMs": following, "status": status,
+                   "counted": reached and hit is None and skip_reason is None,
+                   "reason": skip_reason or ("本场尚未走完整个检查窗口" if not reached and hit is None else
+                       "在要求窗口使用" if hit is not None else f"{fmt_ms(begin)}–{fmt_ms(end)} 未使用；"+
+                       (f"上一次 {fmt_ms(previous)}；" if previous is not None else "此前无使用记录；")+
+                       (f"下一次 {fmt_ms(following)}，延后" if following is not None else "后续无使用记录"))}
+            checks.append(row)
+            timeline["windows"].append(row)
+        if not aura and assignment.get("durationSeconds") and effect_kind != "cast-only":
+            timeline["intervals"] = [{"startTimeMs": t, "endTimeMs": min(duration, t+assignment["durationSeconds"]*1000),
+                                      "evidence": "configured-estimate"} for t in actual]
+        timelines.append(timeline)
+    return {"enabled": True, "analysisProfile": profile, "phaseControl": phases, "defaultThreshold": 5,
+            "evidenceVersion": "guild-effects-v2",
+            "holdWindowVersion": 2,
+            "burstSkipped": skip_reason is not None, "burstSkipReason": skip_reason,
+            "checks": checks, "timelines": timelines, "unresolved": unresolved,
+            "timelineViewVersion": "icons-v1",
+            "displayTimelines": build_guild_icon_timelines(timelines, raw, players, actor_map, fight),
+            "bossComparison": build_timeline_comparison_evidence(fight, raw.get("casts", []), raw.get("enemyBuffs", [])),
+            "count": sum(r["counted"] for r in checks),
+            "players": [{**player_ref(players, actor_map, pid), "count": sum(r["counted"] for r in checks if r["playerID"] == pid)} for pid in players],
+            "plan": effective_plan, "planNotes": [] if options.get("burstPlan") else AVALON_PLAN_NOTES,
+            "phaseTimings": guild_phase_timings(markers, phases),
+            "phaseTimeline": markers, "durationMs": duration,
+            "reference": {"reportID": "Qh8XMfKGTmLJtk2r", "fightID": 1, "killTimeMs": 636333,
+                          "p2TimeMs": 177991, "intermissionTimeMs": 389099, "p3TimeMs": 427666,
+                          "phaseMethod": "boss-starts-phase-auras-v1"},
+            "evidenceNote": "cast 仅统计玩家以该阶段 Boss 为目标的成功施法；伤害包含宠物。血量取目标自身资源或此前 3 秒内的样本；缺失不补零。未到达的爆发窗口不计数，技能充能与冷却刷新不替代实际施法。"}
+
+
+def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options):
+    if not _guild_timeline_enabled(payload, options) or int(fight.get("difficulty") or 0) != 5:
+        return payload
+    burst_plan(options)  # Reject malformed configuration before expensive evidence requests.
+    bosses = [a["id"] for a in actor_rows if a.get("gameID") in {257911, 259854}]
+    if not bosses:
+        return payload
+    # WCL expression target.id is the NPC game ID, unlike GraphQL targetID
+    # which is report-local. A report actor ID here silently returns no damage.
+    expression = "target.id IN (257911, 259854)"
+    payload["guildBossDamage"] = client.events(report_id, "DamageDone", fight,
+        filter_expression=expression, include_resources=True)
+    payload["guildPlayerCasts"] = client.events(report_id, "Casts", fight, hostility_type="Friendlies", include_resources=True)
+    payload["guildPlayerBuffs"] = client.events(report_id, "Buffs", fight, hostility_type="Friendlies")
+    catalog = {a["key"]: a for a in load_player_ability_catalog()["abilities"]}
+    enemy_ids = sorted({sid for row in burst_plan(options) for ability in [catalog.get(row.get("ability"), {})]
+                        if ability.get("auraTarget") == "enemy" for sid in ability.get("auraIds", [])})
+    payload["guildEnemyDebuffs"] = client.events(report_id, "All", fight,
+        filter_expression='type IN ("applydebuff", "refreshdebuff", "applydebuffstack", "removedebuff") AND ability.id IN ('+
+        ', '.join(map(str, enemy_ids))+')') if enemy_ids else []
+    return payload
+
+
+def guild_timeline_overview(rendered):
+    enabled = [p for p in rendered if (p.get("coiledaltar", {}).get("guildTimeline") or {}).get("enabled")]
+    if not enabled:
+        return []
+    burst, hold = [], []
+    for pull in enabled:
+        data = pull["coiledaltar"]["guildTimeline"]
+        for row in data["checks"]:
+            if row["counted"]:
+                burst.append(nightly_detail(pull, fmt_ms(row["startTimeMs"]), row["label"]+"："+row["reason"],
+                    player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"), count=1))
+        for phase in data["phaseControl"]:
+            if phase["status"] != "early":
+                continue
+            for row in phase["thresholds"].get("5", []):
+                if row["castCount"]:
+                    hold_until = phase.get("thresholdWindows", {}).get("5", {}).get("endTimeMs", 165000)
+                    hold.append(nightly_detail(pull, fmt_ms(phase["endTimeMs"]),
+                        phase["phase"].upper()+(" 首次低于 5% 至 "+fmt_ms(hold_until)+" 前目标施法 " if phase["phase"] == "p1" else " 提前结束，Boss 5% 以下目标施法 ")+str(row["castCount"])+" 次",
+                        player=row["player"],playerID=row["playerID"],classColor=row.get("classColor"),
+                        count=row["castCount"],damage=row["damage"],petDamage=row["petDamage"]))
+    return [
+        {"key":"guildBurstMisses","label":"公会爆发窗口未使用","value":len(burst),"unit":"次","tone":"warning",
+         "description":"仅统计没有提前转阶段、已走完窗口且角色技能匹配的安排。",
+         "players":nightly_player_totals(burst),"events":burst,"detailTab":"guildTimeline"},
+        {"key":"guildHoldCasts","label":"提前转阶段低血量施法","value":sum(r["count"] for r in hold),"unit":"次","tone":"warning",
+         "description":"P1 从首次低于 5% 至配置的停手截止（默认 2:45）前；P2 统计低于 5% 的目标施法。宠物只计伤害，单场支持 1%–10% 调整。",
+         "players":nightly_player_totals(hold),"events":hold,"detailTab":"guildTimeline"}]
+
+
 def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
+    burst_plan(options)
     needs = _analysis_needs(options)
     field_enabled = needs["positions"]
     phase_enabled = options["eternalNightfallReviewEnabled"]
@@ -5594,7 +6199,8 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
                         'deaths':deaths,
                         'bossDamage':streams[2][1] if damage_window else [e for e in rows if event_type(e) == 'damage' and e.get('targetID') == zuljan],
                         'analysisOptions':options})
-        return payload
+        payload["reportGuild"] = fight.get("reportGuild") or {}
+        return _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options)
     zuljan_id = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
     malacrass_id = resolve_boss_actor_id(actor_rows, 259854, ("Hex Lord Malacrass", "玛拉卡斯", "Malacrass"))
     manifest_ids = set(manifest_actor_ids(actor_rows))
@@ -5618,7 +6224,8 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     boss_damage = []
     if intermission_enabled and zuljan_id is not None:
         boss_damage = client.events(report_id, "DamageDone", fight, target_id=zuljan_id)
-    return {
+    payload = {
+        "reportGuild": fight.get("reportGuild") or {},
         "casts": _fetch_by_abilities(
             client, report_id, "Casts", fight, MECHANIC_CAST_IDS,
             hostility_type="Enemies", include_resources=field_enabled,
@@ -5654,6 +6261,7 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         "bossDamage": boss_damage,
         "analysisOptions": options,
     }
+    return _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options)
 
 
 def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fight, raw):
@@ -5662,6 +6270,10 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
     players = build_player_catalog(actor_map, actor_type, raw["combatants"])
     mechanics = analyze_fight(fight, actor_map, actor_type, actor_rows, raw)
     mechanics["tuning"] = encounter_tuning(fight)
+    options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
+    mechanics["analysisProfile"] = resolve_profile(raw.get("reportGuild"), options)
+    mechanics["guildTimeline"] = analyze_guild_timeline(
+        fight, mechanics["phaseTimeline"], raw, actor_rows, actor_map, players, options)
 
     duration_ms = int(fight["endTime"] - fight["startTime"])
     started = datetime.fromtimestamp((report_start + fight["startTime"]) / 1000, tz=CN_TZ)
@@ -5686,6 +6298,9 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
         "isKill": bool(fight.get("kill")),
         "kill": bool(fight.get("kill")),
         "bossPercentage": float(fight.get("bossPercentage") or 0),
+        "fightPercentage": fight.get("fightPercentage"),
+        "phaseCode": {"p1":"P1", "p2":"P2", "intermission":"P2.5", "p3":"P3"}.get(
+            next((p["key"] for p in reversed(mechanics["phaseTimeline"]) if p["key"] not in {"wipe", "kill"}), ""), ""),
         "durationMs": duration_ms,
         "duration": fmt_ms(duration_ms),
         "wipePhase": end_phase,
@@ -5855,6 +6470,7 @@ def build_aggregated_json(report_ids, options=None):
                     **fight,
                     "wclPhaseMetadata": phase_metadata,
                     "reportStartTime": report["startTime"],
+                    "reportGuild": report.get("guild") or {},
                 }
                 for fight in report["fights"]
                 if int(fight.get("encounterID") or 0) in ENCOUNTER_IDS
@@ -5881,6 +6497,7 @@ def build_aggregated_json(report_ids, options=None):
                       "unclearedSouls": options["soulSeverReviewEnabled"] or options["blightedSeverReviewEnabled"],
                       "regularDreadmarch": options["dreadmarchReviewEnabled"], "graveboundDeaths": options["graveboundReviewEnabled"]}
     overview["metrics"] = [row for row in overview["metrics"] if metric_enabled[row["key"]]]
+    overview["metrics"].extend(guild_timeline_overview(rendered))
     return {
         "code": 200,
         "meta": {
@@ -5890,12 +6507,12 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-observed-tuning-soulbind-2026-10-13-v9",
+            "mechanicVersion": "coiledaltar-guild-timeline-2026-10-19-v150",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
                                if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
                                and (key != "intermission" or options["intermissionReviewEnabled"])],
             "analysisConfig": options,
-            "skippedAnalyses": [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]],
+            "skippedAnalyses": [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]],
             "arenaImage": ARENA_IMAGE,
             "fieldIcons": dict(FIELD_ICONS),
             "features": {"survival": True, "fieldReplay": options["fieldReplayEnabled"]},

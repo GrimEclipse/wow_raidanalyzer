@@ -58,4 +58,6 @@ a{color:var(--gold)}a:hover{color:var(--gold-hi)}
 .pull-tile .pull-percent{filter:brightness(1.25) saturate(1.1)}
 .overview-tab{color:#b3a58c}
 .check input,.metric-filter input[type=checkbox]{accent-color:#d7b36a}
+.progress-legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px}.progress-legend span::before{content:"";display:inline-block;width:8px;height:8px;margin-right:5px;background:var(--tier);border-radius:50%}
+.report-module{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin:12px 0 18px;padding:14px;border:1px solid var(--brass);background:var(--inset)}.report-module p{margin:6px 0 0;color:var(--muted)}.report-module .error{color:#efa984}.report-module select{max-width:100%}
 .overview-tools select,.toolbar select{appearance:none;padding:6px 28px 6px 10px;border:1px solid var(--brass);border-radius:2px;background:var(--inset) linear-gradient(45deg,transparent 50%,var(--gold) 50%) calc(100% - 15px) 50%/5px 5px no-repeat;color:var(--text)}

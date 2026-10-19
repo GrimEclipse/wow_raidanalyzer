@@ -62,7 +62,7 @@ window.AnalysisConfigForm = {
           let input;
           if (field.type === 'select') {
             input = `<select data-config-input>${field.options.map(option => {const v = typeof option === 'object' ? option.value : option;return `<option value="${esc(v)}" ${String(value) === String(v) ? 'selected' : ''}>${esc(typeof option === 'object' ? option.label : option)}</option>`;}).join('')}</select>`;
-          } else if (['playerList','textList'].includes(field.type)) {
+          } else if (['playerList','textList'].includes(field.type) || field.multiline) {
             input = `<textarea data-config-input rows="2">${esc(Array.isArray(value) ? value.join(' ') : value)}</textarea>`;
           } else {
             input = `<input data-config-input type="${field.type === 'number' ? 'number' : 'text'}" value="${esc(value)}" ${field.type==='number'&&field.step==null?'step="any"':''} ${['min','max','step'].filter(k => field[k] != null).map(k => `${k}="${esc(field[k])}"`).join(' ')}>`;
