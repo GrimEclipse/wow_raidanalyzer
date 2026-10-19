@@ -393,6 +393,7 @@ def _cache_key(report_code: str, fight_id: int, entry: BossEntry, options: dict)
         ROOT / "analyzer_core" / "event_evidence.py",
         ROOT / "analyzer_core" / "combat_replay.py",
         ROOT / "analyzer_core" / "wcl_api.py",
+        ROOT / "analyzer_core" / "analysis_profile.py",
     ]
     if entry.raid_key == "venomous_abyss":
         implementation_paths.extend([

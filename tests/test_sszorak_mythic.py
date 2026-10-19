@@ -11,7 +11,7 @@ class SszorakMythicTests(unittest.TestCase):
         self.players[19]["role"] = "range-healer"
         self.players[20]["role"] = "melee-healer"
         self.actors = {i: f"P{i}" for i in self.players}
-        self.raw = {"bossID": 99, "enemyBuffs": [self.event(10000, "applybuff", s.UNBOUND_FEROCITY_ID, 99)],
+        self.raw = {"reportGuild": {"id": 774422}, "bossID": 99, "enemyBuffs": [self.event(10000, "applybuff", s.UNBOUND_FEROCITY_ID, 99)],
                     "debuffs": [self.event(1, "applydebuff", s.SERPENTS_FURY_MARK_ID, 1)],
                     "casts": [self.event(timestamp, "cast", spell, -1) for timestamp, spell in (
                         (8000, 1277002), (12000, 1277027), (16000, 1287072),
@@ -160,7 +160,7 @@ class SszorakMythicTests(unittest.TestCase):
         self.assertEqual(len(waves[0]['axes']), 2)
 
     def test_fetch_dependencies_when_replay_off(self):
-        options = {field["key"]: False for field in s.CONFIG_SCHEMA}
+        options = {field["key"]: False for field in s.CONFIG_SCHEMA if field["type"] == "boolean"}
         options["tempestReviewEnabled"] = True
         with patch.object(s, "_build", return_value={"data": {"page1_wipeAnalysis": []}}) as build:
             s.build_aggregated_json('test', options)

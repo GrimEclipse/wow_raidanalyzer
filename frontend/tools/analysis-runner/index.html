@@ -280,6 +280,8 @@ function renderConfig() {
                     <textarea data-config-input rows="2" placeholder="${escapeHtml(field.placeholder || '用逗号、空格或换行分隔')}" class="${inputClass}">${escapeHtml(textValue)}</textarea>
                 </label>
             `;
+        } else if (field.type === 'text' && field.multiline) {
+            control = `<label class="block"><span class="text-sm font-semibold text-gray-200">${label}</span>${description}<textarea data-config-input rows="8" class="${inputClass}">${escapeHtml(value)}</textarea></label>`;
         } else if (field.type === 'text') {
             control = `
                 <label class="block">

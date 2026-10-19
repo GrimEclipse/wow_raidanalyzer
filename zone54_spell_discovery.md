@@ -720,7 +720,7 @@
 - 唤醒蛇群：史诗难度下，伊斯拉兹召唤幼体反复施放内脏爆裂。打断施法会迫使幼体退场。
 - Ravenous Feast: On Mythic difficulty, consumed Eternal Venom creates Tainted Blood founts that must have their healing absorption removed before they expire.
 
-## 盘卷祭坛 / The Coiled Altar (`bargained`)
+## 盘卷祭坛 / The Coiled Altar (`the_coiler_altar`)
 
 - 普通代表战斗：`T9G1VpZHkmNgCfxL` / Fight 33，358.0s，kill=True
 - 英雄代表战斗：`fgGFk1zvxV8QAwmW` / Fight 31，540.7s，kill=False

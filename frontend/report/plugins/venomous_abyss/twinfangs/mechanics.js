@@ -177,11 +177,12 @@ function renderTwin(tab) {
   }
   if (tab === 'brood') {
     const section=data.brood;if(!section?.enabled)return twinEmpty(section);
-    const rounds=[...new Set((section.events||[]).map(r=>r.round))];
+    const evidence=section.replayEvents||section.events||[];
+    const rounds=[...new Set(evidence.map(r=>r.round))];
     const leaks=(section.events||[]).filter(r=>r.successfulCasts>0);
     return `<div id="twinBroodWorkbench"></div><section class="panel"><h2>蛇头打断，${section.successfulCastCount} 次首漏断</h2>${leaks.length?table(['时间','实际打断玩家','结果'],leaks.map(r=>[esc(r.time),(r.interrupts||[]).map(e=>player(e.player)).join('、')||'—',esc(r.leakLabel||r.status)])):'<p class="muted">没有首漏断记录。</p>'}${section.collapseExemption?`<p class="muted">${esc(section.collapseExemption.time)} 起已满足崩溃豁免；完整过程保留在回放中。</p>`:''}</section><details class="panel"><summary>打断记录与点位明细</summary><p class="muted">${esc(section.positionNote)} 未定位 ${section.unresolvedCount} 个。</p>
-      ${rounds.map(no=>{const rows=section.events.filter(r=>r.round===no);const arenas=(section.arenas||[]).filter(a=>rows.some(r=>r.position?.arena===a.key));return `<article class="card"><h3>召唤第 ${no||'未知'} 轮</h3>${arenas.map(a=>twinBroodMap(a,rows)).join('')}
-      ${table(['首次漏断时间','点位','组别 / 序号','主断','补断','实际打断','结果 / 证据'],rows.map(r=>[esc(r.time),esc(r.position?`${r.position.arenaLabel} ${r.position.label}`:'坐标未确认'),esc(r.groupLabel||'')+' '+(r.groupOrder||'—'),players(r.assigned)+(r.unresolvedNames?.length?`<br><small>名单待匹配：${esc(r.unresolvedNames.join('、'))}</small>`:''),players(r.backup),(r.interrupts||[]).map(e=>`${esc(e.time)} ${player(e.player)} ${spellLink(e.spellID)}`).join('<br>')||'—',`${esc(r.leakLabel||r.status)}${r.successfulCasts?` ×${r.successfulCasts}`:''}<br><small>${esc(r.assignmentNote)}</small>${r.tankEvidence?`<br><small>${esc(r.tankEvidence.reason)}，${Math.round((r.tankEvidence.ageMs||0)/100)/10}s 前</small>`:''}`]))}</article>`;}).join('')||'<div class="empty">本场未见脏腑爆裂成功施法。</div>'}</details>`;
+      ${rounds.map(no=>{const rows=evidence.filter(r=>r.round===no);const arenas=(section.arenas||[]).filter(a=>rows.some(r=>r.position?.arena===a.key));return `<article class="card"><h3>召唤第 ${no||'未知'} 轮</h3>${arenas.map(a=>twinBroodMap(a,rows)).join('')}
+      ${table(['蛇头出现时间','点位','组别 / 序号','主断','补断','实际打断','结果 / 证据'],rows.map(r=>[esc(r.time),esc(r.position?`${r.position.arenaLabel} ${r.position.label}`:'坐标未确认'),esc(r.groupLabel||'')+' '+(r.groupOrder||'—'),players(r.assigned)+(r.unresolvedNames?.length?`<br><small>名单待匹配：${esc(r.unresolvedNames.join('、'))}</small>`:''),players(r.backup),(r.interrupts||[]).map(e=>`${esc(e.time)} ${player(e.player)} ${spellLink(e.spellID)}`).join('<br>')||'—',`${esc(r.leakLabel||r.status)}${r.successfulCasts?` ×${r.successfulCasts}`:''}<br><small>${esc(r.assignmentNote)}</small>${r.tankEvidence?`<br><small>${esc(r.tankEvidence.reason)}，${Math.round((r.tankEvidence.ageMs||0)/100)/10}s 前</small>`:''}`]))}</article>`;}).join('')||'<div class="empty">本场未见脏腑爆裂成功施法。</div>'}</details>`;
   }
   if (tab === 'stone') {
     const section=data.stone;if(!section?.enabled)return twinEmpty(section);

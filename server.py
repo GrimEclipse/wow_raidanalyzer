@@ -695,7 +695,7 @@ def safe_redirect_target(value, default="/online"):
 
 
 class AnalyzerHandler(BaseHTTPRequestHandler):
-    server_version = "MythicAnalyzer/1.4.0"
+    server_version = "MythicAnalyzer/1.5.0"
 
     def do_GET(self):
         path = self.request_path()
@@ -985,7 +985,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         if path.startswith("/api/"):
             self.json_error("请先登录。", HTTPStatus.UNAUTHORIZED)
         else:
-            next_path = path if path.startswith("/") and not path.startswith("//") else "/"
+            next_path = safe_redirect_target(getattr(self, "path", path), default="/")
             self.redirect(f"/?{urlencode({'auth': '1', 'next': next_path})}")
         return None
 
@@ -1503,7 +1503,11 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/frontend/report/plugins/venomous_abyss/vashnik/wave-replay.js",
             "/frontend/report/plugins/venomous_abyss/vashnik/field-view.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/field-replay.js",
+            "/frontend/report/plugins/venomous_abyss/coiledaltar/guild-timeline.js",
             "/frontend/report/plugins/venomous_abyss/ulatek/field-replay.js",
+            "/frontend/report/plugins/venomous_abyss/coiledaltar/timeline-assets.js",
+            "/frontend/report/plugins/venomous_abyss/coiledaltar/icon-timeline.js",
+            "/frontend/report/plugins/venomous_abyss/coiledaltar/icon-timeline.css",
         }
         for plugin in ("venomous_abyss/progression", "venomous_abyss/coiledaltar", "venomous_abyss/ulatek", "venomous_abyss/vashnik", "tidebound_grotto/nymrissa_wavecaller"):
             demo_assets.update(f"/frontend/report/plugins/{plugin}/report.{suffix}" for suffix in ("html", "css", "js"))

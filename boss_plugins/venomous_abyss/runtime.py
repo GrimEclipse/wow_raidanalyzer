@@ -221,6 +221,8 @@ def render_fight(config, analyzer, report_id, report_start, actor_map, actor_typ
         config["spellNames"],
     )
     mechanics = analyzer(fight, actor_map, players, raw)
+    from analyzer_core.analysis_profile import resolve_profile
+    mechanics["analysisProfile"] = resolve_profile(raw.get("reportGuild"), raw.get("analysisOptions"))
     if "replayEvents" in raw:
         replay_events = raw['replayEvents']
         if config.get('replayActorGameIDs') is not None:
@@ -335,6 +337,7 @@ def build_aggregated_json(config, analyzer, report_ids, options=None):
                 actor_rows=actors,
             )
             raw["analysisOptions"] = dict(options or {})
+            raw["reportGuild"] = report.get("guild") or {}
             raw["actorRows"] = actors
             return index, render_fight(
                 config,

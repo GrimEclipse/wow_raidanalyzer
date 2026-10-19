@@ -46,7 +46,7 @@
   addCss(); addFonts();
   if (window.top === window) {
     var statusScript = document.createElement('script');
-    statusScript.src = abs('frontend/core/wcl-status.js?v=20261013-shared');
+    statusScript.src = abs('frontend/core/wcl-status.js?v=20261019-v150');
     document.head.appendChild(statusScript);
   }
 })();

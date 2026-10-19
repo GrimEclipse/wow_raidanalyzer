@@ -5,6 +5,7 @@ const api=globalThis.MechanicWorkbench;
 assert.deepEqual(api.trackPosition({samples:[[0,10,20],[1000,30,40]]},500),{x:20,y:30,stale:false});
 assert.deepEqual(api.trackPosition({samples:[[0,10,20],[10000,30,40]]},6000),{x:10,y:20,stale:true});
 assert.equal(api.trackPosition({samples:[]},500),null);
+assert.equal(api.trackPosition({samples:[[1000,30,40]]},999),null); // No future actor position.
 const portrait=api.avatar({key:'1:0',name:'Mage',icon:'/assets/specs/mage-arcane.jpg',color:'#3FC7EB'},{x:5,y:6},11,true);
 assert.ok(portrait.includes('<image href="/assets/specs/mage-arcane.jpg"'));
 assert.ok(portrait.includes('fill="#ff223b"'));

@@ -49,7 +49,7 @@
       "subtitleTrackAvailable": false
     },
     {
-      "boss": "bargained",
+      "boss": "the_coiler_altar",
       "bvid": "BV11rMJ6sEoc",
       "title": "H7-盘卷祭坛",
       "url": "https://www.bilibili.com/video/BV11rMJ6sEoc",
@@ -1256,7 +1256,7 @@
       ],
       "difficultySource": "https://www.wowhead.com/cn/npc=257361/vexhul"
     },
-    "bargained": {
+    "the_coiler_altar": {
       "encounterID": 3429,
       "name": "The Coiled Altar",
       "available": true,

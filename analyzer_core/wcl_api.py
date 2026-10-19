@@ -171,7 +171,7 @@ class WclClient:
         query = """
         query($code: String!) {
           reportData { report(code: $code) {
-            title startTime
+            title startTime guild { id name }
             fights {
               id name encounterID difficulty kill startTime endTime
               bossPercentage fightPercentage
@@ -195,7 +195,7 @@ class WclClient:
                 """
                 query($code: String!) {
                   reportData { report(code: $code) {
-                    title startTime
+                    title startTime guild { id name }
                     fights { id name encounterID difficulty kill startTime endTime bossPercentage fightPercentage }
                   } }
                 }

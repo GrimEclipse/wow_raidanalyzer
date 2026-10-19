@@ -13,6 +13,7 @@ def fixture():
     fight = dict(id=1, startTime=0, endTime=120000, difficulty=5)
     players = {i:dict(id=i,name=f'P{i}',specID=64,role='ranged') for i in range(1,6)}
     raw = {key:[] for key in ['casts','damage','debuffs','friendlyBuffs','friendlyCasts','deaths','combatants','interrupts','trackedActorEvents']}
+    raw["reportGuild"] = {"id": 774422}
     return fight, {}, players, raw
 
 

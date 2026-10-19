@@ -133,10 +133,10 @@
     return appendQuery("frontend/report/overview.html", { json: sourcePath });
   }
 
-  function detailUrl(descriptor, sourcePath, fightID) {
+  function detailUrl(descriptor, sourcePath, fightID, tab) {
     const page = descriptor && descriptor.reportPage;
     if (!page) throw new Error("该 Boss 尚未提供专属报告页面");
-    return appendQuery(page, { json: sourcePath, fight: fightID });
+    return appendQuery(page, { json: sourcePath, fight: fightID, tab });
   }
 
   function reportUrl(_descriptor, sourcePath) {

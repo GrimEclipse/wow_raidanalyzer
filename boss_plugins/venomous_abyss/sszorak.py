@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from copy import deepcopy
 from analyzer_core.config import resolve_analysis_options
+from analyzer_core.analysis_profile import profile_schema, resolve_profile
 from collections import Counter, defaultdict
 
 from boss_plugins.common import write_json_result
@@ -31,7 +32,7 @@ from boss_plugins.venomous_abyss.shared import (
 
 GUIDE_SPELLS = load_confirmed_spell_names()
 
-CONFIG_SCHEMA = [
+CONFIG_SCHEMA = profile_schema([
     {"key": "predatorReviewEnabled", "type": "boolean", "label": "顶级掠食者技能处理", "default": True},
     {"key": "tempestReviewEnabled", "type": "boolean", "label": "风暴施加与驱散", "default": True},
     {"key": "serpentsFuryReviewEnabled", "type": "boolean", "label": "史诗印记分摊", "default": True},
@@ -40,7 +41,7 @@ CONFIG_SCHEMA = [
     {"key": "crosswindsReviewEnabled", "type": "boolean", "label": "狂怒侧风位置归因", "default": True},
     {"key": "fieldReplayEnabled", "type": "boolean", "label": "场地推演", "default": True, "expensive": True,
      "description": "生成逐帧回放。关闭后跳过回放帧；囊肿、侧风也关闭时，不再读取场地坐标。"},
-]
+])
 
 BOSS_CONFIG = {
     "key": "sszorak",
@@ -1177,7 +1178,16 @@ def _serpents_fury(fight, actor_map, players, raw, position_index):
     life_events = sorted(raw.get("deaths", []) + [e for e in raw.get("trackedActorEvents", []) if event_type(e) == "resurrect"],
                          key=lambda e: e["timestamp"])
     misses = Counter()
-    for checkpoint in _fury_tactical_checkpoints(fight, raw.get("casts", [])):
+    profile = resolve_profile(raw.get("reportGuild"), raw.get("analysisOptions"))
+    checkpoints = _fury_tactical_checkpoints(fight, raw.get("casts", [])) if profile["key"] == "avalon" else [
+        {"round": i, "timestamp": ts, "plannedTimeMs": ts-int(fight["startTime"]),
+         "comboAnchorTimestamp": ts, "comboDriftMs": 0, "comboObservedDriftMs": 0}
+        for i, ts in enumerate(enrages, 1)]
+    result["analysisProfile"] = profile
+    if profile["key"] != "avalon":
+        result["tacticalCheckpointsMs"] = []
+        result["evidenceNote"] = "基础分析按实测怒不可遏检查集合，不套用阿瓦隆战术板。"
+    for checkpoint in checkpoints:
         timestamp = checkpoint["timestamp"]
         dead = set()
         for event in life_events:
@@ -1655,7 +1665,7 @@ def build_aggregated_json(report_ids, options=None):
                    "crosswinds": options["crosswindsReviewEnabled"], "fury": options["serpentsFuryReviewEnabled"]}
     config["tabs"] = [row for row in config["tabs"] if tab_enabled.get(row[0], False)]
     config["fetchKeys"] = {"friendlyCasts", "deaths", "combatants"}
-    if any(options.values()):
+    if any(options[field["key"]] for field in CONFIG_SCHEMA if field["type"] == "boolean"):
         config["fetchKeys"].update({"casts", "damage"})
     if spatial or options["tempestReviewEnabled"]:
         config["fetchKeys"].add("debuffs")
@@ -1666,7 +1676,7 @@ def build_aggregated_json(report_ids, options=None):
         config["fetchKeys"].add("enemyBuffs")
         filters.append("type = 'resurrect'")
     config["trackedActorEventFilters"] = [" OR ".join(filters)] if filters else []
-    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if not options[field["key"]]]
+    config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]]
     result = _build(config, analyze_mechanics, report_ids, options)
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []
