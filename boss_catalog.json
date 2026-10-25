@@ -771,6 +771,43 @@
               ]
             }
           ]
+        },
+        {
+          "key": "unbinding_of_kithix",
+          "name": "基希克斯破封",
+          "englishName": "The Unbinding of Kith'ix",
+          "externalKey": "wow.unbindingofkithix",
+          "aliases": ["基希克斯解封"],
+          "bosses": [
+            {
+              "key": "kithix",
+              "previewImage": "assets/raids/venomous_abyss/icons/kithix.png",
+              "order": 1,
+              "name": "基希克斯",
+              "englishName": "Kith'ix",
+              "externalKey": "wow.unbindingofkithix,01.kithix",
+              "aliases": ["Kithix"],
+              "plugin": "boss_plugins.unbinding_of_kithix.kithix",
+              "encounterIds": [3513, 53513],
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "kithix" },
+                "avoidable": { "enabled": false, "renderer": "kithix" },
+                "replay": { "enabled": true, "renderer": "kithix" }
+              },
+              "configSchemaFromPlugin": true,
+              "configSchema": [],
+              "arenaAssets": [
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/the-unbinding-of-kith-ix.png",
+                  "width": 1093,
+                  "height": 614
+                }
+              ]
+            }
+          ]
         }
       ]
     }
