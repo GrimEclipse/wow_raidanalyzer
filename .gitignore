@@ -21,7 +21,7 @@ tools/tmp/
 # Local generated WCL output, private report snapshots, and release artifacts.
 .analysis_jobs/
 .single_fight_cache/
-/assets/demos/*.json
+# Homepage mechanic demos under /assets/demos/ are published assets and must stay tracked.
 /verdict_data.json
 /data/*
 !/data/.gitkeep

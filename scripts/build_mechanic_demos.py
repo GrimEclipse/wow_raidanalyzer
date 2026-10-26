@@ -17,8 +17,9 @@ DEMOS = [
     {"key": "ulatek", "homepageVisible": False, "boss": "ulatek", "label": "乌拉特克（英雄）", "report": "ZFDWvrfqd6ygMKY2", "fight": 12, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
     {"key": "ulatek_mythic", "boss": "ulatek", "label": "乌拉特克", "report": "r19Gk7PJfVvmnFgM", "fight": 3, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
     {"key": "vashnik", "boss": "vashnik", "label": "瓦什尼克", "report": "ZFDWvrfqd6ygMKY2", "fight": 54, "raid": "venomous_abyss", "renderer": "vashnik", "tab": "replay"},
-    {"key": "nymrissa_wavecaller", "homepageVisible": False, "boss": "nymrissa_wavecaller", "label": "尼姆瑞莎", "report": "ZFDWvrfqd6ygMKY2", "fight": 57, "raid": "tidebound_grotto", "renderer": "nymrissa_wavecaller", "tab": "explore"},
+    {"key": "nymrissa_wavecaller", "homepageVisible": False, "boss": "nymrissa_wavecaller", "label": "尼姆瑞莎", "report": "ZFDWvrfqd6ygMKY2", "fight": 57, "raid": "tidebound_grotto", "renderer": "nymrissa_wavecaller", "tab": "replay"},
     {"key": "coiledaltar_progression", "homepageVisible": False, "boss": "coiledaltar", "label": "盘卷祭坛（史诗开荒）", "report": "H1LdCx4hNG6jW2FT", "fight": 16, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
+    {"key": "kithix_heroic", "boss": "kithix", "label": "基希克斯", "report": "8RjgZwb1kMTD7m4Y", "fight": 5, "raid": "unbinding_of_kithix", "renderer": "kithix", "tab": "replay"},
 ]
 
 

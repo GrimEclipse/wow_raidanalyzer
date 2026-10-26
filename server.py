@@ -1493,6 +1493,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/assets/demos/sszorak.json",
             "/assets/demos/ulatek.json",
             "/assets/demos/ulatek_mythic.json",
+            "/assets/demos/kithix_heroic.json",
             "/assets/spells/1022.jpg", "/assets/spells/642.jpg", "/assets/spells/45438.jpg", "/assets/spells/186265.jpg",
             "/assets/spells/357210.jpg", "/assets/spells/403631.jpg",
             "/assets/spells/1286399.jpg",
@@ -1508,8 +1509,16 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/frontend/report/plugins/venomous_abyss/coiledaltar/timeline-assets.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/icon-timeline.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/icon-timeline.css",
+            "/frontend/report/plugins/unbinding_of_kithix/kithix/field-replay.js",
         }
-        for plugin in ("venomous_abyss/progression", "venomous_abyss/coiledaltar", "venomous_abyss/ulatek", "venomous_abyss/vashnik", "tidebound_grotto/nymrissa_wavecaller"):
+        for plugin in (
+            "venomous_abyss/progression",
+            "venomous_abyss/coiledaltar",
+            "venomous_abyss/ulatek",
+            "venomous_abyss/vashnik",
+            "tidebound_grotto/nymrissa_wavecaller",
+            "unbinding_of_kithix/kithix",
+        ):
             demo_assets.update(f"/frontend/report/plugins/{plugin}/report.{suffix}" for suffix in ("html", "css", "js"))
         for plugin in ("twinfangs", "sszorak"):
             demo_assets.update(f"/frontend/report/plugins/venomous_abyss/{plugin}/mechanics.{suffix}" for suffix in ("css", "js"))

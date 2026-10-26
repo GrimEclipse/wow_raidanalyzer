@@ -35,6 +35,7 @@
     const first = samples.length ? samples[0][0] : null;
     const last = samples.length ? samples[samples.length - 1][0] : null;
     const marked = [];
+    if (add?.explodeTimeMs != null) marked.push(add.explodeTimeMs);
     if (add?.deathTimeMs != null) marked.push(add.deathTimeMs);
     for (const row of unit?.states || []) if (row[1] === "dead") marked.push(row[0]);
     marked.sort((a, b) => a - b);
@@ -43,6 +44,8 @@
     const deaths = marked.filter(time => time >= (start || 0) - 300).sort((a, b) => a - b);
     const death = deaths.length ? deaths[0] : null;
     const end = death != null ? death : last;
+    const explodeGone = add?.kind === "bomber" && add?.explodeTimeMs != null && cursor >= add.explodeTimeMs;
+    if (explodeGone) return null;
     if (end != null && cursor >= end + 900) return null;
     const fading = end != null && cursor >= end;
     return { dead: fading, opacity: fading ? Math.max(0, 1 - (cursor - end) / 900) : 1, positionTime: fading ? end : cursor };
@@ -135,9 +138,9 @@
       renderMap(_selected, _filtered, cursor) {
         const scale = yardScale(arena);
         const phase = [...(mechanics.phaseTimeline || [])].reverse().find(row => row.timeMs <= cursor);
-        const scars = scarRows.filter(row => cursor >= row.startTimeMs && cursor <= (row.endTimeMs ?? durationMs)).map((row, index) => {
+        const scars = scarRows.filter(row => cursor >= row.startTimeMs && cursor <= (row.endTimeMs ?? durationMs)).map(row => {
           const point = projectPoint(row, arena);
-          return point ? `<g data-key="scar:${row.key || row.startTimeMs}"><circle cx="${point.x}" cy="${point.y}" r="22" fill="#4c1d95" fill-opacity=".82" stroke="#f5f3ff" stroke-width="3"/><text x="${point.x}" y="${point.y + 5}" text-anchor="middle" fill="#f5f3ff" font-size="14">${index + 1}</text><title>虚空之痕 ${index + 1}${row.tank ? `，${api.escape(row.tank)}` : ""}</title></g>` : "";
+          return point ? `<g data-key="scar:${row.key || row.startTimeMs}"><circle cx="${point.x}" cy="${point.y}" r="22" fill="#4c1d95" fill-opacity=".82" stroke="#c4b5fd" stroke-width="2"/><title>虚空之痕${row.tank ? `，${api.escape(row.tank)}` : ""}</title></g>` : "";
         }).join("");
         const waves = (mechanics.darkness || []).map(row => ({ ...row, startTimeMs: row.startTimeMs ?? row.timeMs ?? 0, launchTimeMs: row.timeMs ?? row.startTimeMs ?? 0, endTimeMs: waveEnd(row) }));
         const wave = waves.find(row => cursor >= row.launchTimeMs && cursor <= row.endTimeMs);
@@ -191,22 +194,62 @@
           if (!origin || !facing) return "";
           return `<path data-key="roar:${row.timeMs}" d="${conePath(origin, facing.angle, 60 * scale, 30 * Math.PI / 180)}" fill="#86efac" fill-opacity="${cursor < row.timeMs ? .16 : .28}" stroke="#bbf7d0" stroke-width="2"/>`;
         }).join("");
-        const gates = (mechanics.gates || []).filter(row => cursor >= row.dropTimeMs && (row.clearedTimeMs == null || cursor < row.clearedTimeMs + 700)).map(row => {
-          const point = projectPoint(position(row.playerID, row.dropTimeMs) || row.position, arena);
+        const gates = (mechanics.gates || []).filter(row => {
+          const place = row.placeTimeMs ?? row.dropTimeMs;
+          return place != null && cursor >= place && (row.clearedTimeMs == null || cursor < row.clearedTimeMs + 700);
+        }).map(row => {
+          const place = row.placeTimeMs ?? row.dropTimeMs;
+          const point = projectPoint(row.position || position(row.playerID, place), arena);
           if (!point) return "";
           const fading = row.clearedTimeMs != null && cursor >= row.clearedTimeMs;
-          return `<g data-key="gate:${row.playerID}:${row.applyTimeMs}" opacity="${fading ? 1 - (cursor - row.clearedTimeMs) / 700 : 1}"><circle cx="${point.x}" cy="${point.y}" r="${5 * scale}" fill="#312e81" fill-opacity=".25" stroke="#a5b4fc" stroke-width="2"/><title>虚无之门，${api.escape(row.player || "")}</title></g>`;
+          const icon = arena.nullGateIcon || "/assets/raids/unbinding_of_kithix/null-gate.png";
+          const size = 6;
+          return `<g data-key="gate:${row.key || `${row.playerID}:${place}`}" opacity="${fading ? 1 - (cursor - row.clearedTimeMs) / 700 : 1}"><image href="${icon}" x="${point.x - size / 2}" y="${point.y - size / 2}" width="${size}" height="${size}"/><title>虚无之门，${api.escape(row.player || "")}</title></g>`;
         }).join("");
+        const nullOrbs = (mechanics.nullVolleys || []).flatMap(volley => {
+          const end = volley.clearedTimeMs != null ? Math.min(volley.clearedTimeMs, volley.expireTimeMs) : volley.expireTimeMs;
+          if (cursor < volley.launchTimeMs || cursor > end + 200) return [];
+          const elapsed = Math.max(0, Math.min(cursor, end) - volley.launchTimeMs) / 1000;
+          const fading = volley.clearedTimeMs != null && cursor >= volley.clearedTimeMs;
+          return (volley.angles || []).map((angle, index) => {
+            const world = {
+              x: volley.origin.x + Math.cos(angle) * elapsed * (volley.speedYards || 20) * (arena.unitsPerYard || 100),
+              y: volley.origin.y - Math.sin(angle) * elapsed * (volley.speedYards || 20) * (arena.unitsPerYard || 100),
+            };
+            const point = projectPoint(world, arena);
+            if (!point) return "";
+            return `<circle data-key="null-orb:${volley.key}:${index}" cx="${point.x}" cy="${point.y}" r="5" fill="#c4b5fd" fill-opacity="${fading ? .2 : .9}" stroke="#f5f3ff" stroke-width="1.5"/>`;
+          });
+        }).join("");
+        const axis = mechanics.nullAxis || {};
+        const axisLine = (() => {
+          if (!axis.liadrin || !axis.bossInitial || (mechanics.phaseTimeline || []).every(row => row.key !== "p2" || cursor < row.timeMs)) return "";
+          const from = projectPoint(axis.liadrin, arena), to = projectPoint(axis.bossInitial, arena);
+          if (!from || !to) return "";
+          return `<g data-key="null-axis" opacity=".35"><line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="#fde68a" stroke-width="2" stroke-dasharray="10 8"/><title>0°/180° 基准：莉亚德琳 → Boss 开场</title></g>`;
+        })();
         const blasts = (mechanics.restabilizations || []).filter(row => cursor >= row.timeMs && cursor < row.timeMs + 800).map(row => {
           const point = projectPoint(row.position || position(row.sourceID, row.timeMs), arena);
           if (!point) return "";
           const progress = (cursor - row.timeMs) / 800;
           return `<circle data-key="blast:${row.timeMs}" cx="${point.x}" cy="${point.y}" r="${10 * scale * progress}" fill="#fde68a" fill-opacity="${.35 * (1 - progress)}" stroke="#fbbf24" stroke-width="3"/>`;
         }).join("");
+        const beetleByKey = Object.fromEntries((mechanics.beetles || []).map(row => [row.key, row]));
+        const beetleBlasts = (mechanics.beetles || []).map(beetle => {
+          if (beetle.explodeTimeMs == null || cursor < beetle.explodeTimeMs || cursor >= beetle.explodeTimeMs + 700) return "";
+          const unit = units.find(row => row.actorID === beetle.actorID && row.instance === beetle.instance) || unitOf(beetle.actorID);
+          if (!unit) return "";
+          const origin = projectPoint(api.trackPosition(unit, beetle.explodeTimeMs, 5000), arena);
+          if (!origin) return "";
+          const progress = (cursor - beetle.explodeTimeMs) / 700;
+          const radius = (beetle.contactRadiusYards || 4) * scale * (0.6 + progress);
+          return `<g data-key="beetle-blast:${beetle.key}"><circle cx="${origin.x}" cy="${origin.y}" r="${radius}" fill="#fb7185" fill-opacity="${.45 * (1 - progress)}" stroke="#fecaca" stroke-width="2"/></g>`;
+        }).join("");
         const adds = (mechanics.adds || []).filter(add => add.kind !== "liadrin" && add.kind !== "kithix").map(add => {
           const unit = units.find(row => row.actorID === add.actorID && row.instance === add.instance) || (units.filter(row => row.actorID === add.actorID).length === 1 ? unitOf(add.actorID) : null);
           if (!unit) return "";
-          const state = addState(add, unit, cursor);
+          const beetle = add.kind === "bomber" ? (beetleByKey[add.key] || add) : add;
+          const state = addState(beetle, unit, cursor);
           if (!state) return "";
           const point = projectPoint(api.trackPosition(unit, state.positionTime, 5000), arena);
           if (!point) return "";
@@ -215,7 +258,18 @@
           const remain = egg ? Math.max(0, egg.deadlineMs - cursor) : null;
           const late = egg && cursor > egg.deadlineMs && !state.dead;
           const timer = egg && !state.dead ? `<text x="${point.x}" y="${point.y - 28}" text-anchor="middle" fill="${late ? "#fda4af" : "#fde68a"}" font-size="14">${(remain / 1000).toFixed(1)}s</text>` : "";
-          return `<g data-key="add:${add.key}" opacity="${state.opacity}">${frenzy ? `<circle cx="${point.x}" cy="${point.y}" r="26" fill="#ef4444" fill-opacity=".25" stroke="#fecaca"/>` : ""}${api.avatar({ ...unit, key: add.key, name: add.name, icon: add.icon, color: frenzy ? "#f87171" : "#ddd6fe" }, point, add.kind === "hulk" ? 22 : 16, false, state.dead, state.opacity)}${timer}</g>`;
+          const contactYards = beetle.contactRadiusYards || 4;
+          const contact = add.kind === "bomber" && !state.dead
+            ? `<circle cx="${point.x}" cy="${point.y}" r="${contactYards * scale}" fill="#fb7185" fill-opacity=".12" stroke="#fda4af" stroke-width="2" stroke-dasharray="6 4"/>`
+            : "";
+          const chaseId = beetle.chaseTargetID || beetle.triggerPlayerID;
+          const chasePoint = chaseId != null && !state.dead ? projectPoint(position(chaseId, cursor), arena) : null;
+          const tether = chasePoint
+            ? `<path d="M ${point.x} ${point.y} L ${chasePoint.x} ${chasePoint.y}" fill="none" stroke="#fb7185" stroke-width="2" opacity=".75" stroke-dasharray="8 8" stroke-dashoffset="${-(cursor * .025) % 16}"/><title>甲虫追逐 ${api.escape(beetle.triggerPlayer || "")}</title>`
+            : "";
+          const castSource = { ...(unit || {}), casts: beetle.casts || add.casts || unit?.casts || [], actorID: add.actorID };
+          const cast = !state.dead ? api.castBar(castSource, cursor, point, add.kind === "hulk" ? 160 : 132) : "";
+          return `<g data-key="add:${add.key}" opacity="${state.opacity}">${tether}${contact}${frenzy ? `<circle cx="${point.x}" cy="${point.y}" r="26" fill="#ef4444" fill-opacity=".25" stroke="#fecaca"/>` : ""}${api.avatar({ ...unit, key: add.key, name: add.name, icon: add.icon, color: frenzy ? "#f87171" : "#ddd6fe" }, point, add.kind === "hulk" ? 22 : 16, false, state.dead, state.opacity)}${timer}${cast}</g>`;
         }).join("");
         const bosses = (replay.bosses || []).map(boss => {
           const unit = unitOf(boss.actorID);
@@ -240,16 +294,31 @@
           const fragmentBadge = stacks ? `<g><circle cx="${point.x + 16}" cy="${point.y - 16}" r="10" fill="#5b21b6" stroke="#ddd6fe"/><text x="${point.x + 16}" y="${point.y - 12}" text-anchor="middle" fill="#f5f3ff" font-size="12">${stacks}</text></g>` : "";
           return `<g data-key="player:${unit.actorID}">${embrace ? `<circle cx="${point.x}" cy="${point.y}" r="22" fill="#fde68a" fill-opacity=".2" stroke="#facc15"/>` : ""}${horror ? `<circle cx="${point.x}" cy="${point.y}" r="30" fill="none" stroke="#c084fc" stroke-dasharray="4 4"/>` : ""}${lightOn ? `<circle cx="${point.x}" cy="${point.y}" r="20" fill="none" stroke="${grace.radiantGrace ? "#fef3c7" : "#fb7185"}"/>` : ""}${graspArc}${api.avatar(unit, point, 15, !!grasp?.missed, life.dead, life.opacity)}${fragmentBadge}</g>`;
         }).join("");
-        const liadrin = (mechanics.adds || []).filter(add => add.kind === "liadrin").map(add => {
-          const unit = unitOf(add.actorID, add.instance);
-          const state = unit ? addState(add, unit, cursor) : null;
-          const point = state && unit && projectPoint(api.trackPosition(unit, state.positionTime, 5000), arena);
+        const barrierNow = (mechanics.barriers || []).find(row => cursor >= row.startTimeMs && cursor <= row.endTimeMs);
+        const barrierRadius = barrierNow ? (() => {
+          const elapsed = (cursor - barrierNow.startTimeMs) / 1000;
+          const start = Number(barrierNow.startRadiusYards);
+          const end = Number(barrierNow.endRadiusYards);
+          const shrink = Number(barrierNow.shrinkYardsPerSec || 1);
+          if (start >= end) return Math.max(end, start - elapsed * shrink);
+          return Math.min(end, start + elapsed * shrink);
+        })() : null;
+        const liadrinPortrait = arena.liadrinPortrait || "/assets/raids/unbinding_of_kithix/liadrin.png";
+        const liadrinAdds = (mechanics.adds || []).filter(add => add.kind === "liadrin");
+        const liadrinFallbackPoint = barrierNow?.position || mechanics.nullAxis?.liadrin || (arena.centerX == null ? null : { x: arena.centerX, y: arena.centerY });
+        const liadrin = (liadrinAdds.length ? liadrinAdds : [{ key: "liadrin-fallback" }]).map(add => {
+          const unit = add.actorID != null ? unitOf(add.actorID, add.instance) : null;
+          const state = unit ? addState(add, unit, cursor) : { opacity: 1 };
+          const tracked = state && unit && projectPoint(api.trackPosition(unit, state.positionTime, 5000), arena);
+          const point = tracked || projectPoint(liadrinFallbackPoint, arena);
           if (!point) return "";
-          const barrier = (mechanics.barriers || []).some(row => cursor >= (row.applyTimeMs ?? row.startTimeMs) && cursor < (row.removeTimeMs ?? row.timeMs ?? Infinity));
           const faded = (mechanics.darkness || []).some(row => (row.fadeTimesMs || []).some(time => cursor >= time && cursor < time + 2000));
-          return `<g data-key="liadrin" opacity="${state.opacity}"><circle cx="${point.x}" cy="${point.y}" r="${barrier ? 70 : 18}" fill="${faded ? "#fb7185" : "#fde68a"}" fill-opacity="${barrier ? .12 : .4}" stroke="${faded ? "#fecdd3" : "#fbbf24"}" stroke-width="2"/><text x="${point.x}" y="${point.y + 4}" text-anchor="middle" fill="#fff7d6" font-size="12">莉</text></g>`;
+          const shield = barrierRadius != null
+            ? `<circle cx="${point.x}" cy="${point.y}" r="${barrierRadius * scale}" fill="#fde68a" fill-opacity=".10" stroke="#fbbf24" stroke-width="3"/><title>神圣光辉屏障，第 ${barrierNow.index} 次，当前约 ${barrierRadius.toFixed(1)} 码</title>`
+            : "";
+          return `<g data-key="liadrin" opacity="${state?.opacity ?? 1}">${shield}<circle cx="${point.x}" cy="${point.y}" r="22" fill="#1e1030" stroke="${faded ? "#fecdd3" : "#fbbf24"}" stroke-width="2"/><image href="${liadrinPortrait}" x="${point.x - 20}" y="${point.y - 20}" width="40" height="40" style="clip-path:circle(50%)"/><title>莉亚德琳</title></g>`;
         }).join("");
-        return `<div class="kithix-map" data-replay-field><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="基希克斯战斗回放"><image href="${arena.image || "/assets/raids/venomous_abyss/the-unbinding-of-kith-ix.png"}" width="${WIDTH}" height="${HEIGHT}"/>${devs}${roars}${scars}${beams}${flights}${gates}${blasts}${liadrin}<g data-key="adds">${adds}</g><g data-key="bosses">${bosses}</g><g data-key="players">${players}</g><text x="24" y="36" fill="#f8fafc" font-size="22">${api.escape(phase?.key === "p2" ? "第二阶段" : "第一阶段")}</text></svg></div>`;
+        return `<div class="kithix-map" data-replay-field><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="基希克斯战斗回放"><image href="${arena.image || "/assets/raids/venomous_abyss/the-unbinding-of-kith-ix.png"}" width="${WIDTH}" height="${HEIGHT}"/>${devs}${roars}${scars}${beams}${flights}${axisLine}${gates}${nullOrbs}${blasts}${liadrin}<g data-key="adds">${adds}</g>${beetleBlasts}<g data-key="bosses">${bosses}</g><g data-key="players">${players}</g><text x="24" y="36" fill="#f8fafc" font-size="22">${api.escape(phase?.key === "p2" ? "第二阶段" : "第一阶段")}</text></svg></div>`;
       },
     });
     return workbench;

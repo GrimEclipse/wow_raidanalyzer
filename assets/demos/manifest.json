@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "demos": [
+    {
+      "key": "sszorak",
+      "homepageVisible": true,
+      "label": "斯索拉克",
+      "json": "/assets/demos/sszorak.json",
+      "page": "/frontend/report/plugins/venomous_abyss/progression/report.html",
+      "tab": "replay",
+      "description": "史诗，击杀，06:03.1，WCL ZFDWvrfqd6ygMKY2 / Fight 38"
+    },
+    {
+      "key": "coiledaltar",
+      "homepageVisible": true,
+      "label": "盘卷祭坛",
+      "json": "/assets/demos/coiledaltar.json",
+      "page": "/frontend/report/plugins/venomous_abyss/coiledaltar/report.html",
+      "tab": "replay",
+      "description": "史诗，击杀，09:07.2，WCL mDcP2prKBwFMxLH4 / Fight 35"
+    },
+    {
+      "key": "coiledaltar_today_check",
+      "homepageVisible": false,
+      "label": "盘卷祭坛（10月13日记录）",
+      "json": "/assets/demos/coiledaltar_today_check.json",
+      "page": "/frontend/report/plugins/venomous_abyss/coiledaltar/report.html",
+      "tab": "replay",
+      "description": "史诗，击杀，09:47.6，WCL 8TJdnK1Rzy26gmAC / Fight 7"
+    },
+    {
+      "key": "twinfangs",
+      "homepageVisible": true,
+      "label": "双子毒牙",
+      "json": "/assets/demos/twinfangs.json",
+      "page": "/frontend/report/plugins/venomous_abyss/progression/report.html",
+      "tab": "brood",
+      "description": "史诗，击杀，07:00.7，WCL BZKtqb6wyTnAHGRV / Fight 37"
+    },
+    {
+      "key": "ulatek",
+      "homepageVisible": false,
+      "label": "乌拉特克（英雄）",
+      "json": "/assets/demos/ulatek.json",
+      "page": "/frontend/report/plugins/venomous_abyss/ulatek/report.html",
+      "tab": "replay",
+      "description": "英雄，击杀，09:26.6，WCL ZFDWvrfqd6ygMKY2 / Fight 12"
+    },
+    {
+      "key": "ulatek_mythic",
+      "homepageVisible": true,
+      "label": "乌拉特克",
+      "json": "/assets/demos/ulatek_mythic.json",
+      "page": "/frontend/report/plugins/venomous_abyss/ulatek/report.html",
+      "tab": "replay",
+      "description": "史诗，击杀，09:37.5，WCL r19Gk7PJfVvmnFgM / Fight 3"
+    },
+    {
+      "key": "vashnik",
+      "homepageVisible": true,
+      "label": "瓦什尼克",
+      "json": "/assets/demos/vashnik.json",
+      "page": "/frontend/report/plugins/venomous_abyss/vashnik/report.html",
+      "tab": "replay",
+      "description": "史诗，击杀，06:45.5，WCL ZFDWvrfqd6ygMKY2 / Fight 54"
+    },
+    {
+      "key": "nymrissa_wavecaller",
+      "homepageVisible": false,
+      "label": "尼姆瑞莎",
+      "json": "/assets/demos/nymrissa_wavecaller.json",
+      "page": "/frontend/report/plugins/tidebound_grotto/nymrissa_wavecaller/report.html",
+      "tab": "replay",
+      "description": "史诗，击杀，05:21.6，WCL ZFDWvrfqd6ygMKY2 / Fight 57"
+    },
+    {
+      "key": "coiledaltar_progression",
+      "homepageVisible": false,
+      "label": "盘卷祭坛（史诗开荒）",
+      "json": "/assets/demos/coiledaltar_progression.json",
+      "page": "/frontend/report/plugins/venomous_abyss/coiledaltar/report.html",
+      "tab": "replay",
+      "description": "史诗，开荒，02:34.4，WCL H1LdCx4hNG6jW2FT / Fight 16"
+    },
+    {
+      "key": "kithix_heroic",
+      "homepageVisible": true,
+      "label": "基希克斯",
+      "json": "/assets/demos/kithix_heroic.json",
+      "page": "/frontend/report/plugins/unbinding_of_kithix/kithix/report.html",
+      "tab": "replay",
+      "description": "英雄，击杀，05:35.7，WCL 8RjgZwb1kMTD7m4Y / Fight 5"
+    }
+  ]
+}

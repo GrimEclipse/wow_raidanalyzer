@@ -53,12 +53,15 @@ UNSPEAKABLE_HORRORS = 1304045
 OVERWHELMING_FEAR = 1304046
 ABYSSAL_GRASP = 1303406
 NULL_GATE = 1308873
+NULLIFY = 1308875
 NEGATION = 1318467
 EXPLOSIVE_RESTABILIZATION = 1318472
 LAST_LIGHT = 1305427
 RADIANT_GRACE = 1305428
 ECLIPSE_FRAGMENT = 1308674
 RADIANT_FADE = 1308675
+STYGIAN_HOWL = 1301110
+EIGHTFOLD_ECLIPSE = 1301479
 
 EGG_HATCH_MS = 10_000
 GRASP_CLEAR_MS = 8_000
@@ -67,6 +70,14 @@ ROAR_RADIUS_YARDS = 60.0
 ROAR_HALF_ANGLE_DEG = 30.0
 GATE_RADIUS_YARDS = 5.0
 RESTABILIZE_RADIUS_YARDS = 10.0
+BEETLE_CONTACT_YARDS = 4.0
+NULL_ORB_COUNT = 12
+NULL_ORB_STEP_DEG = 30.0
+NULL_ORB_SPEED_YARDS = 8.0
+NULL_ORB_TRAVEL_YARDS = 60.0
+BARRIER_START_RADIUS_YARDS = 40.0
+BARRIER_SHRINK_YARDS_PER_SEC = 0.5
+NULL_GATE_ICON = "/assets/raids/unbinding_of_kithix/null-gate.png"
 UNITS_PER_YARD = 100.0
 MAP_WIDTH = 1093
 MAP_HEIGHT = 614
@@ -74,6 +85,7 @@ PLATFORM_RADIUS_YARDS = 45.0
 PLATFORM_RADIUS_PX = 220.0
 ICON_ROOT = "/assets/raids/venomous_abyss/icons"
 MAP_IMAGE = "/assets/raids/venomous_abyss/the-unbinding-of-kith-ix.png"
+ADD_CAST_SPELLS = {VENOM_ROAR, VOIDWEAVE, MIND_STING, GUT_REACTION, VOIDSWARM}
 
 APPLY_TYPES = {"applydebuff", "applybuff", "applydebuffstack", "applybuffstack"}
 REMOVE_TYPES = {"removedebuff", "removebuff", "removedebuffstack", "removebuffstack"}
@@ -95,7 +107,7 @@ ADD_ICONS = {
 CONFIG_SCHEMA = [
     {"key": "fullReplayEnabled", "type": "boolean", "default": True, "label": "完整战斗回放", "description": "读取整场玩家与小怪的位置，用于场地回放。"},
     {"key": "phaseOneReviewEnabled", "type": "boolean", "default": True, "label": "第一阶段机制", "description": "黑暗毁灭、虫群、熄灭、窒息黑暗、蚀日碎片、恐惧与深渊攫取。"},
-    {"key": "phaseTwoReviewEnabled", "type": "boolean", "default": True, "label": "第二阶段机制", "description": "虚无之门、湮消、爆炸复稳，以及玩家是否获得光耀恩典 debuff。"},
+    {"key": "phaseTwoReviewEnabled", "type": "boolean", "default": True, "label": "第二阶段机制", "description": "虚无之门十二向飞球、湮消清场、八重蚀日转阶段，以及光耀恩典。"},
 ]
 
 SPELL_NAMES = {
@@ -117,12 +129,15 @@ SPELL_NAMES = {
     OVERWHELMING_FEAR: "极度恐惧",
     ABYSSAL_GRASP: "深渊攫取",
     NULL_GATE: "虚无之门",
+    NULLIFY: "虚无",
     NEGATION: "湮消",
     EXPLOSIVE_RESTABILIZATION: "爆炸复稳",
     LAST_LIGHT: "最后的圣光",
     RADIANT_GRACE: "光耀恩典",
     ECLIPSE_FRAGMENT: "蚀日碎片",
     RADIANT_FADE: "辉光消逝",
+    STYGIAN_HOWL: "冥河嚎叫",
+    EIGHTFOLD_ECLIPSE: "八重蚀日",
     3: "跌落",
 }
 
@@ -130,7 +145,7 @@ BOSS_CONFIG = {
     "key": "kithix",
     "name": "基希克斯",
     "encounterIDs": ENCOUNTER_IDS,
-    "mechanicVersion": "kithix-replay-p1-p2-2026-10-25",
+    "mechanicVersion": "kithix-barrier40-orb8-2026-10-25",
     "tabs": [
         ["survival", "死亡与战复"],
         ["replay", "战斗回放"],
@@ -231,6 +246,8 @@ def build_arena(center):
         "plotScaleX": round(PLATFORM_RADIUS_PX / MAP_WIDTH * 100, 4),
         "plotScaleY": round(PLATFORM_RADIUS_PX / MAP_HEIGHT * 100, 4),
         "bossPortrait": f"{ICON_ROOT}/kithix.png",
+        "liadrinPortrait": "/assets/raids/unbinding_of_kithix/liadrin.png",
+        "nullGateIcon": NULL_GATE_ICON,
         "method": "liadrin-or-kithix-median-center-45yd-platform",
     }
 
@@ -404,8 +421,174 @@ def egg_reviews(eggs, fight_duration_ms):
             "elapsedMs": max(0, elapsed),
             "cleared": death is not None and int(death) - spawn <= EGG_HATCH_MS,
             "missed": missed,
+            "hatched": missed,
         })
     return reviews
+
+
+def egg_damage_breakdown(fight, eggs, damage_events, players, actor_map):
+    """Only hatched / missed eggs need a per-player damage taken breakdown."""
+    reviews = []
+    for egg in eggs or []:
+        if not egg.get("missed"):
+            continue
+        spawn = int(egg["spawnTimeMs"])
+        end = int(egg["deathTimeMs"]) if egg.get("deathTimeMs") is not None else int(fight["endTime"]) - int(fight["startTime"])
+        egg_instance = int(egg.get("instance") or 0)
+        by_player = {}
+        total = 0
+        for event in damage_events or []:
+            if event.get("targetID") != egg.get("actorID"):
+                continue
+            event_instance = int(event.get("targetInstance") or 0)
+            if egg_instance and event_instance and event_instance != egg_instance:
+                continue
+            moment = rel_ms(fight, event.get("timestamp"))
+            if moment < spawn - 200 or moment > end + 500:
+                continue
+            source = event.get("sourceID")
+            if source not in players:
+                continue
+            amount = int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
+            if amount <= 0:
+                continue
+            row = by_player.setdefault(source, {**player_ref(players, actor_map, source), "hits": 0, "damage": 0})
+            row["hits"] += 1
+            row["damage"] += amount
+            total += amount
+        contributors = sorted(by_player.values(), key=lambda row: (-row["damage"], row["player"]))
+        reviews.append({
+            **egg,
+            "totalDamage": total,
+            "damageByPlayer": contributors,
+        })
+    return reviews
+
+
+def voidscar_damage_summary(fight, damage_events, players, actor_map):
+    by_player = {}
+    for event in damage_events or []:
+        if ability_id(event) != VOIDSCAR:
+            continue
+        target = event.get("targetID")
+        if target not in players:
+            continue
+        amount = int(event.get("amount") or 0) + int(event.get("absorbed") or 0)
+        row = by_player.setdefault(target, {**player_ref(players, actor_map, target), "hits": 0, "damage": 0})
+        row["hits"] += 1
+        row["damage"] += amount
+        row.setdefault("timesMs", []).append(rel_ms(fight, event.get("timestamp")))
+    return sorted(by_player.values(), key=lambda row: (-row["hits"], -row["damage"], row["player"]))
+
+
+def extinguish_reviews(fight, extinguishes, embraces, players, deaths):
+    """Each Extinguish: living players without Light's Embrace failed the soak."""
+    death_times = {}
+    for event in deaths or []:
+        target = event.get("targetID")
+        if target not in players:
+            continue
+        moment = rel_ms(fight, event.get("timestamp"))
+        death_times[target] = min(death_times.get(target, moment), moment)
+    reviews = []
+    for index, cast in enumerate(extinguishes or [], start=1):
+        moment = int(cast.get("timeMs") or 0)
+        missing = []
+        soaked = []
+        for actor_id, player in players.items():
+            death_at = death_times.get(actor_id)
+            if death_at is not None and death_at < moment - 200:
+                continue
+            has_buff = any(
+                row.get("playerID") == actor_id
+                and int(row.get("applyTimeMs") or 0) <= moment
+                and (row.get("removeTimeMs") is None or int(row["removeTimeMs"]) >= moment - 200)
+                for row in embraces or []
+            )
+            ref = {
+                "playerID": actor_id,
+                "player": player.get("name"),
+                "classColor": player.get("classColor"),
+                "icon": player.get("icon"),
+                "role": player.get("role"),
+            }
+            (soaked if has_buff else missing).append(ref)
+        reviews.append({
+            **cast,
+            "index": index,
+            "soakedCount": len(soaked),
+            "missedCount": len(missing),
+            "missedPlayers": missing,
+            "soakedPlayers": soaked,
+        })
+    return reviews
+
+
+def beetle_reviews(beetles, players, actor_map):
+    rows = []
+    for beetle in beetles or []:
+        target_id = beetle.get("chaseTargetID") or beetle.get("triggerPlayerID")
+        trigger = player_ref(players, actor_map, target_id) if target_id in players else {
+            "playerID": target_id,
+            "player": actor_name(actor_map, target_id) if target_id else None,
+        }
+        rows.append({
+            **beetle,
+            "contactRadiusYards": BEETLE_CONTACT_YARDS,
+            "triggerPlayerID": target_id,
+            "triggerPlayer": trigger.get("player"),
+            "triggerClassColor": trigger.get("classColor"),
+            "triggerIcon": trigger.get("icon"),
+            "triggered": target_id is not None,
+            "timedOut": beetle.get("explodeTimeMs") is not None and target_id is None,
+        })
+    return rows
+
+
+def add_cast_windows(fight, casts, adds):
+    """Build per-add cast bars from begin→cast pairs for the field replay."""
+    by_source = {}
+    pending = {}
+    for event in sorted(casts or [], key=lambda item: int(item.get("timestamp") or 0)):
+        spell_id = ability_id(event)
+        if spell_id not in ADD_CAST_SPELLS:
+            continue
+        source = event.get("sourceID")
+        instance = int(event.get("sourceInstance") or 0)
+        key = (source, instance, spell_id)
+        kind = event_type(event)
+        if kind == "begincast":
+            pending[key] = event
+            continue
+        if kind != "cast":
+            continue
+        begin = pending.pop(key, None)
+        start_ms = rel_ms(fight, (begin or event).get("timestamp"))
+        end_ms = rel_ms(fight, event.get("timestamp"))
+        if end_ms <= start_ms:
+            end_ms = start_ms + 1000
+        by_source.setdefault((source, instance), []).append({
+            "spellID": spell_id,
+            "spellName": spell_name(spell_id),
+            "startTimeMs": start_ms,
+            "endTimeMs": end_ms,
+            "expectedEndTimeMs": end_ms,
+            "durationMs": max(0, end_ms - start_ms),
+            "outcome": "completed",
+            "targetID": event.get("targetID"),
+        })
+    for add in adds or []:
+        exact = by_source.get((add.get("actorID"), int(add.get("instance") or 0)), [])
+        fallback = by_source.get((add.get("actorID"), 0), []) if not exact else []
+        windows = exact or fallback
+        spawn = int(add.get("spawnTimeMs") or 0)
+        death = add.get("deathTimeMs")
+        matched = [
+            row for row in windows
+            if row["startTimeMs"] >= spawn - 500 and (death is None or row["startTimeMs"] <= int(death) + 500)
+        ]
+        add["casts"] = matched
+    return adds
 
 
 def final_light_reviews(players, auras, moment_ms, dead_before):
@@ -807,6 +990,236 @@ def _clear_gates(gates, blasts):
                 gate["clearedBy"] = blast.get("sourceID")
 
 
+def boss_initial_point(samples, boss_ids):
+    for actor_id in boss_ids or []:
+        rows = (samples or {}).get(actor_id) or []
+        if rows:
+            return {"x": rows[0][1], "y": rows[0][2]}
+    return None
+
+
+def axis_radians(liadrin, boss_point):
+    """0° / 180° baseline: Liadrin → boss opening position."""
+    if not liadrin or not boss_point:
+        return 0.0
+    return math.atan2(-(float(boss_point["y"]) - float(liadrin["y"])), float(boss_point["x"]) - float(liadrin["x"]))
+
+
+def liadrin_energy_samples(fight, actor_rows, events):
+    liadrin_ids = {
+        int(row["id"]) for row in actor_rows or []
+        if row.get("id") is not None and classify_actor(row) == "liadrin"
+    }
+    samples = []
+    for event in events or []:
+        for side in ("source", "target"):
+            actor_id = event.get(side + "ID")
+            if actor_id not in liadrin_ids:
+                continue
+            resource = event.get(side + "Resources") or {}
+            if str(event.get("resourceActor")) in {"1", "2", "Source", "Target"}:
+                if (side == "source" and str(event.get("resourceActor")) in {"1", "Source"}) or (
+                    side == "target" and str(event.get("resourceActor")) in {"2", "Target"}
+                ):
+                    resource = event
+            for power in resource.get("classResources") or []:
+                if power.get("amount") is None:
+                    continue
+                samples.append((
+                    rel_ms(fight, event.get("timestamp")),
+                    float(power.get("amount") or 0),
+                    float(power.get("max") or 100),
+                ))
+    samples.sort()
+    return samples
+
+
+def energy_reaches_ms(samples, after_ms, threshold=100.0):
+    for time_ms, amount, maximum in samples or []:
+        if int(time_ms) < int(after_ms):
+            continue
+        cap = maximum or threshold
+        if amount >= min(threshold, cap) - 1e-6:
+            return int(time_ms)
+    return None
+
+
+def radiant_barrier_windows(darkness_casts, liadrin, duration_ms, stun_casts=None, energy_samples=None):
+    """Barrier rises when Suffocating Darkness finishes: 40 yd, shrinks 0.5 yd/s until Liadrin energy hits 100."""
+    rows = []
+    stuns = sorted(stun_casts or [], key=lambda row: int(row.get("timeMs") or 0))
+    ordered = list(darkness_casts or [])
+    for index, cast in enumerate(ordered):
+        start_ms = int(cast.get("timeMs") if cast.get("timeMs") is not None else cast.get("endTimeMs") or cast.get("startTimeMs") or 0)
+        next_start = int(ordered[index + 1].get("startTimeMs") or ordered[index + 1].get("timeMs") or duration_ms) if index + 1 < len(ordered) else int(duration_ms)
+        energy_ms = energy_reaches_ms(energy_samples, start_ms, 100.0)
+        stun = next((row for row in stuns if int(row.get("timeMs") or 0) >= start_ms), None)
+        time_to_zero = int(round(BARRIER_START_RADIUS_YARDS / BARRIER_SHRINK_YARDS_PER_SEC * 1000))
+        candidates = [next_start, int(duration_ms), start_ms + time_to_zero]
+        if energy_ms is not None:
+            candidates.append(energy_ms)
+        if stun is not None:
+            candidates.append(int(stun["timeMs"]))
+        end_ms = min(candidates)
+        elapsed = max(0.0, (end_ms - start_ms) / 1000)
+        end_radius = max(0.0, round(BARRIER_START_RADIUS_YARDS - BARRIER_SHRINK_YARDS_PER_SEC * elapsed, 2))
+        ended_by = (
+            "莉亚德琳能量到达 100，随后令 Boss 昏迷数秒"
+            if energy_ms is not None and end_ms == energy_ms else
+            "神圣光辉（Boss 昏迷）"
+            if stun is not None and end_ms == int(stun["timeMs"]) else
+            "屏障半径收到 0"
+            if end_ms == start_ms + time_to_zero else
+            "下一轮窒息黑暗或战斗结束"
+        )
+        rows.append({
+            "index": index + 1,
+            "spellID": DIVINE_RADIANCE,
+            "spellName": spell_name(DIVINE_RADIANCE),
+            "startTimeMs": start_ms,
+            "endTimeMs": end_ms,
+            "startRadiusYards": BARRIER_START_RADIUS_YARDS,
+            "endRadiusYards": end_radius,
+            "shrinkYardsPerSec": BARRIER_SHRINK_YARDS_PER_SEC,
+            "energyFullTimeMs": energy_ms,
+            "stunTimeMs": None if stun is None else int(stun["timeMs"]),
+            "endedBy": ended_by,
+            "position": None if liadrin is None else {"x": round(float(liadrin["x"]), 2), "y": round(float(liadrin["y"]), 2)},
+            "note": (
+                f"Boss 读完窒息黑暗后撑起 {BARRIER_START_RADIUS_YARDS:g} 码屏障，"
+                f"以每秒 {BARRIER_SHRINK_YARDS_PER_SEC:g} 码收缩；结束原因：{ended_by}。"
+            ),
+        })
+    return rows
+
+
+def _orb_angles(axis_rad):
+    return [axis_rad + math.radians(NULL_ORB_STEP_DEG * index) for index in range(NULL_ORB_COUNT)]
+
+
+def _make_null_volley(origin, launch_ms, axis_rad, source, player_id=None, player=None, gate_key=None):
+    travel_ms = int(round(NULL_ORB_TRAVEL_YARDS / NULL_ORB_SPEED_YARDS * 1000))
+    return {
+        "key": f"null-volley:{source}:{player_id or gate_key}:{launch_ms}",
+        "source": source,
+        "playerID": player_id,
+        "player": player,
+        "gateKey": gate_key,
+        "launchTimeMs": int(launch_ms),
+        "expireTimeMs": int(launch_ms) + travel_ms,
+        "clearedTimeMs": None,
+        "origin": {"x": round(float(origin["x"]), 2), "y": round(float(origin["y"]), 2)},
+        "axisRadians": round(axis_rad, 5),
+        "speedYards": NULL_ORB_SPEED_YARDS,
+        "orbCount": NULL_ORB_COUNT,
+        "stepDeg": NULL_ORB_STEP_DEG,
+        "travelYards": NULL_ORB_TRAVEL_YARDS,
+        "angles": [round(angle, 5) for angle in _orb_angles(axis_rad)],
+    }
+
+
+def build_null_gate_volleys(gates, marks, samples, axis_rad, duration_ms):
+    """On each mark expiry: the player and every standing Null Gate fire 12 orbs.
+
+    Directions are locked to the Liadrin→boss opening axis, one orb every 30°.
+    """
+    placed = []
+    for gate in gates or []:
+        place_ms = int(gate.get("placeTimeMs") if gate.get("placeTimeMs") is not None else gate.get("applyTimeMs") or gate.get("dropTimeMs") or 0)
+        point = gate.get("position") or _nearest_sample(samples, gate.get("playerID"), place_ms)
+        if not point:
+            continue
+        row = {
+            **gate,
+            "key": gate.get("key") or f"gate:{gate.get('playerID')}:{place_ms}",
+            "placeTimeMs": place_ms,
+            "dropTimeMs": place_ms,
+            "position": {"x": round(float(point["x"]), 2), "y": round(float(point["y"]), 2)},
+            "clearedTimeMs": gate.get("clearedTimeMs"),
+            "fireTimesMs": [],
+        }
+        placed.append(row)
+
+    fire_events = []
+    for mark in marks or []:
+        launch = mark.get("removeTimeMs")
+        if launch is None:
+            continue
+        origin = mark.get("position") or _nearest_sample(samples, mark.get("playerID"), launch)
+        if not origin:
+            continue
+        fire_events.append({
+            "launchTimeMs": int(launch),
+            "playerID": mark.get("playerID"),
+            "player": mark.get("player"),
+            "origin": origin,
+        })
+    fire_events.sort(key=lambda row: row["launchTimeMs"])
+
+    volleys = []
+    for event in fire_events:
+        launch = event["launchTimeMs"]
+        volleys.append(_make_null_volley(event["origin"], launch, axis_rad, "mark", event["playerID"], event["player"]))
+        for gate in placed:
+            if gate["placeTimeMs"] > launch:
+                continue
+            if gate.get("clearedTimeMs") is not None and gate["clearedTimeMs"] <= launch:
+                continue
+            gate.setdefault("fireTimesMs", []).append(launch)
+            volleys.append(_make_null_volley(gate["position"], launch, axis_rad, "gate", gate.get("playerID"), gate.get("player"), gate["key"]))
+    for gate in placed:
+        gate["fireTimesMs"] = sorted(set(gate.get("fireTimesMs") or []))
+        gate["endTimeMs"] = gate.get("clearedTimeMs") if gate.get("clearedTimeMs") is not None else duration_ms
+    return placed, volleys
+
+
+def clear_null_field(gates, volleys, clears):
+    """Negation removal (and Explosive Restabilization) wipe nearby gates and flying orbs."""
+    for clear in clears or []:
+        origin = clear.get("position")
+        moment = int(clear.get("timeMs") or 0)
+        if not origin:
+            continue
+        for gate in gates or []:
+            if gate.get("clearedTimeMs") is not None or gate.get("placeTimeMs", gate.get("dropTimeMs", 0)) > moment:
+                continue
+            gap = distance_yards(gate.get("position"), origin)
+            if gap is not None and gap <= RESTABILIZE_RADIUS_YARDS:
+                gate["clearedTimeMs"] = moment
+                gate["clearedBy"] = clear.get("playerID") or clear.get("sourceID")
+                gate["clearedBySpell"] = clear.get("spellName") or spell_name(NEGATION)
+        for volley in volleys or []:
+            if volley.get("clearedTimeMs") is not None:
+                continue
+            if not (volley["launchTimeMs"] <= moment <= volley["expireTimeMs"]):
+                continue
+            elapsed = (moment - volley["launchTimeMs"]) / 1000
+            hit = False
+            for angle in volley.get("angles") or []:
+                orb = {
+                    "x": volley["origin"]["x"] + math.cos(angle) * elapsed * NULL_ORB_SPEED_YARDS * UNITS_PER_YARD,
+                    "y": volley["origin"]["y"] - math.sin(angle) * elapsed * NULL_ORB_SPEED_YARDS * UNITS_PER_YARD,
+                }
+                gap = distance_yards(orb, origin)
+                if gap is not None and gap <= RESTABILIZE_RADIUS_YARDS:
+                    hit = True
+                    break
+            origin_gap = distance_yards(volley["origin"], origin)
+            if hit or (origin_gap is not None and origin_gap <= RESTABILIZE_RADIUS_YARDS):
+                volley["clearedTimeMs"] = moment
+                volley["clearedBy"] = clear.get("playerID") or clear.get("sourceID")
+    return gates, volleys
+
+
+def patch_boss_cast_names(replay):
+    for boss in (replay or {}).get("bosses") or []:
+        for cast in boss.get("casts") or []:
+            spell_id = int(cast.get("spellID") or 0)
+            if spell_id in SPELL_NAMES:
+                cast["spellName"] = SPELL_NAMES[spell_id]
+    return replay
+
+
 def analyze_kithix(fight, actor_map, players, raw, actor_rows):
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     start = int(fight["startTime"])
@@ -814,7 +1227,7 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
     casts = list(raw.get("casts") or [])
     auras = aura_windows(fight, list(raw.get("debuffs") or []) + list(raw.get("buffs") or []) + list(raw.get("enemyBuffs") or []), {
         LIGHTS_EMBRACE, DARK_FRENZY, RADIANT_BARRIER, UNSPEAKABLE_HORRORS, OVERWHELMING_FEAR,
-        ABYSSAL_GRASP, NULL_GATE, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE,
+        ABYSSAL_GRASP, NULL_GATE, NULLIFY, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE,
     })
     markers = phase_timeline(fight, casts)
     center = arena_center(actor_rows, list(raw.get("replayEvents") or []) + casts + list(raw.get("damage") or []))
@@ -841,7 +1254,30 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         row["phase"] = phase_at(markers, row["startTimeMs"])
         voidscars.append(row)
     darkness_casts = completed_casts(fight, casts, {SUFFOCATING_DARKNESS}) if options["phaseOneReviewEnabled"] else []
-    radiance_casts = completed_casts(fight, casts, {DIVINE_RADIANCE}) if options["phaseOneReviewEnabled"] else []
+    radiance_casts = completed_casts(
+        fight,
+        list(casts) + list(raw.get("friendlyMechanicCasts") or []),
+        {DIVINE_RADIANCE},
+    ) if options["phaseOneReviewEnabled"] else []
+    liadrin = None if center is None else {"x": center[0], "y": center[1]}
+    energy_samples = liadrin_energy_samples(
+        fight, actor_rows, list(raw.get("replayEvents") or []) + list(casts) + list(raw.get("friendlyMechanicCasts") or []),
+    ) if options["phaseOneReviewEnabled"] else []
+    barriers = radiant_barrier_windows(
+        darkness_casts, liadrin, duration_ms, stun_casts=radiance_casts, energy_samples=energy_samples,
+    ) if options["phaseOneReviewEnabled"] else []
+    if barriers and not radiance_casts:
+        radiance_casts = [
+            {
+                "spellID": DIVINE_RADIANCE,
+                "spellName": spell_name(DIVINE_RADIANCE),
+                "timeMs": row["endTimeMs"],
+                "startTimeMs": row["startTimeMs"],
+                "time": fmt_ms(row["endTimeMs"]),
+            }
+            for row in barriers
+            if row.get("endedBy", "").startswith("莉亚德琳能量") or row.get("energyFullTimeMs") is not None
+        ]
     voidscars, darkness = eclipse_volleys(
         voidscars,
         darkness_casts,
@@ -850,7 +1286,6 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         [row for row in auras if row["spellID"] == ECLIPSE_FRAGMENT],
         duration_ms,
     )
-    liadrin = None if center is None else {"x": center[0], "y": center[1]}
     paths = fragment_paths(voidscars, darkness, fragment_hits(fight, raw.get("damage"), auras, samples), liadrin, actor_map)
     eggs = egg_reviews([row for row in adds if row["kind"] == "egg"], duration_ms) if options["phaseOneReviewEnabled"] else []
     roars = []
@@ -860,27 +1295,106 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         weaves = [{**cast, "phase": phase_at(markers, cast["timeMs"]), "target": actor_name(actor_map, cast.get("targetID"))} for cast in completed_casts(fight, casts, {VOIDWEAVE})]
     explosions = completed_casts(fight, casts, {GUT_REACTION}) if options["phaseOneReviewEnabled"] else []
     beetles = [row for row in adds if row["kind"] == "bomber"]
+    juice_hits = [
+        event for event in (raw.get("damage") or [])
+        if ability_id(event) in {GUT_REACTION, DIGESTIVE_JUICES} and event.get("targetID") in players
+    ]
     for beetle in beetles:
-        blast = next((cast for cast in explosions if cast["sourceID"] == beetle["actorID"] and beetle["spawnTimeMs"] <= cast["timeMs"] <= (beetle["deathTimeMs"] or duration_ms) + 500), None)
+        lifespan_end = (beetle["deathTimeMs"] or duration_ms) + 500
+        blast = next((
+            cast for cast in explosions
+            if cast["sourceID"] == beetle["actorID"]
+            and beetle["spawnTimeMs"] <= cast["timeMs"] <= lifespan_end
+            and int(cast.get("sourceInstance") or 0) in {0, int(beetle.get("instance") or 0)}
+        ), None)
+        if blast is None:
+            blast = next((
+                cast for cast in explosions
+                if cast["sourceID"] == beetle["actorID"] and beetle["spawnTimeMs"] <= cast["timeMs"] <= lifespan_end
+            ), None)
+        trigger = blast.get("targetID") if blast else None
+        if trigger is None:
+            hit = next((
+                event for event in juice_hits
+                if event.get("sourceID") == beetle["actorID"]
+                and beetle["spawnTimeMs"] <= rel_ms(fight, event.get("timestamp")) <= lifespan_end
+            ), None)
+            trigger = hit.get("targetID") if hit else None
         beetle["explodeTimeMs"] = blast["timeMs"] if blast else beetle.get("deathTimeMs")
-        beetle["chaseTargetID"] = blast.get("targetID") if blast else None
+        beetle["chaseTargetID"] = trigger
+        beetle["triggerPlayerID"] = trigger
+        beetle["contactRadiusYards"] = BEETLE_CONTACT_YARDS
+        if beetle.get("explodeTimeMs") is not None:
+            beetle["deathTimeMs"] = beetle["explodeTimeMs"]
+    if options["phaseOneReviewEnabled"]:
+        add_cast_windows(fight, casts, adds)
+    beetles = beetle_reviews(beetles, players, actor_map)
     grasps = grasp_reviews(auras, duration_ms) if options["phaseOneReviewEnabled"] else []
     gates = []
     negations = []
     blasts = []
+    null_volleys = []
+    axis = {"liadrin": liadrin, "bossInitial": None, "radians": 0.0}
     if options["phaseTwoReviewEnabled"]:
-        for row in auras:
+        boss_ids = {
+            int(row["id"]) for row in (actor_rows or [])
+            if classify_actor(row) == "kithix" and row.get("id") is not None
+        }
+        boss_point = boss_initial_point(samples, boss_ids)
+        axis = {
+            "liadrin": liadrin,
+            "bossInitial": None if boss_point is None else {"x": round(boss_point["x"], 2), "y": round(boss_point["y"], 2)},
+            "radians": axis_radians(liadrin, boss_point),
+            "note": "以莉亚德琳指向 Boss 开场坐标为 0°/180° 基准线；每次点名结束沿该基准每 30° 射出 12 个球，约 20 码/秒外飞。",
+        }
+        mark_auras = [row for row in auras if row["spellID"] in {NULL_GATE, NULLIFY}]
+        gate_seeds = []
+        for row in mark_auras:
             if row["spellID"] != NULL_GATE:
                 continue
-            drop = row["removeTimeMs"] if row["removeTimeMs"] is not None else row["applyTimeMs"] + 5000
-            gates.append({**row, "dropTimeMs": drop, "radiusYards": GATE_RADIUS_YARDS, "clearedTimeMs": None})
-        blasts = [{**cast, "radiusYards": RESTABILIZE_RADIUS_YARDS, "position": cast.get("targetPosition") or cast.get("position")} for cast in completed_casts(fight, casts, {EXPLOSIVE_RESTABILIZATION})]
-        _clear_gates(gates, blasts)
+            place = int(row["applyTimeMs"])
+            point = row.get("position") or _nearest_sample(samples, row.get("playerID"), place)
+            gate_seeds.append({
+                **row,
+                "placeTimeMs": place,
+                "dropTimeMs": place,
+                "radiusYards": GATE_RADIUS_YARDS,
+                "clearedTimeMs": None,
+                "position": point,
+            })
+        gates, null_volleys = build_null_gate_volleys(gate_seeds, mark_auras, samples, axis["radians"], duration_ms)
+        blasts = [{
+            **cast,
+            "radiusYards": RESTABILIZE_RADIUS_YARDS,
+            "position": cast.get("targetPosition") or cast.get("position") or _nearest_sample(samples, cast.get("sourceID") or cast.get("targetID"), cast.get("timeMs")),
+            "spellName": spell_name(EXPLOSIVE_RESTABILIZATION),
+        } for cast in completed_casts(fight, casts, {EXPLOSIVE_RESTABILIZATION})]
+        negation_clears = []
         for row in auras:
             if row["spellID"] != NEGATION:
                 continue
-            resolved = any(row["playerID"] == blast.get("sourceID") and row["applyTimeMs"] <= blast["timeMs"] <= (row["removeTimeMs"] or duration_ms) + 800 for blast in blasts)
-            negations.append({**row, "restabilized": resolved, "missed": not resolved and row["closed"]})
+            remove_ms = row.get("removeTimeMs")
+            clear_point = None
+            if remove_ms is not None:
+                clear_point = row.get("position") or _nearest_sample(samples, row.get("playerID"), remove_ms)
+                negation_clears.append({
+                    "timeMs": remove_ms,
+                    "playerID": row.get("playerID"),
+                    "position": clear_point,
+                    "spellName": spell_name(NEGATION),
+                })
+            resolved = any(
+                row["playerID"] == blast.get("sourceID")
+                and row["applyTimeMs"] <= blast["timeMs"] <= (row["removeTimeMs"] or duration_ms) + 800
+                for blast in blasts
+            ) or remove_ms is not None
+            negations.append({**row, "restabilized": resolved, "missed": not resolved and row["closed"], "clearPosition": clear_point})
+        clears = negation_clears + [
+            {"timeMs": blast["timeMs"], "sourceID": blast.get("sourceID"), "position": blast.get("position"), "spellName": blast.get("spellName")}
+            for blast in blasts
+        ]
+        _clear_gates(gates, blasts)
+        gates, null_volleys = clear_null_field(gates, null_volleys, clears)
     dead_before = set()
     light_moment = next((row["timeMs"] for row in completed_casts(fight, casts, {LAST_LIGHT})), next((row["timeMs"] for row in markers if row["key"] == "p2"), None))
     if light_moment is not None:
@@ -889,48 +1403,62 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
                 dead_before.add(event.get("targetID"))
     lights = final_light_reviews(players, auras, light_moment, dead_before) if options["phaseTwoReviewEnabled"] and light_moment is not None else []
     frenzy = [row for row in auras if row["spellID"] == DARK_FRENZY]
+    embraces = [row for row in auras if row["spellID"] == LIGHTS_EMBRACE]
+    extinguishes = completed_casts(fight, casts, {EXTINGUISH}) if options["phaseOneReviewEnabled"] else []
+    extinguish_rows = extinguish_reviews(fight, extinguishes, embraces, players, raw.get("deaths") or []) if options["phaseOneReviewEnabled"] else []
+    voidscar_hits = voidscar_damage_summary(fight, raw.get("damage") or [], players, actor_map) if options["phaseOneReviewEnabled"] else []
+    egg_damage = egg_damage_breakdown(
+        fight, eggs, list(raw.get("addDamage") or []) + list(raw.get("damage") or []), players, actor_map,
+    ) if options["phaseOneReviewEnabled"] else []
     return {
         "phaseTimeline": markers,
         "arena": build_arena(center),
         "adds": adds,
         "eggs": eggs,
+        "eggDamage": egg_damage,
         "devastations": devastations,
         "voidscars": voidscars,
+        "voidscarHits": voidscar_hits,
         "roars": roars,
         "weaves": weaves,
         "beetles": beetles,
         "explosions": explosions,
-        "extinguishes": completed_casts(fight, casts, {EXTINGUISH}) if options["phaseOneReviewEnabled"] else [],
-        "embraces": [row for row in auras if row["spellID"] == LIGHTS_EMBRACE],
+        "extinguishes": extinguish_rows,
+        "embraces": embraces,
         "darkness": darkness,
         "fragments": [row for row in auras if row["spellID"] == ECLIPSE_FRAGMENT],
         "fragmentPaths": paths,
         "frenzies": frenzy,
-        "barriers": [row for row in auras if row["spellID"] == RADIANT_BARRIER] or completed_casts(fight, casts, {RADIANT_BARRIER}),
+        "barriers": barriers,
         "radiances": radiance_casts,
         "horrors": [row for row in auras if row["spellID"] in {UNSPEAKABLE_HORRORS, OVERWHELMING_FEAR}],
         "grasps": grasps,
         "swarms": completed_casts(fight, casts, {VOIDSWARM}),
         "gates": gates,
+        "nullAxis": axis,
+        "nullVolleys": null_volleys,
         "negations": negations,
         "restabilizations": blasts,
         "finalLights": lights,
+        "eightfold": completed_casts(fight, casts, {EIGHTFOLD_ECLIPSE}),
         "checks": {
             "eggsMissed": sum(1 for row in eggs if row["missed"]),
             "graspsMissed": sum(1 for row in grasps if row["missed"]),
             "fragmentLeaks": sum(row["fadeCount"] for row in darkness),
+            "beetleTriggers": sum(1 for row in beetles if row.get("triggered")),
+            "voidscarHits": sum(row["hits"] for row in voidscar_hits),
+            "extinguishMisses": sum(row["missedCount"] for row in extinguish_rows),
+            "nullVolleys": len(null_volleys),
+            "gatesCleared": sum(1 for row in gates if row.get("clearedTimeMs") is not None),
             "frenziedAdds": len({(row.get("playerID"), row.get("instance")) for row in frenzy}),
             "negationsUnresolved": sum(1 for row in negations if row["missed"]),
             "finalLightMissing": sum(1 for row in lights if not row["complete"]),
         },
         "evidenceNote": (
-            "阶段来自 WCL 的阶段切换，回放左上角固定显示第一阶段、第二阶段。"
-            "缚脑者之卵需在出现后 10 秒内死亡。深渊攫取需在 8 秒内移除。"
-            "黑暗毁灭按坦克周围 15 码绘制，烈毒咆哮按施法者朝向前方 60 度、60 码绘制。"
-            "窒息黑暗开始前已经留下的虚空之痕会朝莉亚德琳射出蚀日碎片。玩家第一次受到蚀日碎片伤害的位置若落在某条痕迹射向莉亚德琳的 8 码走廊内，就把这一发的飞行路径按该伤害时间拟合。"
-            "辉光消逝表示有碎片碰到了她。"
-            "爆炸复稳以 10 码清除仍在场上的虚无之门。光耀恩典只核对仍存活玩家身上的 debuff。"
-            "场地中心优先取莉亚德琳，否则取基希克斯的坐标中位数；可见石台按半径 45 码贴合地图。"
+            "P1：甲虫由谁触发、虚空之痕命中与伤害、每次熄灭漏吃圣光之拥；卵仅超时孵化才展开承伤。"
+            "Boss 读完窒息黑暗后，莉亚德琳撑起 40 码神圣光辉屏障，以每秒 0.5 码收缩；待其能量到达 100 时令 Boss 昏迷数秒。需在场地被压死前将 Boss 打到 25% 读八重蚀日转阶段。"
+            "P2：以莉亚德琳→Boss 开场坐标为 0°/180°；点名 buff 结束时，该玩家与场上每扇虚无之门各沿基准线每 30° 射出 12 个球（约 8 码/秒）。"
+            "湮消 debuff 移除（或爆炸复稳）会清掉范围内正在飞行的球与虚无之门。"
         ),
     }
 
@@ -1021,11 +1549,11 @@ def fetch_payload(client, report_id, fight, options=None):
     cast_ids = {
         DARK_DEVASTATION, VOIDSWARM, GUT_REACTION, VOIDWEAVE, MIND_STING, VENOM_ROAR, EXTINGUISH,
         SUFFOCATING_DARKNESS, RADIANT_BARRIER, DIVINE_RADIANCE, NULL_GATE, NEGATION,
-        EXPLOSIVE_RESTABILIZATION, LAST_LIGHT, RADIANT_GRACE,
+        EXPLOSIVE_RESTABILIZATION, LAST_LIGHT, RADIANT_GRACE, STYGIAN_HOWL, EIGHTFOLD_ECLIPSE,
     }
     aura_ids = {
         LIGHTS_EMBRACE, DARK_FRENZY, RADIANT_BARRIER, UNSPEAKABLE_HORRORS, OVERWHELMING_FEAR,
-        ABYSSAL_GRASP, NULL_GATE, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE,
+        ABYSSAL_GRASP, NULL_GATE, NULLIFY, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE,
     }
     damage_ids = {DARK_DEVASTATION, VOIDSCAR, GUT_REACTION, DIGESTIVE_JUICES, VOIDWEAVE, MIND_STING, VENOM_ROAR, EXTINGUISH, EXPLOSIVE_RESTABILIZATION, ECLIPSE_FRAGMENT}
 
@@ -1037,7 +1565,22 @@ def fetch_payload(client, report_id, fight, options=None):
     return {
         "casts": fetch("Casts", cast_ids, hostility_type="Enemies", include_resources=True),
         "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies"),
+        "friendlyMechanicCasts": client.events(
+            report_id,
+            "Casts",
+            fight,
+            hostility_type="Friendlies",
+            filter_expression=_id_filter({DIVINE_RADIANCE, RADIANT_BARRIER}),
+            include_resources=True,
+        ) if options["phaseOneReviewEnabled"] else [],
         "damage": fetch("DamageTaken", damage_ids, include_resources=True),
+        "addDamage": client.events(
+            report_id,
+            "DamageDone",
+            fight,
+            hostility_type="Friendlies",
+            filter_expression=f"target.id = {MINDSTINGER_EGG_NPC_GAME_ID}",
+        ) if options["phaseOneReviewEnabled"] else [],
         "debuffs": fetch("Debuffs", aura_ids, include_resources=True),
         "buffs": fetch("Buffs", aura_ids, hostility_type="Friendlies", include_resources=True),
         "enemyBuffs": fetch("Buffs", {DARK_FRENZY, RADIANT_BARRIER}, hostility_type="Enemies", include_resources=True),
@@ -1074,10 +1617,10 @@ def render_fight(report_id, report_start, actors, fight, raw):
     survival = survival_timeline(fight, actor_map, players, player_deaths, raw.get("friendlyCasts") or [])
     mechanics = analyze_kithix(fight, actor_map, players, raw, actors)
     if raw.get("replayEvents"):
-        mechanics["combatReplay"] = build_replay_tracks(
+        mechanics["combatReplay"] = patch_boss_cast_names(build_replay_tracks(
             fight, players, actor_map, raw["replayEvents"], actor_rows=actors,
             spell_names=SPELL_NAMES, deaths=player_deaths, survival_timeline=survival["timeline"], include_facing=True,
-        )
+        ))
         _stamp_add_deaths(mechanics["combatReplay"], mechanics.get("adds"))
     duration_ms = int(fight["endTime"]) - int(fight["startTime"])
     started = datetime.fromtimestamp((int(report_start) + int(fight["startTime"])) / 1000, tz=CN_TZ)
