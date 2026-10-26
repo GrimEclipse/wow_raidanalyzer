@@ -468,7 +468,7 @@
                 "dispels": { "enabled": false, "renderer": "generic-dispels" },
                 "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
                 "verdict": { "enabled": false, "renderer": "mistake-verdict" },
-                "replay": { "enabled": false, "renderer": "sentinels-field" }
+                "replay": { "enabled": true, "renderer": "sentinels-field" }
               },
               "configSchema": [
                 {
@@ -551,6 +551,14 @@
                   "label": "分析剧毒水滴 / 绿球",
                   "description": "按每轮 1284434 汇总 1284451 踩球，并用 1284452 确认漏球爆炸。",
                   "default": true
+                },
+                {
+                  "key": "fieldReplayEnabled",
+                  "type": "boolean",
+                  "label": "场地推演",
+                  "description": "读取全场坐标并回放原型毒液、分摊放水、注射红水和腐蚀长矛。",
+                  "default": true,
+                  "expensive": true
                 }
               ],
               "arenaAssets": [
@@ -767,6 +775,43 @@
                   "path": "assets/raids/tidebound_grotto/01-nymrissa.jpg",
                   "width": 1997,
                   "height": 1118
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "unbinding_of_kithix",
+          "name": "基希克斯破封",
+          "englishName": "The Unbinding of Kith'ix",
+          "externalKey": "wow.unbindingofkithix",
+          "aliases": ["基希克斯解封"],
+          "bosses": [
+            {
+              "key": "kithix",
+              "previewImage": "assets/raids/unbinding_of_kithix/01-kithix-hero.png",
+              "order": 1,
+              "name": "基希克斯",
+              "englishName": "Kith'ix",
+              "externalKey": "wow.unbindingofkithix,01.kithix",
+              "aliases": ["Kithix"],
+              "plugin": "boss_plugins.unbinding_of_kithix.kithix",
+              "encounterIds": [3513, 53513],
+              "supported": true,
+              "disabledReason": "",
+              "capabilities": {
+                "wipe": { "enabled": true, "renderer": "kithix" },
+                "avoidable": { "enabled": false, "renderer": "kithix" },
+                "replay": { "enabled": true, "renderer": "kithix" }
+              },
+              "configSchemaFromPlugin": true,
+              "configSchema": [],
+              "arenaAssets": [
+                {
+                  "key": "default",
+                  "path": "assets/raids/venomous_abyss/the-unbinding-of-kith-ix.png",
+                  "width": 1093,
+                  "height": 614
                 }
               ]
             }
