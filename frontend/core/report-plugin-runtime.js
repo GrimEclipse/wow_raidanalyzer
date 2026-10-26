@@ -145,15 +145,32 @@
 
   const LOCAL_DB_NAME = "mythic-analyzer-local";
   const LOCAL_STORE_NAME = "reports";
+  const LOCAL_META_STORE_NAME = "reportMetadata";
+  const LOCAL_DB_VERSION = 2;
+
+  function metadataOf(record) {
+    return {key:record.key,savedAt:record.savedAt,label:record.label,
+      identity:record.identity,originalSource:record.originalSource||""};
+  }
 
   function openLocalDatabase() {
     return new Promise((resolve, reject) => {
       if (!global.indexedDB) return reject(new Error("当前浏览器不支持本地报告库。"));
-      const request = global.indexedDB.open(LOCAL_DB_NAME, 1);
+      const request = global.indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains(LOCAL_STORE_NAME)) {
           database.createObjectStore(LOCAL_STORE_NAME, { keyPath: "key" });
+        }
+        if (!database.objectStoreNames.contains(LOCAL_META_STORE_NAME)) {
+          const metadata = database.createObjectStore(LOCAL_META_STORE_NAME, {keyPath:"key"});
+          const cursor = request.transaction.objectStore(LOCAL_STORE_NAME).openCursor();
+          cursor.onsuccess = () => {
+            const row = cursor.result;
+            if (!row) return;
+            metadata.put(metadataOf(row.value));
+            row.continue();
+          };
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -161,12 +178,13 @@
     });
   }
 
-  function databaseRequest(mode, operation) {
+  function databaseRequest(mode, operation, storeNames = LOCAL_STORE_NAME) {
     return openLocalDatabase().then(database => new Promise((resolve, reject) => {
-      const transaction = database.transaction(LOCAL_STORE_NAME, mode);
-      const store = transaction.objectStore(LOCAL_STORE_NAME);
+      const names = Array.isArray(storeNames) ? storeNames : [storeNames];
+      const transaction = database.transaction(names, mode);
+      const store = transaction.objectStore(names[0]);
       let request;
-      try { request = operation(store); }
+      try { request = operation(store, transaction); }
       catch (error) { database.close(); reject(error); return; }
       request.onerror = () => reject(request.error || new Error("本地报告操作失败。"));
       transaction.oncomplete = () => { database.close(); resolve(request.result); };
@@ -185,15 +203,18 @@
       originalSource: options.originalSource || "",
       label: String(options.label || identity.bossName || "本地分析报告"),
       identity,
-      approximateBytes: new Blob([JSON.stringify(payload)]).size
+      approximateBytes: 0
     };
     try {
-      await databaseRequest("readwrite", store => store.put(record));
+      await databaseRequest("readwrite", (store, transaction) => {
+        transaction.objectStore(LOCAL_META_STORE_NAME).put(metadataOf(record));
+        return store.put(record);
+      }, [LOCAL_STORE_NAME, LOCAL_META_STORE_NAME]);
       return `idb:${key}`;
     } catch (_) {
       const sessionKey = `mythicReportPayload.${key}`;
       global.sessionStorage.setItem(sessionKey, JSON.stringify(payload));
-      global.sessionStorage.setItem(`${sessionKey}.metadata`, JSON.stringify({savedAt: record.savedAt, label: record.label}));
+      global.sessionStorage.setItem(`${sessionKey}.metadata`, JSON.stringify({savedAt: record.savedAt, label: record.label, identity}));
       return `session:${sessionKey}`;
     }
   }
@@ -203,8 +224,7 @@
       const key = String(sourcePath).slice("idb:".length);
       const record = await databaseRequest("readonly", store => store.get(key));
       if (!record?.payload) throw new Error("本地报告已被清除，请重新选择 JSON。");
-      record.savedAt = Date.now();
-      try { await databaseRequest("readwrite", store => store.put(record)); } catch (_) {}
+      try { await databaseRequest("readwrite", store => store.put({...metadataOf(record),savedAt:Date.now()}), LOCAL_META_STORE_NAME); } catch (_) {}
       return record.payload;
     }
     if (String(sourcePath || "").startsWith("session:")) {
@@ -236,17 +256,17 @@
     return payload;
   }
 
-  async function listLocalPayloads() {
+  async function listLocalPayloads(limit = 10) {
     let localRows = [];
     try {
-      const rows = await databaseRequest("readonly", store => store.getAll());
+      const rows = await databaseRequest("readonly", store => store.getAll(), LOCAL_META_STORE_NAME);
       localRows = (rows || []).map(row => ({
         key: row.key,
         sourcePath: `idb:${row.key}`,
         savedAt: row.savedAt,
         label: row.label,
         identity: row.identity,
-        approximateBytes: row.approximateBytes || 0
+        approximateBytes: 0
       }));
     } catch (_) {}
     try {
@@ -254,13 +274,12 @@
         const key = global.sessionStorage.key(i);
         if (!key.startsWith('mythicReportPayload.') || key.endsWith('.metadata')) continue;
         try {
-          const payload = JSON.parse(global.sessionStorage.getItem(key));
           const metadata = JSON.parse(global.sessionStorage.getItem(`${key}.metadata`) || '{}');
-          localRows.push({sourcePath: `session:${key}`, identity: identityOf(payload), ...metadata});
+          localRows.push({sourcePath: `session:${key}`, ...metadata});
         } catch (_) {}
       }
     } catch (_) {}
-    return localRows.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0));
+    return localRows.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0)).slice(0, Math.max(0, limit));
   }
 
   async function deleteLocalPayload(sourcePath) {
@@ -272,7 +291,27 @@
     }
     const key = String(sourcePath || "").replace(/^idb:/, "");
     if (!key) return;
-    await databaseRequest("readwrite", store => store.delete(key));
+    await databaseRequest("readwrite", (store, transaction) => {
+      transaction.objectStore(LOCAL_META_STORE_NAME).delete(key);
+      return store.delete(key);
+    }, [LOCAL_STORE_NAME, LOCAL_META_STORE_NAME]);
+  }
+
+  async function clearLocalPayloads() {
+    let databaseError;
+    try {
+      await databaseRequest("readwrite", (store, transaction) => {
+        transaction.objectStore(LOCAL_META_STORE_NAME).clear();
+        return store.clear();
+      }, [LOCAL_STORE_NAME, LOCAL_META_STORE_NAME]);
+    } catch (error) { databaseError = error; }
+    const keys = [];
+    for (let i=0;i<global.sessionStorage.length;i++) {
+      const key=global.sessionStorage.key(i);
+      if (key?.startsWith('mythicReportPayload.')) keys.push(key);
+    }
+    keys.forEach(key=>global.sessionStorage.removeItem(key));
+    if (databaseError && global.indexedDB) throw databaseError;
   }
 
   global.MythicReportRuntime = {
@@ -286,7 +325,8 @@
     readLocalFile,
     loadPayload,
     listLocalPayloads,
-    deleteLocalPayload
+    deleteLocalPayload,
+    clearLocalPayloads
   };
   installTooltipLayer();
 })(window);

@@ -202,6 +202,11 @@ function render() {
   renderSummary();
   $("pageTitle").textContent = `陵寝哨兵${current()?.difficultyName ? `（${current().difficultyName}）` : ""}，Fight ${current()?.fightID || "-"} 技能分析`;
   document.querySelectorAll("[data-tab]").forEach(button => button.classList.toggle("active", button.dataset.tab === state.tab));
+  if (state.tab === "replay") {
+    $("content").innerHTML = '<section class="panel"><div id="sentinelsReplay"></div></section>';
+    window.SentinelsReplay.mount($("sentinelsReplay"), current()?.sentinels?.fieldReplay, current()?.durationMs);
+    return;
+  }
   ({ survival: renderSurvival, helical: renderHelical, marks: renderMarks, field: renderField, protovenom: renderProtovenom, avoidable: renderAvoidable }[state.tab] || renderHelical)();
 }
 

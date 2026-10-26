@@ -15,6 +15,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from analyzer_core.concurrency import run_parallel_indexed
+from analyzer_core.combat_replay import build_replay_tracks, fetch_replay_events
 from analyzer_core.court_rules import validate_court_profile
 from analyzer_core.progress import emit_progress
 from analyzer_core.wcl_api import WclClient
@@ -59,6 +60,12 @@ SHIFTING_PROTOVENOM_DEBUFF_ID = 1296880
 SHIFTING_PROTOVENOM_DAMAGE_ID = 1296882
 PROTOVENOM_ERUPTION_ID = 1296962
 PROTOVENOM_ERUPTION_RADIUS_YARDS = 10.0
+PROTOVENOM_DISPLAY_RADIUS_YARDS = 5.0
+VENOM_COAGULATION_GAME_ID = 260766
+INJECTION_ID = 1284491
+MIASMA_CAST_ID = 1288232
+MIASMA_PRECAST_WARNING_MS = 1500
+SPEAR_HIT_ID = LIVING_VENOM_ID
 
 DEFAULT_OPTIONS = {
     "helicalToxinReviewEnabled": True,
@@ -72,6 +79,7 @@ DEFAULT_OPTIONS = {
     "livingVenomReviewEnabled": True,
     "toxicDropletReviewEnabled": True,
     "shiftingProtovenomReviewEnabled": True,
+    "fieldReplayEnabled": True,
 }
 
 COURT_PROFILE = {
@@ -174,6 +182,10 @@ def build_player_catalog(actor_map, actor_type, combatants):
 def _unique_input_pair(result_stack):
     if result_stack == 2:
         return [1, 1]
+    if result_stack == 3:
+        return [1, 2]
+    if result_stack == 5:
+        return [2, 3]
     if result_stack == 6:
         return [3, 3]
     return None
@@ -300,10 +312,8 @@ def analyze_helical_toxins(
                     "resultStack": result_stack,
                     "inferredInput": inferred,
                     "collisionCombination": (
-                        "1+2" if result_stack == 3 else
-                        "1+1" if result_stack == 2 else
-                        "3+3" if result_stack == 6 else
-                        f"合计 {result_stack} 层"
+                        "+".join(map(str, inferred)) + ("（个人归属待定）" if inferred[0] != inferred[1] else "")
+                        if inferred else f"合计 {result_stack} 层"
                     ),
                     "recoverable": result_stack < 4,
                     "overflow": result_stack > 4,
@@ -1340,6 +1350,277 @@ def phase_timeline(fight, stasis_events):
     return rows
 
 
+def build_helical_aura_segments(fight, player_catalog, aura_events, helical, burst_damage):
+    """Show only confirmed overflow stacks while the toxin aura remains active."""
+    start = int(fight["startTime"])
+    duration = int(fight["endTime"]) - start
+    collisions = [row for round_row in helical.get("rounds", [])
+                  for row in round_row.get("collisions", [])]
+    wrong = [row for row in collisions if row["kind"] == "wrong-collision"]
+    clears = [row for row in collisions if row["kind"] in {"safe-clear", "recovery-clear"}]
+    actions = []
+    for event in aura_events:
+        player_id = event.get("targetID")
+        if player_id not in player_catalog:
+            continue
+        kind = event_type(event)
+        t = int(event["timestamp"]) - start
+        if kind == "removedebuff":
+            actions.append((t, 1, "remove", player_id, None))
+    for row in wrong:
+        actions.append((row["timeMs"], 0, "collision", None, row))
+    for row in clears:
+        actions.append((row["timeMs"], 0, "clear", None, row))
+    for row in burst_damage:
+        if row.get("targetID") in player_catalog:
+            actions.append((int(row["timestamp"]) - start, 2, "burst", row["targetID"], None))
+    actions.sort(key=lambda action: (action[0], action[1]))
+    segments = []
+    active = {}
+
+    def finish(player_id, t):
+        prior = active.pop(player_id, None)
+        if prior:
+            prior["endTimeMs"] = max(prior["startTimeMs"], t)
+            if prior["endTimeMs"] > prior["startTimeMs"]:
+                segments.append(prior)
+
+    def begin(player_id, t, stack):
+        active[player_id] = {"playerID": player_id, "startTimeMs": t,
+                             "endTimeMs": duration, "radiusYards": 2,
+                             "stack": min(stack, 100)}
+
+    for t, _, kind, player_id, row in actions:
+        if kind == "collision":
+            for pid in row["playerIDs"]:
+                finish(pid, t)
+                if int(row["resultStack"]) > 4:
+                    begin(pid, t, int(row["resultStack"]))
+        elif kind == "clear":
+            for pid in row["playerIDs"]:
+                finish(pid, t)
+        elif kind in {"remove", "burst"}:
+            finish(player_id, t)
+    for player_id in list(active):
+        finish(player_id, duration)
+    return sorted(segments, key=lambda row: (row["startTimeMs"], row["playerID"]))
+
+
+def wipe_boss_health(fight, actor_rows, field_replay, boss_damage):
+    """Use the higher of the two Sentinels' last reliable health snapshots."""
+    if fight.get("kill"):
+        return float(fight.get("bossPercentage") or 0), []
+    bosses = {row["id"]: row for row in actor_rows if row.get("gameID") in {258557, 258558}}
+    latest = {}
+    for boss in (field_replay.get("combatReplay") or {}).get("bosses", []):
+        if boss["actorID"] in bosses and boss.get("health"):
+            t, hp, maximum = boss["health"][-1]
+            latest[boss["actorID"]] = (int(t), int(hp), int(maximum))
+    if not latest:
+        start = int(fight["startTime"])
+        for event in boss_damage:
+            boss_id = event.get("targetID")
+            if boss_id not in bosses or str(event.get("resourceActor")) != "2":
+                continue
+            hp, maximum = event.get("hitPoints"), event.get("maxHitPoints")
+            if hp is not None and maximum:
+                t = int(event["timestamp"]) - start
+                if boss_id not in latest or t > latest[boss_id][0]:
+                    latest[boss_id] = (t, int(hp), int(maximum))
+    duration = int(fight["endTime"]) - int(fight["startTime"])
+    rows = [{"actorID": boss_id, "name": bosses[boss_id].get("name"),
+             "timeMs": t, "percentage": round(100 * hp / maximum, 2)}
+            for boss_id, (t, hp, maximum) in latest.items()
+            if maximum > 0 and 0 <= duration - t <= 5000]
+    if len(rows) != len(bosses):
+        return float(fight.get("bossPercentage") or 0), rows
+    return max(row["percentage"] for row in rows), rows
+
+
+def build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, survival, helical):
+    """Keep the Sentinels' replay evidence and visual rules in this Boss module."""
+    start, end = int(fight["startTime"]), int(fight["endTime"])
+    duration = end - start
+    tracks = build_replay_tracks(
+        fight, player_catalog, actor_map, payload["replayEvents"],
+        actor_rows=actor_rows, deaths=payload["deaths"],
+        survival_timeline=survival["timeline"],
+        spell_names={**load_confirmed_spell_names(), 1284458: "强化猛击",
+                     TOXIC_DROPLETS_CAST_ID: "剧毒液滴", MIASMA_CAST_ID: "不稳定瘴气",
+                     INJECTION_ID: "血毒注射", SHIFTING_PROTOVENOM_CAST_ID: "变幻的原型毒液"},
+    )
+    # All coordinates use WCL's one hundred units per yard. Fight 6 of
+    # 92RV4cFMT1d7bW6A and the annotated lower-right soak row anchor this
+    # rotation and offset against the existing arena artwork.
+    arena = {"image": "/assets/raids/venomous_abyss/02-sentinels.png",
+             "width": 1997, "height": 1118, "centerX": 34000, "centerY": 72000,
+             "pixelsPerYard": 10, "unitsPerYard": 100, "rotationDegrees": 117,
+             "offsetX": 76, "offsetY": 226,
+             "calibrationReport": "92RV4cFMT1d7bW6A", "calibrationFight": 6}
+    positions = build_position_index(payload["replayEvents"] + payload["damage"] + payload["resources"])
+    def point(actor_id, timestamp, event=None):
+        if event and event.get("x") is not None and event.get("y") is not None:
+            return {"x": float(event["x"]), "y": float(event["y"])}
+        row = position_at(positions, actor_id, timestamp, 2500)
+        return {"x": row["x"], "y": row["y"]} if row else None
+    def time(event):
+        return int(event["timestamp"]) - start
+    def item(event, **extra):
+        return {"timeMs": time(event), **extra}
+
+    slimes = []
+    for unit in tracks["units"]:
+        if unit.get("gameID") != VENOM_COAGULATION_GAME_ID or not unit.get("samples"):
+            continue
+        first = unit["samples"][0]
+        death = next((state[0] for state in unit.get("states", []) if state[1] == "dead"), duration)
+        nearby = []
+        for player_id, player in player_catalog.items():
+            sample = position_at(positions, player_id, start+first[0], 2500)
+            if not sample:
+                continue
+            distance = math.dist((first[1], first[2]), (sample["x"], sample["y"])) / 100
+            if distance <= 8:
+                nearby.append({"playerID": player_id, "player": player["name"],
+                               "distanceYards": round(distance, 1)})
+        slimes.append({"key": unit["key"], "actorID": unit["actorID"],
+                       "instance": unit["instance"], "startTimeMs": first[0],
+                       "endTimeMs": death, "position": {"x": first[1], "y": first[2]},
+                       "nearbyPlayers": sorted(nearby, key=lambda row: row["distanceYards"])})
+
+    protovenom = []
+    active = {}
+    for event in sorted(payload["debuffs"], key=lambda row: int(row.get("timestamp") or 0)):
+        if ability_id(event) != SHIFTING_PROTOVENOM_DEBUFF_ID or event.get("targetID") not in player_catalog:
+            continue
+        player_id, timestamp = event["targetID"], int(event["timestamp"])
+        kind = event_type(event)
+        if kind in {"applydebuff", "applydebuffstack", "refreshdebuff"}:
+            active.setdefault(player_id, timestamp)
+        elif kind in {"removedebuff", "removedebuffstack"} and player_id in active:
+            protovenom.append({"playerID": player_id, "startTimeMs": active.pop(player_id)-start,
+                               "endTimeMs": timestamp-start, "radiusYards": PROTOVENOM_DISPLAY_RADIUS_YARDS})
+    protovenom.extend({"playerID": player_id, "startTimeMs": timestamp-start,
+                       "endTimeMs": duration, "radiusYards": PROTOVENOM_DISPLAY_RADIUS_YARDS}
+                      for player_id, timestamp in active.items())
+    safe_clears = []
+    removals = [row for row in payload["debuffs"] if ability_id(row) == SHIFTING_PROTOVENOM_DEBUFF_ID
+                and event_type(row) == "removedebuff" and row.get("targetID") in player_catalog]
+    for group in cluster_events(removals, 100):
+        if len(group) < 2:
+            continue
+        timestamp = min(int(row["timestamp"]) for row in group)
+        for index, left in enumerate(group):
+            for right in group[index+1:]:
+                a = point(left["targetID"], timestamp)
+                b = point(right["targetID"], timestamp)
+                if a and b and math.dist((a["x"], a["y"]), (b["x"], b["y"])) <= 1000:
+                    safe_clears.append({"timeMs": timestamp-start, "playerIDs": [left["targetID"], right["targetID"]],
+                                        "position": {"x": (a["x"]+b["x"])/2, "y": (a["y"]+b["y"])/2}})
+
+    eruptions = [item(row, playerID=row.get("targetID"), position=point(row.get("targetID"), int(row["timestamp"]), row))
+                 for row in payload["damage"] if ability_id(row) == PROTOVENOM_ERUPTION_ID
+                 and row.get("targetID") in player_catalog]
+    miasma = []
+    active_miasma = {}
+    miasma_cast_starts = sorted(int(row["timestamp"]) for row in payload["casts"]
+                                if ability_id(row) == MIASMA_CAST_ID and event_type(row) == "begincast")
+    for event in sorted(payload["debuffs"], key=lambda row: int(row.get("timestamp") or 0)):
+        if ability_id(event) != UNSTABLE_MIASMA_ID or event.get("targetID") not in player_catalog:
+            continue
+        player_id = event["targetID"]
+        if event_type(event) == "applydebuff":
+            apply_timestamp = int(event["timestamp"])
+            cast_start = next((value for value in reversed(miasma_cast_starts)
+                               if 0 <= apply_timestamp-value <= 4000), None)
+            active_miasma[player_id] = {
+                "startTimeMs": max(0, cast_start-start-MIASMA_PRECAST_WARNING_MS) if cast_start else time(event),
+                "castStartTimeMs": cast_start-start if cast_start else None,
+                "auraStartTimeMs": time(event),
+                "timingInferred": cast_start is not None,
+            }
+        elif event_type(event) == "removedebuff" and player_id in active_miasma:
+            miasma.append({"playerID": player_id, **active_miasma.pop(player_id),
+                            "endTimeMs": time(event), "radiusYards": 8})
+    miasma.extend({"playerID": player_id, **warning,
+                   "endTimeMs": duration, "radiusYards": 8}
+                  for player_id, warning in active_miasma.items())
+
+    helical_explosions = []
+    helical_auras = sorted((row for row in payload["debuffs"] if ability_id(row) == HELICAL_ID),
+                           key=lambda row: int(row.get("timestamp") or 0))
+    for event in payload["damage"]:
+        if ability_id(event) != CULTIVATED_BURST_DAMAGE_ID or event.get("targetID") not in player_catalog:
+            continue
+        timestamp, player_id = int(event["timestamp"]), event["targetID"]
+        stack = None
+        for aura in helical_auras:
+            aura_time = int(aura.get("timestamp") or 0)
+            if aura_time > timestamp or aura.get("targetID") != player_id:
+                if aura_time > timestamp:
+                    break
+                continue
+            kind = event_type(aura)
+            if kind == "applydebuff":
+                stack = int(aura["stack"]) if aura.get("stack") is not None else None
+            elif kind in {"applydebuffstack", "refreshdebuff"} and aura.get("stack") is not None:
+                stack = int(aura["stack"])
+            elif kind in {"removedebuff", "removedebuffstack"} and timestamp-aura_time > 100:
+                stack = None
+        helical_explosions.append(item(event, playerID=player_id, position=point(player_id, timestamp, event),
+                                       stack=stack, radiusYards=5*stack if stack else None))
+    murk = []
+    water = []
+    injection_stacks = {}
+    for event in sorted(payload["debuffs"], key=lambda row: int(row.get("timestamp") or 0)):
+        player_id = event.get("targetID")
+        if player_id not in player_catalog:
+            continue
+        spell, kind = ability_id(event), event_type(event)
+        if spell == CLINGING_MURK_ID:
+            if kind == "applydebuff":
+                murk.append(item(event, playerID=player_id, endTimeMs=duration))
+            elif kind == "removedebuff":
+                prior = next((row for row in reversed(murk) if row["playerID"] == player_id and row["endTimeMs"] == duration), None)
+                if prior:
+                    prior["endTimeMs"] = time(event)
+                p = point(player_id, int(event["timestamp"]))
+                if p:
+                    water.append(item(event, playerID=player_id, position=p, radiusYards=5,
+                                      expansionYardsPerSecond=1, source="clinging-murk", endTimeMs=duration))
+        elif spell == INJECTION_ID and kind in {"applydebuff", "applydebuffstack"}:
+            injection_stacks[player_id] = int(event.get("stack") or (injection_stacks.get(player_id, 0) + 1))
+        elif spell == INJECTION_ID and kind == "removedebuff":
+            stacks = injection_stacks.pop(player_id, 0)
+            p = point(player_id, int(event["timestamp"]))
+            if p and stacks:
+                water.append(item(event, playerID=player_id, position=p, radiusYards=5*stacks,
+                                  expansionYardsPerSecond=1, source="injection",
+                                  stackCount=stacks, endTimeMs=duration))
+    droplets = []
+    for event in payload["damage"]:
+        if ability_id(event) != TOXIC_DROPLETS_HIT_ID or event.get("targetID") not in player_catalog:
+            continue
+        timestamp = int(event["timestamp"])
+        p = point(event["targetID"], timestamp, event)
+        if p:
+            droplets.append(item(event, playerID=event["targetID"], position=p,
+                                 launchTimeMs=min(duration, time(event)+5000), bossID=event.get("sourceID")))
+    spear_hits = [item(row, playerID=row.get("targetID"), position=point(row.get("targetID"), int(row["timestamp"]), row))
+                  for row in payload["damage"] if ability_id(row) == SPEAR_HIT_ID and row.get("targetID") in player_catalog]
+    soaks = [item(row, playerID=row.get("targetID"), position=point(row.get("targetID"), int(row["timestamp"]), row))
+             for row in payload["damage"] if ability_id(row) == SOAK_DAMAGE_ID and row.get("targetID") in player_catalog]
+    return {"enabled": True, "arena": arena, "combatReplay": tracks,
+            "protovenom": protovenom, "safeClears": safe_clears, "eruptions": eruptions,
+            "miasma": miasma, "murk": murk, "water": water, "slimes": slimes,
+            "helicalAuras": build_helical_aura_segments(
+                fight, player_catalog, helical_auras, helical,
+                [row for row in payload["damage"] if ability_id(row) == CULTIVATED_BURST_DAMAGE_ID]),
+            "helicalExplosions": helical_explosions, "droplets": droplets, "spearHits": spear_hits,
+            "soaks": soaks, "soakCasts": [item(row, targetID=row.get("targetID")) for row in payload["casts"]
+                                         if ability_id(row) == MIASMA_CAST_ID and event_type(row) == "cast"]}
+
+
 def fetch_payload(client, report_id, fight, options):
     casts = client.events(report_id, "Casts", fight, hostility_type="Enemies")
     friendly_casts = client.events(report_id, "Casts", fight, hostility_type="Friendlies")
@@ -1349,7 +1630,7 @@ def fetch_payload(client, report_id, fight, options):
     deaths = client.events(report_id, "Deaths", fight)
     combatants = client.events(report_id, "CombatantInfo", fight)
     resources = []
-    if options["waterPlacementReviewEnabled"] or options["helicalToxinReviewEnabled"]:
+    if options["waterPlacementReviewEnabled"] or options["helicalToxinReviewEnabled"] or options["fieldReplayEnabled"]:
         resources = client.events(report_id, "Resources", fight, include_resources=True)
     return {
         "casts": casts,
@@ -1360,10 +1641,13 @@ def fetch_payload(client, report_id, fight, options):
         "deaths": deaths,
         "combatants": combatants,
         "resources": resources,
+        "bossDamage": client.events(report_id, "DamageDone", fight, include_resources=True)
+                      if not options["fieldReplayEnabled"] else [],
+        "replayEvents": fetch_replay_events(client, report_id, fight) if options["fieldReplayEnabled"] else [],
     }
 
 
-def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, payload, options):
+def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, payload, options, actor_rows=()):
     player_catalog = build_player_catalog(actor_map, actor_type, payload["combatants"])
     player_deaths = [event for event in payload["deaths"] if event.get("targetID") in player_catalog]
     stasis_events = [
@@ -1460,6 +1744,8 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         fight, actor_map, player_catalog, player_deaths, payload.get("friendlyCasts") or [],
         survival_spell_names,
     )
+    field_replay = build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, survival, helical) if options["fieldReplayEnabled"] else {"enabled": False}
+    boss_percentage, boss_health = wipe_boss_health(fight, actor_rows, field_replay, payload.get("bossDamage") or [])
     return {
         "reportID": report_id,
         "fightID": fight["id"],
@@ -1470,7 +1756,8 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
         "startTimeIso": started_at.isoformat(),
         "isKill": bool(fight.get("kill")),
         "kill": bool(fight.get("kill")),
-        "bossPercentage": float(fight.get("bossPercentage") or 0),
+        "bossPercentage": boss_percentage,
+        "bossHealthAtWipe": boss_health,
         "fightPercentage": fight.get("fightPercentage"),
         "durationMs": duration_ms,
         "duration": fmt_ms(duration_ms),
@@ -1490,6 +1777,7 @@ def analyze_report_fight(report_id, report_start, actor_map, actor_type, fight, 
             "toxicDroplets": droplets,
             "livingVenom": living,
             "shiftingProtovenom": protovenom,
+            "fieldReplay": field_replay,
         },
         "avoidableSummary": {"1284209": living["players"]},
     }
@@ -1645,6 +1933,7 @@ def build_aggregated_json(report_ids, options=None):
                 fight,
                 payload,
                 options,
+                actor_rows,
             )
 
         for _, row in run_parallel_indexed(list(enumerate(fights, start=1)), fetch_one):
@@ -1663,12 +1952,12 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "sentinels",
             "bossName": "陵寝哨兵",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "sentinels-mythic-protovenom-water-row-v5-2026-09-06",
-            "features": {"interrupts": False, "dispels": False, "fieldReplay": False, "mistakes": False},
+            "mechanicVersion": "sentinels-field-replay-v1-2026-10-26",
+            "features": {"interrupts": False, "dispels": False, "fieldReplay": options["fieldReplayEnabled"], "mistakes": False},
             "capabilities": {
                 "wipe": {"enabled": True, "renderer": "sentinels-pulls"},
                 "avoidable": {"enabled": True, "renderer": "sentinels-avoidable"},
-                "replay": {"enabled": False, "renderer": "sentinels-field"},
+                "replay": {"enabled": options["fieldReplayEnabled"], "renderer": "sentinels-field"},
                 "mistakes": {"enabled": False, "renderer": "mistake-tracker"},
                 "verdict": {"enabled": False, "renderer": "mistake-verdict"},
             },
