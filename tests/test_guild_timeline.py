@@ -14,8 +14,8 @@ def setup(p1_end=170000, duration=240000):
     actors = [dict(id=90, gameID=257911), dict(id=91, gameID=259854), dict(id=20, petOwner=1)]
     players = {1: dict(id=1, name="Warrior", role="melee-dps")}
     markers = [dict(key="p1", timeMs=0), dict(key="p2", timeMs=p1_end), dict(key="wipe", timeMs=duration)]
-    options = resolve_analysis_options(m7.CONFIG_SCHEMA, {
-        "burstPlan": json.dumps([dict(player="Warrior", ability="warrior.avatar", times=[0, 180])])})
+    options = resolve_analysis_options(m7.CONFIG_SCHEMA, {})
+    options["burstPlan"] = json.dumps([dict(player="Warrior", ability="warrior.avatar", times=[0, 180])])
     raw = {"reportGuild": {"id": 774422}, "casts": [], "guildPlayerCasts": [],
            "guildPlayerBuffs": [], "guildBossDamage": [], "enemyDeaths": []}
     def event(t, kind="damage", **kwargs):
@@ -143,9 +143,10 @@ def test_base_profile_has_no_extra_requests_or_guild_counts():
     fixture = setup()
     fixture[2]["reportGuild"] = {"id":1}
     client = Mock()
-    assert not analyze(fixture)["enabled"]
+    assert analyze(fixture)["enabled"] and not analyze(fixture)["checksEnabled"]
     assert m7._fetch_guild_timeline(client,"R",fixture[0],fixture[3],fixture[2],fixture[5]) is fixture[2]
-    client.events.assert_not_called()
+    assert client.events.call_count == 1
+    assert client.events.call_args.args[1] == "Casts"
 
 
 def test_damage_transport_uses_npc_game_ids_and_does_not_filter_enemy_targets_as_friendlies():
@@ -356,17 +357,17 @@ def test_comparison_does_not_merge_repeated_instant_casts():
     assert r['counts']['cackle']==2
 
 
-def test_icon_evidence_keeps_fixed_major_plan_and_only_configured_skills():
+def test_icon_evidence_shows_all_observed_bursts_without_planned_markers():
     fixture=setup();raw,event=fixture[2],fixture[-1]
     raw['guildPlayerCasts']=[event(3000,'cast',sourceID=1,abilityGameID=107574),
                             event(5000,'cast',sourceID=1,abilityGameID=1250533),
                             event(6000,'cast',sourceID=1,abilityGameID=395152)]
     result=analyze(fixture)
     rows=result['displayTimelines']
-    assert {r['ability'] for r in rows}=={'warrior.avatar','item.1250533'}
+    assert {r['ability'] for r in rows}=={'warrior.avatar','item.1250533','evoker.ebon-might'}
     assert next(r for r in rows if r['ability']=='item.1250533')['plannedWindows']==[]
     avatar=next(r for r in rows if r['ability']=='warrior.avatar')
-    assert avatar['plannedWindows'][1]['timeMs']==180000
-    assert avatar['plannedWindows'][1]['windowStartMs']==170000
+    assert avatar['plannedWindows']==[]
+    assert result['checksEnabled'] and result['actualOnly']
     assert result['timelineViewVersion']=='icons-v1'
     assert result['reference']['p2TimeMs']==177991

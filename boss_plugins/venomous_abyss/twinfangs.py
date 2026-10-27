@@ -88,11 +88,11 @@ BOSS_CONFIG = {
     "spellNames": GUIDE_SPELLS,
     "tabs": [
         ["survival", "全场存活情况"],
+        ["replay", "场地推演"],
         ["venom", "永恒毒液"],
         ["globules", "地板炸圈"],
         ["feast", "盛宴分摊"], ["spit", "蛇头射线"], ["brood", "蛇头打断"],
         ["venomDeaths", "带毒死亡"], ["stone", "裂石击"], ["earlyDeaths", "提前死亡"],
-        ["explore", "机制工作台"],
     ],
     "mechanicVersion": "twinfangs-cone-chronological-venom-2026-10-13",
     "features": {"survival": True, "fieldReplay": False},
@@ -1842,9 +1842,9 @@ def build_aggregated_json(report_ids, options=None):
     # With no custom filter the generic runtime would fetch every tracked NPC.
     if not config["trackedActorEventFilters"]:
         config["trackedActorGameIDs"] = set()
-    tab_enabled = {"survival": True, "venom": options["venomReviewEnabled"] or options["feastReviewEnabled"],
+    tab_enabled = {"survival": True, "replay": options["fullReplayEnabled"] and any(options[k] for k in REVIEW_KEYS), "venom": options["venomReviewEnabled"] or options["feastReviewEnabled"],
                    "globules": options["globulesReviewEnabled"], "feast": options["feastReviewEnabled"], "brood": options["broodReviewEnabled"], "spit": options["spitReviewEnabled"],
-                   "venomDeaths": options["venomDeathReviewEnabled"], "stone": options["stoneReviewEnabled"], "earlyDeaths": options["earlyDeathReviewEnabled"], "explore": options["broodReviewEnabled"]}
+                   "venomDeaths": options["venomDeathReviewEnabled"], "stone": options["stoneReviewEnabled"], "earlyDeaths": options["earlyDeathReviewEnabled"]}
     config["tabs"] = [row for row in config["tabs"] if tab_enabled[row[0]]]
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]]
     result = _build(config, analyze_mechanics, report_ids, options)

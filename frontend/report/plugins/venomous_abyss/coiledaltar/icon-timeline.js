@@ -21,7 +21,7 @@
           skills[s.ability]={name:s.label,kind,spellID:(s.spellIDs||[])[0]};
           return {key:s.ability,c:(s.casts||[]).map(t=>finite(t)/1000),
             a:(s.intervals||[]).filter(a=>a.evidence!=='configured-estimate').map(a=>[finite(a.startTimeMs)/1000,finite(a.endTimeMs)/1000]),
-            plan:kind==='major'?(s.plannedWindows||[]).map(w=>[finite(w.timeMs)/1000,finite(w.endTimeMs)/1000,finite(w.windowStartMs)/1000,finite(w.windowEndMs)/1000]):[]};
+            plan:!guild.actualOnly&&kind==='major'?(s.plannedWindows||[]).map(w=>[finite(w.timeMs)/1000,finite(w.endTimeMs)/1000,finite(w.windowStartMs)/1000,finite(w.windowEndMs)/1000]):[]};
         })};
     });
     const references=pulls.map(p=>({pull:p,value:comparison(p)})).filter(p=>p.value).map(p=>({...p.value,id:'night-'+p.pull.fightID,label:'Fight '+p.pull.fightID+'，'+(p.pull.duration||'')}));
@@ -40,12 +40,13 @@
  const clock=s=>`${String(Math.floor(Math.max(0,s)/60)).padStart(2,'0')}:${String(Math.floor(Math.max(0,s)%60)).padStart(2,'0')}`;
  const allKeys=[...data.defs.map(d=>'boss.'+d[0]),...Object.keys(data.skills)];
  let state={fight:data.current.id,ref:'old-m',zoom:2,start:0,phase:'',showPlan:true,hidden:Object.keys(data.skills).filter(k=>data.skills[k].kind==='item'),...options.state},view=null,drag=null,saveTimer=null;
- state.fight=data.current.id;state.zoom=Math.max(1,Math.min(12,+state.zoom||2));state.hidden=Array.isArray(state.hidden)?state.hidden:[];
+ if(guild.actualOnly){state.showPlan=false;root.querySelector('.i-plan-key').hidden=true;root.querySelector('.i-note').textContent='实心图标表示实际成功施法；上方为本场Boss机制。';} if(guild.checksEnabled===false)refSelect.closest('label').hidden=true; state.fight=data.current.id;state.zoom=Math.max(1,Math.min(12,+state.zoom||2));state.hidden=Array.isArray(state.hidden)?state.hidden:[];
  refSelect.innerHTML='<option value="old-m">旧 M，10:36</option>'+data.references.map(r=>`<option value="${r.id}">${escape(r.label)}</option>`).join('');
  if(state.ref!=='old-m'&&!data.references.some(r=>r.id===state.ref))state.ref='old-m';
  const save=()=>{if(options.state)Object.assign(options.state,state);};
  const queueSave=()=>{clearTimeout(saveTimer);saveTimer=setTimeout(save,250);};
- const img=(key,alt='')=>data.images[key]?`<img src="${escape(data.images[key])}" alt="${escape(alt)}" draggable="false">`:'<span class="i-missing-icon" aria-hidden="true">?</span>';
+ const fallbackNames=Object.fromEntries(Object.values(data.skills).map(s=>[String(s.spellID),s.name]));
+ const img=(key,alt='')=>data.images[key]?`<img src="${escape(data.images[key])}" alt="${escape(alt)}" draggable="false">`:`<span class="i-missing-icon" title="${escape(fallbackNames[key]||alt||'技能')}">${escape((fallbackNames[key]||alt||'技能').slice(0,2))}</span>`;
  function filters(){
   const group=(kind,label,items)=>`<div class="i-group" style="--cat:${colors[kind]}"><label class="i-group-title"><input type="checkbox" data-group="${kind}" aria-label="显示${label}"><i></i>${label}</label><div class="i-filters">${items.map(([key,name,image])=>`<label class="i-filter" data-tooltip="${escape(name)}">${img(image)}<input type="checkbox" aria-label="显示${escape(name)}" data-key="${key}" ${state.hidden.includes(key)?'':'checked'}></label>`).join('')}</div></div>`;
   let html=group('boss','Boss',data.defs.map(([key,name])=>['boss.'+key,name,String(data.bossIDs[key])]));
@@ -56,7 +57,7 @@
  }
  function syncGroups(){selection.querySelectorAll('[data-group]').forEach(input=>{const groupInputs=Array.from(input.closest('.i-group').querySelectorAll('[data-key]'));input.checked=groupInputs.some(i=>i.checked);input.indeterminate=groupInputs.some(i=>i.checked)&&groupInputs.some(i=>!i.checked);});}
  function render(){
-  const p=data.current,r=data.references.find(r=>r.id===state.ref)||data.reference,total=Math.max(p.duration,r.duration),span=total/state.zoom;
+  const p=data.current,r=guild.checksEnabled===false?p:(data.references.find(r=>r.id===state.ref)||data.reference),total=Math.max(p.duration,r.duration),span=total/state.zoom;
   state.start=Math.max(0,Math.min(total-span,+state.start||0));view={p,r,total,span};
   refSelect.value=state.ref;zoom.value=state.zoom;root.querySelector('[aria-label="显示预定轴"]').checked=state.showPlan;root.querySelector('.i-zoom').textContent=Math.round(state.zoom*100)+'%';pan.max=total-span;pan.value=state.start;pan.disabled=state.zoom===1;root.querySelector('.i-range').textContent=clock(state.start)+' — '+clock(state.start+span);
   root.querySelectorAll('[data-phase]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.phase===state.phase)));
@@ -69,13 +70,13 @@
   const row=(label,content,cls='',style='')=>`<div class="i-row ${cls}"><div class="i-label" style="${style}">${label}</div><div class="i-lane">${content}</div></div>`;
   function event(a,b,image,kind,tooltip,aria,caption=false){if(!visible(a,b))return '';const left=Math.max(0,x(a)),duration=Math.max(0,b-a)/span*100,imageVisible=a>=state.start;return `<button type="button" class="i-event ${kind}" style="left:${left}%;width:${Math.max(0,duration)}%;--cat:${colors[kind]||colors.boss}" data-tooltip="${escape(tooltip)}" data-time="${escape(tooltip)}" aria-label="${escape(aria)}">${imageVisible?img(image):''}${caption?`<span class="i-time">${clock(a)}</span>`:''}</button>`;}
   let html=row('玩家 / 时间',ticks.map(t=>`<span class="i-tick" style="left:${x(t)}%;${x(t)<2?'transform:none':x(t)>94?'transform:translateX(-100%)':''}">${clock(t)}</span>`).join(''),'i-ruler');
-  for(const [source,label,compare] of [[r,state.ref==='old-m'?'旧 M':r.label||r.id,false],[p,'Fight '+p.id,true]]){
+  for(const [source,label,compare] of (guild.checksEnabled===false?[[p,'Fight '+p.id,true]]:[[r,state.ref==='old-m'?'旧 M':r.label||r.id,false],[p,'Fight '+p.id,true]])){
    let marks=grid()+phases(source,true,compare);
    const bossEvents=source.boss.filter(e=>!state.hidden.includes('boss.'+e[0])).slice().sort((a,b)=>a[1]-b[1]);
    bossEvents.forEach((e,i)=>{const [key,a,b]=e,name=data.defs.find(d=>d[0]===key)[1],sid=String(data.bossIDs[key]),tip=name+' '+clock(a)+(b>a?'–'+clock(b):''),next=Math.min(bossEvents[i+1]?.[1]??Infinity,state.start+span),caption=(next-a)/span*width>=70;marks+=event(a,b,sid,'boss',tip,tip,caption);});
    html+=row(img('boss')+`<span>${compare?'当前':'参照'}，${label}<small>${clock(source.duration)}</small></span>`,marks,'i-boss');
   }
-  html+=`<div class="i-divider"><span>DPS，同一玩家的预定 / 实际</span><span>${p.players.length} 人</span></div>`;
+  html+=`<div class="i-divider"><span>${guild.actualOnly?'玩家实际施法':'DPS，同一玩家的预定 / 实际'}</span><span>${p.players.length} 人</span></div>`;
   for(const player of p.players){let marks=phases(p)+grid();
    if(state.showPlan)for(const s of player.s){const def=data.skills[s.key];if(state.hidden.includes(s.key)||def.kind!=='major')continue;
     for(const [a,b,lo,hi] of s.plan||[]){if(!visible(lo,hi))continue;marks+=segment(lo,hi,'i-plan-window');const text=clock(a)+(b>a?'–'+clock(b):'');marks+=`<button type="button" class="i-planned" style="left:${x(lo)}%" data-tooltip="${text}" data-time="${text}" aria-label="${escape(player.n+' '+def.name+' 预定 '+text)}">${img(String(def.spellID))}</button>`;}

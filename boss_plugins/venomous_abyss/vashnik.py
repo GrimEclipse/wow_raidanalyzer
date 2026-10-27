@@ -333,7 +333,6 @@ BOSS_CONFIG = {
         ["avoidable", "可规避机制"],
         ["infection", "适应性感染"],
         ["waves", "光柱与波浪"],
-        ["explore", "机制工作台"],
     ],
     "mechanicVersion": "vashnik-wave-totem-replay-2026-10-08",
     "features": {"survival": True, "fieldReplay": False},
@@ -471,6 +470,8 @@ def analyze_vashnik(fight, actor_map, players, raw):
     wave_review = build_pillar_review(build_wave_review(scene, players), scene, fight, raw) if options["waveReviewEnabled"] else {"records": [], "rounds": []}
     if options["waveReviewEnabled"]:
         build_totem_replay(scene, fight, raw)
+    for event in scene["events"]:
+        event.pop("points", None)
     return {"avoidable": {"players": avoidable, "summary": avoidable_summary}, "adaptiveInfection": {"rounds": rounds, "groupBasis": group_basis}, "plagueWaves": wave_review, "eventScene": scene}
 
 analyze_mechanics = analyze_vashnik
@@ -539,7 +540,7 @@ def build_aggregated_json(report_ids, options=None):
         config["trackedDamageTargetGameIDs"] = set()
         config["tabs"] = [row for row in config["tabs"] if row[0] == "survival"]
     config["skippedAnalyses"] = [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]]
-    config["tabs"] = [row for row in config["tabs"] if row[0] in {"survival", "replay", "explore"} or options[{"avoidable":"avoidableReviewEnabled", "infection":"infectionReviewEnabled", "waves":"waveReviewEnabled"}[row[0]]]]
+    config["tabs"] = [row for row in config["tabs"] if row[0] in {"survival", "replay"} or options[{"avoidable":"avoidableReviewEnabled", "infection":"infectionReviewEnabled", "waves":"waveReviewEnabled"}[row[0]]]]
     result = _build(config, analyze_mechanics, report_ids, options)
     result["data"]["mechanicOverview"] = _mechanic_overview(
         result.get("data", {}).get("page1_wipeAnalysis") or []

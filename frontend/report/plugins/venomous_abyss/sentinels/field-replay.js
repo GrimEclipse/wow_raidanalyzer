@@ -11,25 +11,26 @@
   }
   function mount(host,field,durationMs){
     if(!field?.enabled){host.innerHTML='<div class="empty">这场战斗没有场地推演数据，请重新分析。</div>';return null;}
-    const replay=field.combatReplay||{},arena=field.arena,workbench=api();
+    const replay=field.combatReplay||{},arena={...field.arena,pixelsPerYard:9.5},workbench=api();
     const units=new Map((replay.units||[]).map(u=>[u.actorID,u]));
     const unitsByKey=new Map((replay.units||[]).map(u=>[u.key,u]));
     const position=(id,t)=>{const unit=units.get(id);return unit&&workbench.trackPosition(unit,t,replay.interpolateMaxGapMs);};
     const screen=(p)=>project(p,arena);
     const radius=y=>y*arena.pixelsPerYard;
+    const lanceLaunchTime=d=>Math.min(durationMs,d.timeMs+4000);
     const marks=[{id:'start',timeMs:0,label:'战斗开始',layer:'全场'}];
     const add=(rows,label,layer)=>rows.forEach((row,i)=>marks.push({id:`${layer}:${i}`,timeMs:row.startTimeMs??row.timeMs,
       label:typeof label==='function'?label(row):label,layer,actor:units.get(row.playerID)?.name||'',spellID:row.spellID}));
     add(field.protovenom||[],'变幻的原型毒液','原型毒液');
     add(field.safeClears||[],'双人安全消毒','原型毒液');
     add(field.eruptions||[],'错误接触击飞','原型毒液');
-    add(field.miasma||[],'不稳定瘴气读条前预兆（8 码）','分摊放水');
+    add(field.miasma||[],'不稳定瘴气读条前预兆（5 码）','分摊放水');
     add(field.soaks||[],'不稳定瘴气命中','分摊放水');
     add(field.helicalExplosions||[],r=>r.stack?`螺旋毒素 ${r.stack} 层爆炸，${r.radiusYards} 码`:'螺旋毒素爆炸，层数未记录','螺旋毒素');
     add(field.helicalAuras||[],r=>`螺旋毒素撞错后 ${r.stack>99?'∞':r.stack} 层，2 码个人圈`,'螺旋毒素');
     add(field.water||[],r=>r.source==='injection'?`血毒注射消失，${r.radiusYards} 码红水`:'附着幽暗放水','地面红水');
     add(field.droplets||[],'踩绿球，腐蚀长矛生成','绿球长矛');
-    (field.droplets||[]).forEach((row,i)=>marks.push({id:`lance-launch:${i}`,timeMs:row.launchTimeMs,
+    (field.droplets||[]).forEach((row,i)=>marks.push({id:`lance-launch:${i}`,timeMs:lanceLaunchTime(row),
       label:'腐蚀长矛射出',layer:'绿球长矛',actor:units.get(row.playerID)?.name||''}));
     add(field.spearHits||[],'腐蚀长矛命中','绿球长矛');
     (field.slimes||[]).forEach((slime,i)=>marks.push({id:`slime:${i}`,timeMs:slime.startTimeMs,
@@ -37,7 +38,7 @@
       evidence:slime.nearbyPlayers.length?`8 码内：${slime.nearbyPlayers.map(p=>`${p.player} ${p.distanceYards} 码`).join('、')}`:'8 码内未找到可靠玩家坐标',
       points:[{position:slime.position,label:'软泥刷新位置'}]}));
     const wb=workbench.mount(host,{key:'sentinels-field',title:'陵寝哨兵 场地推演',combatReplay:replay,
-      durationMs,events:marks,note:'橙圈为 5 码示意；双橙圈接触可安全解除，碰到无毒玩家会击飞两人。不稳定瘴气的 8 码预兆在读条前出现并跟随随后被点名的玩家；读条前目标由后续 debuff 回推。附着幽暗结束时放置半径 5 码的红水；血毒注射消失时每层增加 5 码半径。红水从落点以每秒 1 码扩张并持续到战斗结束。螺旋毒素只在撞错后超过 4 层且 buff 仍存在时显示 2 码个人圈；超过 99 层显示 ∞，爆炸范围为 5 × 已记录层数码。长矛原地蓄势 5 秒后迅速射向 Boss。'},
+      durationMs,events:marks,note:'橙圈为 5 码示意；双橙圈接触可安全解除，碰到无毒玩家会击飞两人。不稳定瘴气的 5 码预兆在读条前出现并跟随随后被点名的玩家；读条前目标由后续 debuff 回推。附着幽暗结束时放置半径 5 码的红水；血毒注射消失时每层增加 5 码半径。红水落地后立即覆盖对应区域，并限制在可站立的场地板块内，持续到战斗结束。螺旋毒素只在撞错后超过 4 层且 buff 仍存在时显示 2 码个人圈；超过 99 层显示 ∞，爆炸范围为 5 × 已记录层数码。长矛原地蓄势 4 秒后迅速射向 Boss。'},
       {video:true,handlesPlayers:true,project:p=>{const q=screen(p);return q&&{x:q.x/arena.width*100,y:q.y/arena.height*100};},
       renderMap(_selected,_filtered,t){
         const circles=(field.protovenom||[]).filter(a=>a.startTimeMs<=t&&t<a.endTimeMs).map(a=>{
@@ -50,21 +51,20 @@
         }).join('');
         const miasma=(field.miasma||[]).filter(a=>a.startTimeMs<=t&&t<a.endTimeMs).map(a=>{
           const q=screen(position(a.playerID,t));if(!q)return '';
-          const r=radius(a.radiusYards),precast=t<a.auraStartTimeMs;
+          const r=radius(5),precast=t<a.auraStartTimeMs;
           const progress=clamp((t-a.startTimeMs)/(a.endTimeMs-a.startTimeMs||1),0,1);
-          return `<g data-key="miasma:${a.playerID}:${a.startTimeMs}" data-effect="${precast?'miasma-precast-warning':'miasma-telegraph'}" data-inferred="${a.timingInferred?'true':'false'}"><title>${precast?'读条前点名预兆，目标由随后光环回推':'不稳定瘴气点名'}，8 码</title><circle cx="${q.x}" cy="${q.y}" r="${r}" fill="#ae83e9" fill-opacity="${precast?.08:.12}" stroke="#e7c7ff" stroke-width="3" ${precast?'stroke-dasharray="12 7"':''}/><circle cx="${q.x}" cy="${q.y}" r="${r*(1-progress)}" fill="none" stroke="#f4dfff" stroke-opacity=".6" stroke-width="2"/></g>`;
+          return `<g data-key="miasma:${a.playerID}:${a.startTimeMs}" data-effect="${precast?'miasma-precast-warning':'miasma-telegraph'}" data-inferred="${a.timingInferred?'true':'false'}"><title>${precast?'读条前点名预兆，目标由随后光环回推':'不稳定瘴气点名'}，5 码</title><circle cx="${q.x}" cy="${q.y}" r="${r}" fill="#ae83e9" fill-opacity="${precast?.08:.12}" stroke="#e7c7ff" stroke-width="3" ${precast?'stroke-dasharray="12 7"':''}/><circle cx="${q.x}" cy="${q.y}" r="${r*(1-progress)}" fill="none" stroke="#f4dfff" stroke-opacity=".6" stroke-width="2"/></g>`;
         }).join('');
         const water=(field.water||[]).filter(a=>a.timeMs<=t&&t<=a.endTimeMs).map((a,i)=>{
           const q=screen(a.position);if(!q)return '';
-          const grownYards=clamp((t-a.timeMs)/1000*(a.expansionYardsPerSecond||1),0,a.radiusYards);
-          const r=radius(grownYards),fade=clamp((t-a.timeMs)/500,0,1);
-          return `<g data-key="pool:${i}" data-effect="${a.source}-water" opacity="${fade}"><circle cx="${q.x}" cy="${q.y}" r="${r}" fill="#d5213c" fill-opacity="${a.source==='injection'?.15:.36}" stroke="#ff5e64" stroke-width="3"/><circle cx="${q.x}" cy="${q.y}" r="${r*.65}" fill="none" stroke="#ff9894" stroke-opacity=".3" stroke-width="2"/></g>`;
+          return `<circle data-key="pool:${i}" data-effect="${a.source}-water" cx="${q.x}" cy="${q.y}" r="${radius(a.radiusYards)}" fill="#c72038" fill-opacity=".65"/>`;
         }).join('');
         const lances=(field.droplets||[]).map((d,i)=>{
-          if(t<d.timeMs||t>d.launchTimeMs+300)return '';
-          const from=screen(d.position),boss=screen(position(d.bossID,Math.min(t,d.launchTimeMs)));
+          const launchTimeMs=lanceLaunchTime(d);
+          if(t<d.timeMs||t>launchTimeMs+300)return '';
+          const from=screen(d.position),boss=screen(position(d.bossID,Math.min(t,launchTimeMs)));
           if(!from||!boss)return '';
-          const launched=t>=d.launchTimeMs,age=t-d.launchTimeMs,f=clamp(age/120,0,1);
+          const launched=t>=launchTimeMs,age=t-launchTimeMs,f=clamp(age/120,0,1);
           const length=Math.hypot(boss.x-from.x,boss.y-from.y)||1,ux=(boss.x-from.x)/length,uy=(boss.y-from.y)/length;
           const tip=launched?{x:from.x+(boss.x-from.x)*f,y:from.y+(boss.y-from.y)*f}:{x:from.x+ux*32,y:from.y+uy*32};
           const fade=launched?clamp(1-(age-120)/180,0,1):1;
@@ -107,7 +107,7 @@
         const soaks=(field.soaks||[]).filter(e=>t>=e.timeMs&&t<e.timeMs+450).map((e,i)=>{
           const q=screen(e.position);return q?`<circle data-key="soak:${i}" data-effect="miasma-soak" cx="${q.x}" cy="${q.y}" r="${radius(5)}" fill="#ae87ff" fill-opacity=".15" stroke="#dac7ff" stroke-width="2"/>`:'';
         }).join('');
-        return `<div class="mw-map" data-replay-field style="aspect-ratio:${arena.width}/${arena.height}"><svg viewBox="0 0 ${arena.width} ${arena.height}" role="img" aria-label="陵寝哨兵连续战斗场地推演"><image href="${arena.image}" width="${arena.width}" height="${arena.height}"/><g pointer-events="none">${water}${murk}${miasma}${circles}${soaks}${lances}${clears}</g><g>${bosses}${slimes}${avatars}</g><g pointer-events="none">${helical}${impacts}</g></svg></div>`;
+        return `<div class="mw-map" data-replay-field style="aspect-ratio:${arena.width}/${arena.height}"><svg viewBox="0 0 ${arena.width} ${arena.height}" role="img" aria-label="陵寝哨兵连续战斗场地推演"><defs><clipPath id="sentinels-standable"><polygon points="555,0 1440,0 1440,345 1475,390 1580,480 1580,630 1470,710 1440,760 1440,1118 555,1118 555,760 520,710 415,630 415,480 520,390 555,345"/></clipPath></defs><image href="${arena.image}" width="${arena.width}" height="${arena.height}"/><g pointer-events="none" clip-path="url(#sentinels-standable)">${water}</g><g pointer-events="none">${murk}${miasma}${circles}${soaks}${lances}${clears}</g><g>${bosses}${slimes}${avatars}</g><g pointer-events="none">${helical}${impacts}</g></svg></div>`;
       }});
     const jumps=marks.filter(e=>e.timeMs>=0).sort((a,b)=>a.timeMs-b.timeMs);
     host.insertAdjacentHTML('afterbegin',`<label>回放片段<select aria-label="陵寝哨兵回放片段">${jumps.map(e=>`<option value="${e.timeMs}">${workbench.escape(e.label)}，${Math.floor(e.timeMs/60000)}:${((e.timeMs%60000)/1000).toFixed(1).padStart(4,'0')}</option>`).join('')}</select></label>`);

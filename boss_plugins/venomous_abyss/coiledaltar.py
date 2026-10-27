@@ -8,23 +8,28 @@ from analyzer_core.analysis_profile import profile_schema, resolve_profile
 from analyzer_core.player_abilities import load_player_ability_catalog
 
 CONFIG_SCHEMA = profile_schema([
-    {"key": "toxicDelugeReviewEnabled", "type": "boolean", "label": "剧毒洪流与毒液搬运", "default": True},
-    {"key": "severReviewEnabled", "type": "boolean", "label": "撕裂清场", "default": True},
-    {"key": "guillotineReviewEnabled", "type": "boolean", "label": "处斩分摊与跑离", "default": True},
-    {"key": "dreadmarchReviewEnabled", "type": "boolean", "label": "恐惧行军与救人", "default": True},
+    {"key": "toxicDelugeReviewEnabled", "type": "boolean", "label": "剧毒洪流与毒液搬运详细复盘", "default": False},
+    {"key": "severReviewEnabled", "type": "boolean", "label": "撕裂清场详细复盘", "default": False},
+    {"key": "guillotineReviewEnabled", "type": "boolean", "label": "处斩分摊与跑离详细复盘", "default": False},
+    {"key": "dreadmarchReviewEnabled", "type": "boolean", "label": "恐惧行军与救人详细复盘", "default": False},
     {"key": "manifestationsReviewEnabled", "type": "boolean", "label": "恐惧具象与凝视", "default": True},
     {"key": "soulSeverReviewEnabled", "type": "boolean", "label": "灵魂撕裂", "default": True},
     {"key": "gloombombReviewEnabled", "type": "boolean", "label": "幽暗炸弹分散", "default": True},
     {"key": "graveboundReviewEnabled", "type": "boolean", "label": "墓缚致死", "default": True},
     {"key": "eternalNightfallReviewEnabled", "type": "boolean", "label": "永恒夜幕破盾与打断", "default": True},
-    {"key": "blightedSeverReviewEnabled", "type": "boolean", "label": "凋零撕裂", "default": True},
-    {"key": "grimGuillotineReviewEnabled", "type": "boolean", "label": "冷酷处斩", "default": True},
-    {"key": "fieldReplayEnabled", "type": "boolean", "label": "场地推演", "default": True, "expensive": True,
-     "description": "为已选机制生成场地示意图。关闭后跳过制图；撕裂等位置判定仍会保留自身所需坐标与毒液、具象证据。"},
-    {"key": "intermissionReviewEnabled", "type": "boolean", "label": "转阶段残片、治疗与输出复盘", "default": True,
+    {"key": "blightedSeverReviewEnabled", "type": "boolean", "label": "凋零撕裂详细复盘", "default": False},
+    {"key": "grimGuillotineReviewEnabled", "type": "boolean", "label": "冷酷处斩详细复盘", "default": False},
+    {"key": "fieldReplayEnabled", "type": "boolean", "label": "连续战斗回放", "default": True, "expensive": True,
+     "description": "保留玩家位置、面向、绿球生成搬运与清除、各阶段头前、恐惧具象、炸弹和盘魂者；详细复盘子项关闭后仍显示这些基础数据。关闭回放可减少取证与输出。"},
+    {"key": "guillotineTelegraphEnabled", "type": "boolean", "label": "回放处斩分摊预兆（6码）", "default": True,
+     "visibleWhen": {"field": "fieldReplayEnabled", "equals": True},
+     "description": "被标记玩家周围显示6码圈，从点名开始，到本轮处斩最后一次命中结束；不执行分摊责任复盘。"},
+    {"key": "playerTimelineEnabled", "type": "boolean", "label": "玩家施法与Boss机制时间轴", "default": True,
+     "description": "仅展示技能实际施法与Boss机制对照；不需要导入爆发安排。关闭后跳过时间轴生成。"},
+    {"key": "intermissionReviewEnabled", "type": "boolean", "label": "转阶段残片、治疗与输出复盘", "default": False,
      "description": "关闭后跳过转阶段治疗、Boss 承伤及药水光环取证。"},
     {"key": "guildTimelineEnabled", "type": "boolean", "label": "阿瓦隆停手与爆发轴检查", "default": True,
-     "description": "仅对日志归属阿瓦隆的史诗场次执行；先检查提前转阶段，再检查爆发安排。"},
+     "description": "仅对日志归属阿瓦隆的史诗场次额外执行内置战术核对；其他团队仍可查看实际施法时间轴。"},
     {"key": "p1EarliestEndSeconds", "type": "number", "label": "P1 最早结束时间（秒）", "default": 170, "min": 170, "max": 600,
      "description": "P1 须完成约 2:42 的末轮撕裂，且至少打到 2:50；首次恐惧行军还须在 3:05 或之后开始读条。"},
     {"key": "firstDreadmarchEarliestSeconds", "type": "number", "label": "首次恐惧行军最早读条（秒）", "default": 185, "min": 185, "max": 600},
@@ -33,13 +38,11 @@ CONFIG_SCHEMA = profile_schema([
     {"key": "p2LastBladeOffsetSeconds", "type": "number", "label": "P2 最后一刀距 P2 开始（秒）", "default": 202.790, "min": 0, "max": 600,
      "description": "旧 M 击杀样本 6:26.052 − 3:03.262；随本场 P2 起点平移，并由首刀实测延迟校正，须有末轮刀完成事件才能确认已达要求。"},
     {"key": "burstWindowSeconds", "type": "number", "label": "爆发时间容差（秒）", "default": 10, "min": 0, "max": 30},
-    {"key": "burstPlan", "type": "text", "multiline": True, "label": "爆发安排 JSON（留空使用截图预设）", "default": "",
-     "description": "数组，每项含 player（角色名或 actor ID）、ability（公共技能目录 key）、times（开战后秒数，可用 [开始,结束] 指定区间）。饰品可单独用 spellIDs 数组与 label 填写确认的准确技能；可选 durationSeconds 仅作持续时间示意。未解析技能不会计错。"},
 ])
 
 import math
 from collections import Counter, defaultdict
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
@@ -133,6 +136,7 @@ SPELLS.update({
     1298795: "腐化毒素",
     1299266: "冷酷处斩",
     1299267: "冷酷处斩",
+    1299296: "冷酷处斩",
     1299396: "死亡之拥",
     1299401: "死亡低语",
     1299684: "撕裂",
@@ -200,7 +204,7 @@ CAST_LAST_SECOND_MS = 1_000
 GUILLOTINE_CAST_IDS = {1283489}
 GRIM_GUILLOTINE_CAST_IDS = {1299266, 1299267}
 GUILLOTINE_DAMAGE_ID = 1283594
-GRIM_GUILLOTINE_DAMAGE_IDS = {1283594, 1299266, 1299267}
+GRIM_GUILLOTINE_DAMAGE_IDS = {1283594, 1299266, 1299267, 1299296}
 GUILLOTINE_MARK = 1307425
 GRIM_GUILLOTINE_MARK_IDS = {1307425, 1307652}
 # P1 处斩后：全团寡妇之触；仍在分摊点 40 码内者额外吃寡妇之吻。
@@ -286,6 +290,7 @@ INTERMISSION_MS = 35_000
 INTERMISSION_SOULBIND = 1304032
 CONE_RADIUS_YARDS = 45  # Replay reach calibrated against observed clear positions and stack gains.
 CONE_HALF_ANGLE_DEG = 30.0  # Preserve the 60-degree frontal angle.
+VENOM_ORB_HIT_RADIUS_YARDS = 2.0  # Ground orbs touching the cone edge are cleared.
 MANIFEST_REPLAY_STEP_MS = 100
 MANIFEST_REPLAY_SPEED_YARDS = 3.0  # Walking speed confirmed by the owner.
 MANIFEST_WATCH_HALF_ANGLE_DEG = 30.0  # Owner: must look closely toward the ghost.
@@ -423,7 +428,6 @@ TABS = [
     ("p3", "P3 盘卷联合"),
     ("replay", "战斗回放"),
     ("field", "场地示意图"),
-    ("explore", "机制工作台"),
 ]
 
 PHASE_LABELS = {
@@ -501,17 +505,29 @@ def actor_facing_at(index, actor_id, timestamp):
     }
 
 
-def in_frontal_cone(origin, facing_radians, point, radius_yards=CONE_RADIUS_YARDS, half_angle_deg=CONE_HALF_ANGLE_DEG):
+def in_frontal_cone(origin, facing_radians, point, radius_yards=CONE_RADIUS_YARDS, half_angle_deg=CONE_HALF_ANGLE_DEG,
+                    hit_radius_yards=0):
     if origin is None or point is None or facing_radians is None:
         return False
     dx = point[0] - origin[0]
     dy = point[1] - origin[1]
     distance = math.hypot(dx, dy)
-    if distance > yards_to_units(radius_yards):
-        return False
+    radius = yards_to_units(radius_yards)
     target_angle = math.atan2(-dy, dx)
     delta = (target_angle - facing_radians + math.pi) % (2 * math.pi) - math.pi
-    return abs(delta) <= math.radians(half_angle_deg)
+    half_angle = math.radians(half_angle_deg)
+    if distance <= radius and abs(delta) <= half_angle:
+        return True
+    if hit_radius_yards <= 0:
+        return False
+    if abs(delta) <= half_angle:
+        gap = distance - radius
+    else:
+        excess = abs(delta) - half_angle
+        along = distance * math.cos(excess)
+        nearest = max(0, min(radius, along))
+        gap = math.hypot(along - nearest, distance * math.sin(excess))
+    return gap <= yards_to_units(hit_radius_yards)
 
 
 def cone_polygon(origin, facing_radians, radius_yards=CONE_RADIUS_YARDS, half_angle_deg=CONE_HALF_ANGLE_DEG, steps=18):
@@ -2265,7 +2281,10 @@ def analyze_cone_sever(
             position = point.get("position") or point.get("manifestPosition")
             inside = False
             if position and origin is not None and facing_radians is not None:
-                inside = in_frontal_cone(origin, facing_radians, (position["x"], position["y"]))
+                inside = in_frontal_cone(
+                    origin, facing_radians, (position["x"], position["y"]),
+                    hit_radius_yards=VENOM_ORB_HIT_RADIUS_YARDS if _is_ground_venom_point(point) else 0,
+                )
             if classify_manifests and point.get("kind") == "manifestation":
                 verdict = classify_fixation_after_sever(point, timestamp, fight_start, inside)
                 row = {**point, **verdict}
@@ -2396,7 +2415,9 @@ def _apply_mythic_side_assignment(row, assigned, side, side_label, slot, pair_in
     marked = []
     for point in assigned:
         coords = _position_xy(point.get("position"))
-        inside = bool(coords and in_frontal_cone(origin_xy, facing, coords))
+        inside = bool(coords and in_frontal_cone(
+            origin_xy, facing, coords, hit_radius_yards=VENOM_ORB_HIT_RADIUS_YARDS,
+        ))
         marked.append({
             **point,
             "assignedSide": side,
@@ -2533,7 +2554,9 @@ def analyze_guillotine(
     mark_ids = set(mark_ids or {GUILLOTINE_MARK})
     pulse_id = int(pulse_damage_id or WIDOW_TOUCH_DAMAGE_ID)
     in_range_id = int(in_range_damage_id or WIDOW_KISS_DAMAGE_ID)
-    completed = [event for event in casts if int(ability_id(event) or 0) in cast_ids and is_cast_complete(event)]
+    # 1299266 announces the P3 cast start; only 1299267 completes that cast.
+    completed = [event for event in casts if int(ability_id(event) or 0) in cast_ids
+                 and ability_id(event) != 1299266 and is_cast_complete(event)]
     rounds = []
     for index, cast in enumerate(completed, start=1):
         timestamp = int(cast["timestamp"])
@@ -3688,9 +3711,24 @@ def _gloombomb_cast_for_wave(completed, first_ts, last_ts):
     return min(completed, key=lambda event: abs(int(event["timestamp"]) - mid))
 
 
+class _IndexedPositionRows(list):
+    """Original sample order plus first-at-timestamp lookup for repeated queries."""
+    def __init__(self, rows):
+        super().__init__(rows)
+        first = {}
+        for order, row in enumerate(rows):
+            first.setdefault(int(row["timestamp"]), (row, order))
+        self.times = sorted(first)
+        self.points = [first[t][0] for t in self.times]
+        self.orders = [first[t][1] for t in self.times]
+
+
 def _index_rows_for_actor(index, actor_id):
     if actor_id is None or not index:
         return []
+    cache = getattr(index, "actor_rows_cache", None)
+    if cache is not None and actor_id in cache:
+        return cache[actor_id]
     keys = {actor_id}
     try:
         keys.add(int(actor_id))
@@ -3705,6 +3743,9 @@ def _index_rows_for_actor(index, actor_id):
                 continue
             seen.add(ident)
             rows.append(row)
+    if cache is not None:
+        rows = _IndexedPositionRows(rows)
+        cache[actor_id] = rows
     return rows
 
 
@@ -3724,10 +3765,16 @@ def _timeline_point_near(rows, timestamp, window_ms=GLOOMBOMB_HIT_POS_WINDOW_MS)
     ts = int(timestamp)
     window = int(window_ms)
     max_gap = int(GLOOMBOMB_INTERP_GAP_MS)
-    before = [row for row in rows if int(row["timestamp"]) <= ts]
-    after = [row for row in rows if int(row["timestamp"]) >= ts]
-    left = max(before, key=lambda row: int(row["timestamp"])) if before else None
-    right = min(after, key=lambda row: int(row["timestamp"])) if after else None
+    if isinstance(rows, _IndexedPositionRows):
+        i = bisect_left(rows.times, ts)
+        li = i if i < len(rows.times) and rows.times[i] == ts else i-1
+        left = rows.points[li] if li >= 0 else None
+        right = rows.points[i] if i < len(rows.times) else None
+    else:
+        before = [row for row in rows if int(row["timestamp"]) <= ts]
+        after = [row for row in rows if int(row["timestamp"]) >= ts]
+        left = max(before, key=lambda row: int(row["timestamp"])) if before else None
+        right = min(after, key=lambda row: int(row["timestamp"])) if after else None
     if left and right:
         left_ts = int(left["timestamp"])
         right_ts = int(right["timestamp"])
@@ -3740,7 +3787,12 @@ def _timeline_point_near(rows, timestamp, window_ms=GLOOMBOMB_HIT_POS_WINDOW_MS)
             y = float(left["y"]) + (float(right["y"]) - float(left["y"])) * t
             reliable = min(ts - left_ts, right_ts - ts) <= window
             return point_dict((x, y), timestamp=ts, reliable=reliable, offset_ms=0)
-    nearby = [row for row in rows if abs(int(row["timestamp"]) - ts) <= max_gap]
+    if isinstance(rows, _IndexedPositionRows):
+        candidates = {j for j in (li, i) if 0 <= j < len(rows.times)}
+        nearby = [rows.points[j] for j in sorted(candidates, key=lambda j: rows.orders[j])
+                  if abs(rows.times[j]-ts) <= max_gap]
+    else:
+        nearby = [row for row in rows if abs(int(row["timestamp"]) - ts) <= max_gap]
     if not nearby:
         return None
     nearest = min(nearby, key=lambda row: abs(int(row["timestamp"]) - ts))
@@ -3758,10 +3810,16 @@ def _timeline_point_at(rows, timestamp, max_age_ms=GLOOMBOMB_POSITION_MAX_OFFSET
     if not rows or timestamp is None:
         return None
     ts = int(timestamp)
-    at_or_before = [row for row in rows if int(row["timestamp"]) <= ts]
-    if not at_or_before:
-        return None
-    last = max(at_or_before, key=lambda row: int(row["timestamp"]))
+    if isinstance(rows, _IndexedPositionRows):
+        i = bisect_right(rows.times, ts)-1
+        if i < 0:
+            return None
+        last = rows.points[i]
+    else:
+        at_or_before = [row for row in rows if int(row["timestamp"]) <= ts]
+        if not at_or_before:
+            return None
+        last = max(at_or_before, key=lambda row: int(row["timestamp"]))
     offset = int(last["timestamp"] - ts)
     if max_age_ms is not None and abs(offset) > max_age_ms:
         return None
@@ -3905,7 +3963,8 @@ def _gloombomb_target_position(hit_event, position_index, target_id):
     rows = _index_rows_for_actor(position_index, target_id)
     point = _player_event_point(hit_event)
     if point:
-        rows.append({"timestamp": snapshot_ts, "x": point[0], "y": point[1]})
+        # Keep event-specific evidence local; never mutate the shared trajectory.
+        rows = [*rows, {"timestamp": snapshot_ts, "x": point[0], "y": point[1]}]
     position = _timeline_point_near(rows, snapshot_ts, GLOOMBOMB_HIT_POS_WINDOW_MS)
     if position:
         return position, "damage-hit"
@@ -3921,6 +3980,10 @@ def analyze_gloombomb(
     completed.sort(key=lambda row: int(row.get("timestamp") or 0))
     debuff_rows = sorted(debuffs, key=lambda row: int(row.get("timestamp") or 0))
     fight_start = int(fight["startTime"])
+    bomb_hits = defaultdict(list)
+    for event in damage_events or []:
+        if event_type(event) == "damage" and ability_id(event) in GLOOMBOMB_DAMAGE_IDS:
+            bomb_hits[event.get("targetID")].append(event)
     rounds = []
     for index, (cast, apply_events, round_ts) in enumerate(_gloombomb_wave_specs(completed, debuff_rows, players), start=1):
         if not apply_events:
@@ -3936,7 +3999,7 @@ def analyze_gloombomb(
             apply_ts = int(event["timestamp"])
             remove_event = _first_full_aura_remove_after(debuff_rows, target_id, apply_ts, GLOOMBOMB_DEBUFF_IDS)
             hit_event = _gloombomb_damage_hit(
-                damage_events, target_id, apply_ts,
+                bomb_hits.get(target_id, []), target_id, apply_ts,
                 remove_ts=int(remove_event["timestamp"]) if remove_event else None,
             )
             explode_ts = int(hit_event["timestamp"]) if hit_event else None
@@ -4846,15 +4909,28 @@ def build_field_audit(
 
 def _analysis_needs(options):
     # Clearing mechanics require the objects being cleared even when their own
-    # report section is deselected. Map generation never enables other reviews.
+    # report section is deselected. Replay also requires object lifetimes and
+    # geometry, independently of whether detailed review sections are enabled.
     needs = dict(options)
-    needs["toxicDelugeReviewEnabled"] |= options["severReviewEnabled"] or options["blightedSeverReviewEnabled"]
-    needs["manifestationsReviewEnabled"] |= options["soulSeverReviewEnabled"] or options["blightedSeverReviewEnabled"]
+    if options["fieldReplayEnabled"]:
+        for key in ("toxicDelugeReviewEnabled", "severReviewEnabled", "blightedSeverReviewEnabled",
+                    "soulSeverReviewEnabled", "manifestationsReviewEnabled", "gloombombReviewEnabled",
+                    "guillotineReviewEnabled", "grimGuillotineReviewEnabled"):
+            needs[key] = True
+    needs["toxicDelugeReviewEnabled"] |= needs["severReviewEnabled"] or needs["blightedSeverReviewEnabled"]
+    needs["manifestationsReviewEnabled"] |= needs["soulSeverReviewEnabled"] or needs["blightedSeverReviewEnabled"]
     needs["positions"] = any(needs[key] for key in (
         "toxicDelugeReviewEnabled", "manifestationsReviewEnabled", "severReviewEnabled",
         "blightedSeverReviewEnabled", "soulSeverReviewEnabled", "guillotineReviewEnabled",
         "grimGuillotineReviewEnabled", "gloombombReviewEnabled"))
     return needs
+
+
+class _MechanicPositionIndex(dict):
+    """Per-fight immutable position input with reusable actor projections."""
+    def __init__(self, values):
+        super().__init__(values)
+        self.actor_rows_cache = {}
 
 
 def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
@@ -4881,13 +4957,13 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         enemy_deaths=enemy_deaths, zuljan_id=zuljan_id, malacrass_id=malacrass_id,
     )
     boss_position_events = _npc_position_events(raw, boss_ids) if field_enabled else []
-    caster_index = build_caster_self_position_index(
+    caster_index = _MechanicPositionIndex(build_caster_self_position_index(
         list(raw.get("casts") or [])
         + list(raw.get("damage") or [])
         + list(raw.get("resources") or [])
         + list(raw.get("npcPositionEvents") or []),
         boss_ids or None,
-    ) if field_enabled else {}
+    )) if field_enabled else {}
     position_events = (
         list(raw.get("damage") or [])
         + list(raw.get("debuffs") or [])
@@ -4895,7 +4971,7 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         + list(raw.get("npcPositionEvents") or [])
         + boss_position_events
     )
-    position_index = build_position_index(position_events) if field_enabled else {}
+    position_index = _MechanicPositionIndex(build_position_index(position_events)) if field_enabled else {}
     arena = coiledaltar_arena(position_index, list(players), boss_id=boss_id) if field_enabled else {}
     if arena:
         arena["virulentBlastRadiusYards"] = encounter_tuning(fight)["mutationRadiusYards"]
@@ -4918,12 +4994,12 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
     sever = analyze_cone_sever(
         "撕裂", SEVER_IDS, fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         venom_points, actor_catalog, boss_actor_id=zuljan_id, origin_index=caster_index,
-    ) if options["severReviewEnabled"] else {}
+    ) if needs["severReviewEnabled"] else {}
     blighted_sever = analyze_cone_sever(
         "凋零撕裂", BLIGHTED_SEVER_IDS, fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         active_points, actor_catalog, boss_actor_id=zuljan_id, origin_index=caster_index,
         npc_position_index=npc_position_index,
-    ) if options["blightedSeverReviewEnabled"] else {}
+    ) if needs["blightedSeverReviewEnabled"] else {}
     if int(fight.get("difficulty") or 0) == MYTHIC_DIFFICULTY:
         annotate_mythic_sever_deluge_pairs(fight, toxic_deluge, sever, blighted_sever, venom_points)
     _reconcile_venom_severs(fight, raw, venom_points, sever, blighted_sever)
@@ -4934,7 +5010,7 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         in_range_damage_id=WIDOW_KISS_DAMAGE_ID,
         origin_index=caster_index,
         boss_actor_id=zuljan_id,
-    ) if options["guillotineReviewEnabled"] else {}
+    ) if needs["guillotineReviewEnabled"] else {}
     grim_guillotine = analyze_guillotine(
         fight, raw["casts"], raw["damage"], raw["debuffs"], position_index, actor_map, players, markers,
         GRIM_GUILLOTINE_CAST_IDS, "冷酷处斩",
@@ -4944,7 +5020,7 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         in_range_damage_id=DEATH_EMBRACE_DAMAGE_ID,
         origin_index=caster_index,
         boss_actor_id=zuljan_id,
-    ) if options["grimGuillotineReviewEnabled"] else {}
+    ) if needs["grimGuillotineReviewEnabled"] else {}
     dreadmarch = analyze_dreadmarch(
         fight, raw["casts"], raw["debuffs"], raw["damage"], [],
         deaths, actor_map, players, markers,
@@ -4955,14 +5031,14 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         fight, raw["casts"], enemy_deaths, position_index, actor_map, markers, manifestations.get("activePoints") or [],
         boss_actor_id=malacrass_id, origin_index=caster_index, debuffs=raw["debuffs"],
         npc_position_index=npc_position_index,
-    ) if options["soulSeverReviewEnabled"] else {}
+    ) if needs["soulSeverReviewEnabled"] else {}
     gloombomb = analyze_gloombomb(
         fight, raw["casts"], raw["debuffs"], position_index, actor_map, players, markers,
         origin_index=caster_index, boss_actor_id=malacrass_id,
         npc_position_index=npc_position_index, actor_rows=actor_rows,
         enemy_buffs=raw.get("enemyBuffs") or [], interrupts=raw.get("interrupts") or [],
         enemy_deaths=enemy_deaths, damage_events=list(raw.get("damage") or []),
-    ) if options["gloombombReviewEnabled"] else {}
+    ) if needs["gloombombReviewEnabled"] else {}
     gravebound = analyze_gravebound_failures(
         fight, raw["debuffs"], deaths, actor_map, players,
         damage_events=list(raw.get("damage") or []),
@@ -4985,27 +5061,30 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
         actor_rows=actor_rows,
         buffs=raw.get("buffs") or [],
     ) if options["intermissionReviewEnabled"] else {}
-    field_audit = build_field_audit(
-        arena, toxic_deluge if options["toxicDelugeReviewEnabled"] else {}, sever, soul_sever, gloombomb, blighted_sever,
-        manifestations if options["manifestationsReviewEnabled"] else {},
-        guillotine=guillotine, grim_guillotine=grim_guillotine,
-    ) if options["fieldReplayEnabled"] and field_enabled else {}
+    # Continuous replay uses only the arena calibration. Snapshot diagrams
+    # duplicated positions, polygons and player records for every mechanic.
+    field_audit = {"arena": arena, "diagrams": []} if options["fieldReplayEnabled"] else {}
 
     return {
         "phaseTimeline": markers,
         "toxicDeluge": toxic_deluge if options["toxicDelugeReviewEnabled"] else {},
-        "sever": sever,
-        "guillotine": guillotine,
+        "sever": sever if options["severReviewEnabled"] else {},
+        "guillotine": guillotine if options["guillotineReviewEnabled"] else {},
         "dreadmarch": dreadmarch,
         "manifestations": manifestations if options["manifestationsReviewEnabled"] else {},
-        "soulSever": soul_sever,
-        "gloombomb": gloombomb,
+        "soulSever": soul_sever if options["soulSeverReviewEnabled"] else {},
+        "gloombomb": gloombomb if options["gloombombReviewEnabled"] else {},
         "graveboundFailures": gravebound,
         "eternalNightfall": eternal,
         "intermission": intermission,
-        "blightedSever": blighted_sever,
-        "grimGuillotine": grim_guillotine,
+        "blightedSever": blighted_sever if options["blightedSeverReviewEnabled"] else {},
+        "grimGuillotine": grim_guillotine if options["grimGuillotineReviewEnabled"] else {},
         "fieldAudit": field_audit,
+        "replayMechanics": _basic_replay_mechanics(toxic_deluge, (sever, soul_sever, blighted_sever),
+                                                  manifestations, gloombomb, (guillotine, grim_guillotine))
+            if options["fieldReplayEnabled"] else {},
+        "guillotineTelegraphs": _guillotine_telegraphs(fight, raw, players)
+            if options["fieldReplayEnabled"] and options["guillotineTelegraphEnabled"] else [],
         "npcCatalog": {
             "manifestNpcGameID": MANIFEST_NPC_GAME_ID,
             "manifestActors": actor_catalog["byGameID"].get(MANIFEST_NPC_GAME_ID, []),
@@ -5023,6 +5102,71 @@ def analyze_fight(fight, actor_map, actor_type, actor_rows, raw):
             ),
         },
     }
+
+
+def _basic_replay_mechanics(venom, sections, manifestations, bombs, guillotines=()):
+    """Compact visual evidence; detailed review outputs remain opt-in."""
+    def fields(row, keys):
+        return {key: row[key] for key in keys if key in row}
+
+    carry_keys = ("puddleID", "playerID", "applyTimeMs", "removeTimeMs", "pickupPosition", "dropPosition", "venomKind")
+    cones = []
+    for section in sections:
+        for row in section.get("rounds", []):
+            cone = fields(row, ("label", "phase", "spellID", "timeMs", "time", "casterID", "origin",
+                                "facingRadians", "facingLockMs", "facingRule", "coneRadiusYards", "coneHalfAngleDeg"))
+            cone["targetsInCone"] = [{"puddleID": p["puddleID"]} for p in row.get("targetsInCone", []) if p.get("puddleID") is not None]
+            cones.append(cone)
+    return {"version": 1,
+            "toxicDeluge": {
+                "virulentBlastRadiusYards": venom.get("virulentBlastRadiusYards"),
+                "rounds": [{"timeMs": row["timeMs"], "spawns": [fields(s, ("spawnTimeMs", "dropRespawn"))
+                            for s in row.get("spawns", [])]} for row in venom.get("rounds", [])],
+                "carriers": [fields(row, carry_keys) for row in venom.get("carriers", [])],
+                "pickups": [fields(row, carry_keys) for row in venom.get("pickups", [])],
+                "groundPuddles": [{**fields(row, ("puddleID", "venomKind", "groundedFromMs", "pickedUpAtMs", "position")),
+                    "carriers": [fields(c, carry_keys) for c in row.get("carriers", [])]}
+                    for row in venom.get("groundPuddles", [])]},
+            "cones": cones,
+            "runouts": [{**fields(row, ("label", "phase", "spellID", "timeMs", "time", "shareCentroid",
+                                        "dangerRadiusYards", "pulseTimeMs")),
+                         "rangeLabel": "寡妇之吻" if row.get("inRangeDamageID") == WIDOW_KISS_DAMAGE_ID else "死亡之拥",
+                         "participants": [fields(p, ("shareTimeMs",)) for p in row.get("participants", [])]}
+                        for section in guillotines for row in section.get("rounds", [])],
+            "manifestations": {"fixations": [fields(row, ("manifest", "playerID", "applyTimeMs", "removeTimeMs",
+                "despawnTimeMs", "despawnReason")) for row in manifestations.get("fixations", [])]},
+            "gloombomb": {"rounds": [{"targets": [fields(row, ("playerID", "applyTimeMs", "removeTimeMs",
+                "explodeTimeMs", "position")) for row in wave.get("targets", [])]} for wave in bombs.get("rounds", [])]}}
+
+
+def _guillotine_telegraphs(fight, raw, players):
+    """Lightweight target warnings, ending at the last observed share hit."""
+    start, end = int(fight["startTime"]), int(fight["endTime"])
+    ids = GUILLOTINE_CAST_IDS | GRIM_GUILLOTINE_CAST_IDS
+    casts = [e for e in raw.get("casts", []) if ability_id(e) in ids]
+    damage = [e for e in raw.get("damage", []) if ability_id(e) in {GUILLOTINE_DAMAGE_ID} | GRIM_GUILLOTINE_DAMAGE_IDS]
+    warnings, seen = [], set()
+    for begin in casts:
+        if event_type(begin) != "begincast":
+            continue
+        ts, sid, source = int(begin["timestamp"]), ability_id(begin), begin.get("sourceID")
+        completed = next((e for e in casts if is_cast_complete(e) and ability_id(e) == sid
+                          and e.get("sourceID") == source and ts <= int(e["timestamp"]) <= ts+15000), None)
+        finish = int(completed["timestamp"]) if completed else min(end, ts+15000)
+        # WCL begincast often has target=-1; the paired completed cast records
+        # the actual marked target. Guillotined debuffs belong to ALL soakers,
+        # so they cannot be used to invent additional warning targets.
+        targets = {begin.get("targetID"), (completed or {}).get("targetID")} & set(players)
+        hits = [int(e["timestamp"]) for e in damage if completed and finish-500 <= int(e["timestamp"]) <= finish+3000]
+        finish = max([finish, *hits])
+        for pid in targets:
+            signature = (ts, source, sid, pid)
+            if signature not in seen:
+                seen.add(signature)
+                warnings.append({"playerID": pid, "spellID": sid, "radiusYards": 6,
+                                 "startTimeMs": ts-start, "endTimeMs": min(end, finish)-start,
+                                 "completed": completed is not None})
+    return warnings
 
 
 def _merge_venom_drop_spawns(venom):
@@ -5119,7 +5263,9 @@ def _reconcile_venom_severs(fight, raw, venom_points, *sections):
             angles.append(own_facing)
         alternatives = []
         for angle in angles:
-            hits = [p for p in candidates.values() if p.get('position') and in_frontal_cone(origin, angle, _position_xy(p['position']))]
+            hits = [p for p in candidates.values() if p.get('position') and in_frontal_cone(
+                origin, angle, _position_xy(p['position']), hit_radius_yards=VENOM_ORB_HIT_RADIUS_YARDS,
+            )]
             alternatives.append((angle, hits))
         matching = [(a, h) for a, h in alternatives if actual is not None and len(h) == actual]
         sets = {tuple(sorted(p['puddleID'] for p in h)) for _, h in matching}
@@ -5166,7 +5312,8 @@ def _build_manifest_replay(fight, mechanics, raw, players, actor_map):
                           '_facingTimes':[r[0] for r in u.get('facingSamples', [])]}
              for u in mechanics.get('combatReplay', {}).get('units', []) if u['kind'] == 'player'}
     grouped = defaultdict(list)
-    for row in mechanics.get('manifestations', {}).get('fixations', []):
+    visual_manifestations = mechanics.get('replayMechanics', {}).get('manifestations', mechanics.get('manifestations', {}))
+    for row in visual_manifestations.get('fixations', []):
         m = row['manifest']
         grouped[(m['sourceID'], int(m.get('sourceInstance') or 0))].append(row)
     anchors = defaultdict(list)
@@ -5380,7 +5527,10 @@ def _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map):
     by_key = {(a['actorID'], a['instance']):a for a in actors.values()}
     pending = {}
     cursed = set()
-    rows = sorted(raw.get('replayEvents', []), key=lambda e:int(e['timestamp']))
+    actor_ids = {actor for actor, _ in by_key}
+    rows = sorted((e for e in raw.get('replayEvents', [])
+                   if e.get('sourceID') in actor_ids or e.get('targetID') in actor_ids),
+                  key=lambda e:int(e['timestamp']))
     for e in rows:
         t, kind = int(e['timestamp'])-start, event_type(e)
         source = (e.get('sourceID'), int(e.get('sourceInstance') or 0))
@@ -5535,7 +5685,8 @@ def _apply_altar_soulbind_replay(fight, mechanics, raw):
     """35-second Malacrass channel, anchored to his self aura/cast."""
     start, duration = int(fight['startTime']), int(fight['endTime'])-int(fight['startTime'])
     bosses = {b['actorID']:b for b in mechanics['combatReplay']['bosses'] if b.get('gameID')==259854}
-    rows = sorted([*(raw.get('replayEvents') or []),*(raw.get('casts') or []),*(raw.get('enemyBuffs') or [])],
+    rows = sorted((e for key in ('replayEvents', 'casts', 'enemyBuffs') for e in raw.get(key) or []
+                   if ability_id(e) in {INTERMISSION_SOULBIND, P3_SOULBOUND}),
                   key=lambda e:int(e['timestamp']))
     channels, seen = [], {}
     for event in rows:
@@ -5618,7 +5769,8 @@ def build_timeline_comparison_evidence(fight, casts, enemy_buffs):
                     "timeMs": by_phase["intermission"], "endTimeMs": by_phase.get("p3", duration),
                     "phase": "intermission", "sourceType": "phase"})
             continue
-        rows = [e for e in casts if ability_id(e) in ids]
+        rows = list({(int(e["timestamp"]), event_type(e), e.get("sourceID"), e.get("sourceInstance"), ability_id(e)): e
+                     for e in casts if ability_id(e) in ids}.values())
         begins = [e for e in rows if event_type(e) == "begincast"]
         onsets = list(begins)
         if key == "grim":
@@ -5814,6 +5966,20 @@ def _guild_phase_control(fight, markers, raw, actor_rows, options):
             if reasons:
                 row["reason"] = "；".join(reasons)
         samples = sorted(health.items())
+        candidates = {}
+        for key, kind in (("guildPlayerCasts", "cast"), ("guildBossDamage", "damage")):
+            selected = []
+            for event in raw.get(key, []):
+                t = int(event.get("timestamp") or 0)-start
+                if (event.get("targetID") != boss_id or event_type(event) != kind
+                        or not begin <= t <= limit or observed_end is not None and t > observed_end):
+                    continue
+                resource = _resource_for_actor(event, boss_id) if phase == "p2" else None
+                i = bisect_right(samples, (t, float("inf")))-1 if phase == "p2" else -1
+                hp = float(resource["hitPoints"])/float(resource["maxHitPoints"])*100 if resource else (
+                    samples[i][1] if i >= 0 and t-samples[i][0] <= 3000 else None)
+                selected.append((t, event, hp))
+            candidates[key] = selected
         row["thresholdWindows"] = {}
         for threshold in range(1, 11):
             hold_begin = next((t for t, hp in samples if hp < threshold), None)
@@ -5827,20 +5993,13 @@ def _guild_phase_control(fight, markers, raw, actor_rows, options):
                 }
             # Use only the causal last HP sample, with a bounded sampling age.
             cast_rows, damage_rows = [], []
-            for key, target, kinds in (("guildPlayerCasts", cast_rows, {"cast"}), ("guildBossDamage", damage_rows, {"damage"})):
-                for event in raw.get(key, []):
-                    t = int(event.get("timestamp") or 0)-start
-                    if event.get("targetID") != boss_id or event_type(event) not in kinds or not begin <= t <= limit:
-                        continue
+            for key, target in (("guildPlayerCasts", cast_rows), ("guildBossDamage", damage_rows)):
+                for t, event, hp in candidates[key]:
                     if phase == "p1":
-                        if hold_begin is not None and hold_begin <= t < hold_until and (observed_end is None or t <= observed_end):
+                        if hold_begin is not None and hold_begin <= t < hold_until:
                             target.append(event)
                         continue
-                    resource = _resource_for_actor(event, boss_id)
-                    index = bisect_right(samples, (t, float("inf")))-1
-                    hp = float(resource["hitPoints"])/float(resource["maxHitPoints"])*100 if resource else (
-                        samples[index][1] if index >= 0 and t-samples[index][0] <= 3000 else None)
-                    if hp is not None and hp < threshold and (observed_end is None or t <= observed_end):
+                    if hp is not None and hp < threshold:
                         target.append(event)
             row["thresholds"][str(threshold)] = {"casts": cast_rows, "damage": damage_rows}
         row["healthSampleCount"] = len(samples)
@@ -5936,6 +6095,36 @@ def build_guild_icon_timelines(timelines, raw, players, actor_map, fight):
 GUILD_PLANNED_PHASE_STARTS = {"p1": 0, "p2": 180000, "intermission": 395000, "p3": 430000}
 
 
+def _actual_cast_timeline(fight, markers, raw, actor_map, players, profile):
+    """Observed player casts for every guild, independent of the Avalon plan."""
+    start = int(fight["startTime"])
+    catalog = load_player_ability_catalog()["abilities"]
+    allowed = {"major-burst", "minor-burst", "consumable", "bloodlust"}
+    by_spell = {sid: a for a in catalog if a.get("category") in allowed for sid in a["ids"]}
+    indexed = defaultdict(set)
+    for e in raw.get("guildPlayerCasts", raw.get("friendlyCasts", [])):
+        sid, pid = ability_id(e), e.get("sourceID")
+        if event_type(e) == "cast" and pid in players and sid in by_spell:
+            key = "item."+str(sid) if by_spell[sid]["key"] == "item.offensive-trinket" else by_spell[sid]["key"]
+            indexed[(pid, key)].add(int(e["timestamp"])-start)
+    abilities = {a["key"]: a for a in catalog}
+    timelines = []
+    for (pid, key), times in indexed.items():
+        item_id = int(key.split(".", 1)[1]) if key.startswith("item.") and key.split(".", 1)[1].isdigit() else None
+        ability = abilities["item.offensive-trinket"] if item_id else abilities[key]
+        timelines.append({**player_ref(players, actor_map, pid), "ability": key,
+            "label": ability["nameZh"]+(f" {item_id}" if item_id else ""), "spellIDs": [item_id] if item_id else ability["ids"], "category": "trinket" if item_id else ability["category"],
+            "casts": sorted(times), "intervals": [], "windows": [], "plannedWindows": [],
+            "effectKind": "cast-only"})
+    return {"enabled": True, "checksEnabled": False, "actualOnly": True,
+            "analysisProfile": profile, "timelineViewVersion": "icons-v1", "evidenceVersion": "actual-casts-v1",
+            "displayTimelines": timelines, "timelines": timelines, "checks": [], "phaseControl": [],
+            "players": [], "plan": [], "unresolved": [], "count": 0,
+            "phaseTimeline": markers, "durationMs": int(fight["endTime"])-start,
+            "bossComparison": build_timeline_comparison_evidence(fight, raw.get("casts", []), raw.get("enemyBuffs", [])),
+            "evidenceNote": "仅显示公共技能目录中实际成功施放的爆发、药水、饰品和嗜血；不显示预定轴，不判断其他团队的战术安排。"}
+
+
 def guild_phase_timings(markers, controls):
     by_phase = {row["phase"]: row for row in controls}
     result = []
@@ -5957,8 +6146,10 @@ def guild_phase_timings(markers, controls):
 def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, options):
     profile = resolve_profile(raw.get("reportGuild"), options)
     result = {"enabled": False, "analysisProfile": profile}
+    if not options.get("playerTimelineEnabled", True):
+        return {**result, "reason": "未启用玩家施法时间轴"}
     if not _guild_timeline_enabled(raw, options) or int(fight.get("difficulty") or 0) != 5:
-        return {**result, "reason": "仅对已启用专属检查的阿瓦隆史诗日志执行"}
+        return _actual_cast_timeline(fight, markers, raw, actor_map, players, profile)
     start, duration = int(fight["startTime"]), int(fight["endTime"])-int(fight["startTime"])
     phases = _guild_phase_control(fight, markers, raw, actor_rows, options)
     owners = {a["id"]: a.get("petOwner") for a in actor_rows if a.get("petOwner") is not None}
@@ -5996,6 +6187,11 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
     skip_reason = "前序阶段时间轴提前，跳过爆发缺失计数" if early else "前序阶段结束、末轮刀或首次恐惧行军读条尚未确认，不判漏爆发" if uncertain else None
     catalog = {a["key"]: a for a in load_player_ability_catalog()["abilities"]}
     cast_index = defaultdict(list)
+    aura_index = {"self": defaultdict(list), "enemy": defaultdict(list)}
+    for e in raw.get("guildPlayerBuffs", []):
+        aura_index["self"][e.get("targetID")].append(e)
+    for e in raw.get("guildEnemyDebuffs", []):
+        aura_index["enemy"][e.get("sourceID")].append(e)
     for event in raw.get("guildPlayerCasts", []):
         if event_type(event) == "cast" and event.get("sourceID") in players:
             cast_index[(event["sourceID"], ability_id(event))].append(int(event["timestamp"])-start)
@@ -6042,7 +6238,7 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
         aura_target = ability.get("auraTarget", "self")
         aura_ids = set(ability.get("auraIds", ability["ids"]))
         aura = [] if effect_kind == "cast-only" else _burst_aura_intervals(
-            raw.get("guildEnemyDebuffs" if aura_target == "enemy" else "guildPlayerBuffs", []),
+            aura_index.get(aura_target, {}).get(pid, []),
             pid, aura_ids, start, duration, target=aura_target)
         for interval in aura:
             if interval.get("targetID") is not None:
@@ -6080,13 +6276,14 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
             timeline["intervals"] = [{"startTimeMs": t, "endTimeMs": min(duration, t+assignment["durationSeconds"]*1000),
                                       "evidence": "configured-estimate"} for t in actual]
         timelines.append(timeline)
-    return {"enabled": True, "analysisProfile": profile, "phaseControl": phases, "defaultThreshold": 5,
+    return {"enabled": True, "checksEnabled": True, "analysisProfile": profile, "phaseControl": phases, "defaultThreshold": 5,
             "evidenceVersion": "guild-effects-v2",
             "holdWindowVersion": 2,
             "burstSkipped": skip_reason is not None, "burstSkipReason": skip_reason,
             "checks": checks, "timelines": timelines, "unresolved": unresolved,
             "timelineViewVersion": "icons-v1",
-            "displayTimelines": build_guild_icon_timelines(timelines, raw, players, actor_map, fight),
+            "actualOnly": True,
+            "displayTimelines": _actual_cast_timeline(fight, markers, raw, actor_map, players, profile)["displayTimelines"],
             "bossComparison": build_timeline_comparison_evidence(fight, raw.get("casts", []), raw.get("enemyBuffs", [])),
             "count": sum(r["counted"] for r in checks),
             "players": [{**player_ref(players, actor_map, pid), "count": sum(r["counted"] for r in checks if r["playerID"] == pid)} for pid in players],
@@ -6100,9 +6297,26 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
 
 
 def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options):
-    if not _guild_timeline_enabled(payload, options) or int(fight.get("difficulty") or 0) != 5:
+    if not options.get("playerTimelineEnabled", True):
         return payload
-    burst_plan(options)  # Reject malformed configuration before expensive evidence requests.
+    avalon = _guild_timeline_enabled(payload, options) and int(fight.get("difficulty") or 0) == 5
+    if options["fieldReplayEnabled"] and "replayEvents" in payload:
+        # The replay transport explicitly includes casts, boss damage and the
+        # relevant aura IDs. Reuse it instead of issuing three full-fight reads.
+        rows = payload["replayEvents"]
+        bosses = {a["id"] for a in actor_rows if a.get("gameID") in {257911, 259854}}
+        payload.update(guildPlayerCasts=payload.get("friendlyCasts", []),
+                       guildPlayerBuffs=payload.get("friendlyBuffs", []),
+                       guildEnemyDebuffs=payload.get("debuffs", []),
+                       guildBossDamage=[e for e in rows if avalon and event_type(e) == "damage" and e.get("targetID") in bosses])
+        return payload
+    if not avalon:
+        catalog = load_player_ability_catalog()["abilities"]
+        ids = sorted({sid for a in catalog for sid in a["ids"]})
+        payload["guildPlayerCasts"] = client.events(report_id, "Casts", fight, hostility_type="Friendlies",
+            filter_expression="ability.id IN ("+", ".join(map(str, ids))+")")
+        return payload
+    burst_plan(options)  # Validate only the internal Avalon check configuration.
     bosses = [a["id"] for a in actor_rows if a.get("gameID") in {257911, 259854}]
     if not bosses:
         return payload
@@ -6123,7 +6337,7 @@ def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options
 
 
 def guild_timeline_overview(rendered):
-    enabled = [p for p in rendered if (p.get("coiledaltar", {}).get("guildTimeline") or {}).get("enabled")]
+    enabled = [p for p in rendered if (p.get("coiledaltar", {}).get("guildTimeline") or {}).get("checksEnabled")]
     if not enabled:
         return []
     burst, hold = [], []
@@ -6152,9 +6366,28 @@ def guild_timeline_overview(rendered):
          "players":nightly_player_totals(hold),"events":hold,"detailTab":"guildTimeline"}]
 
 
+def _compact_replay_positions(rows, actor_rows):
+    from analyzer_core.event_evidence import actor_position
+    allowed = {a['id'] for a in actor_rows if a.get('type') == 'Player' or a.get('gameID') in {257911, 259854, SOULCOILER_NPC_GAME_ID, MANIFEST_NPC_GAME_ID}}
+    samples = {}
+    for e in rows:
+        for side, number in (("source", "1"), ("target", "2")):
+            actor = e.get(side+'ID')
+            if actor not in allowed:
+                continue
+            p = actor_position(e, side)
+            if p is None:
+                continue
+            t, instance = int(e['timestamp']), int(e.get(side+'Instance') or 0)
+            resource = e if str(e.get('resourceActor')) == number else e.get(side+'Resources') or {}
+            samples[(actor, instance, t//100)] = {'timestamp': t, 'type': 'resourcechange',
+                'sourceID': actor, 'sourceInstance': instance, 'resourceActor': 1,
+                'x': p['x'], 'y': p['y'], 'facing': resource.get('facing')}
+    return list(samples.values())
+
+
 def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
     options = resolve_analysis_options(CONFIG_SCHEMA, options or {})
-    burst_plan(options)
     needs = _analysis_needs(options)
     field_enabled = needs["positions"]
     phase_enabled = options["eternalNightfallReviewEnabled"]
@@ -6168,11 +6401,15 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
         ids = set(MECHANIC_CAST_IDS) | set(MECHANIC_DAMAGE_IDS) | set(MECHANIC_DEBUFF_IDS)
         ids |= set(MECHANIC_ENEMY_BUFF_IDS) | set(INTERMISSION_POTIONS) | {RECLAIM_ESSENCE}
         ids |= {CURSE_OF_TONGUES_ID,ALTAR_FANGS_ID,ALTAR_DEFILEMENT_ID}
-        cfg = {'fetchCombatReplay':True, 'fetchPositionResources':True,
+        avalon = _guild_timeline_enabled({"reportGuild": fight.get("reportGuild")}, options) and options["playerTimelineEnabled"] and int(fight.get("difficulty") or 0) == 5
+        if avalon:
+            ids |= {sid for a in load_player_ability_catalog()["abilities"] for sid in a.get("auraIds", [])}
+        cfg = {'fetchCombatReplay':True, 'fetchPositionResources':False,
                'unifiedEventFilter':('resources.actor.id > 0 OR type IN '
                    '("cast", "begincast", "combatantinfo", "death", "resurrect", "interrupt") '
                    'OR ability.id IN ('+', '.join(map(str, sorted(ids)))+')'
-                   +(f' OR (type = "heal" AND target.id = {zuljan})' if zuljan else ''))}
+                   +(' OR (type = "damage" AND target.id IN (257911, 259854))' if avalon else '')
+                   +(' OR (type = "heal" AND ability.id = 1287718)' if intermission_enabled else ''))}
         transition = next((p for p in fight.get('phaseTransitions', []) if p.get('id') == 3), None)
         damage_window = None
         if transition and zuljan and options['intermissionReviewEnabled']:
@@ -6199,6 +6436,9 @@ def fetch_payload(client, report_id, fight, actor_rows=None, options=None):
                         'deaths':deaths,
                         'bossDamage':streams[2][1] if damage_window else [e for e in rows if event_type(e) == 'damage' and e.get('targetID') == zuljan],
                         'analysisOptions':options})
+        # Sample display/analysis positions once per actor and 100ms. Raw
+        # mechanic hits remain exact in damage/debuff/NPC evidence streams.
+        payload['resources'] = _compact_replay_positions(rows, actor_rows)
         payload["reportGuild"] = fight.get("reportGuild") or {}
         return _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options)
     zuljan_id = resolve_boss_actor_id(actor_rows, 257911, ("Zul'jan", "祖尔加"))
@@ -6279,14 +6519,16 @@ def render_fight(report_id, report_start, actor_map, actor_type, actor_rows, fig
     started = datetime.fromtimestamp((report_start + fight["startTime"]) / 1000, tz=CN_TZ)
     survival = build_survival_timeline(fight, actor_map, players, raw["deaths"], raw["friendlyCasts"], SPELLS)
     if raw.get("replayEvents"):
-        mechanics["combatReplay"] = build_replay_tracks(fight, players, actor_map, raw["replayEvents"], actor_rows=actor_rows, spell_names=SPELLS, deaths=raw["deaths"], survival_timeline=survival["timeline"], include_facing=True)
+        selected = set(players) | {a['id'] for a in actor_rows if a.get('gameID') in {257911, 259854, SOULCOILER_NPC_GAME_ID}}
+        mechanics["combatReplay"] = build_replay_tracks(fight, players, actor_map, raw["replayEvents"], actor_rows=actor_rows, spell_names=SPELLS, deaths=raw["deaths"], survival_timeline=survival["timeline"], include_facing=True, actor_ids=selected)
         _apply_altar_boss_lifetimes(mechanics, actor_rows)
         mechanics['soulcoilerReplay'] = _build_soulcoiler_replay(fight, mechanics, raw, players, actor_map)
         mechanics['altarGroundReplay'] = _build_altar_ground_replay(fight, mechanics, raw)
         _apply_altar_nightfall_replay(fight, mechanics, raw, players, actor_map)
         mechanics['soulbindReplay'] = _apply_altar_soulbind_replay(fight, mechanics, raw)
         mechanics['manifestReplay'] = _build_manifest_replay(fight, mechanics, raw, players, actor_map)
-        mechanics.setdefault('manifestations', {})['resonanceCollisions'] = mechanics['manifestReplay']['resonanceCollisions']
+        if options['manifestationsReviewEnabled']:
+            mechanics.setdefault('manifestations', {})['resonanceCollisions'] = mechanics['manifestReplay']['resonanceCollisions']
     end_phase = mechanics["phaseTimeline"][-2]["label"] if len(mechanics["phaseTimeline"]) > 1 else "P1"
     return {
         "reportID": report_id,
@@ -6491,7 +6733,7 @@ def build_aggregated_json(report_ids, options=None):
         for _, row in run_parallel_indexed(list(enumerate(fights, start=1)), fetch_one):
             rendered.append(row)
     rendered.sort(key=lambda row: (row["startTimeIso"], row["reportID"], row["fightID"]))
-    progress("生成盘卷祭坛阶段复盘与场地示意图", 96)
+    progress("生成盘卷祭坛重点机制与连续回放", 96)
     overview = _mechanic_overview(rendered)
     metric_enabled = {"gloombombCollateralHits": options["gloombombReviewEnabled"],
                       "unclearedSouls": options["soulSeverReviewEnabled"] or options["blightedSeverReviewEnabled"],
@@ -6507,9 +6749,12 @@ def build_aggregated_json(report_ids, options=None):
             "bossKey": "coiledaltar",
             "bossName": "盘卷祭坛",
             "analyzedReports": report_id_list,
-            "mechanicVersion": "coiledaltar-guild-timeline-2026-10-19-v150",
+            "mechanicVersion": "coiledaltar-replay-basics-2026-10-23",
             "tabDefinitions": [{"key": key, "label": label} for key, label in TABS
-                               if (key not in {"field", "replay"} or options["fieldReplayEnabled"])
+                               if key not in {"field", "explore"}
+                               and (key != "replay" or options["fieldReplayEnabled"])
+                               and (key != "p1" or any(options[k] for k in ("toxicDelugeReviewEnabled", "severReviewEnabled", "guillotineReviewEnabled")))
+                               and (key != "p3" or any(options[k] for k in ("blightedSeverReviewEnabled", "grimGuillotineReviewEnabled")))
                                and (key != "intermission" or options["intermissionReviewEnabled"])],
             "analysisConfig": options,
             "skippedAnalyses": [field["label"] for field in CONFIG_SCHEMA if field["type"] == "boolean" and not options[field["key"]]],

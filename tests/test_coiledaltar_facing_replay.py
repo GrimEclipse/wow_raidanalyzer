@@ -1,3 +1,7 @@
+from unittest.mock import Mock
+import pytest
+from analyzer_core.config import resolve_analysis_options
+from boss_plugins.venomous_abyss.shared import position_at, position_at_interpolated
 import math
 
 from analyzer_core.combat_replay import build_replay_tracks
@@ -143,7 +147,7 @@ def test_vulnerability_damage_fetch_targets_real_boss_only_within_phase():
     fight = {'startTime':0,'endTime':20000,'phaseTransitions':[
         {'id':3,'startTime':1000},{'id':4,'startTime':5000}]}
     payload = boss.fetch_payload(Client(),'example',fight,[
-        dict(id=99,name="Zul'jan",gameID=270093),dict(id=9,name="Zul'jan",gameID=257911)])
+        dict(id=99,name="Zul'jan",gameID=270093),dict(id=9,name="Zul'jan",gameID=257911)], options={"intermissionReviewEnabled":True})
     query = next(opts for kind,opts in calls if kind == 'DamageDone')
     assert query['target_id'] == 9
     assert (query['start_time'],query['end_time']) == (1000,5000)
@@ -254,3 +258,140 @@ def test_sparse_paths_respect_recorded_and_unrecorded_contacts():
     assert abs(ghosts[0]['samples'][-1][1]-ghosts[1]['samples'][-1][1]) >= 150
     assert ghosts[0]['samples'][0][1] == 0
     assert 'estimate' in ghosts[0]['positionEvidence']
+
+
+def test_defaults_focus_on_p2_and_have_no_plan_import():
+    opts = resolve_analysis_options(boss.CONFIG_SCHEMA, {})
+    for key in ('toxicDelugeReviewEnabled', 'severReviewEnabled', 'guillotineReviewEnabled',
+                'dreadmarchReviewEnabled', 'blightedSeverReviewEnabled', 'grimGuillotineReviewEnabled',
+                'intermissionReviewEnabled'):
+        assert not opts[key]
+    assert opts['fieldReplayEnabled'] and opts['playerTimelineEnabled'] and opts['guillotineTelegraphEnabled']
+    assert 'burstPlan' not in opts
+
+
+def test_replay_stream_reused_without_duplicate_timeline_requests():
+    opts = resolve_analysis_options(boss.CONFIG_SCHEMA, {})
+    client = Mock()
+    casts = [dict(timestamp=100, type='cast', sourceID=1, abilityGameID=107574)]
+    damage = dict(timestamp=200, type='damage', sourceID=1, targetID=90, amount=20)
+    raw = dict(reportGuild={'id':774422}, replayEvents=[*casts, damage], friendlyCasts=casts,
+               friendlyBuffs=[], debuffs=[])
+    result = boss._fetch_guild_timeline(client, 'r', {'difficulty':5},
+        [dict(id=90, gameID=257911)], raw, opts)
+    assert result['guildPlayerCasts'] is casts
+    assert result['guildBossDamage'] == [damage]
+    client.events.assert_not_called()
+    opts['playerTimelineEnabled'] = False
+    assert boss._fetch_guild_timeline(client, 'r', {}, [], raw, opts) is raw
+    client.events.assert_not_called()
+
+
+def test_foreign_guild_sees_actual_casts_without_avalon_checks():
+    opts = resolve_analysis_options(boss.CONFIG_SCHEMA, {})
+    players = {1:dict(id=1, name='A', role='melee-dps')}
+    raw = dict(reportGuild={'id':1}, casts=[], enemyBuffs=[], guildPlayerCasts=[
+        dict(timestamp=1200,type='begincast',sourceID=1,abilityGameID=107574),
+        dict(timestamp=1500,type='cast',sourceID=1,abilityGameID=107574)])
+    result = boss.analyze_guild_timeline(dict(startTime=1000,endTime=3000,difficulty=5),
+        [dict(key='p1',timeMs=0)], raw, [], {1:'A'}, players, opts)
+    assert result['enabled'] and not result['checksEnabled'] and result['actualOnly']
+    assert not result['checks'] and not result['plan'] and not result['phaseControl']
+    assert result['displayTimelines'][0]['casts'] == [500]
+    assert result['displayTimelines'][0]['plannedWindows'] == []
+    opts['playerTimelineEnabled'] = False
+    assert not boss.analyze_guild_timeline({}, [], raw, [], {}, players, opts)['enabled']
+
+
+def test_warning_uses_real_cast_target_not_all_soakers_and_ends_after_final_hit():
+    raw = {'casts':[
+        dict(timestamp=1000,type='begincast',abilityGameID=1283489,sourceID=90,targetID=-1),
+        dict(timestamp=4500,type='cast',abilityGameID=1283489,sourceID=90,targetID=1)],
+        'debuffs':[dict(timestamp=6000,type='applydebuff',abilityGameID=1307425,targetID=2)],
+        'damage':[dict(timestamp=t,type='damage',abilityGameID=1283594,targetID=pid)
+                  for t,pid in ((6000,1),(6004,2))]}
+    rows = boss._guillotine_telegraphs({'startTime':0,'endTime':10000},raw,{1:{},2:{}})
+    assert len(rows) == 1 and rows[0]['playerID'] == 1
+    assert rows[0]['radiusYards'] == 6
+    assert (rows[0]['startTimeMs'], rows[0]['endTimeMs']) == (1000,6004)
+    assert rows[0]['completed']
+
+
+def test_binary_position_queries_preserve_nearest_ties_and_interpolation():
+    rows = [dict(timestamp=t,x=x,y=0) for t,x in ((0,0),(100,10),(100,11),(200,20))]
+    index = {1:rows}
+    assert position_at(index,1,150)['x'] == 10
+    assert position_at(index,1,100)['x'] == 10
+    assert position_at_interpolated(index,1,150)['x'] == 15.5
+    assert position_at_interpolated(index,1,-10)['reliable']
+    assert not position_at(index,1,10000)['reliable']
+
+
+def test_indexed_bomb_positions_preserve_unsorted_duplicates_gaps_and_ties():
+    import random
+    rng = random.Random(77)
+    for _ in range(20):
+        rows = [dict(timestamp=rng.randrange(0, 100)*100, x=i, y=-i) for i in range(40)]
+        indexed = boss._IndexedPositionRows(rows)
+        for ts in range(-500, 11000, 137):
+            for window in (0, 100, 750):
+                assert boss._timeline_point_near(indexed, ts, window) == boss._timeline_point_near(rows, ts, window)
+            for age in (None, 0, 500):
+                assert boss._timeline_point_at(indexed, ts, age) == boss._timeline_point_at(rows, ts, age)
+
+
+def test_bomb_hit_snapshot_does_not_mutate_cached_actor_positions():
+    import copy
+    index = boss._MechanicPositionIndex({1:[dict(timestamp=1000,x=0,y=0)]})
+    before = copy.deepcopy(index)
+    rows = boss._index_rows_for_actor(index, 1)
+    point, rule = boss._gloombomb_target_position(dict(timestamp=1500,type='damage',
+        targetID=1,resourceActor=2,x=50,y=60),index,1)
+    assert rule == 'damage-hit' and (point['x'],point['y']) == (50,60)
+    assert index == before and len(rows) == 1
+    assert boss._index_rows_for_actor(index,1) is rows
+
+
+def test_replay_keeps_orbs_and_frontals_when_all_detailed_reviews_are_off():
+    options = resolve_analysis_options(boss.CONFIG_SCHEMA, {})
+    options.update({row['key']: False for row in boss.CONFIG_SCHEMA if row['type'] == 'boolean'})
+    options['fieldReplayEnabled'] = True
+    options['guillotineTelegraphEnabled'] = True
+    sid = next(iter(boss.SEVER_IDS))
+    casts = [dict(timestamp=100,type='cast',abilityGameID=boss.TOXIC_DELUGE,sourceID=9),
+             dict(timestamp=200,type='cast',abilityGameID=boss.COALESCED_VENOM_CAST,sourceID=10,
+                  sourceInstance=1,sourceResources={'x':1000,'y':0}),
+             dict(timestamp=2000,type='begincast',abilityGameID=sid,sourceID=9,targetID=1),
+             dict(timestamp=3000,type='cast',abilityGameID=sid,sourceID=9,targetID=1,
+                  sourceResources={'x':0,'y':0,'facing':0}),
+             dict(timestamp=4000,type='begincast',abilityGameID=1283489,sourceID=9,targetID=1),
+             dict(timestamp=7500,type='cast',abilityGameID=1283489,sourceID=9,targetID=1),
+             dict(timestamp=11000,type='begincast',abilityGameID=1299267,sourceID=9,targetID=1),
+             dict(timestamp=11000,type='cast',abilityGameID=1299266,sourceID=9,targetID=-1),
+             dict(timestamp=14500,type='cast',abilityGameID=1299267,sourceID=9,targetID=1)]
+    raw = {key:[] for key in ('damage','enemyDeaths','deaths','enemyBuffs','debuffs','friendlyCasts')}
+    raw.update(casts=casts,combatants=[dict(sourceID=1,specID=62)],analysisOptions=options,
+               resources=[dict(timestamp=2000,type='resourcechange',sourceID=1,resourceActor=1,x=2000,y=0)])
+    raw['damage'] = [dict(timestamp=t,type='damage',abilityGameID=spell,sourceID=9,targetID=1,
+                         resourceActor=2,x=2000,y=0) for t,spell in
+                     ((8500,boss.GUILLOTINE_DAMAGE_ID),(15500,1299296))]
+    actors = [dict(id=1,name='A',type='Player'),dict(id=9,name="Zul'jan",gameID=257911,type='NPC')]
+    fight = dict(startTime=0,endTime=20000,difficulty=4)
+    result = boss.analyze_fight(fight,{1:'A',9:"Zul'jan"},{1:'Player',9:'NPC'},actors,raw)
+    for key in ('toxicDeluge','sever','blightedSever','soulSever','manifestations','gloombomb','guillotine','grimGuillotine'):
+        assert result[key] == {}
+    visual = result['replayMechanics']
+    assert visual['toxicDeluge']['groundPuddles'][0]['position']['x'] == 1000
+    assert len(visual['cones']) == 1
+    assert visual['cones'][0]['origin'] is not None
+    assert visual['cones'][0]['facingRadians'] is not None
+    assert 'unclearedCount' not in visual['cones'][0]
+    assert len(visual['runouts']) == 2
+    assert all(r['dangerRadiusYards'] == 40 and r['shareCentroid'] for r in visual['runouts'])
+    assert len(result['guillotineTelegraphs']) == 2
+    assert result['guillotineTelegraphs'][0]['endTimeMs'] == 8500
+    assert result['guillotineTelegraphs'][1]['endTimeMs'] == 15500
+    assert result['fieldAudit']['diagrams'] == []
+    options['fieldReplayEnabled'] = False
+    result = boss.analyze_fight(fight,{1:'A',9:"Zul'jan"},{1:'Player',9:'NPC'},actors,raw)
+    assert result['replayMechanics'] == {} and result['fieldAudit'] == {}

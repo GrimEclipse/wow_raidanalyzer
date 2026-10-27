@@ -8,7 +8,7 @@
 
   function boundsOf(replay, arena) {
     if (arena && Number.isFinite(arena.minX) && Number.isFinite(arena.maxX)) {
-      return { minX: arena.minX, maxX: arena.maxX, minY: arena.minY, maxY: arena.maxY, centerX: arena.centerX, centerY: arena.centerY, unitsPerYard: arena.unitsPerYard || 100, plotOffsetY: arena.plotOffsetY || 0 };
+      return { minX: arena.minX, maxX: arena.maxX, minY: arena.minY, maxY: arena.maxY, centerX: arena.centerX, centerY: arena.centerY, unitsPerYard: arena.unitsPerYard || 100, pixelsPerYard: arena.pixelsPerYard || 4.2 };
     }
     const xs = [], ys = [];
     for (const unit of replay?.units || []) {
@@ -24,13 +24,12 @@
 
   function project(point, box) {
     if (!point || !box) return null;
-    const dx = box.maxX - box.minX || 1, dy = box.maxY - box.minY || 1;
-    return { x: ((point.x - box.minX) / dx) * WIDTH, y: (1 - (point.y - box.minY) / dy + (box.plotOffsetY || 0)) * HEIGHT };
+    const scale = (box.pixelsPerYard || 4.2) / (box.unitsPerYard || 100);
+    return { x: WIDTH / 2 + (point.x - box.centerX) * scale, y: HEIGHT / 2 - (point.y - box.centerY) * scale };
   }
 
   function yardToPx(yards, box) {
-    const units = (yards || 10) * (box.unitsPerYard || 100);
-    return (units / (box.maxX - box.minX || 1)) * WIDTH;
+    return (yards || 10) * (box.pixelsPerYard || 4.2);
   }
 
   function bossUnit(replay) {
@@ -101,7 +100,7 @@
     const puddles = field.orbPuddles || mechanics.orbPuddles || [];
     const waterJets = field.waterJets || mechanics.waterJets || [];
     const box = boundsOf(replay, field.arena) || { minX: 0, maxX: 1, minY: 0, maxY: 1, unitsPerYard: 100 };
-    // Bubble / surge origin: always the projected map center (arena bounding-box midpoint).
+    // Bubble / surge origin stays at the artwork center; only world tracks are calibrated.
     const midQ = { x: WIDTH / 2, y: HEIGHT / 2 };
     const boss = bossUnit(replay);
     const bossPortrait = field.bossPortrait || mechanics.portraits?.boss || BOSS_ICON;
@@ -110,6 +109,16 @@
     const posOf = (id, t) => {
       const unit = unitOf(id);
       return unit && api.trackPosition(unit, t, replay.interpolateMaxGapMs || 5000);
+    };
+    const playerScreen = (point, t) => {
+      if (!point) return null;
+      const bubble = bubbles.find(row => t >= row.startTimeMs && t < (row.endTimeMs ?? row.popTimeMs ?? Infinity));
+      if (!bubble) return project(point, box);
+      const dx = point.x - box.centerX, dy = point.y - box.centerY;
+      const distance = Math.hypot(dx, dy);
+      const edge = ((bubble.radiusYards || 10) + 3) * (box.unitsPerYard || 100);
+      if (distance >= edge) return project(point, box);
+      return project({ x: box.centerX + (distance ? dx / distance * edge : edge), y: box.centerY + (distance ? dy / distance * edge : 0) }, box);
     };
 
     const events = [{ id: "start", timeMs: 0, label: "战斗开始", layer: "全场" }];
@@ -172,6 +181,7 @@
           surges.flatMap(row => (row.players || []).filter(p => Math.abs((p.firstTimeMs ?? row.arrivalTimeMs) - cursor) < 900).map(p => p.playerID))
         );
         const touchHit = new Set(touches.filter(row => cursor >= row.timeMs && cursor - row.timeMs < 1200).map(row => row.playerID));
+        const popKnockback = bubbles.some(row => row.popTimeMs != null && cursor >= row.popTimeMs && cursor - row.popTimeMs < 900);
 
         const bubble = bubbles.find(row => cursor >= row.startTimeMs && cursor < (row.endTimeMs ?? row.popTimeMs ?? Infinity));
         let bubbleSvg = "";
@@ -183,7 +193,9 @@
         const popped = bubbles.find(row => row.popTimeMs != null && cursor >= row.popTimeMs && cursor < row.popTimeMs + 1200);
         if (popped) {
           const progress = (cursor - popped.popTimeMs) / 1200;
-          bubbleSvg += `<circle data-key="bubble-pop" cx="${midQ.x}" cy="${midQ.y}" r="${yardToPx(popped.radiusYards || 10, box) + progress * 170}" fill="none" stroke="#a5f3fc" stroke-width="${5 * (1 - progress) + 1}" opacity="${1 - progress}"><title>嘭！</title></circle>`;
+          const radius = yardToPx(popped.radiusYards || 10, box);
+          const farthestCorner = Math.hypot(WIDTH / 2, HEIGHT / 2);
+          bubbleSvg += `<g data-key="bubble-pop"><rect width="${WIDTH}" height="${HEIGHT}" fill="#a5f3fc" opacity="${0.25 * (1 - progress)}"/><circle cx="${midQ.x}" cy="${midQ.y}" r="${radius + progress * (farthestCorner - radius)}" fill="none" stroke="#a5f3fc" stroke-width="${5 * (1 - progress) + 1}" opacity="${1 - progress}"/><title>嘭！全场击飞</title></g>`;
         }
 
         const surge = surges.find(row => cursor >= (row.castEndTimeMs ?? row.timeMs) && cursor < (row.popTimeMs ?? row.endTimeMs ?? Infinity));
@@ -205,7 +217,7 @@
             const pulse = foreshadow ? 0.55 + 0.2 * Math.sin(cursor / 250) : 0.82;
             surgeSvg += `<path data-key="surge:${i}" d="${waveBandPath(midQ.x, midQ.y, front, back, i)}" fill="#38bdf8" fill-opacity="${pulse}" stroke="#e0f2fe" stroke-width="2"><title>激荡漩涡：${foreshadow ? "外缘等待" : rushing ? "向中心推进" : "抵达水泡"}</title></path>`;
           }
-          if (safe != null) {
+          if (safe != null && cursor >= arrival) {
             surgeSvg += `<path data-key="surge-safe" d="${wedgePath(midQ.x, midQ.y, outer, safe)}" fill="#34d399" fill-opacity=".10" stroke="#6ee7b7" stroke-width="2"><title>推断安全方向：${api.escape(DIRS[safe] || surge.safeDirection || "")}（依据抵达时未中招玩家站位）</title></path>`;
           }
         }
@@ -214,7 +226,9 @@
         const puddleSvg = puddles.filter(row => cursor >= row.startTimeMs && cursor < row.endTimeMs).map(row => {
           const q = project(row, box);
           if (!q) return "";
-          return `<g data-key="${row.key}"><circle cx="${q.x}" cy="${q.y}" r="${puddleR}" fill="#0ea5e9" fill-opacity=".36" stroke="#7dd3fc" stroke-width="2" stroke-dasharray="4 3"/><title>残留冰水（约 ${row.radiusYards || 5} 码），${api.escape(row.source || "")}${row.clearedByJet ? "，将被水流喷射清除" : ""}</title></g>`;
+          const fading = row.clearStartTimeMs != null && cursor >= row.clearStartTimeMs;
+          const fade = fading ? Math.max(0, 1 - (cursor - row.clearStartTimeMs) / Math.max(1, row.clearEndTimeMs - row.clearStartTimeMs)) : 1;
+          return `<g data-key="${row.key}" opacity="${fade}"><circle cx="${q.x}" cy="${q.y}" r="${puddleR * (0.7 + 0.3 * fade)}" fill="#0ea5e9" fill-opacity=".36" stroke="#7dd3fc" stroke-width="2" stroke-dasharray="4 3"/><title>残留冰水（约 ${row.radiusYards || 5} 码），${api.escape(row.source || "")}${row.clearedByJet ? "，被水流喷射逐渐清除" : ""}</title></g>`;
         }).join("");
 
         const orbSvg = groundOrbs.filter(orb => cursor >= orb.startTimeMs && cursor < orb.endTimeMs).map(orb => {
@@ -279,9 +293,9 @@
         const avatars = players.map(unit => {
           const life = api.lifeState(unit, cursor);
           const pos = api.trackPosition(unit, life.positionTime, replay.interpolateMaxGapMs);
-          const q = project(pos, box);
+          const q = playerScreen(pos, cursor);
           if (!q || !life.opacity) return "";
-          return `<g data-key="player:${unit.actorID}" opacity="${life.opacity}">${frostMarked.has(unit.actorID) ? `<circle cx="${q.x}" cy="${q.y}" r="22" fill="#bfdbfe" fill-opacity=".18" stroke="#bae6fd" stroke-width="2" stroke-dasharray="4 3"><title>Chilling Frost 点名</title></circle>` : ""}${api.avatar(unit, { ...q, stale: pos?.stale }, 12, hitIDs.has(unit.actorID) || touchHit.has(unit.actorID), life.dead, 1)}</g>`;
+          return `<g data-key="player:${unit.actorID}" opacity="${life.opacity}">${frostMarked.has(unit.actorID) ? `<circle cx="${q.x}" cy="${q.y}" r="22" fill="#bfdbfe" fill-opacity=".18" stroke="#bae6fd" stroke-width="2" stroke-dasharray="4 3"><title>Chilling Frost 点名</title></circle>` : ""}${api.avatar(unit, { ...q, stale: pos?.stale }, 12, popKnockback || hitIDs.has(unit.actorID) || touchHit.has(unit.actorID), life.dead, 1)}</g>`;
         }).join("");
 
         return `<div class="mw-map" data-replay-field style="aspect-ratio:${WIDTH}/${HEIGHT}"><img src="${api.escape(field.arenaImage || "/assets/raids/tidebound_grotto/01-nymrissa.jpg")}" alt="尼姆瑞莎场地" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="尼姆瑞莎场地推演" style="position:relative;z-index:1">${bubbleSvg}${surgeSvg}${puddleSvg}${orbSvg}${jetSvg}${touchSvg}${burstSvg}${addSvg}${bossSvg}${avatars}</svg></div>`;

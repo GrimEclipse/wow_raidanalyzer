@@ -1486,7 +1486,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
     def is_public_page(path):
         demo_assets = {
             "/boss_catalog.json", "/demos", "/frontend/tools/mechanic-demos/index.html",
-            "/assets/demos/manifest.json", "/assets/demos/twinfangs.json", "/assets/demos/coiledaltar.json",
+            "/assets/demos/manifest.json", "/assets/demos/sentinels.json", "/assets/demos/twinfangs.json", "/assets/demos/coiledaltar.json",
             "/assets/demos/coiledaltar_progression.json",
             "/assets/demos/coiledaltar_today_check.json",
             "/assets/demos/vashnik.json", "/assets/demos/nymrissa_wavecaller.json",
@@ -1502,6 +1502,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/frontend/core/home-workspace.css", "/frontend/core/home-workspace.js",
             "/frontend/core/mechanic-workbench.css", "/frontend/core/mechanic-workbench.js",
             "/frontend/report/plugins/venomous_abyss/vashnik/wave-replay.js",
+            "/frontend/report/plugins/venomous_abyss/sentinels/field-replay.js",
+            "/frontend/report/plugins/venomous_abyss/sentinels/revision.css",
             "/frontend/report/plugins/venomous_abyss/vashnik/field-view.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/field-replay.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/guild-timeline.js",
@@ -1513,6 +1515,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/frontend/report/plugins/unbinding_of_kithix/kithix/field-replay.js",
         }
         for plugin in (
+            "venomous_abyss/sentinels",
             "venomous_abyss/progression",
             "venomous_abyss/coiledaltar",
             "venomous_abyss/ulatek",

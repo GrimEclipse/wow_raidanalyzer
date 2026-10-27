@@ -420,11 +420,28 @@ def build_position_index(events):
     return index
 
 
+def _position_bound(rows, timestamp, *, right=False):
+    """Binary search on sorted samples without allocating timestamp arrays."""
+    lo, hi = 0, len(rows)
+    while lo < hi:
+        mid = (lo+hi)//2
+        value = rows[mid]["timestamp"]
+        if value < timestamp or (right and value == timestamp):
+            lo = mid+1
+        else:
+            hi = mid
+    return lo
+
+
 def position_at(index, actor_id, timestamp, max_offset_ms=2500):
     rows = index.get(actor_id) or []
     if not rows:
         return None
-    nearest = min(rows, key=lambda row: abs(row["timestamp"] - timestamp))
+    i = _position_bound(rows, timestamp)
+    candidates = rows[max(0, i-1):i+1]
+    nearest = min(candidates, key=lambda row: abs(row["timestamp"]-timestamp))
+    # Preserve the original first-sample tie behavior for duplicate timestamps.
+    nearest = rows[_position_bound(rows, nearest["timestamp"])]
     offset = nearest["timestamp"] - timestamp
     return {**nearest, "sampleOffsetMs": offset, "reliable": abs(offset) <= max_offset_ms}
 
@@ -434,14 +451,9 @@ def position_at_interpolated(index, actor_id, timestamp, reliable_window_ms=3_00
     rows = index.get(actor_id) or []
     if not rows:
         return None
-    before = None
-    after = None
-    for row in rows:
-        if row["timestamp"] <= timestamp:
-            before = row
-        else:
-            after = row
-            break
+    i = _position_bound(rows, timestamp, right=True)
+    before = rows[i-1] if i else None
+    after = rows[i] if i < len(rows) else None
     if before and after:
         before_delta = timestamp - before["timestamp"]
         after_delta = after["timestamp"] - timestamp

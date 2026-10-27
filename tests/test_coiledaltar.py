@@ -14,6 +14,40 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
         self.assertFalse(coiledaltar.in_frontal_cone(origin, facing, outside_angle))
         self.assertFalse(coiledaltar.in_frontal_cone(origin, facing, outside_range))
 
+    def test_ground_orb_hitbox_intersects_cone_without_widening_the_cone(self):
+        # Avalon M7: these two orb centers sit just beyond the 30-degree edge
+        # at 1:48 and 9:23, but their bodies overlap the blade.
+        examples = [
+            ((-3.0, 114881.0), 1.5787801890907636, (-533.0, 114113.0)),
+            ((583.0, 113534.0), -2.01, (918.0, 115836.0)),
+        ]
+        for origin, facing, orb in examples:
+            self.assertFalse(coiledaltar.in_frontal_cone(origin, facing, orb))
+            self.assertTrue(coiledaltar.in_frontal_cone(
+                origin, facing, orb, hit_radius_yards=coiledaltar.VENOM_ORB_HIT_RADIUS_YARDS,
+            ))
+        self.assertFalse(coiledaltar.in_frontal_cone(
+            (0.0, 0.0), 0.0, (3000.0, -2200.0), hit_radius_yards=coiledaltar.VENOM_ORB_HIT_RADIUS_YARDS,
+        ))
+
+    def test_edge_orb_cleared_by_earlier_blade_does_not_reappear_later(self):
+        first = {"timeMs": 462294, "spellID": 1307292, "origin": {"x": 1427.0, "y": 113641.0},
+                 "facingRadians": -2.075516714386157, "targetsInCone": []}
+        second = {"timeMs": 563394, "spellID": 1307292, "origin": {"x": 583.0, "y": 113534.0},
+                  "facingRadians": -2.01, "targetsInCone": []}
+        points = [
+            {"puddleID": 30, "kind": "ground-venom", "groundedFromMs": 442147,
+             "position": {"x": 539.53, "y": 114153.0}},
+            {"puddleID": 67, "kind": "virulent-mutation", "groundedFromMs": 551051,
+             "position": {"x": 918.0, "y": 115836.0}},
+        ]
+        coiledaltar._reconcile_venom_severs(
+            {"startTime": 0, "phaseTransitions": []}, {"debuffs": [], "casts": []}, points,
+            {"rounds": [first, second]},
+        )
+        self.assertEqual([p["puddleID"] for p in first["targetsInCone"]], [30])
+        self.assertEqual([p["puddleID"] for p in second["targetsInCone"]], [67])
+
     def test_phase_markers_follow_p2_intermission_and_p3_signals(self):
         fight = {"startTime": 1_000_000, "endTime": 1_540_000, "kill": False}
         casts = [
@@ -1710,7 +1744,7 @@ class CoiledAltarMechanicsTest(unittest.TestCase):
         self.assertTrue(transport['include_resources'])
         expression = transport['filter_expression']
         self.assertIn('resources.actor.id > 0', expression)
-        self.assertIn('target.id = 24', expression)
+        self.assertNotIn('type = "heal" AND target.id', expression)
         for spell in (coiledaltar.SPIRIT_ERASURE, coiledaltar.FIXATION, 1287718):
             self.assertIn(str(spell), expression)
         self.assertEqual(sum(row['dataType'] == 'Deaths' for row in calls), 1)

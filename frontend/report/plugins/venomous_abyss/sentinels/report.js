@@ -215,7 +215,7 @@ function load(payload) {
   const selectedFight = Number(new URLSearchParams(location.search).get("fight"));
   const selectedIndex = selectedFight ? state.pulls.findIndex(pull => Number(pull.fightID) === selectedFight) : -1;
   state.pull = selectedIndex >= 0 ? selectedIndex : 0;
-  state.tab = "helical";
+  state.tab = new URLSearchParams(location.search).get("tab") === "replay" ? "replay" : "helical";
   $("pullSelect").innerHTML = state.pulls.map((pull, index) => `<option value="${index}">Fight ${pull.fightID}，${esc(pull.difficultyName || "未知难度")}，${pull.isKill ? "KILL" : `${Number(pull.bossPercentage).toFixed(2)}%`}，${esc(pull.duration)}</option>`).join("");
   $("pullSelect").value = String(state.pull);
   $("error").textContent = state.pulls.length ? "" : "分析结果中没有陵寝哨兵战斗。";

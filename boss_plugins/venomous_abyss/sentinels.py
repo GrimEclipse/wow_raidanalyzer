@@ -1454,7 +1454,7 @@ def build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, su
     # rotation and offset against the existing arena artwork.
     arena = {"image": "/assets/raids/venomous_abyss/02-sentinels.png",
              "width": 1997, "height": 1118, "centerX": 34000, "centerY": 72000,
-             "pixelsPerYard": 10, "unitsPerYard": 100, "rotationDegrees": 117,
+             "pixelsPerYard": 9.5, "unitsPerYard": 100, "rotationDegrees": 117,
              "offsetX": 76, "offsetY": 226,
              "calibrationReport": "92RV4cFMT1d7bW6A", "calibrationFight": 6}
     positions = build_position_index(payload["replayEvents"] + payload["damage"] + payload["resources"])
@@ -1541,9 +1541,9 @@ def build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, su
             }
         elif event_type(event) == "removedebuff" and player_id in active_miasma:
             miasma.append({"playerID": player_id, **active_miasma.pop(player_id),
-                            "endTimeMs": time(event), "radiusYards": 8})
+                            "endTimeMs": time(event), "radiusYards": 5})
     miasma.extend({"playerID": player_id, **warning,
-                   "endTimeMs": duration, "radiusYards": 8}
+                   "endTimeMs": duration, "radiusYards": 5}
                   for player_id, warning in active_miasma.items())
 
     helical_explosions = []
@@ -1587,7 +1587,7 @@ def build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, su
                 p = point(player_id, int(event["timestamp"]))
                 if p:
                     water.append(item(event, playerID=player_id, position=p, radiusYards=5,
-                                      expansionYardsPerSecond=1, source="clinging-murk", endTimeMs=duration))
+                                      source="clinging-murk", endTimeMs=duration))
         elif spell == INJECTION_ID and kind in {"applydebuff", "applydebuffstack"}:
             injection_stacks[player_id] = int(event.get("stack") or (injection_stacks.get(player_id, 0) + 1))
         elif spell == INJECTION_ID and kind == "removedebuff":
@@ -1595,7 +1595,7 @@ def build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, su
             p = point(player_id, int(event["timestamp"]))
             if p and stacks:
                 water.append(item(event, playerID=player_id, position=p, radiusYards=5*stacks,
-                                  expansionYardsPerSecond=1, source="injection",
+                                  source="injection",
                                   stackCount=stacks, endTimeMs=duration))
     droplets = []
     for event in payload["damage"]:
@@ -1605,7 +1605,7 @@ def build_field_replay(fight, player_catalog, actor_map, actor_rows, payload, su
         p = point(event["targetID"], timestamp, event)
         if p:
             droplets.append(item(event, playerID=event["targetID"], position=p,
-                                 launchTimeMs=min(duration, time(event)+5000), bossID=event.get("sourceID")))
+                                 launchTimeMs=min(duration, time(event)+4000), bossID=event.get("sourceID")))
     spear_hits = [item(row, playerID=row.get("targetID"), position=point(row.get("targetID"), int(row["timestamp"]), row))
                   for row in payload["damage"] if ability_id(row) == SPEAR_HIT_ID and row.get("targetID") in player_catalog]
     soaks = [item(row, playerID=row.get("targetID"), position=point(row.get("targetID"), int(row["timestamp"]), row))

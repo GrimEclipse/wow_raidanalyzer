@@ -58,6 +58,7 @@ WATER_JET_DAMAGE_ID = 1271458
 WATER_JET_REACH_YARDS = 40
 LINGERING_FROST_ID = 1257654
 UNITS_PER_YARD = 100
+ARENA_WORLD_CENTER = {"x": 1208558.5, "y": 476164.0}
 BOSS_GAME_ID = 252959
 BIG_MURLOC_GAME_ID = 257892  # Bubblefin Frostscale — Waterfog Shield / 附近减伤
 SMALL_MURLOC_GAME_ID = 253032  # Bubblefin Shorerunner — 无特殊技能
@@ -434,8 +435,8 @@ def arena_bounds_from_replay(replay, center=None):
         return None
     pad = UNITS_PER_YARD * 8
     min_x, max_x, min_y, max_y = min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad
-    # Bubble must sit on the projected map center (= bounding-box midpoint).
-    center = center or {"x": (min_x + max_x) / 2, "y": (min_y + max_y) / 2}
+    # The arena center stays fixed between reports; sampled track bounds drift by pull.
+    center = center or ARENA_WORLD_CENTER
     return {
         "minX": min_x,
         "maxX": max_x,
@@ -444,9 +445,8 @@ def arena_bounds_from_replay(replay, center=None):
         "centerX": center["x"],
         "centerY": center["y"],
         "unitsPerYard": UNITS_PER_YARD,
-        # The 3-second in-game minimap places the raid about 5% lower than the
-        # raw replay projection on this background image.
-        "plotOffsetY": 0.05,
+        # One scale for both axes keeps a 10-yard bubble circular in world space.
+        "pixelsPerYard": 4.2,
     }
 
 
@@ -639,8 +639,8 @@ def _dist2(a, b):
     return (a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2
 
 
-def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, replay, orb_review):
-    """Each Chilling Frost tick drops one ice orb at feet (≈3 per mark); soak → 5yd water."""
+def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, replay, orb_review, frost_rounds=None):
+    """Rebuild the three ice orbs dropped by each Chilling Frost target."""
     start = int(fight["startTime"])
     end_ms = int(fight["endTime"]) - start
     drops = sorted(
@@ -650,13 +650,33 @@ def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, re
         ],
         key=lambda event: int(event.get("timestamp") or 0),
     )
+    scheduled = []
+    if frost_rounds:
+        for round_ in frost_rounds:
+            mark_time = int(round_["timeMs"])
+            for target in round_.get("targets") or []:
+                player_id = target.get("playerID")
+                available = [event for event in drops
+                             if event.get("targetID") == player_id
+                             and 0 <= int(event["timestamp"]) - start - mark_time < 7_000]
+                for slot in range(1, 4):
+                    expected = mark_time + slot * 1_500
+                    event = min(available, key=lambda row: abs(int(row["timestamp"]) - start - expected)) if available else None
+                    if event and abs(int(event["timestamp"]) - start - expected) <= 900:
+                        available.remove(event)
+                        scheduled.append((int(event["timestamp"]) - start, player_id, event, False))
+                    else:
+                        scheduled.append((expected, player_id, None, True))
+    else:
+        scheduled = [(int(event["timestamp"]) - start, event.get("targetID"), event, False) for event in drops]
+    scheduled.sort(key=lambda row: row[0])
     touches = list(orb_review.get("touches") or [])
     bursts = list(orb_review.get("bursts") or [])
     orbs = []
-    for index, event in enumerate(drops, start=1):
-        time_ms = int(event.get("timestamp") or 0) - start
-        player_id = event.get("targetID")
+    for index, (time_ms, player_id, event, inferred) in enumerate(scheduled, start=1):
         point = player_position_at(replay, player_id, time_ms)
+        if not point and event and event.get("x") is not None and event.get("y") is not None:
+            point = {"x": event["x"], "y": event["y"]}
         if not point:
             continue
         orbs.append({
@@ -668,6 +688,7 @@ def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, re
             "y": point["y"],
             "dropperID": player_id,
             "dropper": player_ref(players, actor_map, player_id).get("player"),
+            "inferred": inferred,
             "consumed": False,
             "consumeTimeMs": None,
             "consumeBy": None,
@@ -685,12 +706,6 @@ def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, re
             and orb["startTimeMs"] <= touch["timeMs"] <= orb["endTimeMs"]
             and _dist2(orb, touch_pos) <= soak_radius2
         ]
-        if not candidates:
-            # Fallback: nearest orb dropped in the last 35s regardless of distance noise.
-            candidates = [
-                orb for orb in orbs
-                if not orb["consumed"] and 0 <= touch["timeMs"] - orb["startTimeMs"] <= 35_000
-            ]
         if not candidates:
             continue
         candidates.sort(key=lambda orb: (_dist2(orb, touch_pos), touch["timeMs"] - orb["startTimeMs"]))
@@ -746,13 +761,14 @@ def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, re
                 "y": orb["y"],
                 "dropper": orb.get("dropper"),
                 "dropperID": orb.get("dropperID"),
+                "inferred": orb["inferred"],
                 "consumed": orb["consumed"],
                 "consumeTimeMs": orb.get("consumeTimeMs"),
             }
             for orb in orbs
         ],
         "puddles": puddles,
-        "note": "点名后每次 Chilling Frost 伤害在脚下落一颗冰球（通常每人 3 颗）；踩球后留下约 5 码水面。",
+        "note": "每位 Chilling Frost 点名玩家固定落三颗冰球；缺失的单次伤害记录按 1.5 秒节奏回推。踩球后留下约 5 码冰水。",
     }
 
 
@@ -828,7 +844,7 @@ def _segment_distance_squared(point, start, end):
 
 
 def clear_puddles_with_water_jets(puddles, jets, replay):
-    """End inferred ice patches when the logged tank beam crosses them."""
+    """Begin a short ice-patch fade when the logged tank beam crosses it."""
     boss = boss_unit_from_replay(replay)
     if not boss:
         return puddles
@@ -849,7 +865,9 @@ def clear_puddles_with_water_jets(puddles, jets, replay):
                 reach = float(jet.get("reachYards") or WATER_JET_REACH_YARDS) * UNITS_PER_YARD
                 end_point = {"x": source["x"] + dx / distance * reach, "y": source["y"] + dy / distance * reach}
                 if _segment_distance_squared(puddle, source, end_point) <= radius_squared:
-                    puddle["endTimeMs"] = time_ms
+                    puddle["clearStartTimeMs"] = time_ms
+                    puddle["clearEndTimeMs"] = min(puddle["endTimeMs"], time_ms + 2_000)
+                    puddle["endTimeMs"] = puddle["clearEndTimeMs"]
                     puddle["clearedByJet"] = jet["index"]
                     break
             if puddle.get("clearedByJet"):
@@ -1303,11 +1321,25 @@ def render_fight(report_id, report_start, actors, fight, raw):
         murlocs = build_murloc_review(fight, replay, raw.get("casts") or [])
         orb_fx = build_ground_orbs_and_puddles(
             fight, actor_map, players, raw.get("damage") or [], raw.get("debuffs") or [],
-            replay, mechanics.get("orbReview") or {},
+            replay, mechanics.get("orbReview") or {}, (mechanics.get("frostBarrage") or {}).get("rounds") or [],
         )
         water_jets = build_water_jets(
             fight, actor_map, players, raw.get("casts") or [], raw.get("damage") or [], replay,
         )
+        if replay.get("bosses"):
+            replay["bosses"][0].setdefault("casts", []).extend(
+                {
+                    "startTimeMs": jet["castEndTimeMs"],
+                    "endTimeMs": jet["endTimeMs"],
+                    "expectedEndTimeMs": jet["endTimeMs"],
+                    "spellID": WATER_JET_CAST_ID,
+                    "spellName": spell_name(WATER_JET_CAST_ID),
+                    "outcome": "completed",
+                    "phase": "channel",
+                }
+                for jet in water_jets if jet["endTimeMs"] > jet["castEndTimeMs"]
+            )
+            replay["bosses"][0]["casts"].sort(key=lambda row: row["startTimeMs"])
         clear_puddles_with_water_jets(orb_fx["puddles"], water_jets, replay)
         mechanics["combatReplay"] = replay
         mechanics["alluringBubbles"] = bubbles
@@ -1341,8 +1373,9 @@ def render_fight(report_id, report_start, actors, fight, raw):
             "bigMurlocPortrait": BIG_MURLOC_PORTRAIT,
             "note": (
                 "诱人水泡固定在场地正中央约 10 码直到嘭！；"
-                "激荡漩涡读条完在外缘等待 5 秒，再缓慢涌向中心，安全方向参考抵达时未中招玩家站位；"
-                "Chilling Frost 点名后每次伤害落一冰球，踩球后留下约 5 码冰水；对坦水流喷射可清除沿线冰水。"
+                "激荡漩涡读条完在外缘等待 5 秒，再缓慢涌向中心；浪潮在安全方向留出缺口；"
+                "嘭！造成全场击飞。Chilling Frost 每位点名玩家固定落三颗冰球，踩球后留下约 5 码冰水；"
+                "对坦水流喷射可逐渐清除沿线冰水。"
             ),
         }
     duration_ms = int(fight["endTime"]) - int(fight["startTime"])

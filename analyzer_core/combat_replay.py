@@ -48,7 +48,7 @@ def fetch_replay_events(client, report_id, fight, *, position_filter=True, inclu
     return rows
 
 
-def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), deaths=(), resurrections=(), survival_timeline=(), spell_names=None, include_facing=False):
+def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), deaths=(), resurrections=(), survival_timeline=(), spell_names=None, include_facing=False, actor_ids=None):
     start, end = int(fight['startTime']), int(fight['endTime'])
     metadata = {int(row['id']): row for row in actor_rows}
     samples, states, health, energy = defaultdict(dict), defaultdict(list), defaultdict(dict), defaultdict(dict)
@@ -66,10 +66,10 @@ def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), dea
         if event.get('sourceID') in boss_ids and event.get('type') in {'begincast', 'cast'}:
             boss_events[event['sourceID']].append(event)
         for side in ('source', 'target'):
-            point = actor_position(event, side)
             actor = event.get(side+'ID')
-            if actor is None or actor < 0:
+            if actor is None or actor < 0 or (actor_ids is not None and actor not in actor_ids):
                 continue
+            point = actor_position(event, side)
             instance = int(event.get(side+'Instance') or 0)
             t = timestamp-start
             if point is not None:
