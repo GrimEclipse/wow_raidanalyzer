@@ -34,7 +34,7 @@
       "label": "双子毒牙",
       "json": "/assets/demos/twinfangs.json",
       "page": "/frontend/report/plugins/venomous_abyss/progression/report.html",
-      "tab": "brood",
+      "tab": "replay",
       "description": "史诗，击杀，07:00.7，WCL BZKtqb6wyTnAHGRV / Fight 37"
     },
     {
@@ -66,7 +66,7 @@
     },
     {
       "key": "nymrissa_wavecaller",
-      "homepageVisible": false,
+      "homepageVisible": true,
       "label": "尼姆瑞莎",
       "json": "/assets/demos/nymrissa_wavecaller.json",
       "page": "/frontend/report/plugins/tidebound_grotto/nymrissa_wavecaller/report.html",

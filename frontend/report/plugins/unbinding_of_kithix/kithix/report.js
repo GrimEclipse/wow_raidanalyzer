@@ -86,7 +86,7 @@
       <h3>虚空之痕命中</h3><p class="hint">地板虚空圈（${spell(1304950, "虚空之痕")}）对各玩家的命中次数与伤害。</p>${table(["玩家", "命中次数", "伤害"], voidRows)}
       <h3>熄灭与圣光之拥</h3><p class="hint">每次 Boss 熄灭时，仍存活却没有 ${spell(1304526, "圣光之拥")} 的玩家记为漏球。</p>${table(["时间", "技能", "吃到", "漏球", "漏球玩家"], extinguishRows)}
       ${eggSections}
-      <h3>莉亚德琳 · 神圣光辉屏障</h3><p class="hint">Boss <strong>读完</strong> ${spell(1302951, "窒息黑暗")} 后，莉亚德琳撑起 40 码 ${spell(1303169, "神圣光辉")} 屏障，并以每秒 0.5 码收缩。待莉亚德琳能量到达 100，她会令 Boss 昏迷数秒。场地会被持续压缩，必须赶在被压死前把 Boss 打到 25%，让其读 ${spell(1301479, "八重蚀日")} 转入第二阶段。</p>${table(["次数", "开始", "结束", "半径", "说明"], barrierRows)}
+      <h3>莉亚德琳 · 神圣光辉屏障</h3><p class="hint">Boss 开始读 ${spell(1302951, "窒息黑暗")} 后，莉亚德琳先撑起辉光壁垒；读条结束前保持初始半径。读条完成后才开始以每秒 0.5 码收缩：第一轮从 30 码半径缩至 20 码，第二轮从 20 码缩至 10 码，到下限后保持。莉亚德琳读完 ${spell(1303169, "神圣光辉")} 并击晕 Boss 时屏障消失。转阶段先由冥河嚎叫令玩家短暂昏迷；Boss 开始读 ${spell(1301479, "八重蚀日")} 时立即移除屏障，读完后进入最终 Rush。</p>${table(["次数", "开始", "结束", "半径", "说明"], barrierRows)}
       <h3>窒息黑暗与蚀日碎片</h3>${table(["开始", "结束", "虚空之痕", "挡住碎片", "辉光消逝"], (data.darkness || []).map(row => [clock(row.startTimeMs), clock(row.endTimeMs), row.scarCount ?? 0, row.soakedCount ?? 0, row.leaked ? '<span class="badge bad">碰到莉亚德琳</span>' : '<span class="badge good">未碰到</span>']))}
       <h3>深渊攫取</h3>${table(["玩家", "获得", "移除", "8 秒内"], (data.grasps || []).map(row => [player(row), esc(row.applyTime), esc(row.removeTime || "—"), yes(row.cleared)]))}</section>`;
   }
@@ -99,7 +99,7 @@
       <p class="hint">转阶段读条是 ${spell(1301479, "八重蚀日")}，不是笼统的「施法」。${esc(axis.note || "")}</p>
       <h3>八重蚀日</h3>${table(["开始", "结束", "技能"], eightfold.map(row => [clock(row.startTimeMs), clock(row.timeMs), spell(row.spellID, row.spellName || "八重蚀日")]))}
       <h3>虚无之门与十二向飞球</h3>
-      <p class="hint">点名玩家在脚下放下虚无之门；buff 结束时，该玩家与场上每一扇仍在的门，都会沿基准线每 30° 射出 12 个球（约 8 码/秒）。</p>
+      <p class="hint">点名玩家在脚下放下虚无之门；debuff 移除时，该玩家与对应的门沿基准线每 30° 射出 12 个球（约 8 码/秒）。此后每扇门以自己的首次发射为起点，每隔 10 秒再次发射，直到被清除。</p>
       ${table(["玩家", "落门", "后续开火", "清除"], (data.gates || []).map(row => [player(row), clock(row.placeTimeMs ?? row.dropTimeMs), (row.fireTimesMs || []).map(clock).join("、") || "—", row.clearedTimeMs == null ? '<span class="badge bad">仍在</span>' : clock(row.clearedTimeMs)]))}
       ${table(["发射", "来源", "玩家 / 门", "清除"], volleys.map(row => [clock(row.launchTimeMs), row.source === "gate" ? "虚无之门" : "点名玩家", player(row), row.clearedTimeMs == null ? "飞出" : clock(row.clearedTimeMs)]))}
       <h3>湮消清场</h3>

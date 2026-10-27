@@ -13,11 +13,11 @@ DEMOS = [
     {"key": "sszorak", "boss": "sszorak", "label": "斯索拉克", "report": "ZFDWvrfqd6ygMKY2", "fight": 38, "raid": "venomous_abyss", "renderer": "progression", "tab": "replay"},
     {"key": "coiledaltar", "boss": "coiledaltar", "label": "盘卷祭坛", "report": "mDcP2prKBwFMxLH4", "fight": 35, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
     {"key": "coiledaltar_today_check", "homepageVisible": False, "boss": "coiledaltar", "label": "盘卷祭坛（10月13日记录）", "report": "8TJdnK1Rzy26gmAC", "fight": 7, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
-    {"key": "twinfangs", "boss": "twinfangs", "label": "双子毒牙", "report": "BZKtqb6wyTnAHGRV", "fight": 37, "raid": "venomous_abyss", "renderer": "progression", "tab": "brood"},
+    {"key": "twinfangs", "boss": "twinfangs", "label": "双子毒牙", "report": "BZKtqb6wyTnAHGRV", "fight": 37, "raid": "venomous_abyss", "renderer": "progression", "tab": "replay"},
     {"key": "ulatek", "homepageVisible": False, "boss": "ulatek", "label": "乌拉特克（英雄）", "report": "ZFDWvrfqd6ygMKY2", "fight": 12, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
     {"key": "ulatek_mythic", "boss": "ulatek", "label": "乌拉特克", "report": "r19Gk7PJfVvmnFgM", "fight": 3, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
     {"key": "vashnik", "boss": "vashnik", "label": "瓦什尼克", "report": "ZFDWvrfqd6ygMKY2", "fight": 54, "raid": "venomous_abyss", "renderer": "vashnik", "tab": "replay"},
-    {"key": "nymrissa_wavecaller", "homepageVisible": False, "boss": "nymrissa_wavecaller", "label": "尼姆瑞莎", "report": "ZFDWvrfqd6ygMKY2", "fight": 57, "raid": "tidebound_grotto", "renderer": "nymrissa_wavecaller", "tab": "replay"},
+    {"key": "nymrissa_wavecaller", "boss": "nymrissa_wavecaller", "label": "尼姆瑞莎", "report": "ZFDWvrfqd6ygMKY2", "fight": 57, "raid": "tidebound_grotto", "renderer": "nymrissa_wavecaller", "tab": "replay"},
     {"key": "coiledaltar_progression", "homepageVisible": False, "boss": "coiledaltar", "label": "盘卷祭坛（史诗开荒）", "report": "H1LdCx4hNG6jW2FT", "fight": 16, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},
     {"key": "kithix_heroic", "boss": "kithix", "label": "基希克斯", "report": "8RjgZwb1kMTD7m4Y", "fight": 5, "raid": "unbinding_of_kithix", "renderer": "kithix", "tab": "replay"},
 ]

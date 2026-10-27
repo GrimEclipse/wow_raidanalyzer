@@ -661,7 +661,7 @@
               "capabilities": {
                 "wipe": { "enabled": true, "renderer": "venomous-progression" },
                 "avoidable": { "enabled": true, "renderer": "venomous-progression" },
-                "replay": { "enabled": false, "renderer": "venomous-progression" }
+                "replay": { "enabled": true, "renderer": "venomous-progression" }
               },
               "configSchemaFromPlugin": true,
               "configSchema": [],
@@ -739,7 +739,7 @@
           "bosses": [
             {
               "key": "nymrissa_wavecaller",
-              "homepageVisible": false,
+              "homepageVisible": true,
               "previewImage": "assets/raids/tidebound_grotto/01-nymrissa-hero.png",
               "order": 1,
               "name": "尼姆瑞莎·唤潮者",
@@ -757,7 +757,7 @@
                 "dispels": { "enabled": false, "renderer": "generic-dispels" },
                 "mistakes": { "enabled": false, "renderer": "mistake-tracker" },
                 "verdict": { "enabled": false, "renderer": "mistake-verdict" },
-                "replay": { "enabled": false, "renderer": "field-audit" }
+                "replay": { "enabled": true, "renderer": "field-audit" }
               },
               "configSchemaFromPlugin": true,
               "configSchema": [],

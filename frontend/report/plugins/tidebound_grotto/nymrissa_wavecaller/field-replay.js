@@ -8,7 +8,7 @@
 
   function boundsOf(replay, arena) {
     if (arena && Number.isFinite(arena.minX) && Number.isFinite(arena.maxX)) {
-      return { minX: arena.minX, maxX: arena.maxX, minY: arena.minY, maxY: arena.maxY, centerX: arena.centerX, centerY: arena.centerY, unitsPerYard: arena.unitsPerYard || 100 };
+      return { minX: arena.minX, maxX: arena.maxX, minY: arena.minY, maxY: arena.maxY, centerX: arena.centerX, centerY: arena.centerY, unitsPerYard: arena.unitsPerYard || 100, plotOffsetY: arena.plotOffsetY || 0 };
     }
     const xs = [], ys = [];
     for (const unit of replay?.units || []) {
@@ -25,7 +25,7 @@
   function project(point, box) {
     if (!point || !box) return null;
     const dx = box.maxX - box.minX || 1, dy = box.maxY - box.minY || 1;
-    return { x: ((point.x - box.minX) / dx) * WIDTH, y: (1 - (point.y - box.minY) / dy) * HEIGHT };
+    return { x: ((point.x - box.minX) / dx) * WIDTH, y: (1 - (point.y - box.minY) / dy + (box.plotOffsetY || 0)) * HEIGHT };
   }
 
   function yardToPx(yards, box) {
@@ -49,16 +49,34 @@
     return `M ${pts.join(" L ")} Z`;
   }
 
-  /** Alive only: hide as soon as dead, and drop after samples end. */
+  function waveBandPath(cx, cy, inner, outer, index) {
+    const a0 = -Math.PI / 2 + index * Math.PI / 4 - Math.PI / 8;
+    const points = [];
+    for (let step = 0; step <= 8; step++) {
+      const angle = a0 + step * Math.PI / 4 / 8;
+      points.push(`${cx + Math.cos(angle) * outer},${cy + Math.sin(angle) * outer}`);
+    }
+    for (let step = 8; step >= 0; step--) {
+      const angle = a0 + step * Math.PI / 4 / 8;
+      points.push(`${cx + Math.cos(angle) * inner},${cy + Math.sin(angle) * inner}`);
+    }
+    return `M ${points.join(" L ")} Z`;
+  }
+
+  /** End a visible segment at death or a long replay-sample gap. */
   function livingAdd(unit, cursor) {
     const samples = unit.samples || [];
     if (!samples.length) return null;
-    const first = samples[0][0], last = samples[samples.length - 1][0];
-    if (cursor < first - 400) return null;
-    const death = (unit.states || []).find(row => row[1] === "dead" && row[0] >= first - 500);
+    let index = -1;
+    for (let i = 0; i < samples.length && samples[i][0] <= cursor; i++) index = i;
+    if (index < 0) return null;
+    const current = samples[index], next = samples[index + 1];
+    const death = (unit.states || []).find(row => row[1] === "dead" && row[0] >= samples[0][0] - 500);
     if (death && cursor >= death[0]) return null;
-    if (!death && cursor > last + 600) return null;
-    return { positionTime: Math.min(cursor, last) };
+    const segmentEnds = !next || next[0] - current[0] > 10000;
+    const age = cursor - current[0];
+    if (segmentEnds && age >= 700) return null;
+    return { positionTime: cursor, opacity: segmentEnds ? Math.max(0, 1 - age / 700) : 1 };
   }
 
   function portrait(href, x, y, r, key, title) {
@@ -105,7 +123,10 @@
       events.push({ id: `surgeArrive:${row.index}`, timeMs: row.arrivalTimeMs ?? row.castEndTimeMs, label: `抵达中心${row.safeDirection ? `（安全：${row.safeDirection}）` : ""}`, layer: "激荡漩涡", problem: row.problem });
     }
     for (const row of frostRounds) {
-      events.push({ id: `frost:${row.index}`, timeMs: row.timeMs, label: "冰霜点名放球", layer: "冰球", spellID: row.spellID || 1257614 });
+      events.push({ id: `frost:${row.index}`, timeMs: row.timeMs, label: "Chilling Frost 点名", layer: "冰球", spellID: row.spellID || 1313393 });
+    }
+    for (const row of mechanics.abyssalRain?.rounds || []) {
+      events.push({ id: `rain:${row.index}`, timeMs: row.timeMs, label: "深渊之雨 · 4 秒引导", layer: "深渊之雨", spellID: 1260837 });
     }
     for (const row of touches) {
       events.push({ id: `touch:${row.playerID}:${row.timeMs}`, timeMs: row.timeMs, label: row.underAbyssalRain ? "雨中踩球" : "踩球", layer: "冰球踩踏", actor: row.player, problem: Boolean(row.problem) });
@@ -146,6 +167,7 @@
       },
       renderMap(_selected, _filtered, cursor) {
         const players = (replay.units || []).filter(u => u.kind === "player");
+        const frostMarked = new Set(frostRounds.filter(row => cursor >= row.timeMs && cursor < row.timeMs + 6000).flatMap(row => (row.targets || []).map(target => target.playerID)));
         const hitIDs = new Set(
           surges.flatMap(row => (row.players || []).filter(p => Math.abs((p.firstTimeMs ?? row.arrivalTimeMs) - cursor) < 900).map(p => p.playerID))
         );
@@ -158,6 +180,11 @@
           const popping = bubble.popTimeMs != null && cursor >= bubble.popTimeMs - 400;
           bubbleSvg = `<g data-key="alluring-bubble"><circle cx="${midQ.x}" cy="${midQ.y}" r="${r}" fill="#67e8f9" fill-opacity="${popping ? 0.3 : 0.14}" stroke="#a5f3fc" stroke-width="3"/><title>诱人水泡（场地正中央，约 ${bubble.radiusYards || 10} 码）</title></g>`;
         }
+        const popped = bubbles.find(row => row.popTimeMs != null && cursor >= row.popTimeMs && cursor < row.popTimeMs + 1200);
+        if (popped) {
+          const progress = (cursor - popped.popTimeMs) / 1200;
+          bubbleSvg += `<circle data-key="bubble-pop" cx="${midQ.x}" cy="${midQ.y}" r="${yardToPx(popped.radiusYards || 10, box) + progress * 170}" fill="none" stroke="#a5f3fc" stroke-width="${5 * (1 - progress) + 1}" opacity="${1 - progress}"><title>嘭！</title></circle>`;
+        }
 
         const surge = surges.find(row => cursor >= (row.castEndTimeMs ?? row.timeMs) && cursor < (row.popTimeMs ?? row.endTimeMs ?? Infinity));
         let surgeSvg = "";
@@ -169,18 +196,17 @@
           const rushing = cursor >= foreshadowEnd && cursor < arrival;
           const progress = foreshadow ? 0 : rushing ? Math.min(1, (cursor - foreshadowEnd) / Math.max(1, arrival - foreshadowEnd)) : 1;
           const outer = Math.min(WIDTH, HEIGHT) * 0.48;
+          const bubbleRadius = yardToPx(10, box);
           const safe = surge.safeDirectionIndex;
           for (let i = 0; i < 8; i++) {
             if (i === safe) continue;
-            const lead = outer * (1 - progress * 0.92);
-            const opacity = foreshadow ? 0.12 : rushing ? 0.2 : 0.14;
-            surgeSvg += `<path data-key="surge:${i}" d="${wedgePath(midQ.x, midQ.y, outer, i)}" fill="#38bdf8" fill-opacity="${opacity}" stroke="#7dd3fc" stroke-width="1"/>`;
-            // Rim foreshadow markers, then inward fronts while traveling.
-            const a = -Math.PI / 2 + i * (Math.PI / 4);
-            surgeSvg += `<circle data-key="surge-front:${i}" cx="${midQ.x + Math.cos(a) * lead}" cy="${midQ.y + Math.sin(a) * lead}" r="${foreshadow ? 12 : 10}" fill="#e0f2fe" fill-opacity="${foreshadow ? 0.85 : 0.7}" stroke="#38bdf8" stroke-width="1.5"/>`;
+            const front = outer - (outer - bubbleRadius) * progress;
+            const back = Math.min(outer, front + (foreshadow ? 22 : 42));
+            const pulse = foreshadow ? 0.55 + 0.2 * Math.sin(cursor / 250) : 0.82;
+            surgeSvg += `<path data-key="surge:${i}" d="${waveBandPath(midQ.x, midQ.y, front, back, i)}" fill="#38bdf8" fill-opacity="${pulse}" stroke="#e0f2fe" stroke-width="2"><title>激荡漩涡：${foreshadow ? "外缘等待" : rushing ? "向中心推进" : "抵达水泡"}</title></path>`;
           }
-          if (safe != null && cursor >= foreshadowEnd - 200) {
-            surgeSvg += `<path data-key="surge-safe" d="${wedgePath(midQ.x, midQ.y, outer, safe)}" fill="#34d399" fill-opacity=".2" stroke="#6ee7b7" stroke-width="2"><title>安全：${api.escape(DIRS[safe] || surge.safeDirection || "")}（按抵达时站位）</title></path>`;
+          if (safe != null) {
+            surgeSvg += `<path data-key="surge-safe" d="${wedgePath(midQ.x, midQ.y, outer, safe)}" fill="#34d399" fill-opacity=".10" stroke="#6ee7b7" stroke-width="2"><title>推断安全方向：${api.escape(DIRS[safe] || surge.safeDirection || "")}（依据抵达时未中招玩家站位）</title></path>`;
           }
         }
 
@@ -188,7 +214,7 @@
         const puddleSvg = puddles.filter(row => cursor >= row.startTimeMs && cursor < row.endTimeMs).map(row => {
           const q = project(row, box);
           if (!q) return "";
-          return `<g data-key="${row.key}"><circle cx="${q.x}" cy="${q.y}" r="${puddleR}" fill="#0ea5e9" fill-opacity=".22" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 3"/><title>残留水面（约 5 码），${api.escape(row.source || "")}</title></g>`;
+          return `<g data-key="${row.key}"><circle cx="${q.x}" cy="${q.y}" r="${puddleR}" fill="#0ea5e9" fill-opacity=".36" stroke="#7dd3fc" stroke-width="2" stroke-dasharray="4 3"/><title>残留冰水（约 ${row.radiusYards || 5} 码），${api.escape(row.source || "")}${row.clearedByJet ? "，将被水流喷射清除" : ""}</title></g>`;
         }).join("");
 
         const orbSvg = groundOrbs.filter(orb => cursor >= orb.startTimeMs && cursor < orb.endTimeMs).map(orb => {
@@ -227,8 +253,13 @@
           const tankPos = posOf(jet.targetID, cursor) || posOf(jet.targetID, jet.castEndTimeMs || jet.startTimeMs);
           const tankQ = project(tankPos, box);
           if (!bossQ || !tankQ) continue;
+          const dx = tankPos.x - bossPos.x, dy = tankPos.y - bossPos.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < (box.unitsPerYard || 100)) continue;
+          const reach = Number(jet.reachYards || 40) * (box.unitsPerYard || 100);
+          const endQ = project({ x: bossPos.x + dx / distance * reach, y: bossPos.y + dy / distance * reach }, box);
           const fade = cursor < (jet.castEndTimeMs || jet.startTimeMs) ? 0.45 : 0.85;
-          jetSvg += `<g data-key="jet:${jet.index}" opacity="${fade}"><line x1="${bossQ.x}" y1="${bossQ.y}" x2="${tankQ.x}" y2="${tankQ.y}" stroke="#67e8f9" stroke-width="6" stroke-linecap="round" stroke-opacity=".55"/><line x1="${bossQ.x}" y1="${bossQ.y}" x2="${tankQ.x}" y2="${tankQ.y}" stroke="#e0f2fe" stroke-width="2.5" stroke-linecap="round"/><circle cx="${tankQ.x}" cy="${tankQ.y}" r="16" fill="none" stroke="#67e8f9" stroke-width="2" stroke-dasharray="4 3"/><title>水流喷射 → ${api.escape(jet.target || "坦克")}</title></g>`;
+          jetSvg += `<g data-key="jet:${jet.index}" opacity="${fade}"><line x1="${bossQ.x}" y1="${bossQ.y}" x2="${endQ.x}" y2="${endQ.y}" stroke="#38bdf8" stroke-width="18" stroke-linecap="round" stroke-opacity=".24"/><line x1="${bossQ.x}" y1="${bossQ.y}" x2="${endQ.x}" y2="${endQ.y}" stroke="#67e8f9" stroke-width="7" stroke-linecap="round" stroke-opacity=".72"/><line x1="${bossQ.x}" y1="${bossQ.y}" x2="${endQ.x}" y2="${endQ.y}" stroke="#e0f2fe" stroke-width="2" stroke-linecap="round"/><circle cx="${tankQ.x}" cy="${tankQ.y}" r="16" fill="none" stroke="#67e8f9" stroke-width="2" stroke-dasharray="4 3"/><title>水流喷射 → ${api.escape(jet.target || "坦克")}；沿线清除冰水</title></g>`;
         }
 
         const bossLife = boss ? api.lifeState(boss, cursor) : { opacity: 0, dead: true };
@@ -242,7 +273,7 @@
           const pos = api.trackPosition(unit, alive.positionTime, replay.interpolateMaxGapMs);
           const q = project(pos, box);
           if (!q) return "";
-          return portrait(api.escape(bigPortrait), q.x, q.y, 14, `murloc-big:${unit.key}`, "大鱼人 · 泡鳍霜鳞");
+          return `<g opacity="${alive.opacity}">${portrait(api.escape(bigPortrait), q.x, q.y, 14, `murloc-big:${unit.key}`, "大鱼人 · 泡鳍霜鳞")}</g>`;
         }).join("");
 
         const avatars = players.map(unit => {
@@ -250,7 +281,7 @@
           const pos = api.trackPosition(unit, life.positionTime, replay.interpolateMaxGapMs);
           const q = project(pos, box);
           if (!q || !life.opacity) return "";
-          return `<g data-key="player:${unit.actorID}" opacity="${life.opacity}">${api.avatar(unit, { ...q, stale: pos?.stale }, 12, hitIDs.has(unit.actorID) || touchHit.has(unit.actorID), life.dead, 1)}</g>`;
+          return `<g data-key="player:${unit.actorID}" opacity="${life.opacity}">${frostMarked.has(unit.actorID) ? `<circle cx="${q.x}" cy="${q.y}" r="22" fill="#bfdbfe" fill-opacity=".18" stroke="#bae6fd" stroke-width="2" stroke-dasharray="4 3"><title>Chilling Frost 点名</title></circle>` : ""}${api.avatar(unit, { ...q, stale: pos?.stale }, 12, hitIDs.has(unit.actorID) || touchHit.has(unit.actorID), life.dead, 1)}</g>`;
         }).join("");
 
         return `<div class="mw-map" data-replay-field style="aspect-ratio:${WIDTH}/${HEIGHT}"><img src="${api.escape(field.arenaImage || "/assets/raids/tidebound_grotto/01-nymrissa.jpg")}" alt="尼姆瑞莎场地" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5"><svg viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="尼姆瑞莎场地推演" style="position:relative;z-index:1">${bubbleSvg}${surgeSvg}${puddleSvg}${orbSvg}${jetSvg}${touchSvg}${burstSvg}${addSvg}${bossSvg}${avatars}</svg></div>`;
@@ -260,10 +291,12 @@
     const jumps = [
       ...bubbles.map(row => ({ timeMs: row.startTimeMs, label: `诱人水泡 #${row.index}` })),
       ...bubbles.filter(row => row.popTimeMs != null).map(row => ({ timeMs: row.popTimeMs, label: `嘭！ #${row.index}` })),
-      ...frostRounds.map(row => ({ timeMs: row.timeMs, label: `冰霜放球 #${row.index}` })),
+      ...frostRounds.map(row => ({ timeMs: row.timeMs, label: `Chilling Frost 点名 #${row.index}` })),
+      ...(mechanics.abyssalRain?.rounds || []).map(row => ({ timeMs: row.timeMs, label: `深渊之雨引导 #${row.index}` })),
       ...touches.slice(0, 12).map(row => ({ timeMs: row.timeMs, label: `${row.underAbyssalRain ? "雨中踩球" : "踩球"} · ${row.player}` })),
       ...bursts.slice(0, 12).map(row => ({ timeMs: row.timeMs, label: row.outcome || "冰球结算" })),
-      ...surges.map(row => ({ timeMs: row.castEndTimeMs ?? row.timeMs, label: `激荡漩涡 #${row.index}` })),
+      ...surges.map(row => ({ timeMs: row.castEndTimeMs ?? row.timeMs, label: `激荡漩涡外缘等待 #${row.index}` })),
+      ...surges.map(row => ({ timeMs: row.foreshadowEndTimeMs ?? ((row.castEndTimeMs ?? row.timeMs) + 5000), label: `浪潮向内推进 #${row.index}` })),
       ...waterJets.map(row => ({ timeMs: row.startTimeMs, label: `水流喷射 #${row.index}` })),
     ].filter(row => row.timeMs != null).sort((a, b) => a.timeMs - b.timeMs);
     if (jumps.length) {

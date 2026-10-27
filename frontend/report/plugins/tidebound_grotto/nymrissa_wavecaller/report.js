@@ -74,7 +74,7 @@
     const data=mechanics().surgingVortex||{};
     const rounds=data.rounds||[];
     return `<section class="glass-panel panel alert"><h2>${spell(1258673,'激荡漩涡')} · 八向涌入</h2>
-      <p class="hint">${esc(data.note||'场外预兆→读条完成约 3 秒涌到中心→随后嘭！。八向只有一个安全点。')}</p>
+      <p class="hint">${esc(data.note||'读条结束后浪潮在外缘等待 5 秒，再约 3.5 秒推进到中心，随后嘭！。八向只有一个安全方向。')}</p>
       ${table(["轮次","预兆","读条完成","涌入中心","安全方向","中招","中招玩家"],rounds.map(row=>[`#${row.index}`,esc(row.time),esc(row.castEndTime||'—'),esc(row.arrivalTime||'—'),row.safeDirection?badge("good",row.safeDirection):'—',row.playerCount?badge("bad",String(row.playerCount)):badge("good","0"),(row.players||[]).map(p=>`${player(p)}${p.direction?`（${esc(p.direction)}）`:''}`).join("、")||'—']))}
       <h3>玩家汇总</h3>
       ${table(["玩家","命中","总伤害","时间"],(data.players||[]).map(row=>[player(row),num(row.hitCount),num(row.totalDamage),(row.times||[]).map(esc).join("、")]))}
@@ -116,8 +116,7 @@
       <p class="hint">${esc(data.fieldReplay?.note||'诱人水泡期间中央约 10 码水泡圈，持续到嘭！。可跳到激荡漩涡与雨中踩球节点。')}</p>
       <div id="nymrissaReplay"></div>
     </section>
-    ${renderRainOrbTouches()}
-    ${renderSurgingVortex()}`;
+    ${new URLSearchParams(location.search).get('embed')==='1'?'':`${renderRainOrbTouches()}${renderSurgingVortex()}`}`;
   }
   function renderContent(){
     const renderers={survival:renderSurvival,replay:renderReplay,rain:renderRain,frost:renderFrost,transition:renderTransition,pressure:renderPressure};

@@ -55,6 +55,7 @@ ORB_PUDDLE_DURATION_MS = 30_000
 FROST_DROP_SPELL_ID = 1313393  # each tick drops one ground orb; 3 per mark
 WATER_JET_CAST_ID = 1281951
 WATER_JET_DAMAGE_ID = 1271458
+WATER_JET_REACH_YARDS = 40
 LINGERING_FROST_ID = 1257654
 UNITS_PER_YARD = 100
 BOSS_GAME_ID = 252959
@@ -120,7 +121,7 @@ BOSS_CONFIG = {
     "key": "nymrissa_wavecaller",
     "name": "尼姆瑞莎·唤潮者",
     "encounterIDs": ENCOUNTER_IDS,
-    "mechanicVersion": "nymrissa-rain4s-murloc-surge8-2026-10-25",
+    "mechanicVersion": "nymrissa-orbs-surge-calibration-2026-10-26",
     "tabs": [
         ["survival", "死亡与战复"],
         ["replay", "场地推演"],
@@ -443,6 +444,9 @@ def arena_bounds_from_replay(replay, center=None):
         "centerX": center["x"],
         "centerY": center["y"],
         "unitsPerYard": UNITS_PER_YARD,
+        # The 3-second in-game minimap places the raid about 5% lower than the
+        # raw replay projection on this background image.
+        "plotOffsetY": 0.05,
     }
 
 
@@ -457,8 +461,7 @@ def arena_center_from_replay(replay):
 def direction_index(dx, dy):
     """0=北 … 7=西北，顺时针。+y 北、+x 东。"""
     angle = math.atan2(dx, dy)  # 0 = north, positive toward east
-    sector = (angle + math.pi) / (math.pi / 4)
-    return int(sector) % 8
+    return int(math.floor((angle + math.pi / 8) / (math.pi / 4))) % 8
 
 
 def direction_label(index):
@@ -601,7 +604,7 @@ def build_surging_vortex(fight, actor_map, players, casts, damage, replay, cente
             "safeDirection": direction_label(safe_index) if safe_index is not None else None,
             "sectorCounts": {direction_label(i): sector_votes.get(i, 0) for i in range(8)},
             "problem": bool(players_hit),
-            "note": "读条完预兆约 5 秒后缓慢涌入中心；安全方向按抵达时刻未中招站位众数推断。",
+            "note": "读条完成后浪潮在外缘等待 5 秒，再约 3.5 秒涌入中心；安全方向按抵达时刻未中招玩家的站位众数推断。",
         })
     return {
         "rounds": rounds,
@@ -706,14 +709,18 @@ def build_ground_orbs_and_puddles(fight, actor_map, players, damage, debuffs, re
             # Already handled via matching touch when possible.
             continue
         burst_time = burst["timeMs"]
-        for orb in orbs:
-            if orb["consumed"]:
-                continue
-            if 0 <= burst_time - orb["startTimeMs"] <= 35_000 and burst_time <= orb["endTimeMs"]:
-                orb["consumed"] = True
-                orb["consumeTimeMs"] = burst_time
-                orb["endTimeMs"] = burst_time
-                orb["puddle"] = False  # timeout burst: no lingering soak water
+        candidates = [
+            orb for orb in orbs
+            if not orb["consumed"] and 0 <= burst_time - orb["startTimeMs"] <= 35_000
+            and burst_time <= orb["endTimeMs"]
+        ]
+        if candidates:
+            # One raid-wide burst resolves one ground orb, not every pending orb.
+            orb = min(candidates, key=lambda row: row["startTimeMs"])
+            orb["consumed"] = True
+            orb["consumeTimeMs"] = burst_time
+            orb["endTimeMs"] = burst_time
+            orb["puddle"] = False
 
     puddles = [
         {
@@ -791,6 +798,7 @@ def build_water_jets(fight, actor_map, players, casts, damage, replay):
                 "targetID": target_id,
                 "target": player_ref(players, actor_map, target_id).get("player"),
                 "hitCount": 0,
+                "reachYards": WATER_JET_REACH_YARDS,
             })
             continue
         by_target = Counter(event.get("targetID") for event in window)
@@ -804,10 +812,49 @@ def build_water_jets(fight, actor_map, players, casts, damage, replay):
             "targetID": target_id,
             "target": player_ref(players, actor_map, target_id).get("player"),
             "hitCount": by_target[target_id],
+            "reachYards": WATER_JET_REACH_YARDS,
+            "hitTimesMs": [int(event.get("timestamp") or 0) - start for event in window],
             "spellID": WATER_JET_CAST_ID,
             "spellName": spell_name(WATER_JET_CAST_ID),
         })
     return rows
+
+
+def _segment_distance_squared(point, start, end):
+    dx, dy = end["x"] - start["x"], end["y"] - start["y"]
+    length_squared = dx * dx + dy * dy
+    along = 0 if not length_squared else max(0.0, min(1.0, ((point["x"] - start["x"]) * dx + (point["y"] - start["y"]) * dy) / length_squared))
+    return (point["x"] - start["x"] - along * dx) ** 2 + (point["y"] - start["y"] - along * dy) ** 2
+
+
+def clear_puddles_with_water_jets(puddles, jets, replay):
+    """End inferred ice patches when the logged tank beam crosses them."""
+    boss = boss_unit_from_replay(replay)
+    if not boss:
+        return puddles
+    for puddle in puddles:
+        radius_squared = (float(puddle.get("radiusYards") or ORB_PUDDLE_RADIUS_YARDS) * UNITS_PER_YARD) ** 2
+        for jet in jets:
+            begin = max(int(puddle["startTimeMs"]), int(jet.get("castEndTimeMs") or jet["startTimeMs"]))
+            end = min(int(puddle["endTimeMs"]), int(jet["endTimeMs"]))
+            for time_ms in range(begin, end, 250):
+                source = sample_at(boss.get("samples") or [], time_ms)
+                target = player_position_at(replay, jet["targetID"], time_ms)
+                if not source or not target:
+                    continue
+                dx, dy = target["x"] - source["x"], target["y"] - source["y"]
+                distance = math.hypot(dx, dy)
+                if distance < UNITS_PER_YARD:
+                    continue
+                reach = float(jet.get("reachYards") or WATER_JET_REACH_YARDS) * UNITS_PER_YARD
+                end_point = {"x": source["x"] + dx / distance * reach, "y": source["y"] + dy / distance * reach}
+                if _segment_distance_squared(puddle, source, end_point) <= radius_squared:
+                    puddle["endTimeMs"] = time_ms
+                    puddle["clearedByJet"] = jet["index"]
+                    break
+            if puddle.get("clearedByJet"):
+                break
+    return puddles
 
 
 def build_murloc_review(fight, replay, casts):
@@ -831,22 +878,28 @@ def build_murloc_review(fight, replay, casts):
             samples = unit.get("samples") or []
             if not samples:
                 continue
-            first, last = samples[0][0], samples[-1][0]
-            if last < begin - 2_000 or first >= next_begin:
-                continue
-            death = next((state[0] for state in unit.get("states") or [] if state[1] == "dead" and begin - 2_000 <= state[0] < next_begin), None)
-            row = {
-                "actorID": unit.get("actorID"),
-                "instance": unit.get("instance"),
-                "gameID": unit.get("gameID"),
-                "name": unit.get("name"),
-                "kind": "big" if unit.get("gameID") == BIG_MURLOC_GAME_ID else "small",
-                "spawnTimeMs": max(begin, first),
-                "deathTimeMs": death,
-                "deathTime": fmt_ms(death) if death is not None else None,
-                "portrait": BIG_MURLOC_PORTRAIT if unit.get("gameID") == BIG_MURLOC_GAME_ID else None,
-            }
-            (big if row["kind"] == "big" else small).append(row)
+            segments = [[samples[0]]]
+            for sample in samples[1:]:
+                if sample[0] - segments[-1][-1][0] > 10_000:
+                    segments.append([])
+                segments[-1].append(sample)
+            for segment in segments:
+                first, last = segment[0][0], segment[-1][0]
+                if last < begin - 2_000 or first >= next_begin:
+                    continue
+                death = next((state[0] for state in unit.get("states") or [] if state[1] == "dead" and last <= state[0] <= last + 1_000), None)
+                row = {
+                    "actorID": unit.get("actorID"),
+                    "instance": unit.get("instance"),
+                    "gameID": unit.get("gameID"),
+                    "name": unit.get("name"),
+                    "kind": "big" if unit.get("gameID") == BIG_MURLOC_GAME_ID else "small",
+                    "spawnTimeMs": max(begin, first),
+                    "deathTimeMs": death,
+                    "deathTime": fmt_ms(death) if death is not None else None,
+                    "portrait": BIG_MURLOC_PORTRAIT if unit.get("gameID") == BIG_MURLOC_GAME_ID else None,
+                }
+                (big if row["kind"] == "big" else small).append(row)
         rounds.append({
             "index": index,
             "timeMs": begin,
@@ -886,7 +939,7 @@ def stamp_add_despawns(replay, fight):
         # Still alive at pull end — leave as-is.
         if last >= end_ms - 1_500:
             continue
-        states.append([last, "dead"])
+        states.append([min(end_ms, last + 700), "dead"])
         unit["states"] = sorted(states, key=lambda row: row[0])
     return replay
 
@@ -948,6 +1001,19 @@ def attach_boss_cast_bars(fight, replay, casts):
                 "outcome": "completed",
                 "phase": "cast",
             })
+    for cast in list(built):
+        if cast["spellID"] != RAIN_CAST_ID or cast["outcome"] != "completed":
+            continue
+        channel_start = cast["endTimeMs"]
+        built.append({
+            "startTimeMs": channel_start,
+            "endTimeMs": channel_start + RAIN_CHANNEL_MS,
+            "expectedEndTimeMs": channel_start + RAIN_CHANNEL_MS,
+            "spellID": RAIN_CAST_ID,
+            "spellName": spell_name(RAIN_CAST_ID),
+            "outcome": "completed",
+            "phase": "channel",
+        })
     boss["casts"] = sorted(built, key=lambda row: row["startTimeMs"])
     replay["bosses"] = [boss] + bosses[1:]
     return replay
@@ -1242,6 +1308,7 @@ def render_fight(report_id, report_start, actors, fight, raw):
         water_jets = build_water_jets(
             fight, actor_map, players, raw.get("casts") or [], raw.get("damage") or [], replay,
         )
+        clear_puddles_with_water_jets(orb_fx["puddles"], water_jets, replay)
         mechanics["combatReplay"] = replay
         mechanics["alluringBubbles"] = bubbles
         mechanics["surgingVortex"] = surging
@@ -1274,8 +1341,8 @@ def render_fight(report_id, report_start, actors, fight, raw):
             "bigMurlocPortrait": BIG_MURLOC_PORTRAIT,
             "note": (
                 "诱人水泡固定在场地正中央约 10 码直到嘭！；"
-                "激荡漩涡读条完预兆约 5 秒后缓慢涌入，安全区按抵达时站位；"
-                "点名每次伤害落一冰球，踩球后留下约 5 码水面；水流喷射对坦射线。"
+                "激荡漩涡读条完在外缘等待 5 秒，再缓慢涌向中心，安全方向参考抵达时未中招玩家站位；"
+                "Chilling Frost 点名后每次伤害落一冰球，踩球后留下约 5 码冰水；对坦水流喷射可清除沿线冰水。"
             ),
         }
     duration_ms = int(fight["endTime"]) - int(fight["startTime"])

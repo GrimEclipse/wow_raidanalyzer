@@ -1509,6 +1509,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/frontend/report/plugins/venomous_abyss/coiledaltar/timeline-assets.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/icon-timeline.js",
             "/frontend/report/plugins/venomous_abyss/coiledaltar/icon-timeline.css",
+            "/frontend/report/plugins/tidebound_grotto/nymrissa_wavecaller/field-replay.js",
             "/frontend/report/plugins/unbinding_of_kithix/kithix/field-replay.js",
         }
         for plugin in (

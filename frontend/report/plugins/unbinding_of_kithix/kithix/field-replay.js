@@ -203,7 +203,7 @@
           if (!point) return "";
           const fading = row.clearedTimeMs != null && cursor >= row.clearedTimeMs;
           const icon = arena.nullGateIcon || "/assets/raids/unbinding_of_kithix/null-gate.png";
-          const size = 6;
+          const size = 8;
           return `<g data-key="gate:${row.key || `${row.playerID}:${place}`}" opacity="${fading ? 1 - (cursor - row.clearedTimeMs) / 700 : 1}"><image href="${icon}" x="${point.x - size / 2}" y="${point.y - size / 2}" width="${size}" height="${size}"/><title>虚无之门，${api.escape(row.player || "")}</title></g>`;
         }).join("");
         const nullOrbs = (mechanics.nullVolleys || []).flatMap(volley => {
@@ -288,15 +288,16 @@
           const grasp = (mechanics.grasps || []).find(row => row.playerID === unit.actorID && active(row, cursor, "applyTimeMs", "removeTimeMs"));
           const embrace = (mechanics.embraces || []).some(row => row.playerID === unit.actorID && active(row, cursor, "applyTimeMs", "removeTimeMs"));
           const horror = (mechanics.horrors || []).some(row => row.playerID === unit.actorID && row.spellID === 1304045 && active(row, cursor, "applyTimeMs", "removeTimeMs"));
+          const stunned = (mechanics.stuns || []).some(row => row.playerID === unit.actorID && active(row, cursor, "applyTimeMs", "removeTimeMs"));
           const grace = (mechanics.finalLights || []).find(row => row.playerID === unit.actorID);
           const lightOn = grace && (mechanics.phaseTimeline || []).some(phase => phase.key === "p2" && cursor >= phase.timeMs);
           const graspArc = grasp ? `<circle cx="${point.x}" cy="${point.y}" r="24" fill="none" stroke="${grasp.missed ? "#fb7185" : "#67e8f9"}" stroke-width="3" stroke-dasharray="${2 * Math.PI * 24 * Math.min(1, (cursor - grasp.applyTimeMs) / 8000)} ${2 * Math.PI * 24}" transform="rotate(-90 ${point.x} ${point.y})"/>` : "";
           const fragmentBadge = stacks ? `<g><circle cx="${point.x + 16}" cy="${point.y - 16}" r="10" fill="#5b21b6" stroke="#ddd6fe"/><text x="${point.x + 16}" y="${point.y - 12}" text-anchor="middle" fill="#f5f3ff" font-size="12">${stacks}</text></g>` : "";
-          return `<g data-key="player:${unit.actorID}">${embrace ? `<circle cx="${point.x}" cy="${point.y}" r="22" fill="#fde68a" fill-opacity=".2" stroke="#facc15"/>` : ""}${horror ? `<circle cx="${point.x}" cy="${point.y}" r="30" fill="none" stroke="#c084fc" stroke-dasharray="4 4"/>` : ""}${lightOn ? `<circle cx="${point.x}" cy="${point.y}" r="20" fill="none" stroke="${grace.radiantGrace ? "#fef3c7" : "#fb7185"}"/>` : ""}${graspArc}${api.avatar(unit, point, 15, !!grasp?.missed, life.dead, life.opacity)}${fragmentBadge}</g>`;
+          return `<g data-key="player:${unit.actorID}">${embrace ? `<circle cx="${point.x}" cy="${point.y}" r="22" fill="#fde68a" fill-opacity=".2" stroke="#facc15"/>` : ""}${horror ? `<circle cx="${point.x}" cy="${point.y}" r="30" fill="none" stroke="#c084fc" stroke-dasharray="4 4"/>` : ""}${lightOn ? `<circle cx="${point.x}" cy="${point.y}" r="20" fill="none" stroke="${grace.radiantGrace ? "#fef3c7" : "#fb7185"}"/>` : ""}${stunned ? `<circle cx="${point.x}" cy="${point.y}" r="16" fill="#94a3b8" fill-opacity=".24" stroke="#cbd5e1" stroke-width="2"><title>冥河嚎叫：昏迷</title></circle>` : ""}${graspArc}${api.avatar(unit, point, 10, !!grasp?.missed, life.dead, life.opacity)}${fragmentBadge}</g>`;
         }).join("");
-        const barrierNow = (mechanics.barriers || []).find(row => cursor >= row.startTimeMs && cursor <= row.endTimeMs);
+        const barrierNow = (mechanics.barriers || []).find(row => cursor >= row.startTimeMs && cursor < row.endTimeMs);
         const barrierRadius = barrierNow ? (() => {
-          const elapsed = (cursor - barrierNow.startTimeMs) / 1000;
+          const elapsed = Math.max(0, cursor - (barrierNow.shrinkStartTimeMs ?? barrierNow.startTimeMs)) / 1000;
           const start = Number(barrierNow.startRadiusYards);
           const end = Number(barrierNow.endRadiusYards);
           const shrink = Number(barrierNow.shrinkYardsPerSec || 1);
@@ -314,7 +315,7 @@
           if (!point) return "";
           const faded = (mechanics.darkness || []).some(row => (row.fadeTimesMs || []).some(time => cursor >= time && cursor < time + 2000));
           const shield = barrierRadius != null
-            ? `<circle cx="${point.x}" cy="${point.y}" r="${barrierRadius * scale}" fill="#fde68a" fill-opacity=".10" stroke="#fbbf24" stroke-width="3"/><title>神圣光辉屏障，第 ${barrierNow.index} 次，当前约 ${barrierRadius.toFixed(1)} 码</title>`
+            ? `<circle cx="${point.x}" cy="${point.y}" r="${barrierRadius * scale * 2}" fill="#fde68a" fill-opacity=".10" stroke="#fbbf24" stroke-width="3"/><title>神圣光辉屏障，第 ${barrierNow.index} 次，当前半径约 ${barrierRadius.toFixed(1)} 码</title>`
             : "";
           return `<g data-key="liadrin" opacity="${state?.opacity ?? 1}">${shield}<circle cx="${point.x}" cy="${point.y}" r="22" fill="#1e1030" stroke="${faded ? "#fecdd3" : "#fbbf24"}" stroke-width="2"/><image href="${liadrinPortrait}" x="${point.x - 20}" y="${point.y - 20}" width="40" height="40" style="clip-path:circle(50%)"/><title>莉亚德琳</title></g>`;
         }).join("");

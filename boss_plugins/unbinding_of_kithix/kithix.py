@@ -75,8 +75,9 @@ NULL_ORB_COUNT = 12
 NULL_ORB_STEP_DEG = 30.0
 NULL_ORB_SPEED_YARDS = 8.0
 NULL_ORB_TRAVEL_YARDS = 60.0
-BARRIER_START_RADIUS_YARDS = 40.0
+BARRIER_START_RADIUS_YARDS = 30.0
 BARRIER_SHRINK_YARDS_PER_SEC = 0.5
+NULL_GATE_REPEAT_MS = 10_000
 NULL_GATE_ICON = "/assets/raids/unbinding_of_kithix/null-gate.png"
 UNITS_PER_YARD = 100.0
 MAP_WIDTH = 1093
@@ -145,7 +146,7 @@ BOSS_CONFIG = {
     "key": "kithix",
     "name": "基希克斯",
     "encounterIDs": ENCOUNTER_IDS,
-    "mechanicVersion": "kithix-barrier40-orb8-2026-10-25",
+    "mechanicVersion": "kithix-barrier-cast-finish-2026-10-26",
     "tabs": [
         ["survival", "死亡与战复"],
         ["replay", "战斗回放"],
@@ -979,17 +980,6 @@ def _actor_lifetimes(fight, actor_rows, events, deaths):
     return rows
 
 
-def _clear_gates(gates, blasts):
-    for blast in blasts:
-        for gate in gates:
-            if gate.get("clearedTimeMs") is not None or gate["dropTimeMs"] > blast["timeMs"]:
-                continue
-            gap = distance_yards(gate.get("position"), blast.get("position"))
-            if gap is not None and gap <= RESTABILIZE_RADIUS_YARDS:
-                gate["clearedTimeMs"] = blast["timeMs"]
-                gate["clearedBy"] = blast.get("sourceID")
-
-
 def boss_initial_point(samples, boss_ids):
     for actor_id in boss_ids or []:
         rows = (samples or {}).get(actor_id) or []
@@ -1044,32 +1034,36 @@ def energy_reaches_ms(samples, after_ms, threshold=100.0):
     return None
 
 
-def radiant_barrier_windows(darkness_casts, liadrin, duration_ms, stun_casts=None, energy_samples=None):
-    """Barrier rises when Suffocating Darkness finishes: 40 yd, shrinks 0.5 yd/s until Liadrin energy hits 100."""
+def radiant_barrier_windows(darkness_casts, liadrin, duration_ms, stun_casts=None, energy_samples=None,
+                            barrier_casts=None, eightfold_casts=None):
+    """Pair Liadrin's barrier with each Darkness cast and end it at her stun or Eightfold."""
     rows = []
     stuns = sorted(stun_casts or [], key=lambda row: int(row.get("timeMs") or 0))
+    shields = sorted(barrier_casts or [], key=lambda row: int(row.get("timeMs") or 0))
+    final_start = min((int(row["startTimeMs"]) for row in eightfold_casts or []), default=None)
     ordered = list(darkness_casts or [])
     for index, cast in enumerate(ordered):
-        start_ms = int(cast.get("timeMs") if cast.get("timeMs") is not None else cast.get("endTimeMs") or cast.get("startTimeMs") or 0)
+        darkness_start = int(cast.get("startTimeMs") or cast.get("timeMs") or 0)
+        darkness_end = int(cast.get("timeMs") or darkness_start)
+        shield = next((row for row in shields if darkness_start - 1000 <= int(row.get("timeMs") or 0) <= darkness_end + 1000), None)
+        start_ms = int(shield["timeMs"]) if shield else darkness_end
         next_start = int(ordered[index + 1].get("startTimeMs") or ordered[index + 1].get("timeMs") or duration_ms) if index + 1 < len(ordered) else int(duration_ms)
         energy_ms = energy_reaches_ms(energy_samples, start_ms, 100.0)
-        stun = next((row for row in stuns if int(row.get("timeMs") or 0) >= start_ms), None)
-        time_to_zero = int(round(BARRIER_START_RADIUS_YARDS / BARRIER_SHRINK_YARDS_PER_SEC * 1000))
-        candidates = [next_start, int(duration_ms), start_ms + time_to_zero]
-        if energy_ms is not None:
-            candidates.append(energy_ms)
+        stun = next((row for row in stuns if start_ms <= int(row.get("timeMs") or 0) < next_start), None)
+        candidates = [next_start, int(duration_ms)]
         if stun is not None:
             candidates.append(int(stun["timeMs"]))
+        if final_start is not None and final_start >= start_ms:
+            candidates.append(final_start)
         end_ms = min(candidates)
-        elapsed = max(0.0, (end_ms - start_ms) / 1000)
-        end_radius = max(0.0, round(BARRIER_START_RADIUS_YARDS - BARRIER_SHRINK_YARDS_PER_SEC * elapsed, 2))
+        start_radius = max(10.0, BARRIER_START_RADIUS_YARDS - index * 10.0)
+        floor_radius = max(10.0, start_radius - 10.0)
+        end_radius = max(floor_radius, round(start_radius - BARRIER_SHRINK_YARDS_PER_SEC * max(0.0, (end_ms - darkness_end) / 1000), 2))
         ended_by = (
-            "莉亚德琳能量到达 100，随后令 Boss 昏迷数秒"
-            if energy_ms is not None and end_ms == energy_ms else
-            "神圣光辉（Boss 昏迷）"
+            "八重蚀日开始读条，屏障立刻消失；读完后进入最终 Rush"
+            if final_start is not None and end_ms == final_start else
+            "神圣光辉完成，Boss 昏迷，屏障消失"
             if stun is not None and end_ms == int(stun["timeMs"]) else
-            "屏障半径收到 0"
-            if end_ms == start_ms + time_to_zero else
             "下一轮窒息黑暗或战斗结束"
         )
         rows.append({
@@ -1077,8 +1071,10 @@ def radiant_barrier_windows(darkness_casts, liadrin, duration_ms, stun_casts=Non
             "spellID": DIVINE_RADIANCE,
             "spellName": spell_name(DIVINE_RADIANCE),
             "startTimeMs": start_ms,
+            "shrinkStartTimeMs": darkness_end,
             "endTimeMs": end_ms,
-            "startRadiusYards": BARRIER_START_RADIUS_YARDS,
+            "startRadiusYards": start_radius,
+            "floorRadiusYards": floor_radius,
             "endRadiusYards": end_radius,
             "shrinkYardsPerSec": BARRIER_SHRINK_YARDS_PER_SEC,
             "energyFullTimeMs": energy_ms,
@@ -1086,8 +1082,8 @@ def radiant_barrier_windows(darkness_casts, liadrin, duration_ms, stun_casts=Non
             "endedBy": ended_by,
             "position": None if liadrin is None else {"x": round(float(liadrin["x"]), 2), "y": round(float(liadrin["y"]), 2)},
             "note": (
-                f"Boss 读完窒息黑暗后撑起 {BARRIER_START_RADIUS_YARDS:g} 码屏障，"
-                f"以每秒 {BARRIER_SHRINK_YARDS_PER_SEC:g} 码收缩；结束原因：{ended_by}。"
+                f"Boss 开始窒息黑暗后，莉亚德琳先施放辉光壁垒，保持 {start_radius:g} 码半径；"
+                f"窒息黑暗读条完成后，才以每秒 {BARRIER_SHRINK_YARDS_PER_SEC:g} 码收缩至 {floor_radius:g} 码并保持；{ended_by}。"
             ),
         })
     return rows
@@ -1100,7 +1096,7 @@ def _orb_angles(axis_rad):
 def _make_null_volley(origin, launch_ms, axis_rad, source, player_id=None, player=None, gate_key=None):
     travel_ms = int(round(NULL_ORB_TRAVEL_YARDS / NULL_ORB_SPEED_YARDS * 1000))
     return {
-        "key": f"null-volley:{source}:{player_id or gate_key}:{launch_ms}",
+        "key": f"null-volley:{source}:{gate_key or player_id}:{launch_ms}",
         "source": source,
         "playerID": player_id,
         "player": player,
@@ -1119,7 +1115,7 @@ def _make_null_volley(origin, launch_ms, axis_rad, source, player_id=None, playe
 
 
 def build_null_gate_volleys(gates, marks, samples, axis_rad, duration_ms):
-    """On each mark expiry: the player and every standing Null Gate fire 12 orbs.
+    """The player fires on mark removal; each gate then fires on its own 10-second clock.
 
     Directions are locked to the Liadrin→boss opening axis, one orb every 30°.
     """
@@ -1145,7 +1141,7 @@ def build_null_gate_volleys(gates, marks, samples, axis_rad, duration_ms):
         launch = mark.get("removeTimeMs")
         if launch is None:
             continue
-        origin = mark.get("position") or _nearest_sample(samples, mark.get("playerID"), launch)
+        origin = _nearest_sample(samples, mark.get("playerID"), launch) or mark.get("position")
         if not origin:
             continue
         fire_events.append({
@@ -1160,12 +1156,14 @@ def build_null_gate_volleys(gates, marks, samples, axis_rad, duration_ms):
     for event in fire_events:
         launch = event["launchTimeMs"]
         volleys.append(_make_null_volley(event["origin"], launch, axis_rad, "mark", event["playerID"], event["player"]))
-        for gate in placed:
-            if gate["placeTimeMs"] > launch:
-                continue
+    for gate in placed:
+        first_fire = gate.get("removeTimeMs")
+        if first_fire is None:
+            continue
+        for launch in range(int(first_fire), int(duration_ms) + 1, NULL_GATE_REPEAT_MS):
             if gate.get("clearedTimeMs") is not None and gate["clearedTimeMs"] <= launch:
-                continue
-            gate.setdefault("fireTimesMs", []).append(launch)
+                break
+            gate["fireTimesMs"].append(launch)
             volleys.append(_make_null_volley(gate["position"], launch, axis_rad, "gate", gate.get("playerID"), gate.get("player"), gate["key"]))
     for gate in placed:
         gate["fireTimesMs"] = sorted(set(gate.get("fireTimesMs") or []))
@@ -1175,7 +1173,7 @@ def build_null_gate_volleys(gates, marks, samples, axis_rad, duration_ms):
 
 def clear_null_field(gates, volleys, clears):
     """Negation removal (and Explosive Restabilization) wipe nearby gates and flying orbs."""
-    for clear in clears or []:
+    for clear in sorted(clears or [], key=lambda row: int(row.get("timeMs") or 0)):
         origin = clear.get("position")
         moment = int(clear.get("timeMs") or 0)
         if not origin:
@@ -1208,6 +1206,14 @@ def clear_null_field(gates, volleys, clears):
             if hit or (origin_gap is not None and origin_gap <= RESTABILIZE_RADIUS_YARDS):
                 volley["clearedTimeMs"] = moment
                 volley["clearedBy"] = clear.get("playerID") or clear.get("sourceID")
+    active_gates = {gate["key"]: gate for gate in gates or []}
+    volleys = [volley for volley in volleys or [] if volley.get("source") != "gate" or
+                active_gates.get(volley.get("gateKey"), {}).get("clearedTimeMs") is None or
+                volley["launchTimeMs"] < active_gates[volley["gateKey"]]["clearedTimeMs"]]
+    for gate in gates or []:
+        gate["fireTimesMs"] = [time for time in gate.get("fireTimesMs") or []
+                               if gate.get("clearedTimeMs") is None or time < gate["clearedTimeMs"]]
+        gate["endTimeMs"] = gate.get("clearedTimeMs") if gate.get("clearedTimeMs") is not None else gate.get("endTimeMs")
     return gates, volleys
 
 
@@ -1227,7 +1233,7 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
     casts = list(raw.get("casts") or [])
     auras = aura_windows(fight, list(raw.get("debuffs") or []) + list(raw.get("buffs") or []) + list(raw.get("enemyBuffs") or []), {
         LIGHTS_EMBRACE, DARK_FRENZY, RADIANT_BARRIER, UNSPEAKABLE_HORRORS, OVERWHELMING_FEAR,
-        ABYSSAL_GRASP, NULL_GATE, NULLIFY, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE,
+        ABYSSAL_GRASP, NULL_GATE, NULLIFY, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE, STYGIAN_HOWL,
     })
     markers = phase_timeline(fight, casts)
     center = arena_center(actor_rows, list(raw.get("replayEvents") or []) + casts + list(raw.get("damage") or []))
@@ -1259,25 +1265,16 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         list(casts) + list(raw.get("friendlyMechanicCasts") or []),
         {DIVINE_RADIANCE},
     ) if options["phaseOneReviewEnabled"] else []
+    barrier_casts = completed_casts(fight, raw.get("friendlyMechanicCasts"), {RADIANT_BARRIER}) if options["phaseOneReviewEnabled"] else []
+    eightfold_casts = completed_casts(fight, casts, {EIGHTFOLD_ECLIPSE})
     liadrin = None if center is None else {"x": center[0], "y": center[1]}
     energy_samples = liadrin_energy_samples(
         fight, actor_rows, list(raw.get("replayEvents") or []) + list(casts) + list(raw.get("friendlyMechanicCasts") or []),
     ) if options["phaseOneReviewEnabled"] else []
     barriers = radiant_barrier_windows(
         darkness_casts, liadrin, duration_ms, stun_casts=radiance_casts, energy_samples=energy_samples,
+        barrier_casts=barrier_casts, eightfold_casts=eightfold_casts,
     ) if options["phaseOneReviewEnabled"] else []
-    if barriers and not radiance_casts:
-        radiance_casts = [
-            {
-                "spellID": DIVINE_RADIANCE,
-                "spellName": spell_name(DIVINE_RADIANCE),
-                "timeMs": row["endTimeMs"],
-                "startTimeMs": row["startTimeMs"],
-                "time": fmt_ms(row["endTimeMs"]),
-            }
-            for row in barriers
-            if row.get("endedBy", "").startswith("莉亚德琳能量") or row.get("energyFullTimeMs") is not None
-        ]
     voidscars, darkness = eclipse_volleys(
         voidscars,
         darkness_casts,
@@ -1345,9 +1342,9 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
             "liadrin": liadrin,
             "bossInitial": None if boss_point is None else {"x": round(boss_point["x"], 2), "y": round(boss_point["y"], 2)},
             "radians": axis_radians(liadrin, boss_point),
-            "note": "以莉亚德琳指向 Boss 开场坐标为 0°/180° 基准线；每次点名结束沿该基准每 30° 射出 12 个球，约 20 码/秒外飞。",
+            "note": "以莉亚德琳指向 Boss 开场坐标为 0°/180° 基准线；玩家点名移除时发射，每扇门此后每 10 秒独立重射，沿该基准每 30° 射出 12 个球，约 8 码/秒外飞。",
         }
-        mark_auras = [row for row in auras if row["spellID"] in {NULL_GATE, NULLIFY}]
+        mark_auras = [row for row in auras if row["spellID"] == NULL_GATE]
         gate_seeds = []
         for row in mark_auras:
             if row["spellID"] != NULL_GATE:
@@ -1393,7 +1390,6 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
             {"timeMs": blast["timeMs"], "sourceID": blast.get("sourceID"), "position": blast.get("position"), "spellName": blast.get("spellName")}
             for blast in blasts
         ]
-        _clear_gates(gates, blasts)
         gates, null_volleys = clear_null_field(gates, null_volleys, clears)
     dead_before = set()
     light_moment = next((row["timeMs"] for row in completed_casts(fight, casts, {LAST_LIGHT})), next((row["timeMs"] for row in markers if row["key"] == "p2"), None))
@@ -1432,6 +1428,7 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         "barriers": barriers,
         "radiances": radiance_casts,
         "horrors": [row for row in auras if row["spellID"] in {UNSPEAKABLE_HORRORS, OVERWHELMING_FEAR}],
+        "stuns": [row for row in auras if row["spellID"] == STYGIAN_HOWL],
         "grasps": grasps,
         "swarms": completed_casts(fight, casts, {VOIDSWARM}),
         "gates": gates,
@@ -1440,7 +1437,7 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         "negations": negations,
         "restabilizations": blasts,
         "finalLights": lights,
-        "eightfold": completed_casts(fight, casts, {EIGHTFOLD_ECLIPSE}),
+        "eightfold": eightfold_casts,
         "checks": {
             "eggsMissed": sum(1 for row in eggs if row["missed"]),
             "graspsMissed": sum(1 for row in grasps if row["missed"]),
@@ -1456,8 +1453,8 @@ def analyze_kithix(fight, actor_map, players, raw, actor_rows):
         },
         "evidenceNote": (
             "P1：甲虫由谁触发、虚空之痕命中与伤害、每次熄灭漏吃圣光之拥；卵仅超时孵化才展开承伤。"
-            "Boss 读完窒息黑暗后，莉亚德琳撑起 40 码神圣光辉屏障，以每秒 0.5 码收缩；待其能量到达 100 时令 Boss 昏迷数秒。需在场地被压死前将 Boss 打到 25% 读八重蚀日转阶段。"
-            "P2：以莉亚德琳→Boss 开场坐标为 0°/180°；点名 buff 结束时，该玩家与场上每扇虚无之门各沿基准线每 30° 射出 12 个球（约 8 码/秒）。"
+            "Boss 开始窒息黑暗时，莉亚德琳先撑起辉光壁垒；读条完成前保持初始半径。此后屏障第一轮从 30 缩至 20 码，第二轮从 20 缩至 10 码，均以每秒 0.5 码收缩后保持。神圣光辉完成并击晕 Boss 时屏障消失；转阶段的冥河嚎叫令玩家短暂昏迷，八重蚀日开始读条时立即移除屏障，读完后进入最终 Rush。"
+            "P2：以莉亚德琳→Boss 开场坐标为 0°/180°；点名 debuff 移除时玩家与对应门各射出 12 个球，之后每扇门每 10 秒独立重射（约 8 码/秒）。"
             "湮消 debuff 移除（或爆炸复稳）会清掉范围内正在飞行的球与虚无之门。"
         ),
     }
@@ -1553,7 +1550,7 @@ def fetch_payload(client, report_id, fight, options=None):
     }
     aura_ids = {
         LIGHTS_EMBRACE, DARK_FRENZY, RADIANT_BARRIER, UNSPEAKABLE_HORRORS, OVERWHELMING_FEAR,
-        ABYSSAL_GRASP, NULL_GATE, NULLIFY, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE,
+        ABYSSAL_GRASP, NULL_GATE, NULLIFY, NEGATION, RADIANT_GRACE, ECLIPSE_FRAGMENT, RADIANT_FADE, STYGIAN_HOWL,
     }
     damage_ids = {DARK_DEVASTATION, VOIDSCAR, GUT_REACTION, DIGESTIVE_JUICES, VOIDWEAVE, MIND_STING, VENOM_ROAR, EXTINGUISH, EXPLOSIVE_RESTABILIZATION, ECLIPSE_FRAGMENT}
 
@@ -1567,9 +1564,8 @@ def fetch_payload(client, report_id, fight, options=None):
         "friendlyCasts": client.events(report_id, "Casts", fight, hostility_type="Friendlies"),
         "friendlyMechanicCasts": client.events(
             report_id,
-            "Casts",
+            "All",
             fight,
-            hostility_type="Friendlies",
             filter_expression=_id_filter({DIVINE_RADIANCE, RADIANT_BARRIER}),
             include_resources=True,
         ) if options["phaseOneReviewEnabled"] else [],
