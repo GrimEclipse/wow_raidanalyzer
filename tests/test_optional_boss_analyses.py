@@ -31,7 +31,7 @@ class Client:
 @pytest.mark.parametrize('selected,expected', [('coiledPreyReviewEnabled', {'Casts','Deaths','CombatantInfo','All'}), ('motherWrathReviewEnabled', {'Casts','Deaths','CombatantInfo','All','DamageTaken'})])
 def test_ulatek_critical_suboptions_skip_unselected_queries_and_spatial_computation(selected, expected):
     client = Client(3492)
-    options = {row['key']: False for row in ulatek.CONFIG_SCHEMA}
+    options = {row['key']: False for row in ulatek.CONFIG_SCHEMA if row['type'] == 'boolean'}
     options.update(criticalReviewEnabled=True, **{selected: True})
     with patch('boss_plugins.venomous_abyss.runtime.WclClient', return_value=client), patch.object(ulatek, '_analyze_serpent_bites', side_effect=AssertionError('unselected spatial analysis')):
         result = ulatek.build_aggregated_json('A'*16, options)
@@ -142,7 +142,7 @@ def test_ulatek_replay_keeps_ravenous_variant_by_confirmed_name():
 @pytest.mark.parametrize('module,encounter,key', [
     (module, encounter, row['key'])
     for module,encounter in [(vashnik,3455),(lostexplorers,3497),(sszorak,3420),(twinfangs,3421),(coiledaltar,3429),(ulatek,3492)]
-    for row in module.CONFIG_SCHEMA if row['type'] == 'boolean'
+        for row in module.CONFIG_SCHEMA if row['type'] == 'boolean' and row['key'] != 'cleanWaveReviewEnabled'
 ])
 def test_each_analysis_can_run_alone_in_nightly_pipeline(module,encounter,key):
     client = Client(encounter)
@@ -153,7 +153,8 @@ def test_each_analysis_can_run_alone_in_nightly_pipeline(module,encounter,key):
         result['fights'] *= 3
         return result
     client.report_fights = fights
-    options = {row['key']:row['key'] == key for row in module.CONFIG_SCHEMA if row['type'] == 'boolean'}
+    options = {row['key']:row['key'] == key for row in module.CONFIG_SCHEMA
+               if row['type'] == 'boolean' and row['key'] != 'cleanWaveReviewEnabled'}
     target = 'boss_plugins.venomous_abyss.coiledaltar.WclClient' if module is coiledaltar else 'boss_plugins.venomous_abyss.runtime.WclClient'
     with patch(target,return_value=client):
         result = module.build_aggregated_json('A'*16, options)

@@ -71,3 +71,15 @@ def test_low_egg_duty_filter_only_includes_damage_roles():
     metric = next(m for m in boss._mechanic_overview([{'fightID': 1, 'ulatek': result}])['metrics'] if m['key'] == 'eggCarrierWaveHits')
     eligible = {p['playerID'] for p in metric['players'] if p['dutyFilterEligible']}
     assert eligible == set(range(5, 11))
+
+
+def test_optional_clean_waves_stop_at_first_tether_failure_or_eighth_death():
+    fight, players, raw = fixture()
+    raw['deaths'] = [event(i * 1000, 'death', i) for i in range(1, 9)]
+    waves = {'hits': [{'timeMs': t, 'player': 'P9', 'time': str(t)} for t in [500, 7000, 8000, 9000]]}
+    clean = boss._clean_wave_hits(fight, players, raw, waves,
+                                  {'failures': [{'timeMs': 7500}]})
+    assert [r['timeMs'] for r in clean] == [500, 7000]
+    clean = boss._clean_wave_hits(fight, players, raw, waves,
+                                  {'failures': [{'timeMs': 6500}]})
+    assert [r['timeMs'] for r in clean] == [500]

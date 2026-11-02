@@ -49,6 +49,23 @@ def test_sszorak_mark_refresh_does_not_duplicate_and_removal_ends_ring():
         {'playerID': 1, 'startTimeMs': 1000, 'endTimeMs': 4000, 'radiusYards': 8}]
 
 
+def test_fang_zone_anchors_at_mark_position_until_observed_break():
+    raw = {'debuffs': [event(1000, 'applydebuff', u.FANG_AURA_ID, targetID=1),
+                       event(5000, 'removedebuff', u.FANG_AURA_ID, targetID=1)],
+           'replayEvents': [event(900, 'resourcechange', 0, sourceID=1,
+                                  resourceActor=1, x=1000, y=2000),
+                            event(1100, 'resourcechange', 0, sourceID=1,
+                                  resourceActor=1, x=1200, y=2000),
+                            event(4500, 'resourcechange', 0, sourceID=1,
+                                  resourceActor=1, x=2700, y=2000)],
+           'enemyBuffs': [], 'casts': [], 'resources': []}
+    scene = u._replay_feedback({'startTime': 0, 'endTime': 6000, 'difficulty': 5},
+                               {1: {}}, raw)
+    fang = next(a for a in scene['auras'] if a['kind'] == 'fang')
+    assert (fang['position']['x'], fang['position']['y']) == (1100, 2000)
+    assert (fang['radiusYards'], fang['endTimeMs']) == (15, 5000)
+
+
 def test_corridor_cast_ends_on_interrupt_for_the_matching_instance():
     raw = {'enemyBuffs': [], 'casts': [event(1000, 'begincast', 1290779, sourceInstance=1),
                      event(1100, 'begincast', 1290779, sourceInstance=2)],
@@ -234,6 +251,77 @@ def test_fester_bubble_and_head_cast_are_instance_local_and_end_at_completion():
     assert scene['npcCasts'][0]['spellID'] == u.FESTER_BURST_ID
 
 
+def test_fester_direct_hit_ignores_dot_ticks_and_unhurt_outside_players():
+    fight = {'startTime': 0, 'endTime': 12000, 'difficulty': 5}
+    players = {1: {'name': 'Hit'}, 2: {'name': 'Outside'}}
+    raw = {'casts': [event(1000, 'begincast', u.FESTER_BURST_ID, sourceID=41, sourceInstance=1),
+                     event(5000, 'cast', u.FESTER_BURST_ID, sourceID=41, sourceInstance=1,
+                           resourceActor=1, x=0, y=0)],
+           'damage': [event(5000, 'damage', u.FESTER_BURST_ID, sourceID=41, sourceInstance=1,
+                            targetID=1, amount=300),
+                      event(6000, 'damage', u.FESTER_BURST_ID, sourceID=41, sourceInstance=1,
+                            targetID=1, amount=30)],
+           'resources': [event(5000, 'resourcechange', 0, sourceID=1, resourceActor=1, x=1500, y=0),
+                         event(5000, 'resourcechange', 0, sourceID=2, resourceActor=1, x=1040, y=0)],
+           'deaths': []}
+    row = u._analyze_mythic_wretch(fight, {1: 'Hit', 2: 'Outside'}, players, raw)['rounds'][0]
+    assert row['hitCount'] == 1
+    assert [r['playerID'] for r in row['hits']] == [1]
+    assert [r['playerID'] for r in row['outside']] == [1]
+
+
+def test_spine_mark_previews_eight_yards_until_actual_cast():
+    raw = {'casts': [event(6060, 'cast', u.PETRIFYING_SPINE_ID,
+                           sourceID=91, sourceInstance=1, targetID=-1)],
+           'debuffs': [event(1000, 'applydebuff', u.PETRIFYING_SPINE_MARK_ID,
+                             sourceID=91, sourceInstance=1, targetID=3),
+                       event(6000, 'removedebuff', u.PETRIFYING_SPINE_MARK_ID,
+                             sourceID=91, sourceInstance=1, targetID=3)],
+           'resources': [event(6000, 'resourcechange', 0, sourceID=3,
+                               resourceActor=1, x=500, y=700)], 'enemyBuffs': []}
+    scene = u._replay_effects({'startTime': 0, 'endTime': 10000}, {3: {}}, raw, [])
+    circle = next(c for c in scene['circles'] if c['kind'] == 'petrifying-spine')
+    assert (circle['startTimeMs'], circle['impactTimeMs'], circle['radiusYards']) == (1000, 6060, 8)
+    assert circle['playerID'] == 3
+
+
+def test_roar_cast_stops_at_interrupt_before_completion():
+    raw = {'casts': [event(1000, 'begincast', 1305775, sourceID=91, sourceInstance=2),
+                     event(4000, 'cast', 1305775, sourceID=91, sourceInstance=2)],
+           'interrupts': [event(2500, 'interrupt', 1766, sourceID=3,
+                                targetID=91, targetInstance=2, extraAbilityGameID=1305775)],
+           'enemyBuffs': []}
+    scene = u._replay_effects({'startTime': 0, 'endTime': 5000}, {}, raw, [])
+    cast = next(c for c in scene['npcCasts'] if c['spellID'] == 1305775)
+    assert (cast['endTimeMs'], cast['outcome'], cast['interruptPlayerID']) == (2500, 'interrupted', 3)
+    assert cast['expectedEndTimeMs'] == 4000
+
+
+def test_missed_tether_five_spokes_and_short_fight_is_not_counted():
+    fight = {'startTime': 0, 'endTime': 30000, 'difficulty': 5}
+    players = {9: {'name': 'Tank', 'role': 'tank'}, 10: {'name': 'Other', 'role': 'tank'}}
+    raw = {'actorRows': [{'id': 41, 'gameID': u.BLIGHTSCALE_WRETCH_GAME_ID}],
+           'casts': [event(7000, 'begincast', u.TOXIC_INCUBATION_CAST_ID,
+                           sourceID=55, sourceInstance=1),
+                     event(15000, 'cast', u.TOXIC_INCUBATION_CAST_ID,
+                           sourceID=65, sourceInstance=1, resourceActor=1, x=-4000, y=0)],
+           'damage': [], 'debuffs': [], 'enemyBuffs': [],
+           'resources': [event(15000, 'resourcechange', 0, sourceID=9,
+                               resourceActor=1, x=-2000, y=100),
+                         event(15000, 'resourcechange', 0, sourceID=10,
+                               resourceActor=1, x=5000, y=5000)],
+           'replayEvents': [event(15000, 'damage', 0, sourceID=41, sourceInstance=1,
+                                  resourceActor=1, x=0, y=0)]}
+    review = u._analyze_tether_failures(fight, {9: 'Tank'}, players, raw)
+    assert review['failureCount'] == 1
+    assert review['failures'][0]['playerID'] == 9
+    scene = u._replay_feedback(fight, players, raw, review)
+    wave = next(w for w in scene['waves'] if w['kind'] == 'tether-leak')
+    assert len(wave['directions']) == 5
+    assert len(scene['leakTethers']) == 1
+    assert u._analyze_tether_failures({**fight, 'endTime': 19000}, {}, players, raw)['failureCount'] == 0
+
+
 def test_purge_launches_once_at_six_seconds_not_on_second_aura_apply():
     raw = {'debuffs':[event(1000,'applydebuff',1312967,targetID=1),
                      event(6000,'removedebuff',1312967,targetID=1),
@@ -295,6 +383,28 @@ def test_incubation_degenerate_axis_never_invents_a_direction():
     raw['replayEvents'][0].update(x=0,y=0)
     scene = u._replay_projectiles({'startTime':0},{1:{'role':'tank'}},raw,[])
     assert not scene['waves']
+
+
+def test_boss_arm_wave_uses_synchronized_edge_and_facing_not_independent_rattle_casts():
+    center = u.REPLAY_MAPS['platform']
+    raw = {'casts': [
+        event(1000, 'begincast', 1319282, sourceID=22),
+        event(7000, 'cast', 1319282, sourceID=22, resourceActor=1,
+              x=center['centerX'], y=center['centerY']+4600, facing=-472),
+        event(7000, 'cast', 1311807, sourceID=70, sourceInstance=1,
+              resourceActor=1, x=center['centerX']+4000, y=center['centerY']),
+        event(2000, 'cast', 1298570, sourceID=78, sourceInstance=2,
+              resourceActor=1, x=center['centerX']-5500, y=center['centerY']),
+    ]}
+    waves = u._replay_projectiles({'startTime': 0}, {}, raw, [])['waves']
+    assert len(waves) == 1
+    wave = waves[0]
+    assert (wave['kind'], wave['warningStartTimeMs'], wave['timeMs']) == ('boss-caustic', 1000, 7000)
+    assert (wave['position']['x'], wave['position']['y']) == (0, center['centerY']+4600)
+    assert (wave['frontEndPosition']['x'], wave['frontEndPosition']['y']) == (4000, center['centerY'])
+    assert wave['directions'][0]['y'] == pytest.approx(-1, abs=.01)
+    raw['casts'] = [row for row in raw['casts'] if row['abilityGameID'] != 1311807]
+    assert not u._replay_projectiles({'startTime': 0}, {}, raw, [])['waves']
 
 
 def test_corridor_warden_health_uses_owned_resources_and_separates_instances():

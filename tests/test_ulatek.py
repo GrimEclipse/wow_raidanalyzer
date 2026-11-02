@@ -103,6 +103,25 @@ class UlatekTests(unittest.TestCase):
         self.assertEqual(result["waveDeaths"]["totalCount"], 1)
         self.assertEqual(result["waveDeaths"]["p1Count"], 1)
 
+    def test_egg_steal_requires_full_group_and_links_early_hatch(self):
+        players = {i: {"name": f"P{i}", "role": "range-dps"} for i in range(1, 10)}
+        raw = {"casts": [], "damage": [], "deaths": [], "enemyBuffs": [],
+               "debuffs": [], "analysisOptions": {"eggDutyPlayers": [f"P{i}" for i in range(1, 9)]}}
+        for pid in (1, 2, 3, 4, 5, 6, 7, 9):
+            raw["debuffs"].append(self.event(1000 + pid, "applydebuff", u.EGG_CARRY_ID, pid))
+        raw["debuffs"] += [self.event(1500, "removedebuff", u.EGG_CARRY_ID, 9),
+                           self.event(1500, "applydebuff", u.WAVE_ID, 9),
+                           self.event(1500, "applydebuff", 1301268, 1)]
+        result = u._analyze_waves_and_eggs(self.fight, {}, players, raw, [])
+        self.assertEqual(result["applicationCount"], 1)
+        self.assertEqual(result["eggAssignment"]["matchedCount"], 8)
+        self.assertEqual([(r["player"], r["failureKinds"]) for r in result["stolenCarries"]],
+                         [("P9", ["中波提前孵化"])])
+        raw["analysisOptions"]["eggDutyPlayers"].pop()
+        partial = u._analyze_waves_and_eggs(self.fight, {}, players, raw, [])
+        self.assertFalse(partial["eggAssignment"]["ready"])
+        self.assertEqual(partial["stolenCarries"], [])
+
     def test_mythic_wretch_casts_and_collision_clues_are_evidence_only(self):
         fight = {**self.fight, "difficulty": 5}
         raw = {
