@@ -6,6 +6,8 @@ import mimetypes
 import os
 import queue
 import re
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -31,6 +33,7 @@ from analyzer_core.wcl_report_ids import normalize_wcl_report_ids
 from analyzer_core.wcl_service import SharedWclService, AdmissionError
 from analyzer_core.analysis_admission import AnalysisUsage
 from analyzer_core.analysis_scope import fight_accounting_scope
+from analyzer_core.app_update import APP_VERSION, git as update_git, update_status
 
 
 ROOT = Path(__file__).resolve().parent
@@ -114,13 +117,21 @@ class Job:
 
 JOBS: Dict[str, Job] = {}
 JOBS_LOCK = threading.Lock()
+UPDATE_IN_PROGRESS = threading.Event()
+UPDATE_START_LOCK = threading.Lock()
 JOB_SEMAPHORE = JobSlots(MAX_JOB_THREADS, MAX_USER_JOB_THREADS)
 
 
-def admitted_job(user):
-    job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user['id'])
-    ANALYSIS_USAGE.admit(user, job.id)
-    return job
+def admitted_job(user, *, register=False):
+    with UPDATE_START_LOCK:
+        if UPDATE_IN_PROGRESS.is_set():
+            raise AdmissionError("服务正在更新，请稍后重试。", status=503)
+        job = Job(id=uuid.uuid4().hex[:12], owner_user_id=user['id'])
+        ANALYSIS_USAGE.admit(user, job.id)
+        if register:
+            with JOBS_LOCK:
+                JOBS[job.id] = job
+        return job
 
 
 @contextmanager
@@ -695,7 +706,7 @@ def safe_redirect_target(value, default="/online"):
 
 
 class AnalyzerHandler(BaseHTTPRequestHandler):
-    server_version = "MythicAnalyzer/1.6.0"
+    server_version = f"MythicAnalyzer/{APP_VERSION}"
 
     def do_GET(self):
         path = self.request_path()
@@ -741,6 +752,15 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         user = self.require_user(path)
         if not user:
             return None
+        if path == "/api/system/update":
+            if not user["isAdmin"]:
+                return self.json_error("仅管理员可检查更新。", HTTPStatus.FORBIDDEN)
+            status = update_status(ROOT)
+            with JOBS_LOCK:
+                status["activeJobs"] = sum(job.status in {"queued", "running"} for job in JOBS.values())
+            status["canApply"] = status["canApply"] and not status["activeJobs"] and not UPDATE_IN_PROGRESS.is_set()
+            status["updating"] = UPDATE_IN_PROGRESS.is_set()
+            return self.send_response_body(*json_bytes(status))
         if path in {"/raid-calendar", "/loot"} or path.startswith("/frontend/tools/raid-calendar/"):
             if not user["canModify"]:
                 return self.json_error("仅工会管理员可访问运营页面。", HTTPStatus.FORBIDDEN)
@@ -878,6 +898,47 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
         user = self.require_user(path)
         if not user:
             return None
+        if path == "/api/system/update":
+            if not user["isAdmin"]:
+                return self.json_error("仅管理员可更新服务。", HTTPStatus.FORBIDDEN)
+            if UPDATE_IN_PROGRESS.is_set():
+                return self.json_error("服务正在更新。", HTTPStatus.CONFLICT)
+            status = update_status(ROOT, force=True)
+            if not status["updateAvailable"]:
+                return self.json_error(status["error"] or "GitHub 尚无更新版本。", HTTPStatus.CONFLICT)
+            if not status["canApply"]:
+                return self.json_error(status["blocker"] or "当前无法更新。", HTTPStatus.CONFLICT)
+            fetched = update_git(ROOT, "fetch", "--tags", "origin", timeout=60)
+            if fetched.returncode:
+                return self.json_error("下载 GitHub 版本失败。", HTTPStatus.BAD_GATEWAY)
+            ancestor = update_git(ROOT, "merge-base", "--is-ancestor", "HEAD", f"refs/tags/{status['tag']}")
+            if ancestor.returncode:
+                return self.json_error("目标版本不是当前分支的快进更新。", HTTPStatus.CONFLICT)
+            log_path = DATA_DIR / "app_update.log"
+            with UPDATE_START_LOCK:
+                if UPDATE_IN_PROGRESS.is_set():
+                    return self.json_error("服务正在更新。", HTTPStatus.CONFLICT)
+                with JOBS_LOCK:
+                    if any(job.status in {"queued", "running"} for job in JOBS.values()):
+                        return self.json_error("仍有分析任务运行，请等待完成。", HTTPStatus.CONFLICT)
+                UPDATE_IN_PROGRESS.set()
+            try:
+                with log_path.open("ab") as log:
+                    subprocess.Popen([sys.executable, "-m", "analyzer_core.app_update_helper",
+                                      "--root", str(ROOT), "--tag", status["tag"],
+                                      "--parent-pid", str(os.getpid()),
+                                      "--host", str(self.server.server_address[0]),
+                                      "--port", str(self.server.server_address[1])],
+                                     cwd=ROOT, stdin=subprocess.DEVNULL, stdout=log,
+                                     stderr=subprocess.STDOUT,
+                                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                                     start_new_session=os.name != "nt")
+            except Exception as error:
+                UPDATE_IN_PROGRESS.clear()
+                return self.json_error(f"启动更新失败：{error}", HTTPStatus.INTERNAL_SERVER_ERROR)
+            response = self.send_response_body(*json_bytes({"updating": True, "tag": status["tag"]}, HTTPStatus.ACCEPTED))
+            threading.Thread(target=lambda: (time.sleep(0.5), self.server.shutdown()), daemon=True).start()
+            return response
         if path == "/api/auth/logout":
             return self.handle_logout()
         admin_reset_match = re.fullmatch(r"/api/admin/users/(\d+)/password", path)
@@ -1213,7 +1274,8 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                     raise ValueError("请输入有效的 WCL Report 与大秘境 Fight ID。")
                 if dungeon_key and dungeon_key not in DUNGEON_CONFIGS:
                     raise ValueError("请选择有效的副本配置。")
-                job = admitted_job(user)
+                job = admitted_job(user, register=True)
+                job.status = "running"
                 ANALYSIS_USAGE.record(job.id, report_code, [{'id':fight_id}])
                 try:
                     with tempfile.TemporaryDirectory(prefix="mythic-run-") as temp_dir:
@@ -1226,6 +1288,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                             )
                 finally:
                     ANALYSIS_USAGE.finish(job.id, 'finished')
+                    job.status = "done"
                 return self.send_response_body(*json_bytes(document))
             if path == "/api/single-fight/latest":
                 credentials = self.require_wcl_credentials(user)
@@ -1235,9 +1298,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 guild = selected_user_guild(user["id"], payload.get("guildID"))
                 payload["guildID"] = guild["id"]
                 prune_analysis_storage()
-                job = admitted_job(user)
-                with JOBS_LOCK:
-                    JOBS[job.id] = job
+                job = admitted_job(user, register=True)
                 thread = threading.Thread(
                     target=run_latest_single_fight_job,
                     args=(job, payload, credentials),
@@ -1285,9 +1346,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 payload["reportCode"] = report_code
                 payload["fightID"] = fight_id
                 prune_analysis_storage()
-                job = admitted_job(user)
-                with JOBS_LOCK:
-                    JOBS[job.id] = job
+                job = admitted_job(user, register=True)
                 thread = threading.Thread(
                     target=run_single_fight_job,
                     args=(job, payload, credentials),
@@ -1322,9 +1381,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             if not entry.supported:
                 raise ValueError(f"{entry.boss_name} {entry.disabled_reason or '暂未接入在线分析'}")
 
-            job = admitted_job(user)
-            with JOBS_LOCK:
-                JOBS[job.id] = job
+            job = admitted_job(user, register=True)
             thread = threading.Thread(target=run_job, args=(job, payload, credentials), daemon=True)
             thread.start()
             return self.send_response_body(*json_bytes({
@@ -1501,6 +1558,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             "/assets/spells/30283.jpg", "/assets/spells/179057.jpg", "/assets/spells/132469.jpg", "/assets/spells/51490.jpg", "/assets/spells/5211.jpg", "/assets/spells/221562.jpg", "/assets/spells/368970.jpg", "/assets/spells/108199.jpg", "/assets/spells/202137.jpg",
             "/frontend/core/home-workspace.css", "/frontend/core/home-workspace.js",
             "/frontend/core/mechanic-workbench.css", "/frontend/core/mechanic-workbench.js",
+            "/assets/vendor/mediabunny-1.65.0.min.mjs",
             "/frontend/report/plugins/venomous_abyss/vashnik/wave-replay.js",
             "/frontend/report/plugins/venomous_abyss/sentinels/field-replay.js",
             "/frontend/report/plugins/venomous_abyss/sentinels/revision.css",

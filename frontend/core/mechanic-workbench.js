@@ -92,7 +92,7 @@
     host._workbench?.destroy();
     const events=[...(scene.events||[])].filter(e=>e.timeMs!=null&&Number.isFinite(Number(e.timeMs))).map(e=>{const p=e.points?.find(p=>p.position)?.position;return {...e,positionX:p?.x,positionY:p?.y,sampleOffsetMs:p?p.sampleOffsetMs??0:null};}).sort((a,b)=>a.timeMs-b.timeMs);
     const duration=Math.max(1,Number(scene.durationMs)||events.at(-1)?.timeMs||1),layers=unique(events.map(e=>e.layer)),storageKey=`mythic:view:v1:${scene.key}`;
-    let config=cleanConfig({},duration,layers),selected=events[0]||null,cursor=Number(selected?.timeMs||0),playing=false,frame=0,scrubFrame=0,last=0,page=0,filtered=[];
+    let config=cleanConfig({},duration,layers),selected=events[0]||null,cursor=Number(selected?.timeMs||0),recordStartMs=cursor,playing=false,frame=0,scrubFrame=0,last=0,page=0,filtered=[],videoRecording=false,videoCancelled=false,videoCapture=null;
     function relativeBounds(){const pts=events.flatMap(x=>(x.points||[]).map(p=>p.position)).filter(p=>p&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y)));if(!pts.length)return null;const extent=pts.reduce((b,p)=>({minX:Math.min(b.minX,Number(p.x)),maxX:Math.max(b.maxX,Number(p.x)),minY:Math.min(b.minY,Number(p.y)),maxY:Math.max(b.maxY,Number(p.y))}),{minX:Infinity,maxX:-Infinity,minY:Infinity,maxY:-Infinity}),dx=Math.max(100,(extent.maxX-extent.minX)*.1),dy=Math.max(100,(extent.maxY-extent.minY)*.1);return {minX:extent.minX-dx,maxX:extent.maxX+dx,minY:extent.minY-dy,maxY:extent.maxY+dy};}
     if(scene.projection==='uncalibrated'){config.calibration=relativeBounds();config.projection='relative';}
     host.classList.add('mw');
@@ -103,8 +103,9 @@
     host.innerHTML=`<header class="mw-head"><div><span class="mw-eyebrow">MECHANIC WORKSPACE</span><h2>${esc(scene.title||'机制工作台')}</h2></div><div class="mw-actions"><button data-action="save">保存视图</button><button data-action="restore">恢复视图</button><button data-action="export">导出视图</button><label class="mw-upload">导入视图<input type="file" accept="application/json,.json" data-input="preset" hidden></label><button data-action="csv">导出数据 CSV</button></div></header>
       <p class="mw-note">${esc(scene.note||'视图调整在浏览器内完成。')}</p><div class="mw-filters"><label>玩家 / 单位<select data-config="actor">${choices(unique(events.map(e=>e.actor)))}</select></label><label>分组 / 轮次<select data-config="group">${choices(unique(events.map(e=>String(e.group??''))))}</select></label><label>搜索证据<input data-config="query" placeholder="玩家、法术或结果"></label><label>开始（秒）<input data-config="from" type="number" min="0" step=".1" value="0"></label><label>结束（秒）<input data-config="to" type="number" min="0" step=".1" value="${duration/1000}"></label><label>位置快照窗口（秒）<input data-config="windowMs" type="number" min=".1" max="60" step=".1" value="3"></label><label>死亡截止<select data-input="deathCutoff"><option value="">完整战斗</option>${(scene.deaths||[]).filter(e=>e.kind!=='combat_res').slice(0,10).map((e,i)=>`<option value="${e.timeMs}">第 ${i+1} 次死亡 · ${time(e.timeMs)}</option>`).join('')}</select></label><label class="mw-check"><input data-config="problemOnly" type="checkbox">只看已标记问题</label></div>
       <div class="mw-layers">${layers.map(layer=>`<label><input type="checkbox" data-layer="${esc(layer)}" checked>${esc(layer)}</label>`).join('')}<button data-action="layers">显示全部</button></div>
-      <div class="mw-transport"><button data-action="play" aria-label="播放事件时间轴">播放</button><button data-action="prev">上一事件</button><button data-action="next">下一事件</button><button data-action="problem">下一问题</button><select data-input="speed" aria-label="播放速度"><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select><output data-slot="clock"></output><span data-slot="count"></span></div>
+      <div class="mw-transport"><button data-action="play" aria-label="播放事件时间轴">播放</button><button data-action="prev">上一事件</button><button data-action="next">下一事件</button><button data-action="problem">下一问题</button><select data-input="speed" aria-label="播放速度"><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select><output data-slot="clock"></output><button data-action="recordOpen">录制片段</button><span data-slot="recordProgress" role="status" hidden></span><button data-action="recordCancel" hidden>取消录制</button><span data-slot="count"></span></div>
       <input class="mw-scrub" data-input="time" type="range" min="0" max="${duration}" step="100" value="${cursor}" aria-label="战斗时间"><div class="mw-tracks" data-slot="tracks"></div>
+      <dialog class="mw-record-dialog" data-slot="recordDialog" aria-label="录制场地片段"><div class="mw-record-head"><h3>录制场地片段</h3><button type="button" data-action="recordClose" aria-label="关闭录制对话框">关闭</button></div><p>打开对话框时会固定当前回放时间为起点。填写持续时长，最长 40 秒。MP4 采用 30 帧/秒，WebM 最高 60 帧/秒。</p><p>如需调整起点，关闭窗口并移动时间轴，再重新打开。</p><p data-slot="recordCurrent"></p><div class="mw-record-fields"><label>持续时长（秒）<input data-input="recordDuration" type="number" min=".1" max="40" step=".1" value="10"></label></div><div class="mw-video-export"><label>文件格式<select data-input="videoFormat"><option value="mp4" selected>MP4（兼容性更好）</option><option value="webm">WebM</option></select></label><label data-slot="mp4BitrateRow">MP4 码率<select data-input="mp4Bitrate"><option value="8000000" selected>高清，约 8 Mbps</option><option value="5000000">均衡，约 5 Mbps</option><option value="3000000">小文件，约 3 Mbps</option></select></label><label data-slot="webmQualityRow" hidden>WebM 画质<select data-input="videoQuality"><option value="native" selected>原始画质，最高 60 帧/秒，约 8 Mbps</option><option value="720-60">1280×720，60 帧/秒，约 5 Mbps</option><option value="1080-60">1920×1080，60 帧/秒，约 8 Mbps</option><option value="1080-30">1920×1080，30 帧/秒，约 5 Mbps</option><option value="720-30">1280×720，30 帧/秒，约 3 Mbps</option></select></label><button type="button" data-action="videoRecord">开始录制</button><small>浏览器会询问共享内容，请选择当前标签页。录制期间可在其他窗口或应用中工作。请勿最小化录制窗口，也不要在录制窗口切换标签页。按 Esc 可取消。</small></div><p data-slot="recordStatus" role="status">录制时会在此显示进度。</p></dialog>
       <div class="mw-views"><label>地图缩放<select data-config="zoom"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select></label><button data-action="focus">定位选中事件</button><button data-view="map">场地快照</button><button data-view="matrix">自定义矩阵</button><button data-view="table">证据表</button></div>
       <div class="mw-matrix-options" data-slot="matrixOptions" hidden><label>行<select data-config="rowKey">${fieldOptions}</select></label><label>列<select data-config="colKey">${fieldOptions}</select></label><label>数值<select data-config="metric"><option value="count">事件次数</option><option value="amount">伤害总量</option><option value="problems">标记问题数</option><option value="maxStack">最高光环层数</option></select></label></div>
       <div class="mw-layout"><section data-slot="stage" class="mw-stage"></section><aside data-slot="detail" class="mw-detail"></aside></div>
@@ -112,7 +113,99 @@
       <details class="mw-columns"><summary>自定义证据表列</summary>${Object.entries(columns).map(([key,label])=>`<label><input type="checkbox" data-column="${key}" ${defaultColumns.includes(key)?'checked':''}>${label}</label>`).join('')}</details><div class="mw-evidence" data-slot="list"></div><div class="mw-pages"><button data-action="pagePrev">前页</button><span data-slot="page"></span><button data-action="pageNext">后页</button></div><div class="mw-status" data-slot="status" role="status"></div>`;
     const slot=name=>host.querySelector(`[data-slot="${name}"]`),input=name=>host.querySelector(`[data-input="${name}"]`);
     const status=value=>slot('status').textContent=value;
+    const webmMimes=['video/webm;codecs=vp8','video/webm;codecs=vp9','video/webm'];
+    const supportedWebmMime=()=>global.MediaRecorder?.isTypeSupported&&webmMimes.find(type=>MediaRecorder.isTypeSupported(type));
+    const canRecordMp4=Boolean(global.VideoEncoder&&global.MediaStreamTrackProcessor);
+    if(!canRecordMp4){input('videoFormat').querySelector('[value="mp4"]').disabled=true;input('videoFormat').value='webm';slot('recordStatus').textContent='当前浏览器不支持 MP4 视频编码，请使用 WebM。';}
+    function syncRecordingFormat(){const mp4=input('videoFormat').value==='mp4';slot('mp4BitrateRow').hidden=!mp4;slot('webmQualityRow').hidden=mp4;}
+    syncRecordingFormat();
     function download(value,name,type){const url=URL.createObjectURL(new Blob([value],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    async function recordSelectionVideo(){
+      if(videoRecording)return;
+      const message=slot('recordStatus'),progress=slot('recordProgress'),cancel=host.querySelector('[data-action="recordCancel"]');
+      const from=recordStartMs,seconds=Number(input('recordDuration').value),to=from+seconds*1000;
+      if(!input('recordDuration').value||!Number.isFinite(seconds)||seconds<.1||seconds>40){message.textContent='请填写 0.1 到 40 秒的持续时长。';return;}
+      if(from<0||from>=duration||to>duration){message.textContent='所选时长超出战斗结束时间，请缩短录制时长。';return;}
+      if(!navigator.mediaDevices?.getDisplayMedia){message.textContent='当前浏览器不支持标签页录制，请使用较新的 Chrome 或 Edge。';return;}
+      const format=input('videoFormat').value,mime=format==='webm'?supportedWebmMime():null;
+      if(format==='mp4'&&!canRecordMp4||format==='webm'&&!mime){message.textContent=`当前浏览器不支持录制 ${format.toUpperCase()}。`;return;}
+      const previous={cursor,selected,view:config.view,speed:input('speed').value};
+      const quality=format==='mp4'?'native':input('videoQuality').value,option=format==='mp4'?{fps:30,bitrate:Number(input('mp4Bitrate').value)}:{native:{fps:60,bitrate:8000000},'720-60':{width:1280,height:720,fps:60,bitrate:5000000},'1080-60':{width:1920,height:1080,fps:60,bitrate:8000000},'1080-30':{width:1920,height:1080,fps:30,bitrate:5000000},'720-30':{width:1280,height:720,fps:30,bitrate:3000000}}[quality];
+      let source=null,output=null,video=null,drawFrame=0,recorder=null,mp4Output=null,mp4Source=null,mp4Finalized=false,encodingError=null,encodedFrames=0;
+      videoRecording=true;videoCancelled=false;
+      try{
+        // Keep this call in the click gesture; browsers reject a delayed screen-share request.
+        source=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:option.fps},audio:false,preferCurrentTab:true,selfBrowserSurface:'include'});
+        videoCapture=source;
+        const track=source.getVideoTracks()[0];
+        if(track?.getSettings().displaySurface&&track.getSettings().displaySurface!=='browser')throw Error('请在浏览器提示中选择当前标签页。');
+        track.addEventListener('ended',()=>{videoCancelled=true;stop();},{once:true});
+        slot('recordDialog').close();
+        stop();config.view='map';render();input('speed').value='1';
+        const field=slot('stage').querySelector('.field-map,.replay-map,.mw-map,.brood-map,[data-replay-field]');
+        if(!field)throw Error('没有可录制的场地图。');
+        field.scrollIntoView({block:'center',inline:'center'});
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        const rect=field.getBoundingClientRect();
+        if(format==='mp4'){
+          host.style.setProperty('--mw-record-ratio',String(rect.width/rect.height));host.classList.add('mw-record-capture');
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+          output=source;
+        }else{
+          if(rect.left<0||rect.top<0||rect.right>innerWidth||rect.bottom>innerHeight)throw Error('场地图没有完整显示。请缩小页面比例后重试。');
+          let cropped=false;
+          if(quality==='native'&&global.CropTarget?.fromElement&&typeof track.cropTo==='function'){
+            try{await track.cropTo(await global.CropTarget.fromElement(field));cropped=true;}catch(_){/* Fall back to canvas cropping. */}
+          }
+          if(cropped)output=source;
+          else{
+          video=document.createElement('video');video.muted=true;video.playsInline=true;video.srcObject=source;
+          await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(Error('无法读取标签页画面。'));});
+          await video.play();
+          const canvas=document.createElement('canvas'),scaleX=video.videoWidth/innerWidth,scaleY=video.videoHeight/innerHeight;
+          canvas.width=option.width||Math.min(1920,2*Math.max(1,Math.round(rect.width*scaleX/2)));
+          canvas.height=option.height||2*Math.max(1,Math.round(canvas.width*rect.height/rect.width/2));
+          const ctx=canvas.getContext('2d',{alpha:false});
+          const draw=()=>{if(!videoRecording||videoCancelled)return;ctx.drawImage(video,rect.left*scaleX,rect.top*scaleY,rect.width*scaleX,rect.height*scaleY,0,0,canvas.width,canvas.height);drawFrame=requestAnimationFrame(draw);};
+          draw();output=canvas.captureStream(option.fps);
+          }
+        }
+        cursor=from;selected=filtered.findLast(e=>e.timeMs<=cursor)||null;renderFrame();
+        let chunks=[],finished=null;
+        if(format==='mp4'){
+          const {Output,Mp4OutputFormat,BufferTarget,MediaStreamVideoTrackSource,Quality}=await import('/assets/vendor/mediabunny-1.65.0.min.mjs');
+          mp4Output=new Output({format:new Mp4OutputFormat(),target:new BufferTarget()});
+          mp4Source=new MediaStreamVideoTrackSource(output.getVideoTracks()[0],{codec:'avc',quality:new Quality({bitrate:option.bitrate}),keyFrameInterval:2,onEncodedPacket:()=>{encodedFrames++;}});
+          mp4Source.errorPromise.catch(error=>{encodingError=error;stop();});
+          mp4Output.addVideoTrack(mp4Source);await mp4Output.start();
+        }else{
+          recorder=new MediaRecorder(output,{mimeType:mime,videoBitsPerSecond:option.bitrate});
+          finished=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||Error('视频编码失败。'));});
+        }
+        progress.hidden=false;cancel.hidden=false;if(recorder)recorder.start(1000);play(to);
+        while(playing&&!videoCancelled){progress.textContent=`录制中 ${Math.max(0,(cursor-from)/1000).toFixed(1)} / ${((to-from)/1000).toFixed(1)} 秒`;await new Promise(resolve=>setTimeout(resolve,150));}
+        stop();let blob;
+        if(mp4Output){progress.textContent='正在完成 MP4 文件…';mp4Source.close();await mp4Output.finalize();mp4Finalized=true;if(encodingError)throw encodingError;if(!encodedFrames)throw Error('标签页未产生可录制画面，请保持当前标签页可见后重试。');blob=new Blob([mp4Output.target.buffer],{type:'video/mp4'});}
+        else{if(recorder.state!=='inactive')recorder.stop();await finished;blob=new Blob(chunks,{type:recorder.mimeType||mime});}
+        if(videoCancelled)throw Error('已取消录制。');
+        const extension=format;if(!blob.size)throw Error('录制结果为空，请重试。');
+        const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;
+        anchor.download=`${String(scene.key).replace(/[^\w-]/g,'_')}_${Number((from/1000).toFixed(1))}-${Number((to/1000).toFixed(1))}s.${extension}`;
+        anchor.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
+        message.textContent=`${extension.toUpperCase()} 已保存，${(blob.size/1048576).toFixed(1)} MiB。`;
+      }catch(error){message.textContent=error.name==='NotAllowedError'?'已取消标签页共享。':error.message||'录制失败。';}
+      finally{
+        if(mp4Output&&!mp4Finalized)Promise.resolve(mp4Output.cancel()).catch(()=>{});
+        host.classList.remove('mw-record-capture');host.style.removeProperty('--mw-record-ratio');
+        stop();cancelAnimationFrame(drawFrame);output?.getTracks().forEach(track=>track.stop());source?.getTracks().forEach(track=>track.stop());
+        if(video)video.srcObject=null;videoCapture=null;videoRecording=false;videoCancelled=false;progress.hidden=true;cancel.hidden=true;
+        cursor=previous.cursor;selected=previous.selected;config.view=previous.view;input('speed').value=previous.speed;render();
+        if(host.isConnected&&!slot('recordDialog').open)slot('recordDialog').showModal();
+      }
+    }
+    function cancelRecording(){videoCancelled=true;stop();videoCapture?.getTracks().forEach(track=>track.stop());}
+    function onRecordingKeydown(e){if(e.key==='Escape'&&videoRecording){e.preventDefault();cancelRecording();}}
+    global.addEventListener('keydown',onRecordingKeydown);
     const playbackState=()=>({playing,timeMs:cursor,durationMs:duration,rate:Number(input('speed').value)});
     function stop(){playing=false;cancelAnimationFrame(frame);host.querySelector('[data-action="play"]').textContent='播放';adapter.onPlaybackState?.(playbackState());}
     function play(until=config.to){if(!filtered.length&&!scene.combatReplay)return;playing=true;last=performance.now();host.querySelector('[data-action="play"]').textContent='暂停';adapter.onPlaybackState?.(playbackState());const end=Math.min(duration,until),tick=now=>{if(!host.isConnected){stop();return;}cursor=Math.min(end,cursor+(now-last)*Number(input('speed').value));last=now;selected=filtered.findLast(x=>x.timeMs<=cursor)||null;renderFrame();if(cursor>=end)stop();else frame=requestAnimationFrame(tick);};frame=requestAnimationFrame(tick);}
@@ -152,12 +245,17 @@
       host.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===config.view));slot('matrixOptions').hidden=config.view!=='matrix';slot('stage').hidden=config.view==='table';slot('detail').hidden=config.view!=='map';slot('stage').classList.toggle('mw-map-stage',config.view==='map');if(config.view==='matrix')slot('stage').innerHTML=matrix();renderFrame();renderList();
     }
     function sync(){host.querySelectorAll('[data-column]').forEach(e=>e.checked=config.columns.includes(e.dataset.column));slot('calibrationStatus').textContent=config.projection==='relative'?'相对坐标示意 · 与场地图未标定':config.calibration?'使用自定义校准':'';host.querySelectorAll('[data-config]').forEach(e=>{const k=e.dataset.config;if(e.type==='checkbox')e.checked=config[k];else e.value=['from','to','windowMs'].includes(k)?config[k]/1000:config[k];});host.querySelectorAll('[data-layer]').forEach(e=>e.checked=!config.layers.length||config.layers.includes(e.dataset.layer));if(config.calibration)host.querySelectorAll('[data-bound]').forEach(e=>e.value=config.calibration[e.dataset.bound]);render();}
-    host.addEventListener('change',e=>{if(e.target===input('time')){if(scrubFrame){cancelAnimationFrame(scrubFrame);scrubFrame=0;}cursor=Number(e.target.value);selected=filtered.findLast(x=>x.timeMs<=cursor)||null;renderFrame();}if(e.target.dataset.column){const selectedColumns=[...host.querySelectorAll('[data-column]:checked')].map(x=>x.dataset.column);if(selectedColumns.length){config.columns=selectedColumns;renderList();}else{e.target.checked=true;status('至少保留一列。');}}if(e.target===input('deathCutoff')){config.to=e.target.value?Number(e.target.value):duration;sync();}if(e.target.dataset.config){const k=e.target.dataset.config;config[k]=e.target.type==='checkbox'?e.target.checked:['from','to','windowMs'].includes(k)?Number(e.target.value)*1000:e.target.value;config=cleanConfig(config,duration,layers);render();}
+    slot('recordDialog').addEventListener('cancel',e=>{if(videoRecording)e.preventDefault();});
+    host.addEventListener('change',e=>{if(videoRecording)return;if(e.target===input('videoFormat'))syncRecordingFormat();if(e.target===input('time')){if(scrubFrame){cancelAnimationFrame(scrubFrame);scrubFrame=0;}cursor=Number(e.target.value);selected=filtered.findLast(x=>x.timeMs<=cursor)||null;renderFrame();}if(e.target.dataset.column){const selectedColumns=[...host.querySelectorAll('[data-column]:checked')].map(x=>x.dataset.column);if(selectedColumns.length){config.columns=selectedColumns;renderList();}else{e.target.checked=true;status('至少保留一列。');}}if(e.target===input('deathCutoff')){config.to=e.target.value?Number(e.target.value):duration;sync();}if(e.target.dataset.config){const k=e.target.dataset.config;config[k]=e.target.type==='checkbox'?e.target.checked:['from','to','windowMs'].includes(k)?Number(e.target.value)*1000:e.target.value;config=cleanConfig(config,duration,layers);render();}
       if(e.target.dataset.layer){const checked=[...host.querySelectorAll('[data-layer]:checked')].map(x=>x.dataset.layer);config.layers=checked.length?checked:['__none__'];render();}});
     host.addEventListener('pointerdown',e=>{if(e.target===input('time')&&playing)stop();});
-    host.addEventListener('input',e=>{if(e.target.dataset.config==='query'){config.query=e.target.value;render();}if(e.target===input('time')){if(playing)stop();cursor=Number(e.target.value);selected=filtered.findLast(x=>x.timeMs<=cursor)||null;slot('clock').textContent=time(cursor);if(!scrubFrame)scrubFrame=requestAnimationFrame(()=>{scrubFrame=0;if(host.isConnected)renderFrame();});}});
-    host.addEventListener('click',e=>{const eventNode=e.target.closest('[data-event]');if(eventNode){select(filtered.find(x=>String(x.id)===eventNode.dataset.event));return;}
+    host.addEventListener('input',e=>{if(videoRecording)return;if(e.target.dataset.config==='query'){config.query=e.target.value;render();}if(e.target===input('time')){if(playing)stop();cursor=Number(e.target.value);selected=filtered.findLast(x=>x.timeMs<=cursor)||null;slot('clock').textContent=time(cursor);if(!scrubFrame)scrubFrame=requestAnimationFrame(()=>{scrubFrame=0;if(host.isConnected)renderFrame();});}});
+    host.addEventListener('click',e=>{if(videoRecording&&e.target.closest('[data-action]')?.dataset.action!=='recordCancel')return;const eventNode=e.target.closest('[data-event]');if(eventNode){select(filtered.find(x=>String(x.id)===eventNode.dataset.event));return;}
       const view=e.target.closest('[data-view]');if(view){config.view=view.dataset.view;render();return;}const action=e.target.closest('[data-action]')?.dataset.action;
+      if(action==='recordOpen'){stop();recordStartMs=cursor;const remaining=Math.floor(Math.min(40,Math.max(0,(duration-recordStartMs)/1000))*10)/10;slot('recordCurrent').textContent=`录制起点：${time(recordStartMs)}。剩余最多 ${remaining.toFixed(1)} 秒。`;input('recordDuration').max=String(remaining);if(Number(input('recordDuration').value)>remaining)input('recordDuration').value=remaining.toFixed(1);slot('recordDialog').showModal();return;}
+      if(action==='recordClose'){slot('recordDialog').close();return;}
+      if(action==='videoRecord'){void recordSelectionVideo();return;}
+      if(action==='recordCancel'){cancelRecording();return;}
       if(action==='play'){if(playing){stop();return;}if(cursor>=config.to)cursor=config.from;play();}
       if(action==='next'||action==='prev'||action==='problem'){const eligible=action==='problem'?filtered.filter(x=>x.problem):filtered,index=eligible.indexOf(selected);const next=index>=0?eligible[index+(action==='prev'?-1:1)]:action==='prev'?[...eligible].reverse().find(x=>x.timeMs<=cursor):eligible.find(x=>x.timeMs>=cursor);if(next)select(next);else status('没有更多匹配事件。');}
       if(action==='focus'){const point=selected?.points?.find(p=>p.position)?.position,q=point?project(point):null,stage=slot('stage');if(q&&stage.firstElementChild){stage.scrollLeft=Math.max(0,q.x/100*stage.firstElementChild.offsetWidth-stage.clientWidth/2);stage.scrollTop=Math.max(0,q.y/100*stage.firstElementChild.offsetHeight-stage.clientHeight/2);}else status('选中事件没有可定位的坐标。');}if(action==='layers'){config.layers=[];sync();}
@@ -171,7 +269,7 @@
       if(action==='relative'){const bounds=relativeBounds();if(!bounds){status('日志没有可用坐标。');return;}config.calibration=bounds;config.projection='relative';sync();}
     });
     input('preset').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>100000)throw Error('视图文件过大');const data=JSON.parse(await file.text());if(data.schema!=='mythic-view-v1'||data.sceneKey!==scene.key)throw Error('视图版本或首领不匹配');config=cleanConfig(data.config||{},duration,layers);sync();status('已导入视图。');}catch(error){status(error.message);}finally{e.target.value='';}};
-    host._workbench={destroy(){stop();cancelAnimationFrame(scrubFrame);adapter.onDestroy?.();},refreshMap:renderFrame,seek(timeMs){stop();cursor=Math.max(0,Math.min(duration,Number(timeMs)||0));selected=filtered.findLast(e=>e.timeMs<=cursor)||null;renderFrame();},playRange(from,to){stop();config.view='map';sync();cursor=Math.max(0,Math.min(duration,from));selected=filtered.findLast(e=>e.timeMs<=cursor)||null;renderFrame();play(Math.max(cursor,Math.min(duration,to)));},focusEvent(id){const event=events.find(e=>e.id===String(id));if(event){config.group=event.group;selected=event;cursor=event.timeMs;sync();}}};sync();return host._workbench;
+    host._workbench={destroy(){global.removeEventListener('keydown',onRecordingKeydown);cancelRecording();cancelAnimationFrame(scrubFrame);adapter.onDestroy?.();},refreshMap:renderFrame,seek(timeMs){stop();cursor=Math.max(0,Math.min(duration,Number(timeMs)||0));selected=filtered.findLast(e=>e.timeMs<=cursor)||null;renderFrame();},playRange(from,to){stop();config.view='map';sync();cursor=Math.max(0,Math.min(duration,from));selected=filtered.findLast(e=>e.timeMs<=cursor)||null;renderFrame();play(Math.max(cursor,Math.min(duration,to)));},focusEvent(id){const event=events.find(e=>e.id===String(id));if(event){config.group=event.group;selected=event;cursor=event.timeMs;sync();}}};sync();return host._workbench;
   }
   global.MechanicWorkbench={mount,filterEvents,aggregate,cleanConfig,projectGuides,trackPosition,lifeState,avatar,patchMap,bossStatus,activeCast,castDisplay,castBar,escape:esc};
 })(typeof window==='undefined'?globalThis:window);

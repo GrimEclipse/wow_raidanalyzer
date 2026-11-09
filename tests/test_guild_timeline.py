@@ -46,7 +46,7 @@ def test_early_phase_skips_all_burst_counts_and_pet_casts_but_keeps_pet_damage()
         event(145010, sourceID=20, targetID=90, amount=50),
         event(145020, sourceID=1, targetID=91, amount=9999),
     ]
-    raw["guildPlayerCasts"] = [event(145000, "cast", sourceID=1, targetID=90, abilityGameID=1),
+    raw["guildPlayerCasts"] = [event(145000, "cast", sourceID=1, targetID=90, abilityGameID=12345),
                                event(145005, "cast", sourceID=20, targetID=90, abilityGameID=2)]
     result = analyze(fixture)
     assert result["burstSkipped"] and result["count"] == 0
@@ -72,7 +72,7 @@ def test_p1_window_starts_at_observed_crossing_without_using_player_or_future_hp
     raw, event = fixture[2], fixture[-1]
     raw["guildBossDamage"] = [event(140000, sourceID=1, targetID=90, amount=30,
         sourceResources={"hitPoints":1,"maxHitPoints":100}, targetResources={"hitPoints":400,"maxHitPoints":10000})]
-    raw["guildPlayerCasts"] = [event(t, "cast", sourceID=1, targetID=90, abilityGameID=1)
+    raw["guildPlayerCasts"] = [event(t, "cast", sourceID=1, targetID=90, abilityGameID=12345)
                                for t in [139999, 140000, 143001]]
     row = analyze(fixture)["phaseControl"][0]["thresholds"]["5"][0]
     assert row["castCount"] == 2
@@ -298,7 +298,7 @@ def test_p1_hold_window_is_first_hp_crossing_until_245_excluding_legal_damage_af
         targetResources={'hitPoints':hp,'maxHitPoints':10000}) for t,source,damage,hp in [
             (159000,1,10,600),(160000,1,100,400),(161000,20,50,600),
             (164999,1,30,300),(165000,1,999,200),(166000,20,999,100)]]
-    raw['guildPlayerCasts']=[event(t,'cast',sourceID=1,targetID=90,abilityGameID=1)
+    raw['guildPlayerCasts']=[event(t,'cast',sourceID=1,targetID=90,abilityGameID=12345)
         for t in [159999,160000,161000,164999,165000,166000]]
     result=analyze(fixture);phase=result['phaseControl'][0];row=phase['thresholds']['5'][0]
     assert (row['castCount'],row['damage'],row['petDamage'])==(3,180,50)
@@ -311,9 +311,56 @@ def test_p1_no_hold_fault_when_hp_first_drops_below_threshold_after_245():
     fixture=setup(p1_end=169000);raw,event=fixture[2],fixture[-1]
     raw['guildBossDamage']=[event(166000,sourceID=1,targetID=90,amount=100,
         targetResources={'hitPoints':400,'maxHitPoints':10000})]
-    raw['guildPlayerCasts']=[event(166000,'cast',sourceID=1,targetID=90,abilityGameID=1)]
+    raw['guildPlayerCasts']=[event(166000,'cast',sourceID=1,targetID=90,abilityGameID=12345)]
     phase=analyze(fixture)['phaseControl'][0]
     assert phase['thresholds']['5']==[] and phase['thresholdWindows']['5']['startTimeMs'] is None
+
+
+def test_hold_casts_exclude_melee_and_blade_dance_triggered_throw_glaive():
+    fixture=setup(p1_end=169000)
+    raw,event=fixture[2],fixture[-1]
+    raw['guildBossDamage']=[event(160000,sourceID=1,targetID=90,amount=10,
+        targetResources={'hitPoints':400,'maxHitPoints':10000})]
+    raw['guildPlayerCasts']=[
+        event(160100,'cast',sourceID=1,targetID=90,abilityGameID=1),
+        event(161000,'cast',sourceID=1,targetID=90,abilityGameID=m7.DH_THROW_GLAIVE_ID),
+        event(161000,'cast',sourceID=1,targetID=-1,abilityGameID=m7.DH_BLADE_DANCE_ID),
+        event(161150,'cast',sourceID=1,targetID=90,abilityGameID=337819),
+        event(161400,'cast',sourceID=1,targetID=90,abilityGameID=393035),
+        event(162000,'cast',sourceID=1,targetID=90,abilityGameID=m7.DH_THROW_GLAIVE_ID),
+        event(163000,'cast',sourceID=1,targetID=90,abilityGameID=123456),
+    ]
+    row=analyze(fixture)['phaseControl'][0]['thresholds']['5'][0]
+    assert row['castCount']==2
+    assert [cast['spellID'] for cast in row['casts']]==[m7.DH_THROW_GLAIVE_ID,123456]
+
+
+def test_other_guild_can_request_hold_evidence_without_avalon_burst_checks():
+    fixture=setup(p1_end=170000,duration=420000)
+    raw,event=fixture[2],fixture[-1]
+    raw['reportGuild']={'id':12345,'name':'Other'}
+    fixture[5]['guildTimelineScope']='all'
+    raw['casts'] += [event(202772,'cast',sourceID=91,abilityGameID=next(iter(m7.SOUL_SEVER_IDS))),
+                     event(200000,'begincast',sourceID=91,abilityGameID=m7.ETERNAL_NIGHTFALL),
+                     event(373000,'cast',sourceID=91,abilityGameID=next(iter(m7.SOUL_SEVER_IDS)))]
+    raw['interrupts']=[event(210000,'interrupt',sourceID=1,targetID=91,extraAbilityGameID=m7.ETERNAL_NIGHTFALL)]
+    raw['guildBossDamage']=[event(t,sourceID=1,targetID=91,amount=amount,
+        targetResources={'hitPoints':400,'maxHitPoints':10000}) for t,amount in
+        [(195000,10),(205000,100),(215000,20),(372000,30),(374000,1000)]]
+    result=analyze(fixture)
+    assert result['enabled'] and result['checksEnabled'] is False
+    assert result['checks']==[] and result['phaseControl'][1]['requiredBladeTimeMs']==373000
+    assert result['phaseControl'][1]['nightfallExcludedWindows']==[dict(startTimeMs=200000,endTimeMs=210000)]
+    assert result['phaseControl'][1]['thresholds']['5'][0]['damage']==60
+    overview=m7.guild_timeline_overview([{'coiledaltar':{'guildTimeline':result},'reportID':'R','fightID':21}])
+    assert [row['key'] for row in overview]==['guildHoldCasts']
+
+
+def test_other_guild_uses_public_timeline_until_all_guild_scope_is_selected():
+    fixture=setup()
+    fixture[2]['reportGuild']={'id':12345}
+    result=analyze(fixture)
+    assert result['checksEnabled'] is False and result['phaseControl']==[]
 
 
 def comparison_fixture():

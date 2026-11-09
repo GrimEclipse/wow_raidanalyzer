@@ -11,7 +11,7 @@ assert.equal(targetAt({...profile,tracks:{...profile.tracks,p1:{...profile.track
 let clock=0,nextId=0,pending=new Map();
 class Audio extends EventTarget{
  constructor(){super();this.paused=true;this.readyState=1;this.currentTime=0;this.ended=false;this.plays=0;}
- set src(s){this.source=s;this.currentTime=0;this.ended=false;this.paused=true;}
+ set src(s){this.source=s;this.srcSets=(this.srcSets||0)+1;this.currentTime=0;this.ended=false;this.paused=true;}
  get src(){return this.source;}
  play(){this.paused=false;this.plays++;}
  pause(){this.paused=true;}
@@ -21,6 +21,14 @@ const c=createController(profile,{createAudio:()=>new Audio(),now:()=>clock,
 function advance(ms){clock+=ms;const frames=[...pending.values()];pending.clear();frames.forEach(fn=>fn());}
 c.sync({playing:false,timeMs:0,durationMs:60000,rate:1});
 assert(c.slots.every(s=>s.audio.paused&&!s.audio.src));
+const primed=createController(profile,{createAudio:()=>new Audio(),now:()=>clock,
+ raf:fn=>{pending.set(++nextId,fn);return nextId;},cancel:id=>pending.delete(id)});
+primed.sync({playing:false,timeMs:0,durationMs:60000,rate:1});primed.prime(0);
+assert.equal(primed.slots[0].audio.src,'p1.mp3');
+primed.sync({playing:true,timeMs:0});
+assert.equal(primed.slots[0].audio.srcSets,1,'The first play must reuse the preloaded P1 source');
+assert.equal(primed.slots[0].audio.plays,1);
+primed.destroy();
 c.sync({playing:true,timeMs:0});advance(750);
 assert.equal(c.slots[0].audio.volume,.15);advance(750);
 assert.equal(c.slots[0].audio.volume,.3);

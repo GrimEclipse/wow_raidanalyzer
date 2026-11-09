@@ -69,7 +69,13 @@
       if(changed||a.paused&&!s.starting)begin(s);
       else if(!frame&&!s.starting)a.volume=gain();
     }
-    return {sync,slots,setMuted(value){muted=!!value;sync();},setVolume(value){volume=Math.max(0,Math.min(1,Number(value)||0));sync();},
+    function prime(timeMs=0){
+      if(destroyed||last.playing)return;
+      const target=targetAt(profile,timeMs);if(!target)return;
+      active=0;const s=slots[active];s.key=target.key;s.audio.preload='auto';s.audio.src=target.src;
+      try{s.audio.load?.();}catch(_){}
+    }
+    return {sync,prime,slots,setMuted(value){muted=!!value;sync();},setVolume(value){volume=Math.max(0,Math.min(1,Number(value)||0));sync();},
       destroy(){destroyed=true;clearTimer(heartbeat);heartbeat=0;stopAll();},state(){const state=clockState();return {muted,volume,active,target:targetAt(profile,state.timeMs),last:state};}};
   }
   function mountControls(host,profile,durationMs){
@@ -89,7 +95,7 @@
     const leave=()=>controller.sync({playing:false});window.addEventListener('pagehide',leave);
     const resume=()=>{if(!document.hidden)controller.sync();};document.addEventListener('visibilitychange',resume);window.addEventListener('focus',resume);
     const destroy=controller.destroy;controller.destroy=()=>{window.removeEventListener('pagehide',leave);document.removeEventListener('visibilitychange',resume);window.removeEventListener('focus',resume);destroy();box.remove();};
-    controller.sync({timeMs:0,playing:false,durationMs,rate:1});return controller;
+    controller.sync({timeMs:0,playing:false,durationMs,rate:1});controller.prime(0);return controller;
   }
   root.ReplayAudio={targetAt,createController,mountControls};if(typeof module!=='undefined')module.exports=root.ReplayAudio;
 })(typeof window==='undefined'?globalThis:window);

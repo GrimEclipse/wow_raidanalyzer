@@ -25,7 +25,7 @@ CRITICAL_FIELDS = {
     "motherWrathReviewEnabled": ("motherWrath", "蛇母之怒承接与全团伤害"),
     "platformReviewEnabled": ("platformTransitions", "碎场流程与减伤"),
     "serpentBitesReviewEnabled": ("serpentBites", "毒蛇之咬分摊与位置"),
-    "p25EggsReviewEnabled": ("p25Eggs", "P2.5 带蛋死亡与残留"),
+    "p25EggsReviewEnabled": ("p25Eggs", "P2.5 带蛋死亡与携蛋情况"),
     "coiledPreyReviewEnabled": ("coiledPreyDeaths", "盘绕猎物死亡"),
 }
 CONFIG_SCHEMA += [{"key": key, "type": "boolean", "label": label, "default": True,
@@ -138,6 +138,9 @@ GUIDE_SPELLS = {**load_confirmed_spell_names(), **ULATEK_SPELL_NAMES}
 SOURCE_NAMES = load_confirmed_source_names()
 EGG_CARRY_ID = 1295360
 MYTHIC_EGG_CARRY_ID = 1307612
+DOOMSCALE_EGG_CONTACT_ID = 1300312
+DOOMSCALE_EGG_GAME_ID = 268164
+DOOMSCALE_HATCH_CAST_ID = 1306862
 EGG_CARRY_IDS = (EGG_CARRY_ID, MYTHIC_EGG_CARRY_ID)
 HARDENED_SHELL_ID = 1299650
 REPLAY_EGG_GAME_IDS = {265644, 266085, 268121, 263535, 268164, 271194}
@@ -231,7 +234,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-egg-duty-tether-wave-2026-11-02-v30",
+    "mechanicVersion": "ulatek-fixed-wrath-egg-hatch-2026-11-09-v36",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -241,9 +244,9 @@ COURT_PROFILE = {
     "phaseRule": "P1/P2/P3 以被缚之怒结束点切分；最终碎场轮次以盘绕猎物施法切分。",
     "rules": [
         {
-            "key": "p25_egg_remaining", "label": "P2.5 连续分摊结束仍携蛋", "mode": "direct",
-            "spellIDs": [1299010, 1287265, 1295360],
-            "requiredEvidence": ["第二次被缚之怒结束", "六次幽魂盘卷完成", "结算后存活且携蛋光环仍生效"],
+            "key": "egg_collision", "label": "撞蛋", "mode": "direct",
+            "spellIDs": [1295360, 1301268],
+            "requiredEvidence": ["两名玩家同帧失去携蛋光环", "同帧孵化", "两人可靠位置距离不超过 4 码", "无中波或幽魂盘卷结算"],
             "defaultCountEnabled": True, "severityUnits": 1,
         },
         {
@@ -626,10 +629,47 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
                     **player_ref(players, actor_map, interval["playerID"]),
                     "time": fmt_ms(timestamp - fight["startTime"]),
                     "timeMs": timestamp - fight["startTime"],
-                    "phase": _phase_at(timestamp, rage_windows),
+                    "phase": duty_phase(timestamp) or _phase_at(timestamp, rage_windows),
                     "hatchTime": fmt_ms(hatch["timestamp"] - fight["startTime"]),
+                    "hatchTimestamp": hatch["timestamp"],
                     "evidence": "携蛋光环移除与孵化同帧，未见浪潮或幽魂盘卷；需复核位置，不能单凭日志认定碰蛋",
                 })
+    collisions = []
+    if possible_collision_hatches:
+        position_index = _positions(raw, 'replayEvents' if raw.get('replayEvents') else 'resources')
+        candidates = []
+        for left_index, left in enumerate(possible_collision_hatches):
+            left_position = _position_sample(position_index, left['playerID'],
+                                             fight['startTime'] + left['timeMs'])
+            if not left_position or not left_position['reliable']:
+                continue
+            for right_index in range(left_index + 1, len(possible_collision_hatches)):
+                right = possible_collision_hatches[right_index]
+                if (left['playerID'] == right['playerID'] or left['phase'] != right['phase']
+                        or abs(left['timeMs'] - right['timeMs']) > 250
+                        or abs(left['hatchTimestamp'] - right['hatchTimestamp']) > 80):
+                    continue
+                right_position = _position_sample(position_index, right['playerID'],
+                                                  fight['startTime'] + right['timeMs'])
+                if not right_position or not right_position['reliable']:
+                    continue
+                distance_yards = math.hypot(left_position['x'] - right_position['x'],
+                                            left_position['y'] - right_position['y']) / 100
+                if distance_yards <= 4:
+                    candidates.append((distance_yards, left_index, right_index))
+        used = set()
+        for distance_yards, left_index, right_index in sorted(candidates):
+            if left_index in used or right_index in used:
+                continue
+            used.update((left_index, right_index))
+            left, right = possible_collision_hatches[left_index], possible_collision_hatches[right_index]
+            left['confirmedCollision'] = right['confirmedCollision'] = True
+            collisions.append({'timeMs': min(left['timeMs'], right['timeMs']),
+                               'time': left['time'], 'phase': left['phase'],
+                               'players': [{key: row.get(key) for key in ('player', 'playerID', 'classColor')}
+                                           for row in (left, right)],
+                               'distanceYards': round(distance_yards, 2),
+                               'evidence': '同帧携蛋光环移除与孵化，且两人可靠坐标相距不超过 4 码'})
     configured = (raw.get("analysisOptions") or {}).get("eggDutyPlayers") or []
     guild = raw.get("reportGuild") or {}
     if not configured and int(guild.get("id") or 0) == AVALON_GUILD_ID:
@@ -661,7 +701,10 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
             if any(row["playerID"] == carry["playerID"] and
                    abs(carry["endTimeMs"] - row["timeMs"]) <= 750
                    for row in possible_collision_hatches):
-                failures.append("疑似碰蛋提前孵化")
+                failures.append("确认撞蛋提前孵化" if any(
+                    row["playerID"] == carry["playerID"] and row.get("confirmedCollision")
+                    and abs(carry["endTimeMs"] - row["timeMs"]) <= 750
+                    for row in possible_collision_hatches) else "疑似碰蛋提前孵化")
             stolen_carries.append({**carry, "round": index, "failureKinds": failures,
                                    "earlyHatch": bool(failures)})
     return {
@@ -672,6 +715,7 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
         "eggCarrierHitCount": sum(row["eggCarrier"] for row in hits),
         "earlyHatchCount": sum(row["earlyHatchConfirmed"] for row in hits),
         "possibleCollisionHatches": possible_collision_hatches,
+        "eggCollisions": sorted(collisions, key=lambda row: row['timeMs']),
         "hits": hits,
         "waveDeathWindowMs": WAVE_DEATH_WINDOW_MS,
         "waveDeaths": {
@@ -791,8 +835,9 @@ def _clean_wave_hits(fight, players, raw, waves, tether_review):
 def _analyze_p25_eggs(fight, actor_map, players, raw):
     count = P25_MYTHIC_COIL_COUNT if int(fight.get('difficulty') or 0) == 5 else P25_COIL_COUNT
     result = {"enabled": True, "started": False, "completed": False, "expectedSoakCount": count,
-              "completedSoakCount": 0, "deaths": [], "remaining": [], "deathCount": 0, "mistakeCount": 0,
-              "evidenceNote": f"P2.5 按第二次被缚之怒结束后的{count}次幽魂盘卷界定。阶段内带蛋死亡单独统计；末次结算后仍存活且携蛋记一次玩家失误。预留250毫秒处理同帧光环移除；日志不足或分摊未完成时不判残留。"}
+              "completedSoakCount": 0, "deaths": [], "remaining": [], "deathCount": 0,
+              "remainingCount": 0, "mistakeCount": 0,
+              "evidenceNote": f"P2.5 按第二次被缚之怒结束后的{count}次幽魂盘卷界定。阶段内带蛋死亡单独统计；分摊结束仍携蛋仅供复盘，不判玩家失误。预留250毫秒处理同帧光环移除；日志不足或分摊未完成时不判残留。"}
     rage = _rage_windows(fight, raw)
     if len(rage) < 2 or rage[1].get("openEnded"):
         result["reason"] = "尚未确认第二次被缚之怒结束"
@@ -850,9 +895,10 @@ def _analyze_p25_eggs(fight, actor_map, players, raw):
             if carry:
                 result["remaining"].append({**player_ref(players, actor_map, pid), "time": fmt_ms(checkpoint - fight["startTime"]),
                                             "carryStartTime": fmt_ms(carry["start"] - fight["startTime"]),
-                                            "spellID": EGG_CARRY_ID, "isPlayerMistake": True,
-                                            "reason": f"P2.5 {count}次幽魂盘卷结束后仍携带蛇卵"})
-    result["deathCount"], result["mistakeCount"] = len(result["deaths"]), len(result["remaining"])
+                                            "spellID": EGG_CARRY_ID, "isPlayerMistake": False,
+                                            "reason": f"P2.5 {count}次幽魂盘卷结束后仍携带蛇卵，仅供复盘"})
+    result["deathCount"], result["remainingCount"], result["mistakeCount"] = (
+        len(result["deaths"]), len(result["remaining"]), 0)
     return result
 
 
@@ -2057,6 +2103,33 @@ def _replay_effects(fight, players, raw, changes):
                       and r.get('sourceInstance') == e.get('sourceInstance')
                       and int(e['timestamp'])-10000 <= int(r['timestamp']) <= int(e['timestamp'])]
         return int(candidates[-1]['timestamp']) if candidates else int(e['timestamp'])-fallback
+    def fixed_wrath_point(boss_position):
+        if not boss_position:
+            return None
+        center = REPLAY_MAPS['platform']
+        dx, dy = boss_position['x']-center['centerX'], boss_position['y']-center['centerY']
+        # User-marked left platform point, mirrored onto whichever side holds
+        # the Boss. The impact is a platform landmark, never a hit player's spot.
+        offset = 3_100
+        return ({'x': center['centerX']+(offset if dx > 0 else -offset), 'y': center['centerY']}
+                if abs(dx) >= abs(dy) else
+                {'x': center['centerX'], 'y': center['centerY']+(offset if dy > 0 else -offset)})
+    def boss_front(event, ts):
+        origin = actor_position(event, 'source') or point(event.get('sourceID'), ts)
+        if not origin:
+            return None
+        rows = position_index.get(event.get('sourceID')) or []
+        nearest = min(rows, key=lambda row: abs(row['timestamp'] - ts), default=None)
+        facing = (nearest.get('facing') if nearest and abs(nearest['timestamp'] - ts) <= 3000
+                  else None)
+        if facing is None and (str(event.get('resourceActor')) == '1'
+                               or event.get('sourceResources')):
+            facing = event.get('facing')
+        if facing is None:
+            return None
+        radians = float(facing) / 100
+        return {'x': origin['x'] + 300 * math.cos(radians),
+                'y': origin['y'] - 300 * math.sin(radians)}
     circles, channels, npc_casts, cones, lost_platforms = [], [], [], [], []
     damage = raw.get('damage') or []
     for e in casts:
@@ -2072,16 +2145,14 @@ def _replay_effects(fight, players, raw, changes):
         if sid == 1298367:
             ticks = sorted({int(r['timestamp']) for r in damage if ability_id(r) in {1298369, 1301122}
                             and r.get('sourceID') == e.get('sourceID') and ts <= int(r['timestamp']) < ts+5000})
-            first_hit = next((r for r in damage if ability_id(r) in {1298369, 1301122}
-                              and r.get('targetID') == e.get('targetID') and ts <= int(r['timestamp']) < ts+5000), None)
-            receiver = (actor_position(first_hit, 'target') if first_hit else None) or point(e.get('targetID'), ts)
-            # User-confirmed three-yard soak area; its position stays fixed for
-            # all nine hits. Hit outcomes still come from damage events.
+            receiver = fixed_wrath_point(origin)
+            # The soak stays at the platform-side landmark through knockback.
             if receiver:
                 circles.append({'kind': 'wrath', 'sourceID': e.get('sourceID'), 'playerID': e.get('targetID'),
                     'startTimeMs': cast_start(e, 5000)-start, 'impactTimeMs': ts-start,
                     'endTimeMs': (ticks[-1]+150 if ticks else ts+1000)-start,
-                    'position': receiver, 'radiusYards': MOTHER_WRATH_RADIUS_YARDS,
+                    'position': receiver, 'positionEvidence': 'user-marked-platform-side',
+                    'radiusYards': MOTHER_WRATH_RADIUS_YARDS,
                     'tickTimesMs': [t-start for t in ticks]})
             channels.append({'actorID': e.get('sourceID'), 'spellID': sid, 'spellName': '蛇母之怒',
                 'startTimeMs': ts-start, 'endTimeMs': (ticks[-1]+150 if ticks else ts+1000)-start,
@@ -2094,6 +2165,22 @@ def _replay_effects(fight, players, raw, changes):
             if boss_position:
                 lost_platforms.append({'timeMs': ts-start, 'position': boss_position,
                                        'positionEvidence': 'boss-before-cast'})
+    last_unbridled = {}
+    for hit in sorted(damage, key=lambda row: int(row['timestamp'])):
+        if (ability_id(hit) != 1301007 or _amount(hit) <= 0
+                or hit.get('targetID') not in players):
+            continue
+        ts = int(hit['timestamp'])
+        source_id = hit.get('sourceID')
+        if ts - last_unbridled.get(source_id, -10_000) <= 120:
+            continue
+        position = boss_front(hit, ts)
+        if position:
+            last_unbridled[source_id] = ts
+            circles.append({'kind': 'unbridled', 'sourceID': hit.get('sourceID'),
+                            'startTimeMs': ts-start, 'impactTimeMs': ts-start,
+                            'endTimeMs': ts-start+650, 'position': position,
+                            'radiusYards': 1.5})
     shrieker_ids = {a['id'] for a in raw.get('actorRows') or []
                     if a.get('gameID') == BLIGHTSCALE_SHRIEKER_GAME_ID}
     observed_cast_lengths = defaultdict(list)
@@ -2207,7 +2294,7 @@ def _replay_effects(fight, players, raw, changes):
                    for e in casts if event_type(e)=='cast' and ability_id(e) in P25_EGG_SUMMON_IDS
                    and e.get('sourceID')==boss_id)
     for row in rage:
-        channels.append({'actorID': boss_id, 'spellID': RAGE_ID, 'spellName': '受缚之怒',
+        channels.append({'actorID': boss_id, 'spellID': RAGE_ID, 'spellName': '被缚之怒',
                          'startTimeMs': row['start']-start, 'endTimeMs': row['end']-start,
                          'phase': 'channel', 'outcome': 'completed'})
     phase_windows = []
@@ -2577,6 +2664,24 @@ def _replay_feedback(fight, players, raw, tether_review=None):
                     auras[-1]['warningStartTimeMs'] = row['start']-start
                     auras[-1]['warningEndTimeMs'] = (min(row['end'], row['start']+VOLATILE_PURGE_WARNING_MS)
                                                    if sid == 1316356 else row['start'])-start
+    # This shell is unique to the four Doomscale eggs. Ordinary carry auras
+    # must not create the red 20-second timer.
+    shell_events = [event for stream in ('friendlyBuffs', 'debuffs', 'replayEvents')
+                    for event in raw.get(stream) or []
+                    if ability_id(event) == DOOMSCALE_EGG_CONTACT_ID
+                    and event.get('targetID') in players]
+    seen_shell_auras = set()
+    for row in _aura_intervals(shell_events, DOOMSCALE_EGG_CONTACT_ID, end):
+        if row['playerID'] not in players:
+            continue
+        key = (row['playerID'], row['start'])
+        if key in seen_shell_auras:
+            continue
+        seen_shell_auras.add(key)
+        auras.append({'playerID': row['playerID'], 'kind': 'doom-egg',
+                      'spellID': DOOMSCALE_EGG_CONTACT_ID,
+                      'startTimeMs': row['start']-start,
+                      'endTimeMs': min(row['end'], row['start']+20_000)-start})
     if int(fight.get('difficulty') or 0) == 5:
         # Countdown begins on the post-Bite first Purge mark. Changing aura
         # ID after five seconds does not restart or cancel its six seconds.
@@ -2606,6 +2711,87 @@ def _replay_feedback(fight, players, raw, tether_review=None):
     scene = _replay_effects(fight, players, raw, changes)
     clear_times = [c['timeMs'] for c in changes if c['kind'] in {'rage', 'shatter'}]
     eggs = _replay_eggs(fight, players, raw, auras, clear_times)
+    egg_hatch_casts = []
+    egg_by_instance = {(egg['actorID'], egg['instance']): egg for egg in eggs
+                       if egg['gameID'] == DOOMSCALE_EGG_GAME_ID}
+    doomscale_actors = {row['id'] for row in raw.get('actorRows') or []
+                        if row.get('gameID') == DOOMSCALE_EGG_GAME_ID}
+    unique_contacts = {}
+    for stream in ('friendlyBuffs', 'enemyBuffs', 'debuffs', 'replayEvents'):
+        for event in raw.get(stream) or []:
+            if ability_id(event) == DOOMSCALE_EGG_CONTACT_ID and event_type(event) in {
+                    'applybuff', 'applydebuff', 'refreshbuff', 'refreshdebuff'}:
+                key = (int(event['timestamp']), event_type(event), event.get('sourceID'),
+                       event.get('sourceInstance') or 0, event.get('targetID'),
+                       event.get('targetInstance') or 0)
+                unique_contacts.setdefault(key, event)
+    contacts = sorted(unique_contacts.values(), key=lambda event: int(event['timestamp']))
+    contact_positions = _positions(raw) if any(event.get('targetID') in players for event in contacts) else {}
+    claimed_contacts = set()
+    hatch_events = (raw.get('replayEvents') or []) + (raw.get('casts') or [])
+    hatch_starts = {}
+    for cast in hatch_events:
+        if ability_id(cast) == DOOMSCALE_HATCH_CAST_ID and event_type(cast) == 'begincast':
+            actor, instance = cast.get('sourceID'), cast.get('sourceInstance') or 0
+            if actor in doomscale_actors or (actor, instance) in egg_by_instance:
+                hatch_starts.setdefault((actor, instance, int(cast['timestamp'])), cast)
+    ordered_starts = sorted(hatch_starts.values(), key=lambda event: (int(event['timestamp']),
+                                                                       event.get('sourceInstance') or 0))
+    hatch_positions = {id(cast): (egg_by_instance.get((cast.get('sourceID'),
+                                                       cast.get('sourceInstance') or 0)) or {}).get('position')
+                       or actor_position(cast, 'source') for cast in ordered_starts}
+    sides_by_event = {}
+    cast_batches = []
+    for cast in ordered_starts:
+        if not cast_batches or int(cast['timestamp'])-int(cast_batches[-1][0]['timestamp']) > 1000:
+            cast_batches.append([])
+        cast_batches[-1].append(cast)
+    for batch in cast_batches:
+        # WCL often omits egg coordinates. Rank any observed x positions and
+        # distribute the remaining simultaneous casts evenly between sides.
+        ranked = sorted(batch, key=lambda cast: (
+            hatch_positions[id(cast)]['x'] if hatch_positions[id(cast)] else 0,
+            int(cast['timestamp']), cast.get('sourceInstance') or 0))
+        for index, cast in enumerate(ranked):
+            sides_by_event[id(cast)] = 'left' if index < (len(ranked)+1)//2 else 'right'
+    for cast in ordered_starts:
+        actor, instance, cast_start_ms = cast.get('sourceID'), cast.get('sourceInstance') or 0, int(cast['timestamp'])-start
+        egg = egg_by_instance.get((actor, instance))
+        position = hatch_positions[id(cast)]
+        side = sides_by_event[id(cast)]
+        finish = cast_start_ms + 90_000
+        def touches_egg(event):
+            if ((event.get('sourceID') == actor and (event.get('sourceInstance') or 0) == instance)
+                    or (event.get('targetID') == actor and (event.get('targetInstance') or 0) == instance)):
+                return True
+            player_id = event.get('targetID') if event.get('targetID') in players else event.get('sourceID')
+            if player_id not in players:
+                return False
+            player_position = position_at_interpolated(contact_positions, player_id, int(event['timestamp']))
+            if not player_position or not player_position.get('reliable'):
+                return False
+            if position:
+                return math.hypot(player_position['x']-position['x'],
+                                  player_position['y']-position['y']) <= 300
+            return ('left' if player_position['x'] < 0 else 'right') == side
+        contact = next((event for event in contacts
+                        if cast_start_ms <= int(event['timestamp'])-start < finish
+                        and id(event) not in claimed_contacts
+                        and touches_egg(event)), None)
+        if contact:
+            claimed_contacts.add(id(contact))
+        pickup_ms = int(contact['timestamp'])-start if contact else None
+        egg_hatch_casts.append({
+            'eggKey': (egg or {}).get('key'), 'actorID': actor, 'instance': instance,
+            'position': position, 'side': side, 'spellID': DOOMSCALE_HATCH_CAST_ID, 'spellName': '孵化厄运',
+            'startTimeMs': cast_start_ms, 'endTimeMs': pickup_ms if contact else finish,
+            'expectedEndTimeMs': finish, 'durationMs': 90_000,
+            'outcome': 'interrupted' if contact else 'completed' if end-start >= finish else 'unconfirmed',
+            'interruptFeedbackMs': 1_200 if contact else 0,
+            'interruptPlayerID': (contact.get('targetID') if contact.get('targetID') in players
+                                  else contact.get('sourceID') if contact.get('sourceID') in players else None) if contact else None,
+            'evidence': '厄鳞之卵 1306862 起读；1300312 接触使其停止，90 秒为读条时长',
+        })
     leak_waves, leak_tethers = [], []
     for failure in (tether_review or {}).get('failures') or []:
         source, target = failure.get('sourcePosition'), failure.get('targetPosition')
@@ -2627,6 +2813,7 @@ def _replay_feedback(fight, players, raw, tether_review=None):
                            'travelEvidence': 'visual-model-from-missed-interception'})
     return {'auras': auras, 'hits': [{'timeMs': ts, 'playerID': pid} for ts, pid in sorted(hits)],
             'events': sorted(changes, key=lambda row: row['timeMs']), 'eggs': eggs,
+            'eggHatchCasts': egg_hatch_casts,
             'raidImpacts': _replay_raid_impacts(fight, players, raw),
             'wardens': _replay_warden_health(fight, raw),
             # NSRT's north-up UlatekWaveLines texture is a fixed 120-degree
@@ -2692,7 +2879,7 @@ def _mechanic_overview(rendered):
     melee_events = []
     melee_damage = 0
     mother_wrath_failures = []
-    p25_egg_deaths, p25_egg_remaining = [], []
+    p25_egg_deaths, egg_collisions = [], []
     for pull in rendered:
         full_mechanics = pull.get(BOSS_CONFIG["key"]) or {}
         mechanics = full_mechanics.get("nightlyReview") or full_mechanics
@@ -2710,6 +2897,13 @@ def _mechanic_overview(rendered):
                 player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"),
                 spellID=MYTHIC_EGG_CARRY_ID, earlyHatch=bool(row.get("earlyHatch")),
                 failureKinds=row.get("failureKinds") or []))
+        for row in waves.get("eggCollisions") or []:
+            left, right = row["players"]
+            egg_collisions.append(nightly_detail(
+                pull, row["time"],
+                f"{row['phase']} 阶段，{left['player']} 和 {right['player']} 撞蛋",
+                phase=row["phase"], players=row["players"],
+                distanceYards=row["distanceYards"], spellID=EGG_CARRY_ID))
         for row in (mechanics.get("tankInterception") or {}).get("failures") or []:
             tank_failures.append(nightly_detail(pull, row["time"],
                 f"{row.get('player') or '责任坦克未确定'}：毒性孵化接线不足 {row['tickCount']}/5 跳",
@@ -2725,12 +2919,11 @@ def _mechanic_overview(rendered):
             egg_hits.append(nightly_detail(pull, row["time"], f"{row['player']}：携带蛇卵命中腐蚀浪潮（P1/P2.5）",
                                            player=row["player"], classColor=row.get("classColor"), spellID=WAVE_ID))
         egg_review = (mechanics.get("critical") or {}).get("p25Eggs") or {}
-        for key, target, label in (("deaths", p25_egg_deaths, "P2.5 连续分摊期间带蛋死亡"),
-                                   ("remaining", p25_egg_remaining, "P2.5 分摊结束仍携蛋（玩家失误）")):
-            for row in egg_review.get(key, []):
-                target.append(nightly_detail(pull, row["time"], f"{row['player']}：{label}",
-                                             player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"),
-                                             spellID=EGG_CARRY_ID, isPlayerMistake=key == "remaining"))
+        for row in egg_review.get("deaths", []):
+            p25_egg_deaths.append(nightly_detail(
+                pull, row["time"], f"{row['player']}：P2.5 连续分摊期间带蛋死亡",
+                player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"),
+                spellID=EGG_CARRY_ID, isPlayerMistake=False))
         for row in (mechanics.get("wavesAndEggs") or {}).get("hits") or []:
             event = nightly_detail(
                 pull,
@@ -2857,9 +3050,9 @@ def _mechanic_overview(rendered):
                 "detailTab": "waves"}] if clean_wave_enabled else []),
             {"key": "p25EggDeaths", "label": "P2.5 带蛋死亡", "value": len(p25_egg_deaths), "unit": "人次",
              "tone": "warning", "players": nightly_player_totals(p25_egg_deaths), "events": p25_egg_deaths},
-            {"key": "p25EggRemaining", "label": "P2.5 分摊结束仍携蛋", "value": len(p25_egg_remaining), "unit": "次",
-             "tone": "danger", "description": "六次连续分摊结束后仍存活且携蛋，每名玩家每场计一次失误。",
-             "players": nightly_player_totals(p25_egg_remaining), "events": p25_egg_remaining},
+            {"key": "eggCollisions", "label": "撞蛋", "value": len(egg_collisions), "unit": "次",
+             "tone": "danger", "description": "仅统计两名玩家同帧失去携蛋、出现孵化，且可靠坐标相距不超过 4 码的配对。",
+             "events": egg_collisions, "detailTab": "waves"},
             {
                 "key": "waveHits",
                 "label": "中波施加/刷新次数",
@@ -3019,7 +3212,7 @@ def build_aggregated_json(report_ids, options=None):
     metric_options = {
         "eggSteals": "wavesReviewEnabled", "tankTetherFailures": "wavesReviewEnabled",
         "cleanWaveHits": "cleanWaveReviewEnabled",
-        "p25EggDeaths": "p25EggsReviewEnabled", "p25EggRemaining": "p25EggsReviewEnabled",
+        "p25EggDeaths": "p25EggsReviewEnabled", "eggCollisions": "wavesReviewEnabled",
         "waveHits": "wavesReviewEnabled", "p1WaveDeaths": "wavesReviewEnabled", "p3WaveDeaths": "wavesReviewEnabled", "eggCarrierWaveHits": "wavesReviewEnabled",
         "wrongFangBreaks": "fangsReviewEnabled", "platform2To3Defensives": "platformReviewEnabled",
         "coiledPreyDeaths": "coiledPreyReviewEnabled", "nonTankMelee": "meleeReviewEnabled", "motherWrathRaidwide": "motherWrathReviewEnabled",

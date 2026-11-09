@@ -148,6 +148,16 @@
   const LOCAL_META_STORE_NAME = "reportMetadata";
   const LOCAL_DB_VERSION = 2;
 
+  function isBundledDemoUrl(value) {
+    try { return new URL(value, global.document.baseURI).pathname.startsWith("/assets/demos/"); }
+    catch (_) { return false; }
+  }
+
+  function isAutoSavedDemo(record) {
+    const key = String(record?.key || "");
+    return key.startsWith("server:") && isBundledDemoUrl(record.originalSource || key.slice(7));
+  }
+
   function metadataOf(record) {
     return {key:record.key,savedAt:record.savedAt,label:record.label,
       identity:record.identity,originalSource:record.originalSource||""};
@@ -238,7 +248,7 @@
     const response = await global.fetch(sourcePath, { cache: "no-store" });
     if (!response.ok) throw new Error(`读取失败：HTTP ${response.status}`);
     const payload = await response.json();
-    if (payload?.meta && Array.isArray(payload?.data?.page1_wipeAnalysis)) {
+    if (!isBundledDemoUrl(sourcePath) && payload?.meta && Array.isArray(payload?.data?.page1_wipeAnalysis)) {
       const url = new URL(sourcePath, global.document.baseURI);
       url.searchParams.delete("download");
       const identity = identityOf(payload), pulls = payload.data.page1_wipeAnalysis;
@@ -260,7 +270,21 @@
     let localRows = [];
     try {
       const rows = await databaseRequest("readonly", store => store.getAll(), LOCAL_META_STORE_NAME);
-      localRows = (rows || []).map(row => ({
+      const demoRows = (rows || []).filter(isAutoSavedDemo);
+      if (demoRows.length) {
+        try {
+          await databaseRequest("readwrite", (store, transaction) => {
+            const reports = transaction.objectStore(LOCAL_STORE_NAME);
+            let request;
+            for (const row of demoRows) {
+              store.delete(row.key);
+              request = reports.delete(row.key);
+            }
+            return request;
+          }, [LOCAL_META_STORE_NAME, LOCAL_STORE_NAME]);
+        } catch (error) { console.warn("无法清理自动保存的演示记录：", error); }
+      }
+      localRows = (rows || []).filter(row => !isAutoSavedDemo(row)).map(row => ({
         key: row.key,
         sourcePath: `idb:${row.key}`,
         savedAt: row.savedAt,
@@ -270,13 +294,23 @@
       }));
     } catch (_) {}
     try {
+      const staleDemoSessionKeys = [];
       for (let i = 0; i < global.sessionStorage.length; i++) {
         const key = global.sessionStorage.key(i);
         if (!key.startsWith('mythicReportPayload.') || key.endsWith('.metadata')) continue;
+        if (key.startsWith('mythicReportPayload.server:') &&
+            isBundledDemoUrl(key.slice('mythicReportPayload.server:'.length))) {
+          staleDemoSessionKeys.push(key);
+          continue;
+        }
         try {
           const metadata = JSON.parse(global.sessionStorage.getItem(`${key}.metadata`) || '{}');
           localRows.push({sourcePath: `session:${key}`, ...metadata});
         } catch (_) {}
+      }
+      for (const key of staleDemoSessionKeys) {
+        global.sessionStorage.removeItem(key);
+        global.sessionStorage.removeItem(`${key}.metadata`);
       }
     } catch (_) {}
     return localRows.sort((a,b) => Number(b.savedAt || 0) - Number(a.savedAt || 0)).slice(0, Math.max(0, limit));

@@ -11,7 +11,7 @@ from analyzer_core.wcl_service import SharedWclService, AdmissionError
 def service(rows=None):
     clock = [1000.]
     credentials = WclCredentials('server-test', 'secret-test')
-    manager = SharedWclService(rows or [(credentials, 'shared')], clock=lambda:clock[0])
+    manager = SharedWclService(rows or [(credentials, 'shared')], reserve=3000, clock=lambda:clock[0])
     manager.observe(credentials, {'limitPerHour':18000, 'pointsSpentThisHour':100, 'pointsResetIn':600})
     return manager, credentials, clock
 
@@ -196,3 +196,16 @@ def test_shared_account_page_keeps_the_elements_required_by_its_live_actions():
     page.feed((Path(__file__).resolve().parents[1]/'frontend/auth/account.html').read_text(encoding='utf-8'))
     assert {'identity','status','logout','adminLink','wclState','guilds','guildForm','passwordForm'} <= page.ids
     assert not {'clientId','clientSecret'} & page.inputs
+
+
+def test_free_tier_allows_regular_users_until_800_remaining():
+    cred = WclCredentials('test', 'test')
+    service = SharedWclService([(cred, 'shared')], clock=lambda:1000)
+    for spent in (0, 2799, 2800):
+        service.observe(cred, dict(limitPerHour=3600, pointsSpentThisHour=spent, pointsResetIn=600))
+        assert service.acquire() == cred
+    service.observe(cred, dict(limitPerHour=3600, pointsSpentThisHour=2801, pointsResetIn=600))
+    with pytest.raises(AdmissionError):
+        service.acquire()
+    assert service.acquire(admin=True) == cred
+    assert service.snapshot(refresh=False)['reservePoints'] == 800

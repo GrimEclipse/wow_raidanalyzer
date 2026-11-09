@@ -38,6 +38,7 @@ MAX_REQUEST_RETRIES = env_int("WCL_MAX_REQUEST_RETRIES", 3)
 REQUEST_RETRY_BASE_SECONDS = float(os.getenv("WCL_REQUEST_RETRY_BASE_SECONDS", "0.8") or 0.8)
 
 _REQUEST_SEMAPHORE = threading.BoundedSemaphore(MAX_REQUEST_THREADS)
+_HTTP_LOCAL = threading.local()
 
 
 class JobSlots:
@@ -134,11 +135,26 @@ def wcl_request_slot():
 
 def request_post(*args, **kwargs):
     requests = requests_module()
+    # requests.post creates and closes a Session on every page. Keep one pool
+    # per worker so consecutive pages reuse TCP/TLS without sharing mutable
+    # sessions between threads. Authentication stays request-local; cookies
+    # must not carry over between different users of a shared worker.
+    if getattr(_HTTP_LOCAL, "owner", None) is not requests:
+        previous = getattr(_HTTP_LOCAL, "session", None)
+        if previous is not None:
+            previous.close()
+        _HTTP_LOCAL.session = requests.Session()
+        _HTTP_LOCAL.owner = requests
+    session = _HTTP_LOCAL.session
     last_error = None
     for attempt in range(1, MAX_REQUEST_RETRIES + 1):
         try:
             with wcl_request_slot():
-                response = requests.post(*args, **kwargs)
+                session.cookies.clear()
+                try:
+                    response = session.post(*args, **kwargs)
+                finally:
+                    session.cookies.clear()
             if response.status_code not in _RETRY_STATUSES or attempt >= MAX_REQUEST_RETRIES:
                 return response
             last_error = None

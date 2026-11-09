@@ -150,6 +150,49 @@ class UlatekTests(unittest.TestCase):
         self.assertEqual(len(waves["possibleCollisionHatches"]), 1)
         self.assertIn("不能单凭日志认定碰蛋", waves["possibleCollisionHatches"][0]["evidence"])
 
+    def test_confirmed_egg_collision_requires_two_nearby_carriers_and_hatch(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {"casts": [], "damage": [], "deaths": [], "enemyBuffs": [], "debuffs": [], "resources": []}
+        for pid in (1, 2):
+            raw["debuffs"] += [self.event(1000, "applydebuff", u.EGG_CARRY_ID, pid),
+                               self.event(8000, "removedebuff", u.EGG_CARRY_ID, pid)]
+            raw["resources"].append(self.event(8000, "resourcechange", 0, source=pid,
+                                               resourceActor=1, x=pid * 100, y=2000))
+        raw["debuffs"].append(self.event(8050, "applydebuff", 1301268, 3))
+        waves = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])
+        self.assertEqual(len(waves["eggCollisions"]), 1)
+        self.assertEqual([p["player"] for p in waves["eggCollisions"][0]["players"]], ["P1", "P2"])
+        metric = next(m for m in u._mechanic_overview([{"fightID": 7, "ulatek": {"wavesAndEggs": waves}}])["metrics"]
+                      if m["key"] == "eggCollisions")
+        self.assertEqual(metric["value"], 1)
+        self.assertEqual(metric["events"][0]["fightID"], 7)
+        self.assertEqual(metric["events"][0]["text"], "P1 阶段，P1 和 P2 撞蛋")
+        self.assertNotIn("p25EggRemaining", [m["key"] for m in u._mechanic_overview([])["metrics"]])
+        raw["resources"][1]["x"] = 2000
+        raw.pop("_positionIndexes", None)
+        self.assertEqual(u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])["eggCollisions"], [])
+        raw["resources"][1]["x"] = 200
+        raw.pop("_positionIndexes", None)
+        raw["debuffs"].append(self.event(8000, "applydebuff", u.WAVE_ID, 1))
+        self.assertEqual(u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])["eggCollisions"], [])
+
+    def test_egg_collision_uses_p25_phase_after_second_rage(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {"casts": [self.event(t, "cast", u.P25_COIL_CAST_ID) for t in range(65000, 89000, 3000)],
+               "damage": [], "deaths": [], "resources": [], "debuffs": [],
+               "enemyBuffs": [self.event(t, kind, u.RAGE_ID, 99)
+                              for t, kind in ((10000, "applybuff"), (20000, "removebuff"),
+                                              (50000, "applybuff"), (60000, "removebuff"))]}
+        for pid in (1, 2):
+            raw["debuffs"] += [self.event(61000, "applydebuff", u.EGG_CARRY_ID, pid),
+                               self.event(64000, "removedebuff", u.EGG_CARRY_ID, pid)]
+            raw["resources"].append(self.event(64000, "resourcechange", 0, source=pid,
+                                               resourceActor=1, x=pid * 100, y=2000))
+        raw["debuffs"].append(self.event(64010, "applydebuff", 1301268, 3))
+        waves = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw,
+                                          u._rage_windows(fight, raw))
+        self.assertEqual(waves["eggCollisions"][0]["phase"], "P2.5")
+
     def test_serpent_bite_participation_uses_ingested_venom_aura(self):
         debuffs = []
         for player_id in (1, 2, 3):

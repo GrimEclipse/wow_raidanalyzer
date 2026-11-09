@@ -22,6 +22,17 @@ const egg={startTimeMs:1000,endTimeMs:5000,shield:[[1000,100,100],[2000,0,100]],
 assert.equal(r.eggState(egg,999),null);assert.equal(r.eggState(egg,1500).shield[1],100);
 assert(r.eggState(egg,2500).broken);assert.equal(r.eggState(egg,3500).carry.playerID,1);
 assert(r.eggState(egg,5100).released);assert.equal(r.eggState(egg,5900),null);
+const countdown=r.eggCarryCountdown({startTimeMs:1000},11000,{x:100,y:100},20);
+assert(countdown.includes('data-effect="egg-carry-countdown"'));
+assert(!countdown.includes('<text'));
+assert(countdown.includes('M 100 67 L 100 78.6 A 11.6 11.6 0 0 1 100 55.4'));
+assert(!r.eggCarryCountdown({startTimeMs:1000},21000,{x:100,y:100},20).includes('<path'));
+const fixedFangCircle={x:-6700,y:162200},markedPlayer={x:-5900,y:162600};
+assert.deepEqual(r.fangLinkPoints({position:fixedFangCircle},markedPlayer,{x:0,y:0}),
+  {from:markedPlayer,to:fixedFangCircle});
+assert.deepEqual(r.fangLinkPoints({position:fixedFangCircle},{x:-5500,y:162900},null).to,
+  fixedFangCircle);
+assert.equal(r.fangLinkPoints({position:fixedFangCircle},null,null),null);
 const c={startTimeMs:0,impactTimeMs:5000,endTimeMs:8000,tickTimesMs:[5200,5530]};
 assert.equal(r.circlePulse(c,4000).channel,false);assert.equal(r.circlePulse(c,5540).opacity,.36);assert.equal(r.circlePulse(c,8000),null);
 const bosses=r.channelBosses([{actorID:1,gameID:257758,casts:[{startTimeMs:0,endTimeMs:5000}]}],[{actorID:1,startTimeMs:5000,endTimeMs:25000,phase:'channel'}]);

@@ -1,6 +1,5 @@
 /* Sszorak-only mechanic views. Data adjudication stays in the Boss module. */
-const sszReplay={cursor:null,windowKey:'full',speed:1};
-function sszClock(ms){const s=Math.max(0,ms)/1000;return `${Math.floor(s/60)}:${(s%60).toFixed(1).padStart(4,'0')}`}
+const sszReplay={cursor:null,windowKey:'full'};
 function sszWindows(data){
   const duration=boss().combatReplay?.durationMs||current()?.durationMs||1;
   return [{key:'full',label:'完整战斗',start:0,end:duration},
@@ -90,32 +89,34 @@ function sszAnimatedMap(data,cursor){
   const castBar=center&&!bossLife.dead?MechanicWorkbench.castBar(boss().combatReplay?.bosses?.[0]||{},cursor,{x:center.x,y:center.y-24}):'';
   return `<div data-key="field" class="replay-map ssz-map" style="background-image:url('/${esc(String(data.arenaImage||'').replace(/^\//,''))}')"><svg viewBox="0 0 ${width} ${height}" width="100%" height="100%" aria-label="斯索拉克场地回放"><g data-key="cysts">${cysts}</g><g data-key="wind-layer">${windFx}</g><g data-key="targets">${rings}${collisions}</g><g data-key="marks">${marks}</g><g data-key="virulence">${virulence}</g><g data-key="predator">${cones}</g><g data-key="boss-layer">${bossIcon}${castBar}</g><g data-key="players">${actors}</g></svg></div>`;
 }
-function updateReplayStage(){
-  const data=boss().fieldReplay||{},w=sszWindow(data),cursor=sszReplay.cursor??w.start,stage=$('replayStage');
-  if(stage){MechanicWorkbench.patchMap(stage,sszAnimatedMap(data,cursor));const field=stage.querySelector('.replay-map');let hud=field?.querySelector('[data-managed="boss-status"]');if(field&&!hud){hud=document.createElement('div');hud.setAttribute('data-managed','boss-status');field.append(hud);}if(hud)MechanicWorkbench.patchMap(hud,MechanicWorkbench.bossStatus(boss().combatReplay,cursor));}
-  const round=(data.rounds||[]).find(r=>cursor>=r.timeMs&&cursor<r.timeMs+Number(r.durationSec||25)*1000),wind=windAtFrame(round,cursor);
-  if($('replayStatus'))$('replayStatus').textContent=`${sszClock(cursor)} / ${sszClock(w.end)}${wind?'，风向 '+(wind.directionLabel||'待确认'):''}`;
-  if($('replayScrub'))$('replayScrub').value=String(cursor);
-  if($('playReplay'))$('playReplay').textContent=state.timer?'暂停':'播放';
-}
 function bindReplay(data){
-  const w=sszWindow(data);if(sszReplay.cursor==null||sszReplay.cursor<w.start||sszReplay.cursor>w.end)sszReplay.cursor=w.start;
-  const play=()=>{if(state.timer){stopReplay();updateReplayStage();return;}if(sszReplay.cursor>=w.end)sszReplay.cursor=w.start;
-    let last=performance.now();const tick=now=>{if(!$('replayStage')?.isConnected){stopReplay();return;}
-      sszReplay.cursor=Math.min(w.end,sszReplay.cursor+(now-last)*sszReplay.speed);last=now;updateReplayStage();
-      if(sszReplay.cursor>=w.end){stopReplay();updateReplayStage();}else state.timer=requestAnimationFrame(tick);};
-    state.timer=requestAnimationFrame(tick);updateReplayStage();};
-  $('playReplay').onclick=play;
-  $('restartReplay').onclick=()=>{stopReplay();sszReplay.cursor=w.start;updateReplayStage();};
-  $('replayScrub').oninput=e=>{stopReplay();sszReplay.cursor=Number(e.target.value);updateReplayStage();};
-  $('sszSpeed').onchange=e=>sszReplay.speed=Number(e.target.value);
-  $('sszWindow').onchange=e=>{stopReplay();sszReplay.windowKey=e.target.value;sszReplay.cursor=null;renderContent();};
-  updateReplayStage();
+  const host=$('sszWorkbench');if(!host)return;
+  const initialCursor=sszReplay.cursor;
+  const windows=sszWindows(data),duration=windows[0].end;
+  const events=[{id:'start',timeMs:0,label:'战斗开始',layer:'回放片段'},
+    ...windows.slice(1).map(row=>({id:row.key,timeMs:row.start,label:row.label,layer:'回放片段'}))];
+  const wb=MechanicWorkbench.mount(host,{key:'sszorak-replay',title:'斯索拉克场地回放',
+    durationMs:duration,combatReplay:boss().combatReplay,events},{video:true,handlesPlayers:true,
+    bossPosition:()=>null,renderMap:(_selected,_events,cursor)=>sszAnimatedMap(data,cursor),
+    onFrame:playback=>{sszReplay.cursor=playback.timeMs;}});
+  const select=$('sszWindow');
+  function setWindow(window,resetCursor,preferredCursor=sszReplay.cursor){
+    const target=resetCursor?window.start:Math.max(window.start,Math.min(window.end,preferredCursor??window.start));
+    for(const [key,value] of [['from',window.start],['to',window.end]]){
+      const input=host.querySelector(`[data-config="${key}"]`);
+      input.value=String(value/1000);input.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    wb.seek(target);
+  }
+  select.onchange=()=>{sszReplay.windowKey=select.value;setWindow(sszWindow(data),true);};
+  setWindow(sszWindow(data),false,initialCursor);
+  const observer=new MutationObserver(()=>{if(!host.isConnected){wb.destroy();observer.disconnect();}});
+  observer.observe($('content'),{childList:true});
 }
 function renderReplay(){
   const data=boss().fieldReplay||{},w=sszWindow(data),windows=sszWindows(data);
   setTimeout(()=>{if(state.tab==='replay')bindReplay(data);},0);
-  return `<section class="panel"><div class="replay-tools"><select id="sszWindow" aria-label="回放片段">${windows.map(row=>`<option value="${row.key}" ${row.key===w.key?'selected':''}>${esc(row.label)}</option>`).join('')}</select><button id="playReplay" class="button">播放</button><button id="restartReplay" class="button">重新开始</button><select id="sszSpeed" aria-label="播放速度">${[1,2,4].map(speed=>`<option value="${speed}" ${speed===sszReplay.speed?'selected':''}>${speed}×</option>`).join('')}</select><output id="replayStatus"></output></div><label class="replay-scrub">战斗时间<input id="replayScrub" aria-label="战斗时间" type="range" min="${w.start}" max="${w.end}" step="100" value="${sszReplay.cursor??w.start}"></label><div id="replayStage"></div></section>`;
+  return `<section class="panel"><div class="replay-tools"><label>回放片段 <select id="sszWindow" aria-label="回放片段">${windows.map(row=>`<option value="${row.key}" ${row.key===w.key?'selected':''}>${esc(row.label)}</option>`).join('')}</select></label></div><div id="sszWorkbench"></div></section>`;
 }
 function renderSszorakTempest() {
   const data = boss().tempest;

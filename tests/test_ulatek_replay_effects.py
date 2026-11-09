@@ -1,5 +1,6 @@
 import math
 import pytest
+from unittest.mock import patch
 from boss_plugins.venomous_abyss import ulatek as u
 from boss_plugins.venomous_abyss import sszorak as s
 
@@ -10,7 +11,7 @@ def event(t, kind, sid, **kw):
 
 def test_wrath_fixed_circle_nine_observed_ticks_and_fury_channel():
     raw = {'bossID': 9, 'casts': [event(1000, 'begincast', 1298367),
-        event(6000, 'cast', 1298367, targetID=1, resourceActor=1, x=0, y=2000)],
+        event(6000, 'cast', 1298367, targetID=1, resourceActor=1, x=0, y=158367)],
         'damage': [event(6300+i*333, 'damage', 1298369, targetID=1,
                          resourceActor=2, x=0, y=500+i*10, amount=10) for i in range(9)],
         'enemyBuffs': [event(10000, 'applybuff', u.RAGE_ID), event(30000, 'removebuff', u.RAGE_ID)],
@@ -18,12 +19,94 @@ def test_wrath_fixed_circle_nine_observed_ticks_and_fury_channel():
     changes = []
     scene = u._replay_effects({'startTime': 0, 'endTime': 40000}, {1: {}}, raw, changes)
     circle = scene['circles'][0]
-    assert (circle['position']['x'], circle['position']['y']) == (0, 500)
+    assert (circle['position']['x'], circle['position']['y']) == (0, 158467)
+    assert circle['positionEvidence'] == 'user-marked-platform-side'
     assert len(circle['tickTimesMs']) == 9
     assert circle['radiusYards'] == 3
     assert circle['endTimeMs'] == 6300+8*333+150
     fury = next(c for c in scene['channels'] if c['spellID'] == u.RAGE_ID)
     assert fury['endTimeMs']-fury['startTimeMs'] == 20000
+
+
+@pytest.mark.parametrize('boss_xy,expected', [((-3000, 155367), (-3100, 155367)),
+                                                  ((3000, 155367), (3100, 155367)),
+                                                  ((0, 158367), (0, 158467)),
+                                                  ((0, 152367), (0, 152267))])
+def test_wrath_uses_platform_side_independent_of_tank_position(boss_xy, expected):
+    raw = {'enemyBuffs': [], 'resources': [], 'damage': [],
+           'casts': [event(1000, 'cast', 1298367, targetID=1, resourceActor=1,
+                           x=boss_xy[0], y=boss_xy[1])]}
+    scene = u._replay_effects({'startTime': 0, 'endTime': 5000}, {1: {}}, raw, [])
+    assert tuple(scene['circles'][0]['position'].values()) == expected
+
+
+def test_unbridled_hit_stays_at_boss_front_after_player_knockback():
+    raw = {'enemyBuffs': [], 'casts': [], 'resources': [
+        event(1000, 'resourcechange', 0, sourceID=9, resourceActor=1,
+              x=1000, y=2000, facing=0)],
+        'damage': [event(1000, 'damage', 1301007, sourceID=9, targetID=1,
+                         resourceActor=2, x=9000, y=9000, facing=157, amount=100)]}
+    scene = u._replay_effects({'startTime': 0, 'endTime': 5000}, {1: {}}, raw, [])
+    hit = next(c for c in scene['circles'] if c['kind'] == 'unbridled')
+    assert hit['position'] == {'x': 1300.0, 'y': 2000.0}
+    assert hit['position'] != {'x': 9000, 'y': 9000}
+
+
+def test_p2_egg_hatch_cast_runs_ninety_seconds_and_pickup_interrupts_it():
+    eggs = [{'key': f'egg:{id}:1', 'actorID': id, 'instance': 1,
+             'gameID': 268164, 'position': {'x': x, 'y': 155367}}
+            for id, x in ((40, -3000), (41, -2800), (42, 2800), (43, 3000))]
+    eggs.append({'key': 'egg:50:1', 'actorID': 50, 'instance': 1,
+                 'gameID': 263535, 'position': {'x': -2000, 'y': 155367}})
+    raw = {'actorRows': [{'id': id, 'gameID': 268164} for id in range(40, 44)]
+                        + [{'id': 50, 'gameID': 263535}],
+           'enemyBuffs': [], 'debuffs': [], 'damage': [], 'resources': [],
+           'casts': [event(165500, 'cast', u.RAGE_ID)],
+           'replayEvents': [*[event(174140 + i*2, 'begincast', 1306862,
+                                   sourceID=40+i, sourceInstance=1)
+                             for i in range(4)],
+                            event(174150, 'begincast', 1306862,
+                                  sourceID=50, sourceInstance=1)],
+           'friendlyBuffs': [event(180000, 'applybuff', 1300312,
+                                   sourceID=40, sourceInstance=1, targetID=1),
+                             event(190000, 'removebuff', 1300312,
+                                   sourceID=40, sourceInstance=1, targetID=1)]}
+    with patch.object(u, '_replay_eggs', return_value=eggs):
+        result = u._replay_feedback({'startTime': 0, 'endTime': 270000}, {1: {}}, raw)
+    casts = result['eggHatchCasts']
+    assert len(casts) == 4
+    assert [c['startTimeMs'] for c in casts] == [174140, 174142, 174144, 174146]
+    assert [c['position']['x'] < 0 for c in casts] == [True, True, False, False]
+    assert (casts[0]['endTimeMs'], casts[0]['outcome'], casts[0]['interruptPlayerID']) == (180000, 'interrupted', 1)
+    assert casts[1]['expectedEndTimeMs'] == 264142
+    assert not any(c['actorID'] == 50 for c in casts)
+    assert next(a for a in result['auras'] if a['kind'] == 'doom-egg')['endTimeMs'] == 190000
+
+
+def test_p2_hatch_bars_survive_wcl_casts_without_egg_coordinates():
+    raw = {'actorRows': [{'id': 390, 'gameID': 268164}], 'casts': [],
+           'replayEvents': [event(174140+i*2, 'begincast', 1306862,
+                                  sourceID=390, sourceInstance=i+1)
+                            for i in range(4)],
+           'enemyBuffs': [], 'debuffs': [], 'damage': [], 'resources': []}
+    with patch.object(u, '_replay_eggs', return_value=[]):
+        result = u._replay_feedback({'startTime': 0, 'endTime': 270000}, {}, raw)
+    assert [c['side'] for c in result['eggHatchCasts']] == ['left', 'left', 'right', 'right']
+    assert all(c['position'] is None for c in result['eggHatchCasts'])
+
+
+def test_p2_hatch_side_allocation_does_not_mix_position_and_order_rules():
+    raw = {'actorRows': [{'id': 390, 'gameID': 268164}], 'casts': [],
+           'replayEvents': [event(174140+i*2, 'begincast', 1306862,
+                                  sourceID=390, sourceInstance=i+1)
+                            for i in range(4)],
+           'enemyBuffs': [], 'debuffs': [], 'damage': [], 'resources': []}
+    eggs = [{'actorID': 390, 'instance': 3, 'gameID': 268164,
+             'position': {'x': -1000, 'y': 155367}}]
+    with patch.object(u, '_replay_eggs', return_value=eggs):
+        result = u._replay_feedback({'startTime': 0, 'endTime': 270000}, {}, raw)
+    assert [c['side'] for c in result['eggHatchCasts']].count('left') == 2
+    assert [c['side'] for c in result['eggHatchCasts']].count('right') == 2
 
 
 @pytest.mark.parametrize('difficulty,count', [(4, 6), (5, 8)])

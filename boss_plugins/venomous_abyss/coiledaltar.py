@@ -28,8 +28,11 @@ CONFIG_SCHEMA = profile_schema([
      "description": "仅展示技能实际施法与Boss机制对照；不需要导入爆发安排。关闭后跳过时间轴生成。"},
     {"key": "intermissionReviewEnabled", "type": "boolean", "label": "转阶段残片、治疗与输出复盘", "default": False,
      "description": "关闭后跳过转阶段治疗、Boss 承伤及药水光环取证。"},
-    {"key": "guildTimelineEnabled", "type": "boolean", "label": "阿瓦隆停手与爆发轴检查", "default": True,
-     "description": "仅对日志归属阿瓦隆的史诗场次额外执行内置战术核对；其他团队仍可查看实际施法时间轴。"},
+    {"key": "guildTimelineEnabled", "type": "boolean", "label": "停手与爆发轴检查", "default": True,
+     "description": "史诗场次可查看停手取证；阿瓦隆日志额外执行内置爆发安排核对。"},
+    {"key": "guildTimelineScope", "type": "select", "label": "停手取证公会范围", "default": "auto",
+     "options": [{"value": "auto", "label": "仅阿瓦隆"}, {"value": "all", "label": "所有公会"}],
+     "description": "选择所有公会后，其他公会也生成 P1/P2 停手数据；不套用阿瓦隆的爆发安排。"},
     {"key": "p1EarliestEndSeconds", "type": "number", "label": "P1 最早结束时间（秒）", "default": 170, "min": 170, "max": 600,
      "description": "P1 须完成约 2:42 的末轮撕裂，且至少打到 2:50；首次恐惧行军还须在 3:05 或之后开始读条。"},
     {"key": "firstDreadmarchEarliestSeconds", "type": "number", "label": "首次恐惧行军最早读条（秒）", "default": 185, "min": 185, "max": 600},
@@ -189,6 +192,10 @@ SEVER_IDS = {1299684}
 BLIGHTED_SEVER_IDS = {1307292}
 CONE_SEVER_IDS = SEVER_IDS | BLIGHTED_SEVER_IDS
 SOUL_SEVER_IDS = {1286620}
+MELEE_AUTO_ATTACK_ID = 1
+DH_THROW_GLAIVE_ID = 185123
+DH_THROW_GLAIVE_EFFECT_IDS = {337819, 393035}
+DH_BLADE_DANCE_ID = 188499
 # 坦克易伤 / 结算 debuff：朝向按施加时刻（≈读条末秒）的坦克位置锁定。
 SEVER_TANK_DEBUFF_IDS = {1301690}
 BLIGHTED_SEVER_TANK_DEBUFF_IDS = {1307403}
@@ -5878,7 +5885,8 @@ def burst_plan(options):
 
 
 def _guild_timeline_enabled(raw, options):
-    return options["guildTimelineEnabled"] and resolve_profile(raw.get("reportGuild"), options)["key"] == "avalon"
+    return options["guildTimelineEnabled"] and (options.get("guildTimelineScope") == "all"
+        or resolve_profile(raw.get("reportGuild"), options)["key"] == "avalon")
 
 
 def _resource_for_actor(event, actor_id):
@@ -5897,6 +5905,24 @@ def _guild_phase_control(fight, markers, raw, actor_rows, options):
     start = int(fight["startTime"])
     times = {r["key"]: int(r["timeMs"]) for r in markers}
     streams = raw.get("guildBossDamage", []) + raw.get("replayEvents", []) + raw.get("enemyDeaths", [])
+    blade_dances = defaultdict(list)
+    for event in raw.get("guildPlayerCasts", []):
+        if ability_id(event) == DH_BLADE_DANCE_ID and is_cast_complete(event):
+            blade_dances[event.get("sourceID")].append(int(event["timestamp"]))
+    for timestamps in blade_dances.values():
+        timestamps.sort()
+
+    def is_manual_hold_cast(event):
+        spell_id = ability_id(event)
+        if spell_id == MELEE_AUTO_ATTACK_ID or spell_id in DH_THROW_GLAIVE_EFFECT_IDS:
+            return False
+        if spell_id == DH_THROW_GLAIVE_ID:
+            timestamps = blade_dances.get(event.get("sourceID"), [])
+            timestamp = int(event["timestamp"])
+            index = bisect_left(timestamps, timestamp)
+            if any(abs(timestamps[i]-timestamp) <= 100 for i in (index-1, index) if 0 <= i < len(timestamps)):
+                return False  # Screaming Brutality: Blade Dance triggers Throw Glaive.
+        return True
     phases = []
     for phase, next_phase, game_id, planned in (
         ("p1", "p2", 257911, options["p1EarliestEndSeconds"]*1000),
@@ -5942,6 +5968,24 @@ def _guild_phase_control(fight, markers, raw, actor_rows, options):
         blade_target = 162043 if phase == "p1" else planned
         required_blade = next((t for t in blades if t >= blade_target-1000), None)
         deadline = max(planned, required_blade or planned)
+        damage_end = required_blade if phase == "p2" else None
+        nightfall_windows = []
+        if phase == "p2":
+            completions = sorted(int(e["timestamp"])-start for e in raw.get("casts", [])
+                if ability_id(e) == ETERNAL_NIGHTFALL and is_cast_complete(e)
+                and e.get("sourceID") == boss_id)
+            interrupts = sorted(int(e["timestamp"])-start for e in raw.get("interrupts", [])
+                if _is_nightfall_interrupt(e) and e.get("targetID") == boss_id)
+            for event in raw.get("casts", []):
+                t = int(event.get("timestamp") or 0)-start
+                if (ability_id(event) != ETERNAL_NIGHTFALL or event_type(event) != "begincast"
+                        or event.get("sourceID") != boss_id or not begin <= t <= limit):
+                    continue
+                finish = min((x for x in completions+interrupts if t < x <= t+ETERNAL_NIGHTFALL_CAST_MS+2000),
+                             default=t+ETERNAL_NIGHTFALL_CAST_MS)
+                nightfall_windows.append((t, min(finish, limit)))
+        row["damageEndTimeMs"] = damage_end
+        row["nightfallExcludedWindows"] = [{"startTimeMs": a, "endTimeMs": b} for a, b in nightfall_windows]
         row["earliestEndTimeMs"] = round(deadline)
         row["requiredBladeTimeMs"] = required_blade
         row["status"] = "early" if observed_end is not None and observed_end < deadline else "on-time" if observed_end is not None else "in-progress"
@@ -5973,6 +6017,12 @@ def _guild_phase_control(fight, markers, raw, actor_rows, options):
                 t = int(event.get("timestamp") or 0)-start
                 if (event.get("targetID") != boss_id or event_type(event) != kind
                         or not begin <= t <= limit or observed_end is not None and t > observed_end):
+                    continue
+                if kind == "cast" and not is_manual_hold_cast(event):
+                    continue
+                if (phase == "p2" and kind == "damage"
+                        and (damage_end is None or t >= damage_end
+                             or any(a <= t < b for a, b in nightfall_windows))):
                     continue
                 resource = _resource_for_actor(event, boss_id) if phase == "p2" else None
                 i = bisect_right(samples, (t, float("inf")))-1 if phase == "p2" else -1
@@ -6182,6 +6232,11 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
             phase["thresholds"][threshold] = sorted(
                 [r for r in totals.values() if r["castCount"] or r["damage"]],
                 key=lambda r: (-r["castCount"], -r["damage"]))
+    if profile["key"] != "avalon":
+        actual = _actual_cast_timeline(fight, markers, raw, actor_map, players, profile)
+        return {**actual, "enabled": True, "checksEnabled": False, "phaseControl": phases,
+                "defaultThreshold": 5, "holdWindowVersion": 3,
+                "evidenceNote": "其他公会仅展示 P1/P2 停手取证和实际施法；不套用阿瓦隆的爆发安排。P2 伤害排除永恒夜幕读条期间及末轮刀之后。"}
     early = any(p["status"] == "early" for p in phases)
     uncertain = phases[0]["status"] not in {"on-time", "early"} or any(p["status"] == "unknown" for p in phases)
     skip_reason = "前序阶段时间轴提前，跳过爆发缺失计数" if early else "前序阶段结束、末轮刀或首次恐惧行军读条尚未确认，不判漏爆发" if uncertain else None
@@ -6278,7 +6333,7 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
         timelines.append(timeline)
     return {"enabled": True, "checksEnabled": True, "analysisProfile": profile, "phaseControl": phases, "defaultThreshold": 5,
             "evidenceVersion": "guild-effects-v2",
-            "holdWindowVersion": 2,
+            "holdWindowVersion": 3,
             "burstSkipped": skip_reason is not None, "burstSkipReason": skip_reason,
             "checks": checks, "timelines": timelines, "unresolved": unresolved,
             "timelineViewVersion": "icons-v1",
@@ -6293,7 +6348,7 @@ def analyze_guild_timeline(fight, markers, raw, actor_rows, actor_map, players, 
             "reference": {"reportID": "Qh8XMfKGTmLJtk2r", "fightID": 1, "killTimeMs": 636333,
                           "p2TimeMs": 177991, "intermissionTimeMs": 389099, "p3TimeMs": 427666,
                           "phaseMethod": "boss-starts-phase-auras-v1"},
-            "evidenceNote": "cast 仅统计玩家以该阶段 Boss 为目标的成功施法；伤害包含宠物。血量取目标自身资源或此前 3 秒内的样本；缺失不补零。未到达的爆发窗口不计数，技能充能与冷却刷新不替代实际施法。"}
+            "evidenceNote": "cast 仅统计玩家以该阶段 Boss 为目标的成功施法；伤害包含宠物。P2 伤害排除永恒夜幕读条期间及末轮刀之后。血量取目标自身资源或此前 3 秒内的样本；缺失不补零。未到达的爆发窗口不计数，技能充能与冷却刷新不替代实际施法。"}
 
 
 def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options):
@@ -6316,7 +6371,8 @@ def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options
         payload["guildPlayerCasts"] = client.events(report_id, "Casts", fight, hostility_type="Friendlies",
             filter_expression="ability.id IN ("+", ".join(map(str, ids))+")")
         return payload
-    burst_plan(options)  # Validate only the internal Avalon check configuration.
+    if resolve_profile(payload.get("reportGuild"), options)["key"] == "avalon":
+        burst_plan(options)  # Only Avalon uses the internal burst plan.
     bosses = [a["id"] for a in actor_rows if a.get("gameID") in {257911, 259854}]
     if not bosses:
         return payload
@@ -6328,7 +6384,7 @@ def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options
     payload["guildPlayerCasts"] = client.events(report_id, "Casts", fight, hostility_type="Friendlies", include_resources=True)
     payload["guildPlayerBuffs"] = client.events(report_id, "Buffs", fight, hostility_type="Friendlies")
     catalog = {a["key"]: a for a in load_player_ability_catalog()["abilities"]}
-    enemy_ids = sorted({sid for row in burst_plan(options) for ability in [catalog.get(row.get("ability"), {})]
+    enemy_ids = sorted({sid for row in (burst_plan(options) if resolve_profile(payload.get("reportGuild"), options)["key"] == "avalon" else []) for ability in [catalog.get(row.get("ability"), {})]
                         if ability.get("auraTarget") == "enemy" for sid in ability.get("auraIds", [])})
     payload["guildEnemyDebuffs"] = client.events(report_id, "All", fight,
         filter_expression='type IN ("applydebuff", "refreshdebuff", "applydebuffstack", "removedebuff") AND ability.id IN ('+
@@ -6337,7 +6393,7 @@ def _fetch_guild_timeline(client, report_id, fight, actor_rows, payload, options
 
 
 def guild_timeline_overview(rendered):
-    enabled = [p for p in rendered if (p.get("coiledaltar", {}).get("guildTimeline") or {}).get("checksEnabled")]
+    enabled = [p for p in rendered if (p.get("coiledaltar", {}).get("guildTimeline") or {}).get("phaseControl")]
     if not enabled:
         return []
     burst, hold = [], []
@@ -6357,11 +6413,11 @@ def guild_timeline_overview(rendered):
                         phase["phase"].upper()+(" 首次低于 5% 至 "+fmt_ms(hold_until)+" 前目标施法 " if phase["phase"] == "p1" else " 提前结束，Boss 5% 以下目标施法 ")+str(row["castCount"])+" 次",
                         player=row["player"],playerID=row["playerID"],classColor=row.get("classColor"),
                         count=row["castCount"],damage=row["damage"],petDamage=row["petDamage"]))
-    return [
-        {"key":"guildBurstMisses","label":"公会爆发窗口未使用","value":len(burst),"unit":"次","tone":"warning",
+    metrics = ([{"key":"guildBurstMisses","label":"公会爆发窗口未使用","value":len(burst),"unit":"次","tone":"warning",
          "description":"仅统计没有提前转阶段、已走完窗口且角色技能匹配的安排。",
-         "players":nightly_player_totals(burst),"events":burst,"detailTab":"guildTimeline"},
-        {"key":"guildHoldCasts","label":"提前转阶段低血量施法","value":sum(r["count"] for r in hold),"unit":"次","tone":"warning",
+         "players":nightly_player_totals(burst),"events":burst,"detailTab":"guildTimeline"}]
+        if any(p["coiledaltar"]["guildTimeline"].get("checksEnabled") for p in enabled) else [])
+    return metrics + [{"key":"guildHoldCasts","label":"提前转阶段低血量施法","value":sum(r["count"] for r in hold),"unit":"次","tone":"warning",
          "description":"P1 从首次低于 5% 至配置的停手截止（默认 2:45）前；P2 统计低于 5% 的目标施法。宠物只计伤害，单场支持 1%–10% 调整。",
          "players":nightly_player_totals(hold),"events":hold,"detailTab":"guildTimeline"}]
 

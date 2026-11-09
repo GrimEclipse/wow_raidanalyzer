@@ -29,7 +29,7 @@ class Pool:
 
 
 class SharedWclService:
-    def __init__(self, credentials, *, reserve=3000, refresh_seconds=30, clock=time.time):
+    def __init__(self, credentials, *, reserve=800, refresh_seconds=30, clock=time.time):
         self.pools = [Pool(cred, group) for cred, group in credentials]
         self.reserve = max(0, int(reserve))
         self.refresh_seconds = max(5, int(refresh_seconds))
@@ -49,7 +49,7 @@ class SharedWclService:
                         rows.append((cred, str(entry.get('quotaGroup') or 'shared')))
             except (ValueError, KeyError, TypeError):
                 raise RuntimeError('WCL_SHARED_POOLS 配置无效。') from None
-        return cls(rows, reserve=setting('WCL_RESERVE_POINTS', '3000'))
+        return cls(rows, reserve=setting('WCL_RESERVE_POINTS', '800'))
 
     def observe(self, credentials, rate=None, status=200):
         now = self.clock()
