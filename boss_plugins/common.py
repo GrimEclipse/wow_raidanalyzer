@@ -13,6 +13,7 @@ from boss_plugins.combat_config import (
 
 COMBAT_RES_SPELLS = {
     20484: "复生",
+    21169: "复生",
     61999: "复活盟友",
     20707: "灵魂石",
     391054: "代祷",

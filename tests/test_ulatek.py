@@ -73,7 +73,33 @@ class UlatekTests(unittest.TestCase):
         }, safe_stacks=2)
         self.assertEqual({row["playerID"] for row in lower_cap["rounds"][0]["breaks"] if row["wrong"]}, {3, 4})
 
-    def test_egg_duty_counts_only_p1_and_p25_and_includes_zero_duty_players(self):
+    def test_simultaneous_fangs_split_by_each_players_application_position(self):
+        players = {i: {'name': f'P{i}'} for i in range(1, 7)}
+        debuffs = [self.event(1010, 'applydebuff', u.FANG_AURA_ID, pid,
+                              resourceActor=2, x=-7000 if pid <= 3 else 7000, y=155000)
+                   for pid in players]
+        debuffs += [self.event(5000 + pid, 'removedebuff', u.FANG_AURA_ID, pid)
+                    for pid in players]
+        raw = {'debuffs': debuffs,
+               'casts': [self.event(1000, 'cast', 1301117, -1, source=141,
+                                    sourceInstance=1, x=-6702),
+                         self.event(1000, 'cast', 1301117, -1, source=142,
+                                    sourceInstance=2, x=6702)],
+               'bossID': 99,
+               'bossPositionEvents': [self.event(0, 'damage', 1, -1, source=99, x=0, y=0)]}
+        result = u._analyze_fangs(self.fight, {}, players, raw)
+        round_row = result['rounds'][0]
+        sides = {row['side']: row for row in round_row['sides']}
+        self.assertEqual({row['playerID'] for row in sides['左场']['targets']}, {1, 2, 3})
+        self.assertEqual({row['playerID'] for row in sides['右场']['targets']}, {4, 5, 6})
+        self.assertEqual(sides['右场']['wardenInstance'], 2)
+        self.assertTrue(all(row['sideSource'] == 'player-application-position'
+                            for row in sides.values()))
+        self.assertEqual({row['playerID']: row['side'] for row in round_row['breaks']},
+                         {1: '左场', 2: '左场', 3: '左场',
+                          4: '右场', 5: '右场', 6: '右场'})
+
+    def test_egg_duty_counts_only_p1_and_includes_zero_duty_players(self):
         raw = {k: [] for k in ['casts','debuffs','damage','deaths','friendlyCasts','enemyBuffs']}
         for start,end in [(10000,20000),(50000,60000)]:
             raw['enemyBuffs'] += [self.event(start,'applybuff',u.RAGE_ID,99),self.event(end,'removebuff',u.RAGE_ID,99)]
@@ -82,10 +108,11 @@ class UlatekTests(unittest.TestCase):
             raw['debuffs'] += [self.event(start,'applydebuff',u.EGG_CARRY_ID,pid),self.event(start+10,'refreshdebuff',u.EGG_CARRY_ID,pid),self.event(end,'removedebuff',u.EGG_CARRY_ID,pid)]
         raw['debuffs'] += [self.event(t,'applydebuff',u.WAVE_ID,pid) for t,pid in [(2000,1),(32000,2),(66000,3),(92000,4)]]
         waves=u._analyze_waves_and_eggs(self.fight,self.actors,self.players,raw,u._rage_windows(self.fight,raw))
-        self.assertEqual([(r['playerID'],r['phase']) for r in waves['dutyCarries']],[(1,'P1'),(1,'P1'),(3,'P2.5')])
-        self.assertEqual([r['playerID'] for r in waves['dutyWaveHits']],[1,3])
+        self.assertEqual([(r['playerID'],r['phase']) for r in waves['dutyCarries']],[(1,'P1'),(1,'P1')])
+        self.assertEqual([r['playerID'] for r in waves['dutyWaveHits']],[1])
+        self.assertIn((3, 'P2.5'), [(r['playerID'], r['phase']) for r in waves['carries']])
         metric=next(m for m in u._mechanic_overview([{'fightID':1,'ulatek':{'wavesAndEggs':waves}}])['metrics'] if m['key']=='eggCarrierWaveHits')
-        self.assertEqual((metric['carryCount'],metric['value']),(3,2))
+        self.assertEqual((metric['carryCount'],metric['value']),(2,1))
         rows={r['player']:r for r in metric['players']}
         self.assertEqual((rows['P1']['carryCount'],rows['P1']['waveHitCount']),(2,1))
         self.assertEqual(rows['P6']['carryCount'],0)
@@ -121,6 +148,23 @@ class UlatekTests(unittest.TestCase):
         partial = u._analyze_waves_and_eggs(self.fight, {}, players, raw, [])
         self.assertFalse(partial["eggAssignment"]["ready"])
         self.assertEqual(partial["stolenCarries"], [])
+
+    def test_p25_carry_never_counts_as_stolen_p1_duty(self):
+        fight = {**self.fight, 'endTime': 100000, 'difficulty': 5}
+        players = {i: {'name': f'P{i}', 'role': 'range-dps'} for i in range(1, 10)}
+        raw = {'casts': [], 'damage': [], 'deaths': [], 'enemyBuffs': [],
+               'debuffs': [], 'analysisOptions': {'eggDutyPlayers': [f'P{i}' for i in range(1, 9)]}}
+        for start, end in ((10000, 20000), (50000, 60000)):
+            raw['enemyBuffs'] += [self.event(start, 'applybuff', u.RAGE_ID, 99),
+                                  self.event(end, 'removebuff', u.RAGE_ID, 99)]
+        raw['casts'] = [self.event(t, 'cast', u.P25_COIL_CAST_ID, -1)
+                        for t in (65000, 68000, 71000, 74000, 77000, 80000)]
+        raw['debuffs'] = [self.event(62000, 'applydebuff', u.EGG_CARRY_ID, 9),
+                          self.event(72000, 'removedebuff', u.EGG_CARRY_ID, 9)]
+        waves = u._analyze_waves_and_eggs(fight, {}, players, raw, u._rage_windows(fight, raw))
+        self.assertEqual(waves['dutyCarries'], [])
+        self.assertEqual(waves['stolenCarries'], [])
+        self.assertIn((9, 'P2.5'), [(r['playerID'], r['phase']) for r in waves['carries']])
 
     def test_mythic_wretch_casts_and_collision_clues_are_evidence_only(self):
         fight = {**self.fight, "difficulty": 5}
@@ -192,6 +236,68 @@ class UlatekTests(unittest.TestCase):
         waves = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw,
                                           u._rage_windows(fight, raw))
         self.assertEqual(waves["eggCollisions"][0]["phase"], "P2.5")
+
+    def test_splash_confirms_collision_pair_without_position_samples(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {"casts": [], "damage": [], "deaths": [], "enemyBuffs": [], "debuffs": [], "resources": []}
+        for pid in (1, 2):
+            raw["debuffs"] += [self.event(1000, "applydebuff", u.MYTHIC_EGG_CARRY_ID, pid),
+                               self.event(8000 + pid * 10, "removedebuff", u.MYTHIC_EGG_CARRY_ID, pid)]
+            raw["damage"] += [self.event(8050, "damage", u.EGG_COLLISION_SPLASH_ID, pid,
+                                         amount=100 if pid == 1 else 0, absorbed=100 if pid == 2 else 0),
+                              self.event(9050, "damage", u.EGG_COLLISION_SPLASH_ID, pid, amount=100)]
+        raw["debuffs"].append(self.event(8030, "applydebuffstack", 1301268, 3, stack=2))
+        waves = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])
+        assert len(waves["eggCollisions"]) == 1
+        assert [row["playerID"] for row in waves["eggCollisions"][0]["players"]] == [1, 2]
+        assert waves["eggCollisions"][0]["splashSpellID"] == u.EGG_COLLISION_SPLASH_ID
+        assert waves["eggCollisions"][0]["distanceYards"] is None
+        raw["damage"] = [row for row in raw["damage"] if row["targetID"] == 1]
+        assert u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])["eggCollisions"] == []
+
+    def test_splash_pairs_staggered_log_events_once(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {"casts": [], "damage": [], "deaths": [], "enemyBuffs": [], "debuffs": [], "resources": []}
+        for pid, offset in ((1, 0), (2, 86)):
+            raw["debuffs"] += [self.event(1000, "applydebuff", u.MYTHIC_EGG_CARRY_ID, pid),
+                               self.event(8000 + offset, "removedebuff", u.MYTHIC_EGG_CARRY_ID, pid),
+                               self.event(8001 + offset, "applydebuffstack", 1301268, 3, stack=2)]
+            raw["damage"].append(self.event(8002 + offset, "damage", u.EGG_COLLISION_SPLASH_ID,
+                                            pid, amount=100))
+        result = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])
+        assert len(result["eggCollisions"]) == 1
+        assert {p["playerID"] for p in result["eggCollisions"][0]["players"]} == {1, 2}
+
+    def test_splash_collision_ignores_existing_hatched_viper(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {"casts": [], "damage": [], "deaths": [], "enemyBuffs": [], "debuffs": [],
+               "resources": [], "actorRows": [{"id": 77, "gameID": u.BLIGHTSCALE_VIPER_GAME_ID}]}
+        for pid in (1, 2):
+            raw["debuffs"] += [self.event(1000, "applydebuff", u.MYTHIC_EGG_CARRY_ID, pid),
+                               self.event(8000, "removedebuff", u.MYTHIC_EGG_CARRY_ID, pid)]
+            raw["damage"].append(self.event(8050, "damage", u.EGG_COLLISION_SPLASH_ID,
+                                            pid, amount=100))
+        raw["debuffs"].append(self.event(8030, "applydebuffstack", 1301268, 3, stack=2))
+        raw["trackedActorEvents"] = [self.event(5000, "cast", 1, source=77, sourceInstance=1)]
+        assert u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])["eggCollisions"] == []
+        raw["trackedActorEvents"].append(self.event(7000, "death", 0, 77, sourceInstance=1,
+                                                       targetInstance=1))
+        assert len(u._analyze_waves_and_eggs(fight, self.actors, self.players, raw, [])["eggCollisions"]) == 1
+
+    def test_splash_collision_is_counted_in_p2(self):
+        fight = {**self.fight, "difficulty": 5}
+        raw = {"casts": [], "damage": [], "deaths": [], "resources": [], "debuffs": [],
+               "enemyBuffs": [self.event(10000, "applybuff", u.RAGE_ID, 99),
+                              self.event(20000, "removebuff", u.RAGE_ID, 99)]}
+        for pid in (1, 2):
+            raw["debuffs"] += [self.event(25000, "applydebuff", u.MYTHIC_EGG_CARRY_ID, pid),
+                               self.event(30000, "removedebuff", u.MYTHIC_EGG_CARRY_ID, pid)]
+            raw["damage"].append(self.event(30010, "damage", u.EGG_COLLISION_SPLASH_ID,
+                                            pid, amount=100))
+        raw["debuffs"].append(self.event(30005, "applydebuffstack", 1301268, 3, stack=2))
+        result = u._analyze_waves_and_eggs(fight, self.actors, self.players, raw,
+                                          u._rage_windows(fight, raw))
+        assert result["eggCollisions"][0]["phase"] == "P2"
 
     def test_serpent_bite_participation_uses_ingested_venom_aura(self):
         debuffs = []
@@ -282,3 +388,219 @@ class UlatekTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+
+def event(ts, kind, spell, source=99, target=None, **extra):
+    return dict(timestamp=ts, type=kind, abilityGameID=spell,
+                sourceID=source, targetID=target, **extra)
+
+
+def raw_fixture():
+    return {key: [] for key in ('casts', 'friendlyCasts', 'debuffs', 'damage',
+                                'deaths', 'enemyBuffs', 'friendlyBuffs',
+                                'trackedActorEvents', 'resources')}
+
+
+def test_carrier_contacts_collapse_but_raw_wave_mutations_remain():
+    fight = {'startTime': 0, 'endTime': 10000}
+    players = {1: {'name': 'P1', 'role': 'range-dps'}}
+    raw = raw_fixture()
+    raw['debuffs'] = [event(100, 'applydebuff', u.EGG_CARRY_ID, target=1),
+                      event(1000, 'applydebuff', u.WAVE_ID, target=1),
+                      event(1200, 'applydebuffstack', u.WAVE_ID, target=1),
+                      event(2000, 'refreshdebuff', u.WAVE_ID, target=1)]
+    result = u._analyze_waves_and_eggs(fight, {}, players, raw, [])
+    assert result['applicationCount'] == 3
+    assert [row['timeMs'] for row in result['dutyWaveHits']] == [1000, 2000]
+    assert result['carries'][0]['waveHitCount'] == 2
+
+
+def test_wave_exclusion_starts_at_omen_and_applies_globally_after_leak():
+    fight = {'startTime': 0, 'endTime': 12000}
+    players = {i: {'name': f'P{i}', 'role': 'tank' if i <= 2 else 'range-dps'} for i in range(1, 5)}
+    raw = raw_fixture()
+    raw['debuffs'] = [event(1000, 'applydebuff', u.PETRIFYING_SPINE_MARK_ID, target=3)]
+    raw['debuffs'] += [event(ts, 'applydebuff', u.WAVE_ID, target=pid)
+                       for ts, pid in ((900, 3), (1100, 3), (2100, 4), (3100, 4), (4100, 3))]
+    raw['casts'] = [event(1500, 'cast', u.TOXIC_INCUBATION_CAST_ID,
+                          source=50, sourceInstance=1, resourceActor=1, x=0, y=0)]
+    raw['actorRows'] = [{'id': 60, 'gameID': u.BLIGHTSCALE_WRETCH_GAME_ID}]
+    raw['resources'] = [event(1500, 'resourcechange', 0, source=1, resourceActor=1, x=100, y=0),
+                        event(1500, 'resourcechange', 0, source=2, resourceActor=1, x=5000, y=0)]
+    raw['replayEvents'] = [event(1500, 'damage', 0, source=60, sourceInstance=1,
+                                 resourceActor=1, x=1000, y=0)]
+    result = u.analyze_ulatek(fight, {}, players, raw)
+    assert result['tankInterception']['failures'][0]['playerID'] == 1
+    assert [(row['timeMs'], row['playerID']) for row in result['wavesAndEggs']['waveExclusions']] == [
+        (1100, 3), (2100, 4), (3100, 4), (4100, 3)]
+
+
+def test_wave_exclusions_reset_when_raid_reaches_p3():
+    fight = {'startTime': 0, 'endTime': 70000}
+    players = {1: {'name': 'Tank', 'role': 'tank'}, 3: {'name': 'Carrier', 'role': 'range-dps'}}
+    raw = raw_fixture()
+    raw['analysisOptions'] = {'fullReplayEnabled': False, 'rageReviewEnabled': False,
+                              'fangsReviewEnabled': False, 'criticalReviewEnabled': False}
+    raw['enemyBuffs'] = [event(t, kind, u.RAGE_ID, target=99)
+                         for t, kind in ((10000, 'applybuff'), (20000, 'removebuff'),
+                                         (30000, 'applybuff'), (40000, 'removebuff'))]
+    raw['casts'] = [event(t, 'cast', u.TOXIC_INCUBATION_CAST_ID,
+                          source=50, sourceInstance=i, resourceActor=1, x=0, y=0)
+                    for i, t in ((1, 2000), (2, 50000))]
+    raw['casts'].append(event(41000, 'cast', 1295905, source=50))
+    raw['resources'] = [event(t, 'resourcechange', 0, source=1, resourceActor=1, x=100, y=0)
+                        for t in (2000, 50000)]
+    raw['debuffs'] = [event(1000, 'applydebuff', u.PETRIFYING_SPINE_MARK_ID, target=3)]
+    raw['debuffs'] += [event(t, 'applydebuff', u.WAVE_ID, target=3)
+                       for t in (5000, 25000, 45000, 55000)]
+    result = u.analyze_ulatek(fight, {}, players, raw)
+    assert [row['timeMs'] for row in result['wavesAndEggs']['waveExclusions']] == [5000, 55000]
+
+
+def test_p1_wretch_casts_use_explicit_target_actor():
+    fight = {'startTime': 0, 'endTime': 10000}
+    players = {1: {'name': 'P1'}}
+    raw = raw_fixture()
+    raw['actorRows'] = [{'id': 41, 'gameID': u.BLIGHTSCALE_WRETCH_GAME_ID, 'type': 'NPC'},
+                        {'id': 42, 'gameID': u.ULATEK_GAME_ID, 'type': 'NPC'}]
+    raw['enemyBuffs'] = [event(5000, 'applybuff', u.RAGE_ID)]
+    raw['friendlyCasts'] = [event(1000, 'cast', 123, source=1, target=41),
+                            event(2000, 'cast', 123, source=1, target=42),
+                            event(6000, 'cast', 123, source=1, target=41)]
+    row = u._p1_wretch_focus(fight, {}, players, raw, u._rage_windows(fight, raw))['players'][0]
+    assert (row['wretchCastCount'], row['otherTargetCastCount']) == (1, 1)
+
+
+def test_two_bites_do_not_share_helpers():
+    fight = {'startTime': 0, 'endTime': 20000}
+    players = {i: {'name': f'P{i}'} for i in range(1, 10)}
+    raw = raw_fixture()
+    raw['casts'] = [event(1000, 'cast', 1295905)]
+    raw['debuffs'] = [event(1100, 'applydebuff', u.SERPENT_BITE_TARGET_ID, target=i)
+                      for i in (1, 2)]
+    raw['debuffs'] += [event(5000, 'removedebuff', u.SERPENT_BITE_TARGET_ID, target=i)
+                       for i in (1, 2)]
+    raw['debuffs'] += [event(3000, 'applydebuff', u.INGESTED_VENOM_ID, target=i)
+                       for i in range(3, 10)]
+    raw['resources'] = [event(3000, 'resourcechange', 0, source=i, resourceActor=1,
+                              x=100 if i in (1, 3, 4, 5, 6) else 2100, y=0)
+                        for i in players]
+    soaks = u._analyze_serpent_bites(fight, {}, players, raw)['rounds'][0]['soaks']
+    assert [row['helperCount'] for row in soaks] == [4, 3]
+    assert not any(row['enoughHelpers'] for row in soaks)
+    assert all(row['target']['playerID'] not in {p['playerID'] for p in row['participants']}
+               for row in soaks)
+
+
+def test_bite_counts_nearby_helper_at_resolution_without_aura_event():
+    fight = {'startTime': 0, 'endTime': 20000}
+    players = {i: {'name': f'P{i}'} for i in (1, 2, 3)}
+    raw = raw_fixture()
+    raw['casts'] = [event(1000, 'cast', 1295905)]
+    raw['debuffs'] = [event(1100, 'applydebuff', u.SERPENT_BITE_TARGET_ID, target=1),
+                      event(5000, 'removedebuff', u.SERPENT_BITE_TARGET_ID, target=1)]
+    raw['resources'] = [event(5000, 'resourcechange', 0, source=i,
+                              resourceActor=1, x=x, y=0)
+                        for i, x in ((1, 0), (2, 600), (3, 900))]
+    soak = u._analyze_serpent_bites(fight, {}, players, raw)['rounds'][0]['soaks'][0]
+    assert soak['helperCount'] == 1
+    assert [row['playerID'] for row in soak['participants']] == [2]
+
+
+def test_bite_counts_resurrected_helper_and_other_marked_target_per_circle():
+    fight = {'startTime': 0, 'endTime': 10000}
+    players = {i: {'name': f'P{i}'} for i in range(1, 7)}
+    raw = raw_fixture()
+    raw['deaths'] = [event(1000, 'death', 0, target=6)]
+    raw['friendlyCasts'] = [event(2000, 'cast', 21169, source=6)]
+    raw['casts'] = [event(3000, 'cast', 1295905)]
+    raw['debuffs'] = [event(3100, 'applydebuff', u.SERPENT_BITE_TARGET_ID, target=i)
+                      for i in (1, 2)]
+    raw['debuffs'] += [event(7000, 'removedebuff', u.SERPENT_BITE_TARGET_ID, target=i)
+                       for i in (1, 2)]
+    raw['debuffs'] += [event(7010, 'applydebuff', 1312967, target=i)
+                       for i in (3, 4, 5, 6)]
+    raw['replayEvents'] = [event(7000, 'resourcechange', 0, source=i,
+                                 resourceActor=1, x=100 * i, y=0)
+                           for i in players]
+    soaks = u._analyze_serpent_bites(fight, {}, players, raw)['rounds'][0]['soaks']
+    assert [row['helperCount'] for row in soaks] == [5, 5]
+    assert all(row['resolution'] == 'volatile_purge' for row in soaks)
+    assert all({p['playerID'] for p in row['purgeRecipients']} == {3, 4, 5, 6}
+               for row in soaks)
+
+
+def test_failed_bite_keeps_each_calcified_circles_helpers_separate():
+    fight = {'startTime': 0, 'endTime': 10000}
+    players = {i: {'name': f'P{i}'} for i in range(1, 7)}
+    raw = raw_fixture()
+    raw['casts'] = [event(1000, 'cast', 1295905)]
+    raw['debuffs'] = [event(1100, 'applydebuff', u.SERPENT_BITE_TARGET_ID, target=i)
+                      for i in (1, 2)]
+    raw['debuffs'] += [event(5000, 'removedebuff', u.SERPENT_BITE_TARGET_ID, target=i)
+                       for i in (1, 2)]
+    raw['debuffs'] += [event(5010, 'applydebuff', u.CALCIFIED_CORPSE_ID, target=i)
+                       for i in (1, 2)]
+    raw['replayEvents'] = [event(5000, 'resourcechange', 0, source=i,
+                                 resourceActor=1, x=x, y=0)
+                           for i, x in ((1, 0), (2, 2000), (3, 100), (4, 2100), (5, 2200), (6, 2300))]
+    soaks = u._analyze_serpent_bites(fight, {}, players, raw)['rounds'][0]['soaks']
+    assert [row['resolution'] for row in soaks] == ['calcified_corpse'] * 2
+    assert [{p['playerID'] for p in row['participants']} for row in soaks] == [{3}, {4, 5, 6}]
+
+
+def test_partial_tether_ticks_resolve_tank_when_target_position_missing():
+    fight = {'startTime': 0, 'endTime': 20000}
+    players = {1: {'name': 'P1', 'role': 'tank'}, 2: {'name': 'P2', 'role': 'tank'}}
+    raw = raw_fixture()
+    raw['actorRows'] = [{'id': 60, 'gameID': 268029}, {'id': 73, 'gameID': 268029}]
+    raw['casts'] = [event(5000, 'cast', u.TOXIC_INCUBATION_CAST_ID,
+                          source=73, sourceInstance=1)]
+    raw['damage'] = [event(ts, 'damage', u.TOXIC_INCUBATION_HIT_ID,
+                           source=60 if ts == 5000 else 73, target=1, sourceInstance=1)
+                     for ts in (5000, 6000, 7000)]
+    failure = u._analyze_tether_failures(fight, {}, players, raw)['failures'][0]
+    assert (failure['tickCount'], failure['playerID'], failure['attribution']) == (
+        3, 1, 'observed-interception-ticks')
+
+
+def test_first_p1_tether_with_zero_ticks_keeps_failure_without_wretch_sample():
+    fight = {'startTime': 0, 'endTime': 20000}
+    players = {1: {'name': 'P1', 'role': 'tank'}, 2: {'name': 'P2', 'role': 'tank'}}
+    raw = raw_fixture()
+    raw['casts'] = [event(5000, 'cast', u.TOXIC_INCUBATION_CAST_ID,
+                          source=73, sourceInstance=1, resourceActor=1, x=0, y=0)]
+    raw['resources'] = [event(5000, 'resourcechange', 0, source=1,
+                              resourceActor=1, x=200, y=0),
+                        event(5000, 'resourcechange', 0, source=2,
+                              resourceActor=1, x=5000, y=0)]
+    failure = u._analyze_tether_failures(fight, {}, players, raw)['failures'][0]
+    assert (failure['tickCount'], failure['playerID'], failure['attribution']) == (
+        0, 1, 'nearest-tank-to-caster')
+
+
+def test_p3_wrath_uses_boss_side_at_cast_start():
+    fight = {'startTime': 0, 'endTime': 20000}
+    raw = raw_fixture()
+    raw['casts'] = [event(1000, 'begincast', 1298367, source=21),
+                    event(6000, 'cast', 1298367, source=21,
+                          resourceActor=1, x=3000, y=155367)]
+    raw['resources'] = [event(1000, 'resourcechange', 0, source=21,
+                              resourceActor=1, x=0, y=158367)]
+    circle = u._replay_effects(fight, {}, raw, [])['circles'][0]
+    assert circle['position'] == {'x': 0, 'y': 158167}
+
+
+def test_p3_corner_wrath_uses_its_platform_landmark():
+    fight = {'startTime': 0, 'endTime': 20000}
+    for x, y, expected_x, expected_y in ((3300, 152112, 2800, 152567),
+                                         (3300, 158446, 2800, 158167),
+                                         (-3300, 152112, -2800, 152567),
+                                         (-3300, 158446, -2800, 158167)):
+        raw = raw_fixture()
+        raw['casts'] = [event(6000, 'cast', 1298367, source=21,
+                              resourceActor=1, x=x, y=y)]
+        circle = u._replay_effects(fight, {}, raw, [])['circles'][0]
+        assert circle['position'] == {'x': expected_x, 'y': expected_y}

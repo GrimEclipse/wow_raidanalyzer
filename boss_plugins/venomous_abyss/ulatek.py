@@ -17,7 +17,7 @@ CONFIG_SCHEMA.append({'key': 'fullReplayEnabled', 'type': 'boolean', 'label': '�
 CONFIG_SCHEMA.append({'key': 'eggDutyPlayers', 'type': 'playerList', 'label': '指定搬蛋成员', 'default': [],
                       'description': '阿瓦隆留空时使用固定 8 人名单；其他公会请填写本场搬蛋组。名单不足 8 人时不判定抢蛋。'})
 CONFIG_SCHEMA.append({'key': 'cleanWaveReviewEnabled', 'type': 'boolean', 'label': '统计有效中波', 'default': False,
-                      'description': '另列接线正常、且尚未达到 8 人死亡阈值时的中波受击。原始中波次数始终保留。',
+                      'description': '另列同阶段首次漏接前、且团队同时死亡未达到 2 人时的中波受击。原始中波次数始终保留。',
                       'visibleWhen': {'field': 'wavesReviewEnabled', 'equals': True}})
 CRITICAL_FIELDS = {
     "maliceReviewEnabled": ("malice", "恶意打断"),
@@ -41,7 +41,7 @@ from collections import Counter, defaultdict
 
 from analyzer_core.court_rules import validate_court_profile
 from boss_plugins.combat_config import PERSONAL_DEFENSIVES, find_defensive_uses_before_death
-from boss_plugins.common import write_json_result
+from boss_plugins.common import COMBAT_RES_SPELLS, write_json_result
 from boss_plugins.venomous_abyss.runtime import build_aggregated_json as _build
 from boss_plugins.venomous_abyss.shared import (
     ability_id,
@@ -113,6 +113,7 @@ ULATEK_SPELL_NAMES = {
     1307367: "被缚之怒",
     1307617: "毒性甲壳",
     1307612: "毒性甲壳",
+    1307635: "剧毒喷溅",
     1313754: "蠕动孕育",
     1313757: "沸腾毒液",
     1313758: "沸腾毒液",
@@ -142,6 +143,7 @@ DOOMSCALE_EGG_CONTACT_ID = 1300312
 DOOMSCALE_EGG_GAME_ID = 268164
 DOOMSCALE_HATCH_CAST_ID = 1306862
 EGG_CARRY_IDS = (EGG_CARRY_ID, MYTHIC_EGG_CARRY_ID)
+EGG_COLLISION_SPLASH_ID = 1307635
 HARDENED_SHELL_ID = 1299650
 REPLAY_EGG_GAME_IDS = {265644, 266085, 268121, 263535, 268164, 271194}
 CARRYABLE_EGG_GAME_IDS = {265644, 266085, 268121}
@@ -186,6 +188,7 @@ INGESTED_VENOM_ID = 1313529
 CALCIFIED_CORPSE_ID = 1306119
 SERPENT_BITE_RADIUS_YARDS = 7
 WAVE_DEATH_WINDOW_MS = 1_000
+WAVE_COUNT_DEATH_THRESHOLD = 2
 BASELINE_P3_SHRIEKERS = {1: 0, 2: 0, 3: 1, 4: 2}
 HEALTHSTONE_IDS = {6262, 452930, 387636}
 HEALING_POTION_IDS = {1234768, 1295247}
@@ -234,7 +237,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-fixed-wrath-egg-hatch-2026-11-09-v36",
+    "mechanicVersion": "ulatek-phase-exemptions-viper-splash-2026-11-10-v39",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -245,8 +248,8 @@ COURT_PROFILE = {
     "rules": [
         {
             "key": "egg_collision", "label": "撞蛋", "mode": "direct",
-            "spellIDs": [1295360, 1301268],
-            "requiredEvidence": ["两名玩家同帧失去携蛋光环", "同帧孵化", "两人可靠位置距离不超过 4 码", "无中波或幽魂盘卷结算"],
+            "spellIDs": [1295360, 1307612, 1301268, EGG_COLLISION_SPLASH_ID],
+            "requiredEvidence": ["两名玩家同帧失去携蛋光环", "同帧孵化", "剧毒喷溅同时命中两人且场上没有已孵化的蝰蛇，或可靠位置相距不超过 4 码", "无中波或幽魂盘卷结算"],
             "defaultCountEnabled": True, "severityUnits": 1,
         },
         {
@@ -343,6 +346,25 @@ def _phase_at(timestamp, rage_windows):
     if len(rage_windows) == 1 or timestamp < rage_windows[1]["end"]:
         return "P2"
     return "P3"
+
+
+def _wave_exemption_phase_at(timestamp, fight, raw, rage_windows):
+    phase = _phase_at(timestamp, rage_windows)
+    if phase != "P3" or len(rage_windows) < 2:
+        return phase
+    after = rage_windows[1]["end"]
+    casts = raw.get("casts") or []
+    markers = [int(row["timestamp"]) for row in casts
+               if ability_id(row) in {1295905, 1315341}
+               and event_type(row) in {"begincast", "cast"}
+               and int(row["timestamp"]) > after]
+    coils = sorted(int(row["timestamp"]) for row in casts
+                   if ability_id(row) == P25_COIL_CAST_ID and event_type(row) == "cast"
+                   and int(row["timestamp"]) >= after)
+    count = P25_MYTHIC_COIL_COUNT if int(fight.get("difficulty") or 0) == 5 else P25_COIL_COUNT
+    if len(coils) >= count:
+        markers.append(coils[count - 1] + P25_FLOOR_BREAK_DELAY_MS)
+    return "P3" if markers and timestamp >= min(markers) else "P2.5"
 
 
 def _progression_fields(phase):
@@ -459,6 +481,12 @@ def _living_player_ids(players, raw, timestamp):
         for event in (raw.get("friendlyCasts") or []) + (raw.get("trackedActorEvents") or [])
         if event_type(event) == "resurrect"
     )
+    changes.extend(
+        (int(event.get("timestamp") or 0), "resurrect",
+         event.get("sourceID") if ability_id(event) == 21169 else event.get("targetID"))
+        for event in raw.get("friendlyCasts") or []
+        if event_type(event) == "cast" and ability_id(event) in COMBAT_RES_SPELLS
+    )
     for event_time, kind, player_id in sorted(changes):
         if event_time > timestamp:
             break
@@ -472,12 +500,14 @@ def _living_player_ids(players, raw, timestamp):
 def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
     egg_intervals = _carry_intervals(raw["debuffs"], fight["endTime"])
     p25 = _analyze_p25_eggs(fight, actor_map, players, {**raw, "enemyBuffs": raw.get("enemyBuffs", [])})
-    def duty_phase(timestamp):
-        if _phase_at(timestamp, rage_windows) == "P1":
-            return "P1"
+    def carry_phase(timestamp):
         if p25.get("started") and p25["dutyStartMs"] <= timestamp < p25["dutyEndMs"]:
             return "P2.5"
-        return None
+        return _phase_at(timestamp, rage_windows)
+    def duty_phase(timestamp):
+        # P2.5 requires carrying eggs for its own mechanic, but has no fixed
+        # eight-player pickup assignment and cannot produce a "stolen egg".
+        return "P1" if carry_phase(timestamp) == "P1" else None
     duty_carries = []
     for interval in egg_intervals:
         phase = duty_phase(interval["start"])
@@ -493,9 +523,8 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
         and event.get("targetID") in players
         and event_type(event) in {"applydebuff", "applydebuffstack", "refreshdebuff"}
     ]
-    # Match the recently corrected Sszorak aura metric: count actual aura
-    # applications, stack applications and refreshes.  Only exact duplicate rows
-    # are transport duplicates; two mutations close together are two contacts.
+    # Keep raw aura mutations for review; the carrier statistic counts physical
+    # contacts, so adjacent mutations from one wave must collapse per player.
     distinct_wave_applies = []
     seen = set()
     for event in sorted(wave_applies, key=lambda row: int(row.get("timestamp") or 0)):
@@ -541,7 +570,7 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
             **player_ref(players, actor_map, player_id),
             "timeMs": timestamp - fight["startTime"],
             "time": fmt_ms(timestamp - fight["startTime"]),
-            "phase": _phase_at(timestamp, rage_windows),
+            "phase": carry_phase(timestamp),
             "amount": _amount(direct or {}),
             "eggCarrier": bool(carry),
             "earlyHatchConfirmed": early_hatch,
@@ -588,8 +617,8 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
                 })
     carries = []
     for interval in egg_intervals:
-        phase = _phase_at(interval["start"], rage_windows)
-        if phase not in {"P1", "P3"}:
+        phase = carry_phase(interval["start"])
+        if phase not in {"P1", "P2.5", "P3"}:
             continue
         player_id = interval["playerID"]
         related_hits = [
@@ -597,13 +626,17 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
             if row["playerID"] == player_id
             and interval["start"] <= fight["startTime"] + row["timeMs"] <= interval["end"] + 250
         ]
+        distinct_related_hits = []
+        for hit in related_hits:
+            if not distinct_related_hits or hit["timeMs"] - distinct_related_hits[-1]["timeMs"] > 750:
+                distinct_related_hits.append(hit)
         carries.append({
             **player_ref(players, actor_map, player_id),
             "phase": phase,
             "startTime": fmt_ms(interval["start"] - fight["startTime"]),
             "endTime": fmt_ms(interval["end"] - fight["startTime"]),
             "durationSec": round((interval["end"] - interval["start"]) / 1000, 2),
-            "waveHitCount": len(related_hits),
+            "waveHitCount": len(distinct_related_hits),
             "earlyHatchCount": sum(row["earlyHatchConfirmed"] for row in related_hits),
             "openEnded": bool(interval.get("openEnded")),
         })
@@ -629,7 +662,7 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
                     **player_ref(players, actor_map, interval["playerID"]),
                     "time": fmt_ms(timestamp - fight["startTime"]),
                     "timeMs": timestamp - fight["startTime"],
-                    "phase": duty_phase(timestamp) or _phase_at(timestamp, rage_windows),
+                    "phase": carry_phase(timestamp),
                     "hatchTime": fmt_ms(hatch["timestamp"] - fight["startTime"]),
                     "hatchTimestamp": hatch["timestamp"],
                     "evidence": "携蛋光环移除与孵化同帧，未见浪潮或幽魂盘卷；需复核位置，不能单凭日志认定碰蛋",
@@ -637,28 +670,61 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
     collisions = []
     if possible_collision_hatches:
         position_index = _positions(raw, 'replayEvents' if raw.get('replayEvents') else 'resources')
+        viper_ids = {row['id'] for row in raw.get('actorRows') or []
+                     if row.get('gameID') == BLIGHTSCALE_VIPER_GAME_ID}
+        viper_events = defaultdict(list)
+        for stream in ('replayEvents', 'trackedActorEvents', 'resources', 'casts', 'damage',
+                       'debuffs', 'enemyBuffs', 'trackedDamageTaken'):
+            for event in raw.get(stream) or []:
+                for side in ('source', 'target'):
+                    actor_id = event.get(side + 'ID')
+                    if actor_id in viper_ids:
+                        viper_events[(actor_id, event.get(side + 'Instance') or 0)].append(
+                            (int(event.get('timestamp') or 0),
+                             event_type(event) == 'death' and side == 'target'))
+        def viper_already_hatched(timestamp):
+            for events in viper_events.values():
+                born = min((time for time, died in events if not died), default=None)
+                if born is None or born >= timestamp:
+                    continue
+                death = min((time for time, died in events if died and time >= born), default=None)
+                if death is None or death > timestamp:
+                    return True
+            return False
+        splash_by_player = defaultdict(list)
+        for event in raw.get("damage") or []:
+            if (ability_id(event) == EGG_COLLISION_SPLASH_ID
+                    and event.get("targetID") in players):
+                splash_by_player[event["targetID"]].append(int(event["timestamp"]))
         candidates = []
         for left_index, left in enumerate(possible_collision_hatches):
             left_position = _position_sample(position_index, left['playerID'],
                                              fight['startTime'] + left['timeMs'])
-            if not left_position or not left_position['reliable']:
-                continue
             for right_index in range(left_index + 1, len(possible_collision_hatches)):
                 right = possible_collision_hatches[right_index]
                 if (left['playerID'] == right['playerID'] or left['phase'] != right['phase']
                         or abs(left['timeMs'] - right['timeMs']) > 250
-                        or abs(left['hatchTimestamp'] - right['hatchTimestamp']) > 80):
+                        or abs(left['hatchTimestamp'] - right['hatchTimestamp']) > 150):
                     continue
                 right_position = _position_sample(position_index, right['playerID'],
                                                   fight['startTime'] + right['timeMs'])
-                if not right_position or not right_position['reliable']:
-                    continue
-                distance_yards = math.hypot(left_position['x'] - right_position['x'],
-                                            left_position['y'] - right_position['y']) / 100
-                if distance_yards <= 4:
-                    candidates.append((distance_yards, left_index, right_index))
+                distance_yards = (math.hypot(left_position['x'] - right_position['x'],
+                                             left_position['y'] - right_position['y']) / 100
+                                  if left_position and right_position
+                                  and left_position['reliable'] and right_position['reliable'] else None)
+                splash_pair = next(((left_ts, right_ts)
+                                    for left_ts in splash_by_player[left['playerID']]
+                                    for right_ts in splash_by_player[right['playerID']]
+                                    if abs(left_ts - left['hatchTimestamp']) <= 500
+                                    and abs(right_ts - right['hatchTimestamp']) <= 500
+                                    and abs(left_ts - right_ts) <= 100
+                                    and not viper_already_hatched(min(left_ts, right_ts))), None)
+                if splash_pair or distance_yards is not None and distance_yards <= 4:
+                    candidates.append((0 if splash_pair else 1,
+                                       distance_yards if distance_yards is not None else math.inf,
+                                       left_index, right_index, splash_pair))
         used = set()
-        for distance_yards, left_index, right_index in sorted(candidates):
+        for _, distance_yards, left_index, right_index, splash_pair in sorted(candidates):
             if left_index in used or right_index in used:
                 continue
             used.update((left_index, right_index))
@@ -668,8 +734,11 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
                                'time': left['time'], 'phase': left['phase'],
                                'players': [{key: row.get(key) for key in ('player', 'playerID', 'classColor')}
                                            for row in (left, right)],
-                               'distanceYards': round(distance_yards, 2),
-                               'evidence': '同帧携蛋光环移除与孵化，且两人可靠坐标相距不超过 4 码'})
+                               'distanceYards': round(distance_yards, 2) if math.isfinite(distance_yards) else None,
+                               'splashSpellID': EGG_COLLISION_SPLASH_ID if splash_pair else None,
+                               'splashTime': fmt_ms(min(splash_pair) - fight['startTime']) if splash_pair else None,
+                               'evidence': ('同帧携蛋光环移除与孵化，剧毒喷溅同时命中两人'
+                                            if splash_pair else '同帧携蛋光环移除与孵化，且两人可靠坐标相距不超过 4 码')})
     configured = (raw.get("analysisOptions") or {}).get("eggDutyPlayers") or []
     guild = raw.get("reportGuild") or {}
     if not configured and int(guild.get("id") or 0) == AVALON_GUILD_ID:
@@ -707,12 +776,21 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
                     for row in possible_collision_hatches) else "疑似碰蛋提前孵化")
             stolen_carries.append({**carry, "round": index, "failureKinds": failures,
                                    "earlyHatch": bool(failures)})
+    distinct_carrier_hits = []
+    for row in (hit for hit in hits if hit["eggCarrier"]):
+        previous = next((hit for hit in reversed(distinct_carrier_hits)
+                         if hit["playerID"] == row["playerID"]), None)
+        if previous and row["timeMs"] - previous["timeMs"] <= 750:
+            continue
+        distinct_carrier_hits.append(row)
+    distinct_duty_hits = [row for row in distinct_carrier_hits
+                          if duty_phase(fight["startTime"] + row["timeMs"])]
     return {
         "spellID": WAVE_ID,
         "eggAuraID": EGG_CARRY_ID, "eggAuraIDs": list(EGG_CARRY_IDS),
         "hitCount": len(hits),
         "applicationCount": len(hits),
-        "eggCarrierHitCount": sum(row["eggCarrier"] for row in hits),
+        "eggCarrierHitCount": len(distinct_carrier_hits),
         "earlyHatchCount": sum(row["earlyHatchConfirmed"] for row in hits),
         "possibleCollisionHatches": possible_collision_hatches,
         "eggCollisions": sorted(collisions, key=lambda row: row['timeMs']),
@@ -729,7 +807,7 @@ def _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows):
         "eggAssignment": {"configured": list(configured), "matchedCount": len(assigned_ids),
                            "ready": assignment_ready, "source": "avalon-default" if not (raw.get("analysisOptions") or {}).get("eggDutyPlayers") and int(guild.get("id") or 0) == AVALON_GUILD_ID else "configured" if configured else "missing"},
         "stolenCarries": stolen_carries,
-        "dutyWaveHits": [row for row in hits if row["eggCarrier"] and duty_phase(fight["startTime"] + row["timeMs"])],
+        "dutyWaveHits": distinct_duty_hits,
         "dutyPlayers": [player_ref(players, actor_map, pid) for pid in players],
     }
 
@@ -757,7 +835,8 @@ def _analyze_tether_failures(fight, actor_map, players, raw):
     start, end = int(fight["startTime"]), int(fight["endTime"])
     wretch_ids = {row["id"] for row in raw.get("actorRows") or []
                   if row.get("gameID") == BLIGHTSCALE_WRETCH_GAME_ID}
-    replay_rows = raw.get("replayEvents") or raw.get("resources") or []
+    actor_games = {row.get("id"): row.get("gameID") for row in raw.get("actorRows") or []}
+    replay_rows = (raw.get("replayEvents") or []) + (raw.get("resources") or []) + (raw.get("trackedActorEvents") or [])
     positions = _positions(raw)
     failures = []
     for cast in sorted((e for e in raw.get("casts") or []
@@ -767,6 +846,9 @@ def _analyze_tether_failures(fight, actor_map, players, raw):
         instance = cast.get("sourceInstance") or 0
         ticks = [e for e in raw.get("damage") or []
                  if ability_id(e) == TOXIC_INCUBATION_HIT_ID
+                 and (e.get("sourceID") == cast.get("sourceID")
+                      or actor_games.get(e.get("sourceID")) == actor_games.get(cast.get("sourceID"))
+                      and actor_games.get(cast.get("sourceID")) is not None)
                  and (e.get("sourceInstance") or 0) == instance
                  and ts - 100 <= int(e["timestamp"]) <= ts + 5_500
                  and players.get(e.get("targetID"), {}).get("role") == "tank"]
@@ -780,9 +862,9 @@ def _analyze_tether_failures(fight, actor_map, players, raw):
                 if side == "target" and event_type(event) == "death":
                     wretch_deaths.append(event_ts)
                 point = actor_position(event, side)
-                if point and abs(event_ts - ts) <= 3_000:
+                if point and abs(event_ts - ts) <= 5_500:
                     wretch_samples.append((abs(event_ts - ts), event.get(side + "ID"), point))
-        if not wretch_samples or end < ts + 5_500 or any(death <= ts + 5_500 for death in wretch_deaths):
+        if end < ts + 5_500 or any(death <= ts + 5_500 for death in wretch_deaths):
             continue
         if len(tick_times) >= 5:
             continue
@@ -790,6 +872,9 @@ def _analyze_tether_failures(fight, actor_map, players, raw):
         target_id, target = (None, None)
         if wretch_samples:
             _, target_id, target = min(wretch_samples, key=lambda row: row[0])
+        if target is None and cast.get("targetID") in wretch_ids:
+            target_id = cast["targetID"]
+            target = actor_position(cast, "target") or _position_sample(positions, target_id, ts)
         candidates = []
         if source and target:
             dx, dy = target["x"] - source["x"], target["y"] - source["y"]
@@ -808,6 +893,18 @@ def _analyze_tether_failures(fight, actor_map, players, raw):
         candidates.sort()
         player_id = (candidates[0][1] if candidates and candidates[0][0] <= 12
                      and (len(candidates) == 1 or candidates[1][0] - candidates[0][0] >= 3) else None)
+        attribution = "nearest-tank-to-line" if player_id else "unresolved"
+        tick_owners = Counter(event.get("targetID") for event in ticks)
+        if player_id is None and len(tick_owners) == 1:
+            player_id = next(iter(tick_owners))
+            attribution = "observed-interception-ticks"
+        if player_id is None and source:
+            distances = sorted((math.hypot(point["x"] - source["x"], point["y"] - source["y"]) / 100, pid)
+                               for pid, player in players.items() if player.get("role") == "tank"
+                               for point in [_position_sample(positions, pid, ts)] if point and point["reliable"])
+            if distances and distances[0][0] <= 30 and (len(distances) == 1 or distances[1][0] - distances[0][0] >= 5):
+                player_id = distances[0][1]
+                attribution = "nearest-tank-to-caster"
         ref = player_ref(players, actor_map, player_id) if player_id else {}
         begins = [int(e["timestamp"]) for e in raw.get("casts") or []
                   if event_type(e) == "begincast" and ability_id(e) == TOXIC_INCUBATION_CAST_ID
@@ -819,17 +916,23 @@ def _analyze_tether_failures(fight, actor_map, players, raw):
                          "targetPosition": target, "tickCount": len(tick_times),
                          "playerID": player_id, "player": ref.get("player"),
                          "classColor": ref.get("classColor"),
-                         "attribution": "nearest-tank-to-line" if player_id else "unresolved"})
+                         "attribution": attribution})
     return {"castID": TOXIC_INCUBATION_CAST_ID, "hitID": TOXIC_INCUBATION_HIT_ID,
             "expectedTicks": 5, "failureCount": len(failures), "failures": failures}
 
 
 def _clean_wave_hits(fight, players, raw, waves, tether_review):
-    cutoff = _nightly_collapse(fight, players, raw) or fight["endTime"]
-    first_failure = min((fight["startTime"] + row["timeMs"]
-                         for row in tether_review.get("failures") or []), default=cutoff)
+    cutoff = _nightly_collapse(fight, players, raw, WAVE_COUNT_DEATH_THRESHOLD) or fight["endTime"]
+    rage_windows = _rage_windows(fight, raw)
+    first_failure = {}
+    for row in tether_review.get("failures") or []:
+        timestamp = fight["startTime"] + row["timeMs"]
+        phase = _wave_exemption_phase_at(timestamp, fight, raw, rage_windows)
+        first_failure[phase] = min(first_failure.get(phase, cutoff), timestamp)
     return [row for row in waves["hits"]
-            if fight["startTime"] + row["timeMs"] < min(cutoff, first_failure)]
+            if fight["startTime"] + row["timeMs"] < min(
+                cutoff, first_failure.get(_wave_exemption_phase_at(
+                    fight["startTime"] + row["timeMs"], fight, raw, rage_windows), cutoff))]
 
 
 def _analyze_p25_eggs(fight, actor_map, players, raw):
@@ -912,7 +1015,7 @@ def _analyze_serpent_bites(fight, actor_map, players, raw):
         ),
         key=lambda row: int(row.get("timestamp") or 0),
     )
-    position_index = _positions(raw)
+    position_index = _positions(raw, 'replayEvents' if raw.get('replayEvents') else 'resources')
     rounds = []
     for index, cast in enumerate(casts, start=1):
         cast_time = int(cast["timestamp"])
@@ -985,6 +1088,96 @@ def _analyze_serpent_bites(fight, actor_map, players, raw):
             and event_type(event) in {"applydebuff", "applydebuffstack", "refreshdebuff"}
         })
         aura_participant_set = set(aura_participant_ids) | set(target_ids)
+        purge_events = [event for event in raw.get("debuffs") or []
+                        if int(ability_id(event) or 0) in {1312967, 1316356}
+                        and event_type(event) == "applydebuff"
+                        and snapshot_time - 250 <= int(event.get("timestamp") or 0) <= snapshot_time + 750]
+        purge_ids = {event.get("targetID") for event in purge_events}
+        candidate_soaks = []
+        for target in target_rows:
+            target_id = target["playerID"]
+            removal = removals[target_id]
+            settle_time = int(removal["timestamp"]) if removal else snapshot_time
+            # Each mark has its own seven-yard soak at resolution. The marked
+            # player anchors the circle but cannot help soak their own mark.
+            participant_ids = set()
+            unplaced_ids = set()
+            distances = {}
+            target_position = _position_sample(position_index, target_id, settle_time)
+            living_at_settle = _living_player_ids(players, raw, settle_time)
+            if target_position and target_position["reliable"]:
+                for player_id in living_at_settle - {target_id}:
+                    position = _position_sample(position_index, player_id, settle_time)
+                    if position and position["reliable"]:
+                        distance = math.hypot(position["x"] - target_position["x"],
+                                              position["y"] - target_position["y"])
+                        distances[player_id] = distance
+                        if distance <= SERPENT_BITE_RADIUS_YARDS * 100:
+                            participant_ids.add(player_id)
+            for event in raw.get("debuffs") or []:
+                player_id = event.get("targetID")
+                event_time = int(event.get("timestamp") or 0)
+                if (ability_id(event) != INGESTED_VENOM_ID or player_id not in living_at_settle
+                        or not cast_time <= event_time <= settle_time + 500
+                        or event_type(event) not in {"applydebuff", "applydebuffstack", "refreshdebuff"}):
+                    continue
+                if player_id == target_id:
+                    continue
+                participant_position = _position_sample(position_index, player_id, event_time)
+                target_position = _position_sample(position_index, target_id, event_time)
+                if not participant_position or not target_position or not participant_position["reliable"] or not target_position["reliable"]:
+                    unplaced_ids.add(player_id)
+                    continue
+                if math.hypot(participant_position["x"] - target_position["x"],
+                              participant_position["y"] - target_position["y"]) <= SERPENT_BITE_RADIUS_YARDS * 100:
+                    participant_ids.add(player_id)
+            # The purge is applied just after the soak resolves. A participant
+            # may already have moved out by the target aura removal timestamp.
+            for player_id in (purge_ids | set(aura_participant_ids)) & living_at_settle - {target_id}:
+                if player_id in participant_ids:
+                    continue
+                for offset in (0, 500, 1000, 1500):
+                    sample_time = settle_time - offset
+                    player_position = _position_sample(position_index, player_id, sample_time)
+                    mark_position = _position_sample(position_index, target_id, sample_time)
+                    if not player_position or not mark_position or not player_position["reliable"] or not mark_position["reliable"]:
+                        unplaced_ids.add(player_id)
+                        continue
+                    distance = math.hypot(player_position["x"] - mark_position["x"],
+                                          player_position["y"] - mark_position["y"])
+                    distances[player_id] = min(distances.get(player_id, float("inf")), distance)
+                    if distance <= SERPENT_BITE_RADIUS_YARDS * 100:
+                        participant_ids.add(player_id)
+                        break
+            candidate_soaks.append((target, settle_time, participant_ids, unplaced_ids, distances))
+
+        # When the two circles are apart, one player cannot fill both soaks.
+        if len(candidate_soaks) == 2:
+            first, second = candidate_soaks
+            first_position = _position_sample(position_index, first[0]["playerID"], first[1])
+            second_position = _position_sample(position_index, second[0]["playerID"], second[1])
+            if (first_position and second_position and first_position["reliable"] and second_position["reliable"]
+                    and math.hypot(first_position["x"] - second_position["x"],
+                                   first_position["y"] - second_position["y"]) > 2 * SERPENT_BITE_RADIUS_YARDS * 100):
+                for player_id in first[2] & second[2]:
+                    farther = first if first[4].get(player_id, float("inf")) > second[4].get(player_id, float("inf")) else second
+                    farther[2].discard(player_id)
+
+        soak_rows = []
+        for target, settle_time, participant_ids, unplaced_ids, _ in candidate_soaks:
+            unknown_helpers = unplaced_ids - participant_ids
+            soak_purge_ids = participant_ids & purge_ids
+            resolution = ("calcified_corpse" if target["resolution"] == "calcified_corpse"
+                          else "volatile_purge" if soak_purge_ids else target["resolution"])
+            target["resolution"] = resolution
+            soak_rows.append({"target": target, "time": fmt_ms(settle_time - fight["startTime"]),
+                              "resolution": resolution,
+                              "participants": [player_ref(players, actor_map, pid) for pid in sorted(participant_ids)],
+                              "purgeRecipients": [player_ref(players, actor_map, pid) for pid in sorted(soak_purge_ids)],
+                              "helperCount": len(participant_ids), "minimumHelpers": 5,
+                              "enoughHelpers": len(participant_ids) >= 5,
+                              "insufficientHelpers": len(participant_ids) + len(unknown_helpers) < 5,
+                              "positionUnknown": [player_ref(players, actor_map, pid) for pid in sorted(unknown_helpers)]})
         participants = []
         non_participants = []
         position_unknown = []
@@ -1014,6 +1207,7 @@ def _analyze_serpent_bites(fight, actor_map, players, raw):
             "snapshotTime": fmt_ms(snapshot_time - fight["startTime"]),
             "radiusYards": SERPENT_BITE_RADIUS_YARDS,
             "targets": target_rows,
+            "soaks": soak_rows,
             "participants": participants,
             "participantCount": len(participants),
             "nonParticipants": non_participants,
@@ -1458,38 +1652,55 @@ def _analyze_fangs(fight, actor_map, players, raw, safe_stacks=3):
             apply_groups.append({"timestamp": timestamp, "events": []})
         apply_groups[-1]["events"].append(event)
     warden_casts = sorted(completed_casts(raw.get("casts") or [], 1301117), key=lambda row: int(row["timestamp"]))
-    matched_casts = []
-    for group in apply_groups:
-        cast = min(
-            (
-                row for row in warden_casts
-                if abs(int(row.get("timestamp") or 0) - group["timestamp"]) <= 500
-            ),
-            key=lambda row: abs(int(row.get("timestamp") or 0) - group["timestamp"]),
-            default=None,
-        )
-        matched_casts.append(cast)
     boss_position_index = _positions(raw, 'bossPositionEvents')
     boss_id = raw.get("bossID")
     boss_position_rows = boss_position_index.get(boss_id) or []
     boss_spawn = boss_position_rows[0] if boss_position_rows else None
     boss_boundary_x = float(boss_spawn["x"]) if boss_spawn else None
-    cast_positions = [float(row["x"]) for row in matched_casts if row and row.get("x") is not None]
+    position_index = _positions(raw, 'replayEvents' if raw.get('replayEvents') else 'resources')
+    cast_positions = [float(row["x"]) for row in warden_casts if row.get("x") is not None]
+    def side_from_x(x):
+        return "左场" if float(x) < (boss_boundary_x if boss_boundary_x is not None else 0) else "右场"
+    side_groups = []
     for index, group in enumerate(apply_groups):
-        cast = matched_casts[index]
+        nearby_casts = [row for row in warden_casts
+                        if abs(int(row.get("timestamp") or 0) - group["timestamp"]) <= 500]
+        cast = min(nearby_casts,
+                   key=lambda row: abs(int(row["timestamp"]) - group["timestamp"]), default=None)
         if cast and cast.get("x") is not None and boss_boundary_x is not None:
-            side = "左场" if float(cast["x"]) < boss_boundary_x else "右场"
-            side_source = "boss-initial-boundary"
+            fallback_side, fallback_source = side_from_x(cast["x"]), "boss-initial-boundary"
         elif cast and cast.get("x") is not None and len(cast_positions) >= 2:
-            side = "左场" if float(cast["x"]) == min(cast_positions) else "右场"
-            side_source = "warden-relative-fallback"
+            fallback_side = "左场" if float(cast["x"]) == min(cast_positions) else "右场"
+            fallback_source = "warden-relative-fallback"
         else:
-            side = "先施加场" if index == 0 else ("后施加场" if index == 1 else f"第 {index + 1} 场")
-            side_source = "application-order-fallback"
-        group["side"] = side
-        group["sideSource"] = side_source
-        group["wardenInstance"] = cast.get("sourceInstance") if cast else None
-        group["positionX"] = float(cast["x"]) if cast and cast.get("x") is not None else None
+            fallback_side = "先施加场" if index == 0 else ("后施加场" if index == 1 else f"第 {index + 1} 场")
+            fallback_source = "application-order-fallback"
+        buckets = {}
+        for event in group["events"]:
+            position = actor_position(event, "target")
+            if position is None:
+                sample = _position_sample(position_index, event.get("targetID"), group["timestamp"])
+                # A late position sample still identifies the half when it is
+                # well inside that platform; keep the cast fallback near mid.
+                position = sample if sample and (sample["reliable"] or
+                    abs(float(sample["x"]) - (boss_boundary_x or 0)) > 3_500) else None
+            side = side_from_x(position["x"]) if position else fallback_side
+            bucket = buckets.setdefault(side, {"timestamp": group["timestamp"], "events": [],
+                                              "side": side, "positionSources": set()})
+            bucket["events"].append(event)
+            bucket["positionSources"].add("player-application-position" if position else fallback_source)
+        for bucket in buckets.values():
+            side_cast = min((row for row in nearby_casts if row.get("x") is not None
+                             and side_from_x(row["x"]) == bucket["side"]),
+                            key=lambda row: abs(int(row["timestamp"]) - group["timestamp"]), default=None)
+            if side_cast is None and cast and bucket["side"] == fallback_side:
+                side_cast = cast
+            sources = bucket.pop("positionSources")
+            bucket["sideSource"] = next(iter(sources)) if len(sources) == 1 else "mixed-position-evidence"
+            bucket["wardenInstance"] = side_cast.get("sourceInstance") if side_cast else None
+            bucket["positionX"] = float(side_cast["x"]) if side_cast and side_cast.get("x") is not None else None
+            side_groups.append(bucket)
+    apply_groups = sorted(side_groups, key=lambda group: (group["timestamp"], group["side"]))
     side_by_player = {
         event.get("targetID"): group["side"]
         for group in apply_groups
@@ -1924,7 +2135,7 @@ def _analyze_critical(fight, actor_map, players, raw):
     return result
 
 
-def _nightly_collapse(fight, players, raw):
+def _nightly_collapse(fight, players, raw, threshold=8):
     changes = [e for e in raw.get("deaths", []) if event_type(e) == "death"]
     changes += [e for e in raw.get("friendlyCasts", []) + raw.get("trackedActorEvents", []) if event_type(e) == "resurrect"]
     dead = set()
@@ -1936,7 +2147,7 @@ def _nightly_collapse(fight, players, raw):
             dead.add(pid)
         else:
             dead.discard(pid)
-        if len(dead) >= 8:
+        if len(dead) >= threshold:
             return int(e["timestamp"])
     return None
 
@@ -2103,17 +2314,28 @@ def _replay_effects(fight, players, raw, changes):
                       and r.get('sourceInstance') == e.get('sourceInstance')
                       and int(e['timestamp'])-10000 <= int(r['timestamp']) <= int(e['timestamp'])]
         return int(candidates[-1]['timestamp']) if candidates else int(e['timestamp'])-fallback
-    def fixed_wrath_point(boss_position):
+    def wrath_platform(boss_position):
         if not boss_position:
             return None
         center = REPLAY_MAPS['platform']
         dx, dy = boss_position['x']-center['centerX'], boss_position['y']-center['centerY']
-        # User-marked left platform point, mirrored onto whichever side holds
-        # the Boss. The impact is a platform landmark, never a hit player's spot.
-        offset = 3_100
-        return ({'x': center['centerX']+(offset if dx > 0 else -offset), 'y': center['centerY']}
-                if abs(dx) >= abs(dy) else
-                {'x': center['centerX'], 'y': center['centerY']+(offset if dy > 0 else -offset)})
+        if abs(dx) > 2_000 and abs(dy) > 2_000:
+            return ('corner', 1 if dx > 0 else -1, 1 if dy > 0 else -1)
+        return ('side', 'x' if abs(dx) >= abs(dy) else 'y',
+                1 if (dx if abs(dx) >= abs(dy) else dy) > 0 else -1)
+    def wrath_floor_fallback(platform):
+        if not platform:
+            return None
+        center = REPLAY_MAPS['platform']
+        # A fallback only: the tank's observed successful interception is the
+        # actual reference, not the decorative corner of the inner floor.
+        offset = 2_800
+        if platform[0] == 'corner':
+            return {'x': center['centerX'] + platform[1]*offset,
+                    'y': center['centerY'] + platform[2]*offset}
+        return ({'x': center['centerX'] + platform[2]*offset, 'y': center['centerY']}
+                if platform[1] == 'x' else
+                {'x': center['centerX'], 'y': center['centerY'] + platform[2]*offset})
     def boss_front(event, ts):
         origin = actor_position(event, 'source') or point(event.get('sourceID'), ts)
         if not origin:
@@ -2132,6 +2354,40 @@ def _replay_effects(fight, players, raw, changes):
                 'y': origin['y'] - 300 * math.sin(radians)}
     circles, channels, npc_casts, cones, lost_platforms = [], [], [], [], []
     damage = raw.get('damage') or []
+    wrath_casts = [e for e in casts if event_type(e) == 'cast' and ability_id(e) == 1298367]
+    wrath_anchors = {}
+    for index, wrath in enumerate(wrath_casts):
+        ts = int(wrath['timestamp'])
+        next_cast = int(wrath_casts[index+1]['timestamp']) if index+1 < len(wrath_casts) else end
+        hits = sorted((hit for hit in damage
+                       if ability_id(hit) in {1298369, 1301122}
+                       and hit.get('sourceID') == wrath.get('sourceID')
+                       and hit.get('targetID') in players and _amount(hit) > 0
+                       and ts <= int(hit['timestamp']) < min(ts+5_000, next_cast)),
+                      key=lambda hit: int(hit['timestamp']))
+        hit_players = {hit['targetID'] for hit in hits}
+        # Three distinct damaged players is the raid-wide failure threshold.
+        # A stray second recipient does not invalidate the main tank's soak.
+        if not hit_players or len(hit_players) >= 3:
+            continue
+        tank_id = max(hit_players, key=lambda pid: (sum(hit['targetID'] == pid for hit in hits),
+                                                   pid == wrath.get('targetID')))
+        tank_hits = [hit for hit in hits if hit['targetID'] == tank_id]
+        if len(tank_hits) < 3:
+            continue
+        # Use the later strikes so the opening knockback cannot move the
+        # fixed circle away from the tank's successful interception point.
+        tank_points = [actor_position(hit, 'target') or point(tank_id, int(hit['timestamp']))
+                       for hit in tank_hits[-5:]]
+        tank_points = [p for p in tank_points if p]
+        boss_position = point(wrath.get('sourceID'), cast_start(wrath, 5_000), before_only=True) or actor_position(wrath, 'source')
+        platform = wrath_platform(boss_position)
+        if platform and len(tank_points) >= 3:
+            wrath_anchors.setdefault(platform, []).append({'x': median(p['x'] for p in tank_points),
+                                                            'y': median(p['y'] for p in tank_points)})
+    wrath_anchors = {platform: {'x': median(p['x'] for p in points),
+                                'y': median(p['y'] for p in points)}
+                     for platform, points in wrath_anchors.items()}
     for e in casts:
         if event_type(e) != 'cast':
             continue
@@ -2145,19 +2401,23 @@ def _replay_effects(fight, players, raw, changes):
         if sid == 1298367:
             ticks = sorted({int(r['timestamp']) for r in damage if ability_id(r) in {1298369, 1301122}
                             and r.get('sourceID') == e.get('sourceID') and ts <= int(r['timestamp']) < ts+5000})
-            receiver = fixed_wrath_point(origin)
-            # The soak stays at the platform-side landmark through knockback.
+            wrath_start = cast_start(e, 5000)
+            platform = wrath_platform(point(e.get('sourceID'), wrath_start, before_only=True) or origin)
+            receiver = wrath_anchors.get(platform) or wrath_floor_fallback(platform)
+            # One successful tank interception calibrates every cast on this
+            # platform, including a later cast that spread to the whole raid.
             if receiver:
                 circles.append({'kind': 'wrath', 'sourceID': e.get('sourceID'), 'playerID': e.get('targetID'),
-                    'startTimeMs': cast_start(e, 5000)-start, 'impactTimeMs': ts-start,
+                    'startTimeMs': wrath_start-start, 'impactTimeMs': ts-start,
                     'endTimeMs': (ticks[-1]+150 if ticks else ts+1000)-start,
-                    'position': receiver, 'positionEvidence': 'user-marked-platform-side',
+                    'position': receiver, 'positionEvidence': ('successful-tank-interception'
+                        if platform in wrath_anchors else 'floor-landmark-fallback'),
                     'radiusYards': MOTHER_WRATH_RADIUS_YARDS,
                     'tickTimesMs': [t-start for t in ticks]})
             channels.append({'actorID': e.get('sourceID'), 'spellID': sid, 'spellName': '蛇母之怒',
                 'startTimeMs': ts-start, 'endTimeMs': (ticks[-1]+150 if ticks else ts+1000)-start,
                 'phase': 'channel', 'outcome': 'completed'})
-            changes.append({'kind': 'wrath', 'label': '蛇母之怒', 'timeMs': cast_start(e, 5000)-start})
+            changes.append({'kind': 'wrath', 'label': '蛇母之怒', 'timeMs': wrath_start-start})
         if sid == 1315341:
             before = cast_start(e, 10000)
             # Snapshot the Boss before Circling Prey, never the escaping raid.
@@ -2826,6 +3086,38 @@ def _replay_feedback(fight, players, raw, tether_review=None):
             'leakTethers': leak_tethers}
 
 
+def _p1_wretch_focus(fight, actor_map, players, raw, rage_windows):
+    p1_end = rage_windows[0]["start"] if rage_windows else fight["endTime"]
+    actors = {row.get("id"): row for row in raw.get("actorRows") or []}
+    counts = defaultdict(lambda: Counter())
+    for event in raw.get("friendlyCasts") or []:
+        if event_type(event) != "cast" or event.get("fake") or event.get("sourceID") not in players:
+            continue
+        if not fight["startTime"] <= int(event.get("timestamp") or 0) < p1_end:
+            continue
+        target = actors.get(event.get("targetID")) or {}
+        target_game = target.get("gameID")
+        if target.get("type") != "NPC" or not target_game:
+            continue
+        counts[event["sourceID"]][int(target_game)] += 1
+    rows = []
+    for player_id in players:
+        targets = counts[player_id]
+        rows.append({**player_ref(players, actor_map, player_id),
+                     "wretchCastCount": targets[BLIGHTSCALE_WRETCH_GAME_ID],
+                     "otherTargetCastCount": sum(count for game_id, count in targets.items()
+                                                 if game_id != BLIGHTSCALE_WRETCH_GAME_ID),
+                     "otherTargets": [{"gameID": game_id,
+                                       "name": next((actor.get("name") for actor in actors.values()
+                                                     if actor.get("gameID") == game_id), str(game_id)),
+                                       "castCount": count}
+                                      for game_id, count in sorted(targets.items())
+                                      if game_id != BLIGHTSCALE_WRETCH_GAME_ID]})
+    return {"targetGameID": BLIGHTSCALE_WRETCH_GAME_ID,
+            "p1EndTime": fmt_ms(p1_end - fight["startTime"]), "players": rows,
+            "targetedCastCount": sum(row["wretchCastCount"] for row in rows)}
+
+
 def analyze_ulatek(fight, actor_map, players, raw):
     options = resolve_analysis_options(CONFIG_SCHEMA, raw.get("analysisOptions") or {})
     rage_windows = _rage_windows(fight, raw)
@@ -2833,6 +3125,38 @@ def analyze_ulatek(fight, actor_map, players, raw):
     waves = _analyze_waves_and_eggs(fight, actor_map, players, raw, rage_windows) if options["wavesReviewEnabled"] else {}
     if waves:
         waves["p3Eggs"] = _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows)
+        wave_cutoff = _nightly_collapse(fight, players, raw, WAVE_COUNT_DEATH_THRESHOLD)
+        waves["countingDeathThreshold"] = WAVE_COUNT_DEATH_THRESHOLD
+        waves["countingCutoffMs"] = wave_cutoff - fight["startTime"] if wave_cutoff is not None else None
+        waves["countingHits"] = [row for row in waves["hits"]
+                                 if wave_cutoff is None or fight["startTime"] + row["timeMs"] < wave_cutoff]
+        waves["countingDutyWaveHits"] = [row for row in waves["dutyWaveHits"]
+                                         if wave_cutoff is None or fight["startTime"] + row["timeMs"] < wave_cutoff]
+        spine_first = {}
+        for event in raw.get("debuffs") or []:
+            if (ability_id(event) == PETRIFYING_SPINE_MARK_ID
+                    and event_type(event) in {"applydebuff", "refreshdebuff"}
+                    and event.get("targetID") in players):
+                player_id = event["targetID"]
+                timestamp = int(event["timestamp"])
+                key = (_wave_exemption_phase_at(timestamp, fight, raw, rage_windows), player_id)
+                spine_first[key] = min(spine_first.get(key, fight["endTime"]), timestamp)
+        leak_first = {}
+        for row in tether_review.get("failures") or []:
+            timestamp = fight["startTime"] + row["timeMs"]
+            phase = _wave_exemption_phase_at(timestamp, fight, raw, rage_windows)
+            leak_first[phase] = min(leak_first.get(phase, fight["endTime"]), timestamp)
+        waves["waveExclusions"] = []
+        for hit in waves["countingHits"]:
+            timestamp = fight["startTime"] + hit["timeMs"]
+            phase = _wave_exemption_phase_at(timestamp, fight, raw, rage_windows)
+            reasons = []
+            if spine_first.get((phase, hit["playerID"]), fight["endTime"]) < timestamp:
+                reasons.append("此前获得石化钉刺预兆")
+            if leak_first.get(phase, fight["endTime"]) < timestamp:
+                reasons.append("此前坦克漏线")
+            if reasons:
+                waves["waveExclusions"].append({**hit, "reason": "、".join(reasons)})
         if options["cleanWaveReviewEnabled"]:
             waves["cleanWaveHits"] = _clean_wave_hits(fight, players, raw, waves, tether_review)
     result = {
@@ -2842,6 +3166,7 @@ def analyze_ulatek(fight, actor_map, players, raw):
         "mythicWretch": _analyze_mythic_wretch(fight, actor_map, players, raw) if options["wavesReviewEnabled"] else {},
         "rage": _analyze_rage(fight, actor_map, players, raw, rage_windows) if options["rageReviewEnabled"] else {},
         "fangs": _analyze_fangs(fight, actor_map, players, raw, options["fangSafeStacks"]) if options["fangsReviewEnabled"] else {},
+        "p1WretchFocus": _p1_wretch_focus(fight, actor_map, players, raw, rage_windows),
         "critical": _analyze_critical(fight, actor_map, players, raw) if options["criticalReviewEnabled"] else {},
     }
     if options['fullReplayEnabled'] and not raw.get('_nightlyPass'):
@@ -2869,6 +3194,7 @@ def _mechanic_overview(rendered):
     clean_wave_hits = []
     clean_wave_enabled = False
     egg_hits = []
+    wave_exclusions = []
     egg_duties, egg_roster = [], {}
     egg_steals, tank_failures = [], []
     p1_wave_deaths = []
@@ -2903,7 +3229,8 @@ def _mechanic_overview(rendered):
                 pull, row["time"],
                 f"{row['phase']} 阶段，{left['player']} 和 {right['player']} 撞蛋",
                 phase=row["phase"], players=row["players"],
-                distanceYards=row["distanceYards"], spellID=EGG_CARRY_ID))
+                distanceYards=row["distanceYards"], splashTime=row.get("splashTime"),
+                evidence=row["evidence"], spellID=EGG_COLLISION_SPLASH_ID if row.get("splashSpellID") else EGG_CARRY_ID))
         for row in (mechanics.get("tankInterception") or {}).get("failures") or []:
             tank_failures.append(nightly_detail(pull, row["time"],
                 f"{row.get('player') or '责任坦克未确定'}：毒性孵化接线不足 {row['tickCount']}/5 跳",
@@ -2915,16 +3242,20 @@ def _mechanic_overview(rendered):
         for row in waves.get("dutyCarries", []):
             egg_duties.append(nightly_detail(pull, row["time"], f"{row['player']}：{row['phase']} 领取蛇卵", player=row["player"],
                                              playerID=row["playerID"], classColor=row.get("classColor"), phase=row["phase"], spellID=EGG_CARRY_ID))
-        for row in waves.get("dutyWaveHits", []):
-            egg_hits.append(nightly_detail(pull, row["time"], f"{row['player']}：携带蛇卵命中腐蚀浪潮（P1/P2.5）",
+        for row in waves.get("countingDutyWaveHits", waves.get("dutyWaveHits", [])):
+            egg_hits.append(nightly_detail(pull, row["time"], f"{row['player']}：P1 搬蛋期间命中腐蚀浪潮",
                                            player=row["player"], classColor=row.get("classColor"), spellID=WAVE_ID))
+        for row in waves.get("waveExclusions") or []:
+            wave_exclusions.append(nightly_detail(pull, row["time"],
+                f"{row['player']}：中波可排除（{row['reason']}）",
+                player=row["player"], classColor=row.get("classColor"), reason=row["reason"]))
         egg_review = (mechanics.get("critical") or {}).get("p25Eggs") or {}
         for row in egg_review.get("deaths", []):
             p25_egg_deaths.append(nightly_detail(
                 pull, row["time"], f"{row['player']}：P2.5 连续分摊期间带蛋死亡",
                 player=row["player"], playerID=row["playerID"], classColor=row.get("classColor"),
                 spellID=EGG_CARRY_ID, isPlayerMistake=False))
-        for row in (mechanics.get("wavesAndEggs") or {}).get("hits") or []:
+        for row in (mechanics.get("wavesAndEggs") or {}).get("countingHits", waves.get("hits", [])):
             event = nightly_detail(
                 pull,
                 row.get("time"),
@@ -3016,11 +3347,13 @@ def _mechanic_overview(rendered):
     carry_totals = {row["player"]: row["count"] for row in nightly_player_totals(egg_duties)}
     hit_totals = {row["player"]: row["count"] for row in nightly_player_totals(egg_hits)}
     all_wave_totals = {row["player"]: row["count"] for row in nightly_player_totals(wave_hits)}
+    exclusion_totals = {row["player"]: row["count"] for row in nightly_player_totals(wave_exclusions)}
     egg_players = []
     for name, player in egg_roster.items():
         carries, hits = carry_totals.get(name, 0), hit_totals.get(name, 0)
         egg_players.append({**player, "count": hits, "carryCount": carries, "waveHitCount": hits,
                             "totalWaveHitCount": all_wave_totals.get(name, 0),
+                            "excludableCount": exclusion_totals.get(name, 0),
                             "dutyFilterEligible": player.get("role") in {"melee-dps", "range-dps", "ranged-dps", "dps"}})
     egg_players.sort(key=lambda row: (-row["carryCount"], -row["waveHitCount"], row["player"]))
     stolen_players = nightly_player_totals(egg_steals)
@@ -3041,17 +3374,17 @@ def _mechanic_overview(rendered):
                                 {"key": "failedCount", "label": "同时提前孵化"}],
              "players": stolen_players, "events": egg_steals, "detailTab": "waves"},
             {"key": "tankTetherFailures", "label": "毒性孵化漏接", "value": len(tank_failures), "unit": "次",
-             "tone": "danger", "description": "虚影完成施法后有足够观察时间、畸体存活，但未记录满 5 跳坦克接线；责任坦克仅在位置证据可区分时列出。",
+             "tone": "danger", "description": "虚影完成施法且有足够观察时间，但未记录满 5 跳坦克接线；优先按实际承接跳数归责，零跳时仅在坦克位置明显可区分时推定。",
              "players": nightly_player_totals(tank_failures), "events": tank_failures,
              "detailTab": "waves"},
             *([{"key": "cleanWaveHits", "label": "有效中波受击", "value": len(clean_wave_hits), "unit": "次",
-                "tone": "warning", "description": "仅统计首次可确认漏接之前、且团队死亡人数未达到 8 人时的受击；供复盘，不直接判责。",
+                "tone": "warning", "description": "仅统计同阶段首次可确认漏接之前、且团队同时死亡人数未达到 2 人时的受击；跨阶段重新计算漏接豁免。",
                 "players": nightly_player_totals(clean_wave_hits), "events": clean_wave_hits,
                 "detailTab": "waves"}] if clean_wave_enabled else []),
             {"key": "p25EggDeaths", "label": "P2.5 带蛋死亡", "value": len(p25_egg_deaths), "unit": "人次",
              "tone": "warning", "players": nightly_player_totals(p25_egg_deaths), "events": p25_egg_deaths},
             {"key": "eggCollisions", "label": "撞蛋", "value": len(egg_collisions), "unit": "次",
-             "tone": "danger", "description": "仅统计两名玩家同帧失去携蛋、出现孵化，且可靠坐标相距不超过 4 码的配对。",
+             "tone": "danger", "description": "两名玩家同帧失去携蛋并出现孵化；没有已孵化蝰蛇时，剧毒喷溅同帧命中双方可确认撞蛋，可靠坐标相距不超过 4 码也可确认。P2 同样适用，事件列出双方姓名。",
              "events": egg_collisions, "detailTab": "waves"},
             {
                 "key": "waveHits",
@@ -3082,18 +3415,18 @@ def _mechanic_overview(rendered):
             },
             {
                 "key": "eggCarrierWaveHits",
-                "label": "带蛋任务与中波（P1 / P2.5）",
+                "label": "P1 搬蛋任务与中波",
                 "value": len(egg_hits),
                 "unit": "次",
                 "tone": "danger",
-                "description": f"今晚共带蛋 {len(egg_duties)} 次。只统计 P1 与 P2.5；每次独立获取带蛋光环计一次，刷新不重复计数。包含零带蛋玩家，中波次数为实际命中次数。",
+                "description": f"今晚共带蛋 {len(egg_duties)} 次。中波在团队同时死亡达到 {WAVE_COUNT_DEATH_THRESHOLD} 人时停止计数；同一玩家 750 毫秒内的带蛋中波合并一次。石化钉刺预兆或团队漏线只影响同阶段后续中波的可排除次数。",
                 "carryCount": len(egg_duties),
-                "summaryColumns": [{"key": "carryCount", "label": "搬蛋次数"}, {"key": "totalWaveHitCount", "label": "总中波次数"}, {"key": "waveHitCount", "label": "期间中波次数"}],
+                "summaryColumns": [{"key": "carryCount", "label": "搬蛋次数"}, {"key": "totalWaveHitCount", "label": "总中波次数"}, {"key": "waveHitCount", "label": "期间中波次数"}, {"key": "excludableCount", "label": "可排除次数"}],
                 "summaryFilter": {"key": "carryCount", "label": "仅显示搬蛋次数少于", "defaultThreshold": 10,
                                   "totalKey": "totalWaveHitCount", "totalLabel": "总中波次数",
                                   "eligibilityKey": "dutyFilterEligible", "description": "仅统计输出玩家，排除治疗和坦克。"},
                 "players": egg_players,
-                "events": egg_hits + egg_duties,
+                "events": egg_hits + egg_duties + wave_exclusions,
             },
             {
                 "key": "wrongFangBreaks",
@@ -3166,7 +3499,7 @@ def build_aggregated_json(report_ids, options=None):
         config["trackedDamageTargetGameIDs"].update({ULATEK_GAME_ID, HEART_GAME_ID})
     if options["wavesReviewEnabled"]:
         config["trackedDamageTargetGameIDs"].add(DEVOURERS_SPAWN_GAME_ID)
-    config["trackedActorGameIDs"] = {BLIGHTSCALE_SHRIEKER_GAME_ID} if options["wavesReviewEnabled"] else set()
+    config["trackedActorGameIDs"] = {BLIGHTSCALE_SHRIEKER_GAME_ID, BLIGHTSCALE_VIPER_GAME_ID} if options["wavesReviewEnabled"] else set()
     critical = lambda key: _critical_enabled(options, key)
     spatial = options["wavesReviewEnabled"] or options["fangsReviewEnabled"] or critical("serpentBitesReviewEnabled")
     config["fetchPositionResources"] = spatial
@@ -3194,6 +3527,8 @@ def build_aggregated_json(report_ids, options=None):
     config["trackedActorEventFilters"] = ['type = "resurrect"'] if has_analysis else []
     if options["wavesReviewEnabled"]:
         config["trackedActorEventFilters"].append(f"source.id = {BLIGHTSCALE_SHRIEKER_GAME_ID}")
+        config["trackedActorEventFilters"].append(
+            f"(source.id = {BLIGHTSCALE_VIPER_GAME_ID} OR target.id = {BLIGHTSCALE_VIPER_GAME_ID})")
     if not {"casts", "enemyBuffs"}.issubset(config["fetchKeys"]):
         config["trackedActorEventFilters"].append(
             '(ability.id = 1286860 OR ability.id = 1299010 OR ability.id = 1295905 OR ability.id = 1315341) '

@@ -13,14 +13,14 @@ def test_wrath_fixed_circle_nine_observed_ticks_and_fury_channel():
     raw = {'bossID': 9, 'casts': [event(1000, 'begincast', 1298367),
         event(6000, 'cast', 1298367, targetID=1, resourceActor=1, x=0, y=158367)],
         'damage': [event(6300+i*333, 'damage', 1298369, targetID=1,
-                         resourceActor=2, x=0, y=500+i*10, amount=10) for i in range(9)],
+                         resourceActor=2, x=0, y=158167, amount=10) for i in range(9)],
         'enemyBuffs': [event(10000, 'applybuff', u.RAGE_ID), event(30000, 'removebuff', u.RAGE_ID)],
         'resources': [], 'debuffs': []}
     changes = []
     scene = u._replay_effects({'startTime': 0, 'endTime': 40000}, {1: {}}, raw, changes)
     circle = scene['circles'][0]
-    assert (circle['position']['x'], circle['position']['y']) == (0, 158467)
-    assert circle['positionEvidence'] == 'user-marked-platform-side'
+    assert (circle['position']['x'], circle['position']['y']) == (0, 158167)
+    assert circle['positionEvidence'] == 'successful-tank-interception'
     assert len(circle['tickTimesMs']) == 9
     assert circle['radiusYards'] == 3
     assert circle['endTimeMs'] == 6300+8*333+150
@@ -28,16 +28,36 @@ def test_wrath_fixed_circle_nine_observed_ticks_and_fury_channel():
     assert fury['endTimeMs']-fury['startTimeMs'] == 20000
 
 
-@pytest.mark.parametrize('boss_xy,expected', [((-3000, 155367), (-3100, 155367)),
-                                                  ((3000, 155367), (3100, 155367)),
-                                                  ((0, 158367), (0, 158467)),
-                                                  ((0, 152367), (0, 152267))])
+@pytest.mark.parametrize('boss_xy,expected', [((-3000, 155367), (-2800, 155367)),
+                                                  ((3000, 155367), (2800, 155367)),
+                                                  ((0, 158367), (0, 158167)),
+                                                  ((0, 152367), (0, 152567))])
 def test_wrath_uses_platform_side_independent_of_tank_position(boss_xy, expected):
     raw = {'enemyBuffs': [], 'resources': [], 'damage': [],
            'casts': [event(1000, 'cast', 1298367, targetID=1, resourceActor=1,
                            x=boss_xy[0], y=boss_xy[1])]}
     scene = u._replay_effects({'startTime': 0, 'endTime': 5000}, {1: {}}, raw, [])
     assert tuple(scene['circles'][0]['position'].values()) == expected
+
+
+def test_successful_tank_interception_calibrates_later_failed_cast_on_same_platform():
+    casts = [event(1000, 'begincast', 1298367, resourceActor=1, x=3300, y=152100),
+             event(6000, 'cast', 1298367, resourceActor=1, x=3300, y=152100),
+             event(11000, 'begincast', 1298367, resourceActor=1, x=3300, y=152100),
+             event(16000, 'cast', 1298367, resourceActor=1, x=3300, y=152100)]
+    damage = [event(6300+i*333, 'damage', 1298369, targetID=1, amount=10,
+                    resourceActor=2, x=4100 if i < 4 else 2850, y=152500)
+              for i in range(9)]
+    damage.append(event(7500, 'damage', 1298369, targetID=2, amount=10))
+    damage += [event(16300, 'damage', 1298369, targetID=i, amount=10)
+               for i in (1, 2, 3)]
+    raw = {'casts': casts, 'damage': damage, 'resources': [], 'enemyBuffs': []}
+    scene = u._replay_effects({'startTime': 0, 'endTime': 30000},
+                              {i: {} for i in (1, 2, 3)}, raw, [])
+    assert [c['position'] for c in scene['circles'] if c['kind'] == 'wrath'] == [
+        {'x': 2850, 'y': 152500}, {'x': 2850, 'y': 152500}]
+    assert all(c['positionEvidence'] == 'successful-tank-interception'
+               for c in scene['circles'] if c['kind'] == 'wrath')
 
 
 def test_unbridled_hit_stays_at_boss_front_after_player_knockback():

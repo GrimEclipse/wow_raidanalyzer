@@ -55,7 +55,7 @@
 <main class="shell">
   <section class="brand" aria-labelledby="hero-title">
     <img src="/frontend/assets/theme/emblem-256.webp" alt="" width="96" height="96"><h1 id="hero-title">开荒工具包</h1><p class="brand-sub">Mythic Analyzer</p>
-    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v2.0.0 更新公告">v2.0.0</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈问题</a></div>
+    <div class="brand-meta"><span>edit by 爬爬</span><button id="versionButton" class="version" type="button" aria-label="查看 v2.0.1 更新公告">v2.0.1</button><a class="version" href="https://github.com/GrimEclipse/wow_raidanalyzer/issues/new" target="_blank" rel="noreferrer">反馈问题</a></div>
   </section>
 
   <section class="card" aria-labelledby="auth-title">
@@ -85,12 +85,12 @@
 <div id="releaseNotice" class="notice-layer" hidden>
   <section class="notice-modal" role="dialog" aria-modal="true" aria-labelledby="releaseNoticeTitle" tabindex="-1">
     <header class="notice-head">
-      <div><small>更新公告</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 v2.0.0</span></div>
+      <div><small>更新公告</small><h2 id="releaseNoticeTitle">更新日志以及相关碎碎念</h2><span class="notice-version">当前版本 v2.0.1</span></div>
       <button id="closeReleaseNotice" class="notice-close" type="button" aria-label="关闭更新公告">×</button>
     </header>
     <div class="notice-content">
       <ol>
-        <li><p><strong>v2.0.0  全新回放与分析体验</strong></p><ul><li>更新页面样式与共用播放器，首领回放支持网页内录制和视频导出。</li><li>强化烈毒之渊后段首领回放与问题分析，支持快速分析公会最新一场战斗或整晚日志。</li><li>为后续 12.2 世界之核提供扩展基础。</li><li>修复乌拉特克 P2 厄鳞之卵读条、固定圈心接线、固定技能落点与 P1 音乐，并补齐斯索拉克片段录制入口。</li></ul></li>
+        <li><p><strong>v2.0.1  乌拉特克机制判定修正</strong></p><ul><li>修正蛇母之怒接圈、左右场毒牙、毒蛇之咬逐圈归属及阶段中波豁免。</li><li>固定搬蛋任务限 P1；补充撞蛋双方、P1 主目标施法和复生头像修复。</li></ul></li><li><p><strong>v2.0.0  全新回放与分析体验</strong></p><ul><li>更新页面样式与共用播放器，首领回放支持网页内录制和视频导出。</li><li>强化烈毒之渊后段首领回放与问题分析，支持快速分析公会最新一场战斗或整晚日志。</li><li>为后续 12.2 世界之核提供扩展基础。</li><li>修复乌拉特克 P2 厄鳞之卵读条、固定圈心接线、固定技能落点与 P1 音乐，并补齐斯索拉克片段录制入口。</li></ul></li>
         <li><p><strong>v1.6.0  乌拉特克回放修正</strong></p><ul><li>保留易爆清除和漏线波形，仅移除 Boss 自身腐蚀浪潮的场地推波演示。</li><li>恢复毒牙接线的紫色虚线；中波受击和接线记录继续在报告中提供。</li></ul></li>
         <li>
           <p><strong>v1.3.2  M5 斯索拉克与乌拉特克复盘更新</strong></p>
@@ -163,7 +163,7 @@
 </div>
 <script>
 (() => {
-  const RELEASE_VERSION = 'v2.0.0';
+  const RELEASE_VERSION = 'v2.0.1';
   const canvas = document.querySelector('#starfield');
   const context = canvas.getContext('2d');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -39,19 +39,29 @@
   }
 
   function renderWaves() {
-    const data = boss().wavesAndEggs || {}, deaths = data.waveDeaths || {}, eggs = data.p3Eggs || {};
+    const data = {...(boss().wavesAndEggs || {})}, deaths = data.waveDeaths || {}, eggs = data.p3Eggs || {};
+    if (data.countingHits) data.applicationCount = data.countingHits.length;
+    if (data.countingDutyWaveHits) data.eggCarrierHitCount = data.countingDutyWaveHits.length;
     const wretch = boss().mythicWretch || {}, tether = boss().tankInterception || {};
-    const steals = data.stolenCarries || [], failures = tether.failures || [];
+    const steals = (data.stolenCarries || []).filter(row => row.phase === 'P1'), failures = tether.failures || [];
     const assignment = data.eggAssignment || {};
-    const dutyNote = assignment.ready ? `指定搬蛋组 ${assignment.matchedCount} 人` : assignment.source === 'missing' ? '未配置搬蛋组，暂不判抢蛋' : `搬蛋组仅匹配 ${assignment.matchedCount} 人，暂不判抢蛋`;
-    const stealRows = steals.map(row => [esc(row.time), player(row), `#${row.round}`, row.failureKinds?.length ? badge(row.failureKinds.join('、'), 'bad') : badge('未见提前孵化', 'good')]);
-    const tetherRows = failures.map(row => [esc(row.time), row.player ? `${player(row)} ${badge('位置推定', 'warn')}` : badge('责任坦克未确定', 'warn'), `${row.tickCount}/${tether.expectedTicks || 5}`, row.targetPosition ? '已定位中间畸体' : '缺少畸体位置']);
+    const dutyNote = (assignment.ready ? `P1 指定搬蛋组 ${assignment.matchedCount} 人` : assignment.source === 'missing' ? 'P1 未配置搬蛋组，暂不判抢蛋' : `P1 搬蛋组仅匹配 ${assignment.matchedCount} 人，暂不判抢蛋`) + '；中波次数在团队同时死亡达到 2 人后停止计数';
+    const duties = (data.dutyCarries || data.carries || []).filter(row => row.phase === 'P1');
+    const stolenByPickup = new Map(steals.map(row => [`${row.playerID}:${row.timeMs}`, row]));
+    const carryByPickup = new Map((data.carries || []).map(row => [`${row.playerID}:${row.phase}:${row.startTime}`, row]));
+    const dutyRows = duties.map(row => {
+      const stolen = stolenByPickup.get(`${row.playerID}:${row.timeMs}`);
+      const carry = carryByPickup.get(`${row.playerID}:${row.phase}:${row.time}`);
+      const outcome = [stolen?.failureKinds?.join('、'), carry?.waveHitCount ? `带蛋中波 ${carry.waveHitCount} 次` : '', carry?.earlyHatchCount ? `提前孵化 ${carry.earlyHatchCount} 次` : ''].filter(Boolean);
+      return [esc(row.time || row.startTime), esc(row.phase), player(row), stolen ? badge('抢蛋', 'bad') : badge('搬蛋', 'good'), outcome.map(esc).join('、') || '未见处理失败'];
+    });
+    const tetherRows = failures.map(row => [esc(row.time), row.player ? `${player(row)} ${badge(row.attribution === 'observed-interception-ticks' ? '承接跳数证据' : '位置推定', 'warn')}` : badge('责任坦克未确定', 'warn'), `${row.tickCount}/${tether.expectedTicks || 5}`, row.targetPosition ? '已定位中间畸体' : '缺少畸体位置']);
     const festerRows = (wretch.rounds || []).map(row => [esc(row.time), row.castCompleted ? esc(row.completionTime) : '已中断', row.hits?.length ? row.hits.map(hit => `${player(hit)} ${num(hit.amount)}`).join('、') : '无直接伤害']);
     const eggRounds = (eggs.rounds || []).map(row => [row.index, esc(row.time), row.observedEggCount ?? '—', row.shriekerCount ?? '—', eggs.adjudicationAvailable === false ? '史诗难度不按英雄基准判责' : row.failedEggCount ? badge(`${row.failedEggCount} 只漏蛋`, 'bad') : '无确认漏蛋']);
     const unconfirmedHatches = (data.possibleCollisionHatches || []).filter(row => !row.confirmedCollision);
-    const collisionPanel = `<section class="panel"><h2>撞蛋，${(data.eggCollisions || []).length} 次</h2><p class="muted">仅确认两人同帧失去携蛋光环、出现孵化，且可靠坐标相距不超过 4 码的情况。其余仍列为疑似线索。</p>${table(['时间','阶段','撞蛋玩家','距离'],(data.eggCollisions || []).map(row => [esc(row.time),esc(row.phase),(row.players || []).map(player).join(' 和 '),`${esc(row.distanceYards)} 码`]))}</section>`;
-    const rawDetails = `<details class="panel"><summary>展开原始中波、搬蛋与蛋转火记录</summary><p class="muted">原始中波受击归在被命中玩家名下，仅供复盘，不直接判责。受击记录不包含逐道波的出生点和方向，不能据此还原场地波形。</p><h3>中波施加 / 刷新</h3>${table(['时间','阶段','玩家','带蛋','伤害'], (data.hits || []).map(row => [esc(row.time),esc(row.phase),player(row),row.eggCarrier ? badge('携蛋','warn') : '—',num(row.amount)]))}<h3>搬蛋区间</h3>${table(['阶段','玩家','携带时间','中波','提前孵化'], (data.carries || []).map(row => [esc(row.phase),player(row),`${esc(row.startTime)}–${esc(row.endTime)}`,row.waveHitCount || 0,row.earlyHatchCount || 0]))}<h3>P3 蛋转火</h3>${table(['轮次','时间','蛋','尖啸者','结果'],eggRounds)}</details>`;
-    return `<section class="summary-strip">${metric('中波施加 / 刷新', `${data.applicationCount ?? data.hitCount ?? 0} 次`)}${metric('抢蛋', `${steals.length} 次`)}${metric('漏接', `${failures.length} 次`)}${metric('带蛋中波', `${data.eggCarrierHitCount || 0} 次`)}${data.cleanWaveHits ? metric('有效中波', `${data.cleanWaveHits.length} 次`) : ''}</section><section class="panel"><h2>搬蛋与处理失败</h2><p class="muted">${esc(dutyNote)}。只有指定搬蛋组满 8 人时，其他玩家领蛋才记抢蛋；同时显示中波、确认撞蛋或疑似碰蛋导致的提前孵化。</p>${table(['时间','玩家','轮次','后续'],stealRows)}${unconfirmedHatches.length ? `<details><summary>疑似碰蛋线索（${unconfirmedHatches.length}）</summary>${table(['时间','玩家','孵化'],unconfirmedHatches.map(row => [esc(row.time),player(row),esc(row.hatchTime)]))}</details>` : ''}</section>${collisionPanel}<section class="panel"><h2>虚影接线漏给中间畸体</h2><p class="muted">虚影完成毒性孵化后应由坦克接到 5 跳。漏接时回放按接线方向演示五向浪潮，推进速度仅作视觉示意。责任坦克仅在位置可区分时标为推定。</p>${table(['时间','坦克','接线跳数','场地证据'],tetherRows)}</section><section class="panel"><h2>腐败爆发直接命中</h2><p class="muted">只列读条完成瞬间实际受到直伤的玩家；后续持续伤害不重复记入。</p>${table(['读条开始','完成','直接命中'],festerRows)}</section>${deaths.events?.length ? `<details class="panel"><summary>P1 / P3 中波后 1 秒内死亡（${deaths.events.length}）</summary>${table(['阶段','中波','死亡','玩家','致死技能'],deaths.events.map(row => [esc(row.phase),esc(row.waveTime),esc(row.deathTime),player(row),spell(row.abilityID,row.ability)]))}</details>` : ''}${rawDetails}`;
+    const collisionPanel = `<section class="panel"><h2>撞蛋，${(data.eggCollisions || []).length} 次</h2><p class="muted">P2 同样统计。两人同帧失去携蛋并出现孵化时，若场上没有已孵化蝰蛇，剧毒喷溅同时命中双方可确认撞蛋；可靠坐标相距不超过 4 码也可确认。其余列为疑似线索。</p>${table(['时间','阶段','撞蛋玩家','确认依据'],(data.eggCollisions || []).map(row => [esc(row.time),esc(row.phase),(row.players || []).map(player).join(' 和 '),row.splashSpellID ? `${spell(row.splashSpellID,'剧毒喷溅')} ${esc(row.splashTime)}` : `${esc(row.distanceYards)} 码`]))}</section>`;
+    const rawDetails = `<details class="panel"><summary>展开原始中波、携蛋与蛋转火记录</summary><p class="muted">原始中波受击归在被命中玩家名下，仅供复盘，不直接判责。受击记录不包含逐道波的出生点和方向，不能据此还原场地波形。</p><h3>中波施加 / 刷新</h3>${table(['时间','阶段','玩家','带蛋','伤害'], (data.hits || []).map(row => [esc(row.time),esc(row.phase),player(row),row.eggCarrier ? badge('携蛋','warn') : '—',num(row.amount)]))}<h3>全部携蛋区间（含非任务阶段）</h3>${table(['阶段','玩家','携带时间','中波','提前孵化'], (data.carries || []).map(row => [esc(row.phase),player(row),`${esc(row.startTime)}–${esc(row.endTime)}`,row.waveHitCount || 0,row.earlyHatchCount || 0]))}<h3>P3 蛋转火</h3>${table(['轮次','时间','蛋','尖啸者','结果'],eggRounds)}</details>`;
+    return `<section class="summary-strip">${metric('中波施加 / 刷新', `${data.applicationCount ?? data.hitCount ?? 0} 次`)}${metric('搬蛋', `${duties.length} 次`)}${metric('抢蛋', `${steals.length} 次`)}${metric('漏接', `${failures.length} 次`)}${metric('带蛋中波', `${data.eggCarrierHitCount || 0} 次`)}${data.cleanWaveHits ? metric('有效中波', `${data.cleanWaveHits.length} 次`) : ''}</section><section class="panel"><h2>搬蛋记录与处理结果</h2><p class="muted">${esc(dutyNote)}。共记录 ${duties.length} 次搬蛋；只有指定搬蛋组满 8 人时，其他玩家领蛋才记抢蛋。</p>${table(['时间','阶段','玩家','判定','后续'],dutyRows)}${unconfirmedHatches.length ? `<details><summary>疑似碰蛋线索（${unconfirmedHatches.length}）</summary>${table(['时间','玩家','孵化'],unconfirmedHatches.map(row => [esc(row.time),player(row),esc(row.hatchTime)]))}</details>` : ''}</section>${collisionPanel}<section class="panel"><h2>虚影接线漏给中间畸体</h2><p class="muted">虚影完成毒性孵化后应由坦克接到 5 跳。漏接时回放按接线方向演示五向浪潮，推进速度仅作视觉示意。优先按实际承接跳数归责；零跳时仅在坦克位置明显可区分时推定。</p>${table(['时间','坦克','接线跳数','场地证据'],tetherRows)}</section><section class="panel"><h2>腐败爆发直接命中</h2><p class="muted">只列读条完成瞬间实际受到直伤的玩家；后续持续伤害不重复记入。</p>${table(['读条开始','完成','直接命中'],festerRows)}</section>${deaths.events?.length ? `<details class="panel"><summary>P1 / P3 中波后 1 秒内死亡（${deaths.events.length}）</summary>${table(['阶段','中波','死亡','玩家','致死技能'],deaths.events.map(row => [esc(row.phase),esc(row.waveTime),esc(row.deathTime),player(row),spell(row.abilityID,row.ability)]))}</details>` : ''}${rawDetails}`;
   }
 
   function renderRagePotions(data) {
@@ -104,6 +114,21 @@
       ${data.completed?table(['检查时间','玩家','开始携蛋','状态'],(data.remaining||[]).map(row=>[esc(row.time),player(row),esc(row.carryStartTime),badge('仍携蛋','warn')])):'<p class="muted">等待六次分摊完成及结算后日志。</p>'}</section>`;
   }
 
+  function renderPerBiteAndWretch() {
+    const bites = boss().critical?.serpentBites || {}, focus = boss().p1WretchFocus || {};
+    const biteRows = (bites.rounds || []).flatMap(round => (round.soaks || []).map(soak => [
+      `#${round.index}，${esc(soak.time)}`, player(soak.target),
+      badge({volatile_purge:'感染易爆清除',calcified_corpse:'钙化尸骸',removed:'已移除',unresolved:'未结算'}[soak.resolution] || soak.resolution),
+      `${soak.helperCount} / ${soak.minimumHelpers}`,
+      soak.enoughHelpers ? badge('达到 5 人','good') : soak.insufficientHelpers ? badge('不足 5 人','bad') : badge('坐标证据不足','warn'),
+      players(soak.participants), players(soak.purgeRecipients), players(soak.positionUnknown)
+    ]));
+    const focusRows = (focus.players || []).map(row => [player(row), row.wretchCastCount || 0,
+      row.otherTargetCastCount || 0, (row.otherTargets || []).map(target => `${esc(target.name || target.gameID)} ×${target.castCount}`).join('、') || '—']);
+    const bitePanel = boss().critical?.enabledItems?.serpentBites === false ? '' : `<section class="panel"><h2>逐个毒蛇之咬分摊</h2><p class="muted">每个点名单独核算，至少 5 名其他玩家在 7 码圈内帮忙；另一名点名玩家也可参与。结算后的易爆清除与钙化尸骸分别显示，并列出每个圈的玩家归属。</p>${table(['轮次 / 结算','点名','结算结果','帮忙人数','判定','归属此圈的帮忙者','易爆清除','坐标不足'],biteRows)}</section>`;
+    return `${bitePanel}<section class="panel"><h2>P1 疫鳞畸体主目标施法</h2><p class="muted">仅统计 P1 结束前有明确敌方主目标的玩家 cast；无目标施法不计入。其他目标列可用于检查转火。</p>${table(['玩家','疫鳞畸体 cast','其他目标 cast','其他目标'],focusRows)}</section>`;
+  }
+
   function renderCritical() {
     const data = boss().critical || {}, malice = data.malice || {}, melee = data.nonTankMelee || {}, wrath = data.motherWrath || {}, bites = data.serpentBites || {}, coiled = data.coiledPreyDeaths || {}, focus = data.platform2To3;
     const enabled = key => data.enabledItems?.[key] !== false;
@@ -112,6 +137,7 @@
     const coiledPanel = `<section class="panel" data-critical="coiledPreyDeaths"><h2>${spell(coiled.spellID || 1301510,"盘绕猎物")}死亡</h2>${table(["时间","玩家","致死技能"],(coiled.deaths || []).map(row => [esc(row.time),player(row),spell(row.abilityID,row.ability)]))}</section>`;
     const html = `<section class="summary-strip">${enabled("malice")?metric("恶意漏断", `${malice.completedCount || 0} 次`):""}${enabled("nonTankMelee")?metric("非坦克近战", `${melee.hitCount || 0} 次`):""}${enabled("motherWrath")?metric("蛇母之怒 A 团", `${wrath.raidWideFailureCount || 0} 次`):""}${enabled("coiledPreyDeaths")?metric("死于盘绕猎物", `${coiled.deathCount || 0} 人次`):""}</section>${enabled("p25Eggs")?renderP25Eggs(data.p25Eggs):""}${bitePanel}${coiledPanel}<section class="panel" data-critical="malice"><h2>${spell(malice.spellID || 1290779,"恶意")}打断</h2>${table(["时间","来源","结果"], (malice.casts || []).map(row => [esc(row.time),esc(row.source),row.prevented?badge("已阻止","good"):badge("施法成功","bad")]))}</section><section class="panel" data-critical="nonTankMelee"><h2>非坦克玩家受到近战攻击</h2>${table(["玩家","次数","总伤害","来源"], (melee.players || []).map(row => [player(row),row.hitCount,num(row.totalDamage),(row.sources || []).map(item => `${esc(item.source)} ×${item.count}`).join("、")]))}</section><section class="panel" data-critical="motherWrath"><h2>${spell(1298367,"蛇母之怒")}无人承接 / 全团伤害</h2><p class="muted">正常情况是当前坦克在圈内连续承伤；只有同一轮至少 3 名玩家受到蛇母之怒伤害时才判定为 A 团。承接目标优先取本轮施法目标，缺失时回溯施法前 8 秒内 Boss 最后一次近战目标。</p>${table(["时间","当轮承接目标","目标证据","全团伤害","受影响玩家"], (wrath.failures || []).map(row => [esc(row.time),player(row.receiver),esc(row.receiverEvidence),`${badge(`命中 ${row.affectedCount || 0} 人`,"bad")}，${num(row.totalDamage)} 伤害`,players(row.affectedPlayers)]))}</section>${focusPanel}`;
     const template=document.createElement("template");template.innerHTML=html;
+    template.content.querySelectorAll('[data-critical="serpentBites"]').forEach(node=>node.remove());
     template.content.querySelectorAll("[data-critical]").forEach(node=>{if(!enabled(node.dataset.critical))node.remove()});
     return template.innerHTML;
   }
@@ -119,6 +145,7 @@
   function renderContent() {
     const renderers = { survival: renderSurvival, replay: ()=>'<div id="ulatekReplay"></div>', waves: renderWaves, heart: renderHeart, fangs: renderFangs, critical: renderCritical };
     $("content").innerHTML = (renderers[state.tab] || (() => '<div class="empty">该页暂无数据。</div>'))();
+    if (state.tab === 'critical') $("content").insertAdjacentHTML('beforeend', renderPerBiteAndWretch());
     const exemption=boss().nightlyExemption;
     if(exemption?.active)$("content").insertAdjacentHTML("afterbegin",`<section class="panel"><strong>整晚统计豁免：${esc(exemption.time)} 起已有8人死亡</strong><p>${esc(exemption.reason)}</p></section>`);
     document.querySelectorAll("[data-heart-view]").forEach(button => button.onclick = () => {

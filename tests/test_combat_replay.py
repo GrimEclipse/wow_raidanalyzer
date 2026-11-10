@@ -33,6 +33,14 @@ def test_replay_death_and_resurrection_do_not_hide_other_players():
     assert result["units"][0]["states"] == [[1000, "dead"], [2000, "alive"]]
 
 
+def test_replay_reads_resurrection_from_unified_events():
+    events = [{"timestamp": 100, "sourceID": 1, "resourceActor": 1, "x": 0, "y": 0},
+              {"timestamp": 1000, "type": "death", "targetID": 1},
+              {"timestamp": 2000, "type": "resurrect", "sourceID": 1, "targetID": 1}]
+    result = build_replay_tracks({"startTime": 0, "endTime": 3000}, {1: {"name": "A"}}, {}, events)
+    assert result["units"][0]["states"] == [[1000, "dead"], [2000, "alive"]]
+
+
 def test_boss_health_uses_resource_owner_and_casts_ignore_other_npcs():
     rows = [
         {"timestamp": 100, "type": "damage", "sourceID": 1, "targetID": 9, "resourceActor": 2, "hitPoints": 800, "maxHitPoints": 1000},

@@ -59,10 +59,10 @@ def build_replay_tracks(fight, players, actor_map, events, *, actor_rows=(), dea
         timestamp = int(event.get('timestamp') or 0)
         if not start <= timestamp <= end:
             continue
-        if event.get('type') == 'death' and event.get('targetID') is not None:
+        if event.get('type') in {'death', 'resurrect'} and event.get('targetID') is not None:
             actor=event['targetID']
             state_key=actor if actor in players or actor in boss_ids else (actor,int(event.get('targetInstance') or 0))
-            states[state_key].append([timestamp-start,'dead'])
+            states[state_key].append([timestamp-start,'dead' if event['type'] == 'death' else 'alive'])
         if event.get('sourceID') in boss_ids and event.get('type') in {'begincast', 'cast'}:
             boss_events[event['sourceID']].append(event)
         for side in ('source', 'target'):

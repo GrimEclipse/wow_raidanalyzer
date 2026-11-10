@@ -232,7 +232,7 @@ def build_survival_timeline(fight, actor_map, players, deaths, friendly_casts, s
         spell_id = int(ability_id(event) or 0)
         if spell_id not in COMBAT_RES_SPELLS or event_type(event) not in {"cast", "applybuff"}:
             continue
-        target_id = event.get("targetID")
+        target_id = event.get("sourceID") if spell_id == 21169 else event.get("targetID")
         if target_id not in players:
             continue
         key = (int(event.get("timestamp") or 0) // 1500, event.get("sourceID"), target_id, spell_id)

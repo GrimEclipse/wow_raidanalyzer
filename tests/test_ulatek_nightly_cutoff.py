@@ -57,7 +57,7 @@ def test_nightly_melee_breakdown_groups_creature_names_and_egg_columns_are_struc
     player = metrics['nonTankMelee']['players'][0]
     assert player['count'] == 3
     assert player['countBreakdown'] == [{'label': '乌拉特克', 'count': 2}, {'label': '尖啸者', 'count': 1}]
-    assert [c['label'] for c in metrics['eggCarrierWaveHits']['summaryColumns']] == ['搬蛋次数', '总中波次数', '期间中波次数']
+    assert [c['label'] for c in metrics['eggCarrierWaveHits']['summaryColumns']] == ['搬蛋次数', '总中波次数', '期间中波次数', '可排除次数']
     assert all('countLabel' not in p for p in metrics['eggCarrierWaveHits']['players'])
 
 
@@ -73,13 +73,25 @@ def test_low_egg_duty_filter_only_includes_damage_roles():
     assert eligible == set(range(5, 11))
 
 
-def test_optional_clean_waves_stop_at_first_tether_failure_or_eighth_death():
+def test_optional_clean_waves_stop_at_first_tether_failure_or_second_death():
     fight, players, raw = fixture()
     raw['deaths'] = [event(i * 1000, 'death', i) for i in range(1, 9)]
     waves = {'hits': [{'timeMs': t, 'player': 'P9', 'time': str(t)} for t in [500, 7000, 8000, 9000]]}
     clean = boss._clean_wave_hits(fight, players, raw, waves,
                                   {'failures': [{'timeMs': 7500}]})
-    assert [r['timeMs'] for r in clean] == [500, 7000]
+    assert [r['timeMs'] for r in clean] == [500]
     clean = boss._clean_wave_hits(fight, players, raw, waves,
                                   {'failures': [{'timeMs': 6500}]})
     assert [r['timeMs'] for r in clean] == [500]
+
+
+def test_clean_waves_reset_tether_exclusion_in_later_phase():
+    fight, players, raw = fixture()
+    raw['casts'] = [event(41000, 'cast', 99, 1295905)]
+    raw['enemyBuffs'] = [event(t, kind, 99, boss.RAGE_ID)
+                         for t, kind in ((10000, 'applybuff'), (20000, 'removebuff'),
+                                         (30000, 'applybuff'), (40000, 'removebuff'))]
+    waves = {'hits': [{'timeMs': t} for t in (1000, 5000, 25000, 45000, 55000)]}
+    clean = boss._clean_wave_hits(fight, players, raw, waves,
+                                  {'failures': [{'timeMs': 3000}, {'timeMs': 50000}]})
+    assert [row['timeMs'] for row in clean] == [1000, 25000, 45000]
