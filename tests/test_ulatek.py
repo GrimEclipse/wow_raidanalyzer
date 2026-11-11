@@ -403,6 +403,36 @@ def raw_fixture():
                                 'trackedActorEvents', 'resources')}
 
 
+def test_rage_excludes_duplicated_augmentation_attribution_from_actual_damage():
+    fight = {'startTime': 0, 'endTime': 3000}
+    players = {1: {'name': 'Aug', 'specID': 1473, 'role': 'range-dps'},
+               2: {'name': 'Mage', 'role': 'range-dps'}}
+    raw = raw_fixture()
+    raw['trackedDamageTargetGameIDByActorID'] = {50: u.ULATEK_GAME_ID,
+                                                  60: u.HEART_GAME_ID}
+    raw['trackedDamageTaken'] = [
+        event(1500, 'damage', 101, source=1, target=60, amount=10),
+        event(1500, 'damage', 102, source=2, target=60, amount=100),
+        event(1500, 'damage', 103, source=2, target=50, amount=50),
+        event(1500, 'damage', 104, source=1, target=60, amount=40,
+              supportID=2, subtractsFromSupportedActor=True),
+        event(1500, 'damage', 105, source=1, target=50, amount=20,
+              supportID=2, subtractsFromSupportedActor=True),
+        event(1500, 'damage', 106, source=1, target=60, amount=5,
+              supportID=2, subtractsFromSupportedActor=False),
+    ]
+    result = u._analyze_rage(fight, {}, players, raw,
+                             [{'start': 1000, 'end': 2000, 'playerID': 50}])
+    round_row = result['rounds'][0]
+    assert (round_row['totalDamage'], round_row['heartDamage'], round_row['bossDamage']) == (165, 115, 50)
+    assert (round_row['simulatedSupportDamage'], round_row['simulatedHeartDamage'],
+            round_row['simulatedBossDamage']) == (60, 40, 20)
+    by_player = {row['playerID']: row for row in round_row['damageByPlayer']}
+    assert (by_player[1]['totalDamage'], by_player[1]['simulatedSupportDamage']) == (15, 60)
+    assert (by_player[2]['totalDamage'], by_player[2]['simulatedSupportDamage']) == (150, 0)
+    assert result['totalDamage'] == 165
+
+
 def test_carrier_contacts_collapse_but_raw_wave_mutations_remain():
     fight = {'startTime': 0, 'endTime': 10000}
     players = {1: {'name': 'P1', 'role': 'range-dps'}}

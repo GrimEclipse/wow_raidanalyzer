@@ -237,7 +237,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-phase-exemptions-viper-splash-2026-11-10-v39",
+    "mechanicVersion": "ulatek-physical-heart-damage-2026-11-11-v40",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -298,6 +298,11 @@ def _amount(event):
     if value is None:
         value = event.get("unmitigatedAmount")
     return int(value or 0)
+
+
+def _simulated_support_damage(event):
+    """WCL's attributed support event duplicates the supported actor's hit."""
+    return event.get("supportID") is not None and event.get("subtractsFromSupportedActor") is True
 
 
 def _aura_intervals(events, spell_id, fight_end):
@@ -1277,6 +1282,7 @@ def _analyze_p3_eggs(fight, actor_map, players, raw, rage_windows):
     egg_damage = [
         event for event in raw.get("trackedDamageTaken") or []
         if int(target_game_ids.get(event.get("targetID")) or 0) == DEVOURERS_SPAWN_GAME_ID
+        and not _simulated_support_damage(event)
     ]
     pet_owners = raw.get("petOwners") or {}
     shell_removes = [
@@ -1516,14 +1522,16 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
                 or int(target_game_ids.get(event.get("targetID")) or 0) in {ULATEK_GAME_ID, HEART_GAME_ID}
             )
         ]
+        simulated_damage = [event for event in window_damage if _simulated_support_damage(event)]
+        actual_damage = [event for event in window_damage if not _simulated_support_damage(event)]
         boss_id = window.get("playerID")
         boss_damage = [
-            event for event in window_damage
+            event for event in actual_damage
             if int(target_game_ids.get(event.get("targetID")) or 0) == ULATEK_GAME_ID
             or (not target_game_ids and event.get("targetID") == boss_id)
         ]
         heart_damage = [
-            event for event in window_damage
+            event for event in actual_damage
             if int(target_game_ids.get(event.get("targetID")) or 0) == HEART_GAME_ID
             or (not target_game_ids and event.get("targetID") != boss_id)
         ]
@@ -1532,6 +1540,8 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
             "bossDamage": 0,
             "heartHits": 0,
             "bossHits": 0,
+            "simulatedHeartDamage": 0,
+            "simulatedBossDamage": 0,
         })
         pet_owners = raw.get("petOwners") or {}
 
@@ -1547,6 +1557,15 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
                 continue
             by_player[player_id]["bossDamage"] += _amount(event)
             by_player[player_id]["bossHits"] += 1
+        for event in simulated_damage:
+            player_id = _owner_player_id(event, players, pet_owners)
+            if player_id is None:
+                continue
+            target_game_id = int(target_game_ids.get(event.get("targetID")) or 0)
+            if target_game_id == HEART_GAME_ID or (not target_game_ids and event.get("targetID") != boss_id):
+                by_player[player_id]["simulatedHeartDamage"] += _amount(event)
+            else:
+                by_player[player_id]["simulatedBossDamage"] += _amount(event)
         damage_by_player = []
         for player_id, values in by_player.items():
             total_damage = values["heartDamage"] + values["bossDamage"]
@@ -1554,6 +1573,7 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
                 **player_ref(players, actor_map, player_id),
                 **values,
                 "totalDamage": total_damage,
+                "simulatedSupportDamage": values["simulatedHeartDamage"] + values["simulatedBossDamage"],
                 "damage": total_damage,
                 "hitCount": values["heartHits"] + values["bossHits"],
             })
@@ -1576,7 +1596,14 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
             "potions": _rage_potions(fight, actor_map, players, raw, window, potion_intervals),
             "heartDamage": sum(_amount(event) for event in heart_damage),
             "bossDamage": sum(_amount(event) for event in boss_damage),
-            "totalDamage": sum(_amount(event) for event in window_damage),
+            "totalDamage": sum(_amount(event) for event in actual_damage),
+            "simulatedSupportDamage": sum(_amount(event) for event in simulated_damage),
+            "simulatedHeartDamage": sum(_amount(event) for event in simulated_damage
+                                        if int(target_game_ids.get(event.get("targetID")) or 0) == HEART_GAME_ID
+                                        or (not target_game_ids and event.get("targetID") != boss_id)),
+            "simulatedBossDamage": sum(_amount(event) for event in simulated_damage
+                                       if int(target_game_ids.get(event.get("targetID")) or 0) == ULATEK_GAME_ID
+                                       or (not target_game_ids and event.get("targetID") == boss_id)),
             "damageByPlayer": damage_by_player,
             "heartDamageByPlayer": sorted(
                 [
@@ -1621,6 +1648,7 @@ def _analyze_rage(fight, actor_map, players, raw, rage_windows):
         "totalHeartDamage": sum(row["heartDamage"] for row in rounds),
         "totalBossDamage": sum(row["bossDamage"] for row in rounds),
         "totalDamage": sum(row["totalDamage"] for row in rounds),
+        "simulatedSupportDamage": sum(row["simulatedSupportDamage"] for row in rounds),
     }
 
 

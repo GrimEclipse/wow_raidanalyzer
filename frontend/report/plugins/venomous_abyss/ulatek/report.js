@@ -78,19 +78,24 @@
   function renderHeart() {
     const data = boss().rage || {};
     const rounds = data.rounds || [];
+    if (rounds.length && data.simulatedSupportDamage === undefined) {
+      return '<section class="panel"><h2>被缚之怒伤害需重新分析</h2><p>这份旧结果包含增辉模拟归因，伤害数字可能虚高。请重新分析此场战斗，以查看实际有效伤害与单列的模拟贡献。</p></section>';
+    }
     const totalHeartDamage = data.totalHeartDamage ?? rounds.reduce((sum,row)=>sum+(row.heartDamage||0),0);
     const totalBossDamage = data.totalBossDamage ?? rounds.reduce((sum,row)=>sum+(row.bossDamage||0),0);
     const totalDamage = data.totalDamage ?? totalHeartDamage + totalBossDamage;
+    const simulatedSupportDamage = data.simulatedSupportDamage || 0;
+    const ghost = value => value ? `<span class="muted">(${num(value)})</span>` : '—';
     const damageRows = row => {
       const source = row.damageByPlayer || (row.heartDamageByPlayer || []).map(item => ({...item, heartDamage:item.damage || 0, bossDamage:0, totalDamage:item.damage || 0}));
       const key = state.heartView === "heart" ? "heartDamage" : "totalDamage";
       return [...source].sort((left,right)=>(right[key]||0)-(left[key]||0));
     };
     const damageTable = row => state.heartView === "heart"
-      ? table(["玩家","心脏伤害"], damageRows(row).filter(item => item.heartDamage > 0).map(item => [player(item),num(item.heartDamage)]))
-      : table(["玩家","有效伤害总和","心脏伤害","Boss 本体伤害"], damageRows(row).map(item => [player(item),num(item.totalDamage),num(item.heartDamage),num(item.bossDamage)]));
+      ? table(["玩家","心脏实际伤害","增辉模拟贡献（不计入）"], damageRows(row).filter(item => item.heartDamage > 0 || item.simulatedHeartDamage > 0).map(item => [player(item),num(item.heartDamage),ghost(item.simulatedHeartDamage)]))
+      : table(["玩家","实际有效伤害","心脏实际伤害","Boss 本体实际伤害","增辉模拟贡献（不计入）"], damageRows(row).map(item => [player(item),num(item.totalDamage),num(item.heartDamage),num(item.bossDamage),ghost(item.simulatedSupportDamage)]));
     const switcher = `<div class="rage-view-toggle" role="group" aria-label="易伤伤害显示口径"><button type="button" data-heart-view="total" class="${state.heartView === "total" ? "active" : ""}" aria-pressed="${state.heartView === "total"}">总有效伤害</button><button type="button" data-heart-view="heart" class="${state.heartView === "heart" ? "active" : ""}" aria-pressed="${state.heartView === "heart"}">只看心脏伤害</button></div>`;
-    return `<section class="summary-strip">${metric("被缚之怒", `${rounds.length} 轮`)}${metric("易伤有效伤害", num(totalDamage))}${metric("烈毒之心伤害", num(totalHeartDamage))}${metric("Boss 本体伤害", num(totalBossDamage))}</section><section class="panel rage-view-panel"><div><h2>易伤期间有效伤害</h2><p class="muted">总有效伤害 = 烈毒之心伤害 + 同一被缚之怒窗口内对乌拉特克本体造成的伤害；宠物和召唤物伤害归入主人。</p></div>${switcher}</section><div class="rage-rounds">${rounds.map(row => `<article class="card round-card ${row.deathCount || row.fallingDebrisHitCount ? "bad" : "good"}"><h3>${spell(1286860,`${ordinal(row.index)}被缚之怒`)} <span class="muted">${esc(row.time)}–${esc(row.endTime)}</span> ${badge(`${row.durationSec} 秒`)} ${row.deathCount ? badge(`死亡 ${row.deathCount}`,"bad") : badge("无人死亡","good")}</h3><h4>有效伤害 ${num(row.totalDamage ?? row.heartDamage)}，${spell(1299526,"烈毒之心")} ${num(row.heartDamage)} + Boss 本体 ${num(row.bossDamage)}</h4><div class="rage-damage-table">${damageTable(row)}</div>${renderRagePotions(row.potions)}<h4>${spell(1286885,"落石")}，${row.fallingDebrisHitCount || 0} 次 / ${num(row.fallingDebrisDamage)} 伤害</h4>${table(["时间","玩家","伤害"], (row.fallingDebrisHits || []).map(item => [esc(item.time),player(item),num(item.amount)]))}<h4>易伤期间死亡</h4>${table(["时间","玩家","致死技能"], (row.deaths || []).map(item => [esc(item.time),player(item),spell(item.abilityID,item.ability)]))}</article>`).join("") || '<div class="empty">本场没有记录到被缚之怒窗口。</div>'}</div>`;
+    return `<section class="summary-strip">${metric("被缚之怒", `${rounds.length} 轮`)}${metric("实际有效伤害", num(totalDamage))}${metric("烈毒之心实际伤害", num(totalHeartDamage))}${metric("Boss 本体实际伤害", num(totalBossDamage))}${simulatedSupportDamage ? metric("增辉模拟贡献（不计入）", `(${num(simulatedSupportDamage)})`) : ''}</section><section class="panel rage-view-panel"><div><h2>易伤期间有效伤害</h2><p class="muted">实际有效伤害 = 烈毒之心命中伤害 + 同一被缚之怒窗口内对乌拉特克本体的命中伤害；宠物和召唤物伤害归入主人。WCL 带 supportID 且标记从受增益者扣除的增辉模拟事件以括号单列，不计入总伤害。</p></div>${switcher}</section><div class="rage-rounds">${rounds.map(row => `<article class="card round-card ${row.deathCount || row.fallingDebrisHitCount ? "bad" : "good"}"><h3>${spell(1286860,`${ordinal(row.index)}被缚之怒`)} <span class="muted">${esc(row.time)}–${esc(row.endTime)}</span> ${badge(`${row.durationSec} 秒`)} ${row.deathCount ? badge(`死亡 ${row.deathCount}`,"bad") : badge("无人死亡","good")}</h3><h4>实际有效伤害 ${num(row.totalDamage ?? row.heartDamage)}，${spell(1299526,"烈毒之心")} ${num(row.heartDamage)} + Boss 本体 ${num(row.bossDamage)}</h4>${row.simulatedSupportDamage ? `<p class="muted">增辉模拟贡献（不计入）：(${num(row.simulatedSupportDamage)})</p>` : ''}<div class="rage-damage-table">${damageTable(row)}</div>${renderRagePotions(row.potions)}<h4>${spell(1286885,"落石")}，${row.fallingDebrisHitCount || 0} 次 / ${num(row.fallingDebrisDamage)} 伤害</h4>${table(["时间","玩家","伤害"], (row.fallingDebrisHits || []).map(item => [esc(item.time),player(item),num(item.amount)]))}<h4>易伤期间死亡</h4>${table(["时间","玩家","致死技能"], (row.deaths || []).map(item => [esc(item.time),player(item),spell(item.abilityID,item.ability)]))}</article>`).join("") || '<div class="empty">本场没有记录到被缚之怒窗口。</div>'}</div>`;
   }
 
   function renderFangs() {
