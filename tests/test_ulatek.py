@@ -620,15 +620,15 @@ def test_p3_wrath_uses_boss_side_at_cast_start():
     raw['resources'] = [event(1000, 'resourcechange', 0, source=21,
                               resourceActor=1, x=0, y=158367)]
     circle = u._replay_effects(fight, {}, raw, [])['circles'][0]
-    assert circle['position'] == {'x': 0, 'y': 158167}
+    assert circle['position'] == {'x': 0, 'y': 158367}
 
 
 def test_p3_corner_wrath_uses_its_platform_landmark():
     fight = {'startTime': 0, 'endTime': 20000}
-    for x, y, expected_x, expected_y in ((3300, 152112, 2800, 152567),
-                                         (3300, 158446, 2800, 158167),
-                                         (-3300, 152112, -2800, 152567),
-                                         (-3300, 158446, -2800, 158167)):
+    for x, y, expected_x, expected_y in ((3300, 152112, 2300, 153367),
+                                         (3300, 158446, 2300, 157367),
+                                         (-3300, 152112, -2300, 153367),
+                                         (-3300, 158446, -2300, 157367)):
         raw = raw_fixture()
         raw['casts'] = [event(6000, 'cast', 1298367, source=21,
                               resourceActor=1, x=x, y=y)]

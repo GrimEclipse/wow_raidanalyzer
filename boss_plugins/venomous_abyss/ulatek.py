@@ -237,7 +237,7 @@ BOSS_CONFIG = {
         ["fangs", "攫取毒牙处理"],
         ["critical", "关键流程问题"],
     ],
-    "mechanicVersion": "ulatek-physical-heart-damage-2026-11-11-v40",
+    "mechanicVersion": "ulatek-fixed-wrath-landmarks-2026-11-13-v41",
     "features": {"survival": True, "fieldReplay": True},
 }
 
@@ -2351,19 +2351,19 @@ def _replay_effects(fight, players, raw, changes):
             return ('corner', 1 if dx > 0 else -1, 1 if dy > 0 else -1)
         return ('side', 'x' if abs(dx) >= abs(dy) else 'y',
                 1 if (dx if abs(dx) >= abs(dy) else dy) > 0 else -1)
-    def wrath_floor_fallback(platform):
+    def wrath_floor_position(platform):
         if not platform:
             return None
         center = REPLAY_MAPS['platform']
-        # A fallback only: the tank's observed successful interception is the
-        # actual reference, not the decorative corner of the inner floor.
-        offset = 2_800
+        # The circle is fixed to the inner floor's marked line. Successful
+        # tank hits validate the point, but the tank may stand anywhere inside
+        # its three-yard radius and must not move the displayed center.
         if platform[0] == 'corner':
-            return {'x': center['centerX'] + platform[1]*offset,
-                    'y': center['centerY'] + platform[2]*offset}
-        return ({'x': center['centerX'] + platform[2]*offset, 'y': center['centerY']}
+            return {'x': center['centerX'] + platform[1]*2_300,
+                    'y': center['centerY'] + platform[2]*2_000}
+        return ({'x': center['centerX'] + platform[2]*2_800, 'y': center['centerY']}
                 if platform[1] == 'x' else
-                {'x': center['centerX'], 'y': center['centerY'] + platform[2]*offset})
+                {'x': center['centerX'], 'y': center['centerY'] + platform[2]*3_000})
     def boss_front(event, ts):
         origin = actor_position(event, 'source') or point(event.get('sourceID'), ts)
         if not origin:
@@ -2383,7 +2383,7 @@ def _replay_effects(fight, players, raw, changes):
     circles, channels, npc_casts, cones, lost_platforms = [], [], [], [], []
     damage = raw.get('damage') or []
     wrath_casts = [e for e in casts if event_type(e) == 'cast' and ability_id(e) == 1298367]
-    wrath_anchors = {}
+    wrath_interceptions = {}
     for index, wrath in enumerate(wrath_casts):
         ts = int(wrath['timestamp'])
         next_cast = int(wrath_casts[index+1]['timestamp']) if index+1 < len(wrath_casts) else end
@@ -2408,14 +2408,11 @@ def _replay_effects(fight, players, raw, changes):
         tank_points = [actor_position(hit, 'target') or point(tank_id, int(hit['timestamp']))
                        for hit in tank_hits[-5:]]
         tank_points = [p for p in tank_points if p]
-        boss_position = point(wrath.get('sourceID'), cast_start(wrath, 5_000), before_only=True) or actor_position(wrath, 'source')
-        platform = wrath_platform(boss_position)
-        if platform and len(tank_points) >= 3:
-            wrath_anchors.setdefault(platform, []).append({'x': median(p['x'] for p in tank_points),
-                                                            'y': median(p['y'] for p in tank_points)})
-    wrath_anchors = {platform: {'x': median(p['x'] for p in points),
-                                'y': median(p['y'] for p in points)}
-                     for platform, points in wrath_anchors.items()}
+        if len(tank_points) >= 3:
+            wrath_interceptions[(wrath.get('sourceID'), wrath.get('sourceInstance'), ts)] = {
+                'x': median(p['x'] for p in tank_points),
+                'y': median(p['y'] for p in tank_points),
+            }
     for e in casts:
         if event_type(e) != 'cast':
             continue
@@ -2431,15 +2428,19 @@ def _replay_effects(fight, players, raw, changes):
                             and r.get('sourceID') == e.get('sourceID') and ts <= int(r['timestamp']) < ts+5000})
             wrath_start = cast_start(e, 5000)
             platform = wrath_platform(point(e.get('sourceID'), wrath_start, before_only=True) or origin)
-            receiver = wrath_anchors.get(platform) or wrath_floor_fallback(platform)
-            # One successful tank interception calibrates every cast on this
-            # platform, including a later cast that spread to the whole raid.
+            receiver = wrath_floor_position(platform)
             if receiver:
+                interception = wrath_interceptions.get((e.get('sourceID'), e.get('sourceInstance'), ts))
+                tank_distance = (math.hypot(interception['x']-receiver['x'], interception['y']-receiver['y']) / 100
+                                 if interception else None)
                 circles.append({'kind': 'wrath', 'sourceID': e.get('sourceID'), 'playerID': e.get('targetID'),
                     'startTimeMs': wrath_start-start, 'impactTimeMs': ts-start,
                     'endTimeMs': (ticks[-1]+150 if ticks else ts+1000)-start,
-                    'position': receiver, 'positionEvidence': ('successful-tank-interception'
-                        if platform in wrath_anchors else 'floor-landmark-fallback'),
+                    'position': receiver, 'positionEvidence': ('floor-landmark-confirmed-by-tank'
+                        if tank_distance is not None and tank_distance <= MOTHER_WRATH_RADIUS_YARDS
+                        else 'floor-landmark'),
+                    'observedTankPosition': interception,
+                    'tankDistanceYards': round(tank_distance, 2) if tank_distance is not None else None,
                     'radiusYards': MOTHER_WRATH_RADIUS_YARDS,
                     'tickTimesMs': [t-start for t in ticks]})
             channels.append({'actorID': e.get('sourceID'), 'spellID': sid, 'spellName': '蛇母之怒',

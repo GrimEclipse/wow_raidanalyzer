@@ -15,7 +15,7 @@ DEMOS = [
     {"key": "sszorak", "boss": "sszorak", "label": "斯索拉克", "report": "ZFDWvrfqd6ygMKY2", "fight": 38, "raid": "venomous_abyss", "renderer": "progression", "tab": "replay", "guild": "Avalon"},
     {"key": "twinfangs", "boss": "twinfangs", "label": "双子毒牙", "report": "BZKtqb6wyTnAHGRV", "fight": 37, "raid": "venomous_abyss", "renderer": "progression", "tab": "replay", "guild": "Avalon"},
     {"key": "coiledaltar", "boss": "coiledaltar", "label": "盘卷祭坛", "report": "PHhnv1rfmK2MXtGp", "fight": 12, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay", "guild": "Avalon"},
-    {"key": "ulatek_mythic", "boss": "ulatek", "label": "乌拉特克", "report": "r19Gk7PJfVvmnFgM", "fight": 3, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay"},
+    {"key": "ulatek_mythic", "boss": "ulatek", "label": "乌拉特克", "report": "jaAdqtVwbzPZ4hgT", "fight": 15, "raid": "venomous_abyss", "renderer": "ulatek", "tab": "replay", "guild": "Avalon"},
     {"key": "nymrissa_wavecaller", "boss": "nymrissa_wavecaller", "label": "尼姆瑞莎", "report": "PHhnv1rfmK2MXtGp", "fight": 17, "raid": "tidebound_grotto", "renderer": "nymrissa_wavecaller", "tab": "replay", "guild": "Avalon"},
     {"key": "kithix_heroic", "boss": "kithix", "label": "基希克斯", "report": "Qy6hFYfjN7dqtmrZ", "fight": 60, "raid": "unbinding_of_kithix", "renderer": "kithix", "tab": "replay", "guild": "Avalon"},
     {"key": "coiledaltar_today_check", "homepageVisible": False, "boss": "coiledaltar", "label": "盘卷祭坛（10月13日记录）", "report": "8TJdnK1Rzy26gmAC", "fight": 7, "raid": "venomous_abyss", "renderer": "coiledaltar", "tab": "replay"},

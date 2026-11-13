@@ -19,8 +19,9 @@ def test_wrath_fixed_circle_nine_observed_ticks_and_fury_channel():
     changes = []
     scene = u._replay_effects({'startTime': 0, 'endTime': 40000}, {1: {}}, raw, changes)
     circle = scene['circles'][0]
-    assert (circle['position']['x'], circle['position']['y']) == (0, 158167)
-    assert circle['positionEvidence'] == 'successful-tank-interception'
+    assert (circle['position']['x'], circle['position']['y']) == (0, 158367)
+    assert circle['positionEvidence'] == 'floor-landmark-confirmed-by-tank'
+    assert circle['observedTankPosition'] == {'x': 0, 'y': 158167}
     assert len(circle['tickTimesMs']) == 9
     assert circle['radiusYards'] == 3
     assert circle['endTimeMs'] == 6300+8*333+150
@@ -30,8 +31,8 @@ def test_wrath_fixed_circle_nine_observed_ticks_and_fury_channel():
 
 @pytest.mark.parametrize('boss_xy,expected', [((-3000, 155367), (-2800, 155367)),
                                                   ((3000, 155367), (2800, 155367)),
-                                                  ((0, 158367), (0, 158167)),
-                                                  ((0, 152367), (0, 152567))])
+                                                  ((0, 158367), (0, 158367)),
+                                                  ((0, 152367), (0, 152367))])
 def test_wrath_uses_platform_side_independent_of_tank_position(boss_xy, expected):
     raw = {'enemyBuffs': [], 'resources': [], 'damage': [],
            'casts': [event(1000, 'cast', 1298367, targetID=1, resourceActor=1,
@@ -40,13 +41,14 @@ def test_wrath_uses_platform_side_independent_of_tank_position(boss_xy, expected
     assert tuple(scene['circles'][0]['position'].values()) == expected
 
 
-def test_successful_tank_interception_calibrates_later_failed_cast_on_same_platform():
+def test_wrath_fixed_landmark_stays_put_across_successful_and_failed_casts():
     casts = [event(1000, 'begincast', 1298367, resourceActor=1, x=3300, y=152100),
              event(6000, 'cast', 1298367, resourceActor=1, x=3300, y=152100),
              event(11000, 'begincast', 1298367, resourceActor=1, x=3300, y=152100),
              event(16000, 'cast', 1298367, resourceActor=1, x=3300, y=152100)]
     damage = [event(6300+i*333, 'damage', 1298369, targetID=1, amount=10,
-                    resourceActor=2, x=4100 if i < 4 else 2850, y=152500)
+                    resourceActor=2, x=4100 if i < 4 else 2300,
+                    y=152500 if i < 4 else 153367)
               for i in range(9)]
     damage.append(event(7500, 'damage', 1298369, targetID=2, amount=10))
     damage += [event(16300, 'damage', 1298369, targetID=i, amount=10)
@@ -55,9 +57,30 @@ def test_successful_tank_interception_calibrates_later_failed_cast_on_same_platf
     scene = u._replay_effects({'startTime': 0, 'endTime': 30000},
                               {i: {} for i in (1, 2, 3)}, raw, [])
     assert [c['position'] for c in scene['circles'] if c['kind'] == 'wrath'] == [
-        {'x': 2850, 'y': 152500}, {'x': 2850, 'y': 152500}]
-    assert all(c['positionEvidence'] == 'successful-tank-interception'
-               for c in scene['circles'] if c['kind'] == 'wrath')
+        {'x': 2300, 'y': 153367}, {'x': 2300, 'y': 153367}]
+    assert scene['circles'][0]['positionEvidence'] == 'floor-landmark-confirmed-by-tank'
+    assert scene['circles'][1]['positionEvidence'] == 'floor-landmark'
+
+
+@pytest.mark.parametrize('boss_xy,tank_xy,expected', [
+    ((-3346, 152105), (-2240, 153157), (-2300, 153367)),
+    ((3284, 152112), (2146, 153171), (2300, 153367)),
+    ((3336, 158446), (2386, 157382), (2300, 157367)),
+    ((-3346, 152105), (-2369, 153500), (-2300, 153367)),
+])
+def test_p3_floor_landmark_contains_successful_tank_interception(boss_xy, tank_xy, expected):
+    raw = {'enemyBuffs': [], 'resources': [],
+           'casts': [event(1000, 'begincast', 1298367, resourceActor=1,
+                           x=boss_xy[0], y=boss_xy[1]),
+                     event(6000, 'cast', 1298367, resourceActor=1,
+                           x=boss_xy[0], y=boss_xy[1])],
+           'damage': [event(6300+i*333, 'damage', 1298369, targetID=1,
+                            resourceActor=2, x=tank_xy[0], y=tank_xy[1], amount=10)
+                      for i in range(9)]}
+    circle = u._replay_effects({'startTime': 0, 'endTime': 12000}, {1: {}}, raw, [])['circles'][0]
+    assert circle['position'] == {'x': expected[0], 'y': expected[1]}
+    assert circle['positionEvidence'] == 'floor-landmark-confirmed-by-tank'
+    assert circle['tankDistanceYards'] <= circle['radiusYards']
 
 
 def test_unbridled_hit_stays_at_boss_front_after_player_knockback():
