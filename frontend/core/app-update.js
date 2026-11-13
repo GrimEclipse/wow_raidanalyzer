@@ -1,4 +1,4 @@
-/* Admin-only Git tag update notice. The server enforces all update checks. */
+/* Admin-only main-commit update notice. The server enforces all update checks. */
 (() => {
   const notice = document.getElementById('appUpdateNotice');
   if (!notice) return;
@@ -12,13 +12,14 @@
     const state = await response.json();
     notice.hidden = !state.updateAvailable;
     if (!state.updateAvailable) return;
-    latest = state.latestVersion;
+    latest = state.latestCommit;
     button.disabled = !state.canApply;
+    const published = `GitHub 已发布新提交 ${latest.slice(0, 7)}。`;
     label.textContent = state.blocker
-      ? `GitHub 已发布 v${latest}。${state.blocker}`
+      ? `${published}${state.blocker}`
       : state.activeJobs
-        ? `GitHub 已发布 v${latest}。请等待 ${state.activeJobs} 个分析任务结束。`
-        : `GitHub 已发布 v${latest}。当前版本 v${state.currentVersion}。`;
+        ? `${published}请等待 ${state.activeJobs} 个分析任务结束。`
+        : `${published}当前版本 v${state.currentVersion}。`;
   }
 
   async function waitForRestart() {
@@ -28,7 +29,7 @@
         const response = await fetch('/api/system/update', {cache: 'no-store'});
         if (!response.ok) continue;
         const state = await response.json();
-        if (state.currentVersion === latest) { location.reload(); return; }
+        if (state.currentCommit === latest) { location.reload(); return; }
       } catch (_) { /* Service is restarting. */ }
     }
     label.textContent = '更新尚未完成，请查看服务器 data/app_update.log。';

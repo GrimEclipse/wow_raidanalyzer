@@ -905,15 +905,18 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
                 return self.json_error("服务正在更新。", HTTPStatus.CONFLICT)
             status = update_status(ROOT, force=True)
             if not status["updateAvailable"]:
-                return self.json_error(status["error"] or "GitHub 尚无更新版本。", HTTPStatus.CONFLICT)
+                return self.json_error(status["error"] or "GitHub 尚无新提交。", HTTPStatus.CONFLICT)
             if not status["canApply"]:
                 return self.json_error(status["blocker"] or "当前无法更新。", HTTPStatus.CONFLICT)
-            fetched = update_git(ROOT, "fetch", "--tags", "origin", timeout=60)
+            fetched = update_git(ROOT, "fetch", "origin", "main", timeout=60)
             if fetched.returncode:
-                return self.json_error("下载 GitHub 版本失败。", HTTPStatus.BAD_GATEWAY)
-            ancestor = update_git(ROOT, "merge-base", "--is-ancestor", "HEAD", f"refs/tags/{status['tag']}")
+                return self.json_error("下载 GitHub 更新失败。", HTTPStatus.BAD_GATEWAY)
+            fetched_commit = update_git(ROOT, "rev-parse", "FETCH_HEAD")
+            if fetched_commit.returncode or fetched_commit.stdout.strip() != status["latestCommit"]:
+                return self.json_error("GitHub 上的提交已变化，请重新检查更新。", HTTPStatus.CONFLICT)
+            ancestor = update_git(ROOT, "merge-base", "--is-ancestor", "HEAD", status["latestCommit"])
             if ancestor.returncode:
-                return self.json_error("目标版本不是当前分支的快进更新。", HTTPStatus.CONFLICT)
+                return self.json_error("目标提交不是当前分支的快进更新。", HTTPStatus.CONFLICT)
             log_path = DATA_DIR / "app_update.log"
             with UPDATE_START_LOCK:
                 if UPDATE_IN_PROGRESS.is_set():
@@ -925,7 +928,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             try:
                 with log_path.open("ab") as log:
                     subprocess.Popen([sys.executable, "-m", "analyzer_core.app_update_helper",
-                                      "--root", str(ROOT), "--tag", status["tag"],
+                                      "--root", str(ROOT), "--commit", status["latestCommit"],
                                       "--parent-pid", str(os.getpid()),
                                       "--host", str(self.server.server_address[0]),
                                       "--port", str(self.server.server_address[1])],
@@ -936,7 +939,7 @@ class AnalyzerHandler(BaseHTTPRequestHandler):
             except Exception as error:
                 UPDATE_IN_PROGRESS.clear()
                 return self.json_error(f"启动更新失败：{error}", HTTPStatus.INTERNAL_SERVER_ERROR)
-            response = self.send_response_body(*json_bytes({"updating": True, "tag": status["tag"]}, HTTPStatus.ACCEPTED))
+            response = self.send_response_body(*json_bytes({"updating": True, "commit": status["latestCommit"]}, HTTPStatus.ACCEPTED))
             threading.Thread(target=lambda: (time.sleep(0.5), self.server.shutdown()), daemon=True).start()
             return response
         if path == "/api/auth/logout":

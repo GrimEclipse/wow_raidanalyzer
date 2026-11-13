@@ -5,12 +5,16 @@ from __future__ import annotations
 import argparse
 import ctypes
 import os
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from analyzer_core.app_update import TAG_RE, git, local_update_blocker
+from analyzer_core.app_update import git, local_update_blocker
+
+
+COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def wait_for_parent(pid: int, seconds: int = 60):
@@ -38,21 +42,24 @@ def wait_for_parent(pid: int, seconds: int = 60):
     return False
 
 
-def apply_tag(root: Path, tag: str):
-    if not TAG_RE.fullmatch(tag):
-        raise ValueError("无效的版本标签。")
+def apply_commit(root: Path, commit: str):
+    if not COMMIT_RE.fullmatch(commit):
+        raise ValueError("无效的提交编号。")
     blocker = local_update_blocker(root)
     if blocker:
         raise RuntimeError(blocker)
-    fetched = git(root, "fetch", "--tags", "origin", timeout=60)
+    fetched = git(root, "fetch", "origin", "main", timeout=60)
     if fetched.returncode:
-        raise RuntimeError("下载 GitHub 版本失败：" + fetched.stderr.strip()[-300:])
-    ancestor = git(root, "merge-base", "--is-ancestor", "HEAD", f"refs/tags/{tag}")
+        raise RuntimeError("下载 GitHub 更新失败：" + fetched.stderr.strip()[-300:])
+    fetched_commit = git(root, "rev-parse", "FETCH_HEAD")
+    if fetched_commit.returncode or fetched_commit.stdout.strip() != commit:
+        raise RuntimeError("GitHub 上的提交已变化，请重新检查更新。")
+    ancestor = git(root, "merge-base", "--is-ancestor", "HEAD", commit)
     if ancestor.returncode:
-        raise RuntimeError("目标版本不是当前分支的快进更新。")
-    merged = git(root, "merge", "--ff-only", f"refs/tags/{tag}", timeout=60)
+        raise RuntimeError("目标提交不是当前分支的快进更新。")
+    merged = git(root, "merge", "--ff-only", commit, timeout=60)
     if merged.returncode:
-        raise RuntimeError("应用 GitHub 版本失败：" + merged.stderr.strip()[-300:])
+        raise RuntimeError("应用 GitHub 更新失败：" + merged.stderr.strip()[-300:])
 
 
 def restart_server(root: Path, host: str, port: int):
@@ -69,7 +76,7 @@ def restart_server(root: Path, host: str, port: int):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--tag", required=True)
+    parser.add_argument("--commit", required=True)
     parser.add_argument("--parent-pid", type=int, required=True)
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", type=int, required=True)
@@ -78,10 +85,10 @@ def main():
     if not wait_for_parent(args.parent_pid):
         raise SystemExit("服务未停止，更新已取消。")
     try:
-        apply_tag(root, args.tag)
+        apply_commit(root, args.commit)
     except Exception as error:
         with (root / "data" / "app_update.log").open("a", encoding="utf-8") as log:
-            log.write(f"更新 {args.tag} 失败：{error}\n")
+            log.write(f"更新 {args.commit} 失败：{error}\n")
     finally:
         restart_server(root, args.host, args.port)
 
