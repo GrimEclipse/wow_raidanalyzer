@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 
-APP_VERSION = "2.0.3"
+APP_VERSION = "2.0.2"
 TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 CHECK_INTERVAL_SECONDS = 15 * 60
 _lock = threading.Lock()
